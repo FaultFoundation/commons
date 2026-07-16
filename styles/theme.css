@@ -1260,3 +1260,98 @@ button.ff-nav__link:hover {
     animation: none !important;
   }
 }
+
+/* ---------- 13. Auth pages (login / signup / dashboard) ---------- */
+
+.ff-auth {
+  max-width: 440px;
+  margin-inline: auto;
+  padding: clamp(24px, 5vw, 40px);
+}
+.ff-auth--wide {
+  max-width: 640px;
+}
+.ff-auth__title {
+  margin: 0 0 0.25em;
+  font-size: var(--wp--preset--font-size--x-large);
+}
+.ff-auth__hint {
+  margin: 0 0 1.5em;
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--small);
+}
+.ff-auth__field {
+  display: block;
+  margin-block-end: 1em;
+}
+.ff-auth__label {
+  display: block;
+  margin-block-end: 0.35em;
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 600;
+}
+.ff-auth__input {
+  width: 100%;
+  padding: 0.65em 0.9em;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: inherit;
+}
+.ff-auth__input:focus-visible {
+  outline: 2px solid var(--ff-accent);
+  outline-offset: 1px;
+}
+.ff-auth__error {
+  margin: 0 0 1em;
+  padding: 0.6em 0.9em;
+  border: 1px solid rgba(255, 99, 99, 0.45);
+  border-radius: var(--ff-radius-md);
+  background: rgba(255, 99, 99, 0.14);
+  font-size: var(--wp--preset--font-size--small);
+}
+.ff-auth__submit {
+  width: 100%;
+  margin-block-start: 0.5em;
+}
+.ff-auth__submit[disabled] {
+  opacity: 0.6;
+  cursor: default;
+}
+.ff-auth__divider {
+  display: flex;
+  align-items: center;
+  gap: 0.8em;
+  margin-block: 1.2em;
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--small);
+}
+.ff-auth__divider::before,
+.ff-auth__divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--ff-border);
+}
+.ff-auth__meta {
+  margin-block-start: 1.2em;
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--small);
+}
+.ff-auth__meta a,
+.ff-auth__hint a {
+  color: #fff;
+}
+.ff-auth__meta a:hover,
+.ff-auth__hint a:hover {
+  color: var(--ff-accent);
+}
+.ff-auth__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6em 1.2em;
+  align-items: center;
+  justify-content: space-between;
+  margin-block-start: 1.5em;
+}

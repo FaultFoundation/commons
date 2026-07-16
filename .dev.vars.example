@@ -1,0 +1,16 @@
+# Copy to .dev.vars (gitignored) for local dev/preview.
+# Production values live in Workers Secrets (`wrangler secret put NAME`) and
+# wrangler.jsonc "vars" — see docs/cloudflare-setup.md.
+
+# Any long random string locally; production: openssl rand -base64 32
+BETTER_AUTH_SECRET=replace-with-a-long-random-string
+
+# The origin the app is served from. 3999 = `npm run preview` (wrangler dev);
+# plain `next dev` on :3000 is also trusted in development.
+BETTER_AUTH_URL=http://localhost:3999
+
+# Optional — enables the "Continue with Discord" button locally. Create/reuse
+# a Discord application and add http://localhost:3999/api/auth/callback/discord
+# as an OAuth2 redirect.
+# DISCORD_CLIENT_ID=
+# DISCORD_CLIENT_SECRET=

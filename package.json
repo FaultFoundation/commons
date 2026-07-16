@@ -5,10 +5,18 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "preview": "next build && npx serve out",
-    "lint": "next lint"
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "lint": "next lint",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply fault-foundation-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply fault-foundation-db --remote"
   },
   "dependencies": {
+    "@opennextjs/cloudflare": "^1.20.1",
+    "better-auth": "^1.6.23",
+    "drizzle-orm": "^0.45.2",
     "embla-carousel-autoplay": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
     "next": "^15.3.0",
@@ -19,8 +27,17 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.10",
     "playwright": "^1.61.1",
     "serve": "^14.2.6",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.111.0"
+  },
+  "allowScripts": {
+    "esbuild@0.25.4": true,
+    "esbuild@0.28.1": true,
+    "workerd@1.20260710.1": true,
+    "sharp@0.34.5": true,
+    "esbuild@0.18.20": true
   }
 }

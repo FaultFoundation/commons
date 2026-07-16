@@ -15,7 +15,14 @@ wordpress site/
 # wrangler local state
 .wrangler/
 
+# OpenNext build output
+.open-next/
+
+# local dev secrets (see .dev.vars.example)
+.dev.vars
+
 # misc
 .DS_Store
 .vscode/
 logs/
+temp/

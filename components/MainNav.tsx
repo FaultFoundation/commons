@@ -14,6 +14,8 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { HeaderAuthButton } from "./auth/HeaderAuthButton";
+
 function Chevron() {
   return (
     <svg
@@ -108,11 +110,7 @@ function NavLinks() {
         </a>
       </li>
       <li className="ff-nav__cta">
-        {/* Static link keeps every page prerenderable; /login/ forwards
-            already-signed-in members to /dashboard/. */}
-        <a className="ff-btn ff-btn--outline" href="/login/">
-          Sign In
-        </a>
+        <HeaderAuthButton />
       </li>
     </>
   );

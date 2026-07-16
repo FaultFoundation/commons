@@ -1291,6 +1291,8 @@ button.ff-nav__link:hover {
   font-weight: 600;
 }
 .ff-auth__input {
+  /* width:100% + padding must not overflow the card */
+  box-sizing: border-box;
   width: 100%;
   padding: 0.65em 0.9em;
   border: 1px solid var(--ff-border);
@@ -1298,6 +1300,9 @@ button.ff-nav__link:hover {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
   font: inherit;
+}
+.ff-auth__input::placeholder {
+  color: rgba(255, 255, 255, 0.38);
 }
 .ff-auth__input:focus-visible {
   outline: 2px solid var(--ff-accent);
@@ -1310,6 +1315,18 @@ button.ff-nav__link:hover {
   border-radius: var(--ff-radius-md);
   background: rgba(255, 99, 99, 0.14);
   font-size: var(--wp--preset--font-size--small);
+}
+.ff-auth__error p {
+  margin: 0;
+}
+.ff-auth__error p + p {
+  margin-block-start: 0.35em;
+}
+.ff-auth__error a {
+  color: #fff;
+}
+.ff-auth__error a:hover {
+  color: var(--ff-accent);
 }
 .ff-auth__submit {
   width: 100%;
@@ -1354,4 +1371,33 @@ button.ff-nav__link:hover {
   align-items: center;
   justify-content: space-between;
   margin-block-start: 1.5em;
+}
+
+/* Header avatar (replaces Sign In when a session exists) */
+.ff-nav__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--ff-radius-pill);
+  background: rgba(255, 255, 255, 0.16);
+  color: #c3cedb;
+  transition:
+    background var(--ff-transition),
+    color var(--ff-transition);
+}
+.ff-nav__avatar:hover {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
+}
+.ff-nav__avatar svg {
+  width: 22px;
+  height: 22px;
+}
+.ff-nav__avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
 }

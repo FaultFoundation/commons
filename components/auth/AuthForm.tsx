@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { authClient } from "@/lib/auth-client";
@@ -20,12 +21,19 @@ export function AuthForm({ mode, discordEnabled }: Props) {
     event.preventDefault();
     if (pending) return;
     setError(null);
-    setPending(true);
 
     const form = new FormData(event.currentTarget);
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
 
+    // Login skips native field validation (those hints belong to
+    // registration); just make sure something was entered.
+    if (mode === "login" && (!email || !password)) {
+      setError("Enter your email and password.");
+      return;
+    }
+
+    setPending(true);
     const result =
       mode === "signup"
         ? await authClient.signUp.email({
@@ -61,11 +69,17 @@ export function AuthForm({ mode, discordEnabled }: Props) {
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate={false}>
+    <form onSubmit={onSubmit} noValidate={mode === "login"}>
       {error ? (
-        <p className="ff-auth__error" role="alert">
-          {error}
-        </p>
+        <div className="ff-auth__error" role="alert">
+          <p>{error}</p>
+          {mode === "login" ? (
+            <p>
+              Don&rsquo;t have an account?{" "}
+              <Link href="/signup/">Register one here</Link>.
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       {mode === "signup" ? (
@@ -76,6 +90,7 @@ export function AuthForm({ mode, discordEnabled }: Props) {
             type="text"
             name="name"
             autoComplete="name"
+            placeholder="Your display name"
             required
             maxLength={80}
           />
@@ -89,6 +104,7 @@ export function AuthForm({ mode, discordEnabled }: Props) {
           type="email"
           name="email"
           autoComplete="email"
+          placeholder="you@example.com"
           required
         />
       </label>
@@ -100,8 +116,9 @@ export function AuthForm({ mode, discordEnabled }: Props) {
           type="password"
           name="password"
           autoComplete={mode === "signup" ? "new-password" : "current-password"}
+          placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
           required
-          minLength={8}
+          minLength={mode === "signup" ? 8 : undefined}
         />
       </label>
 

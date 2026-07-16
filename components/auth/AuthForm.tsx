@@ -2,7 +2,6 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { authClient } from "@/lib/auth-client";
 
@@ -13,7 +12,6 @@ type Props = {
 };
 
 export function AuthForm({ mode, discordEnabled }: Props) {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -49,8 +47,9 @@ export function AuthForm({ mode, discordEnabled }: Props) {
       return;
     }
 
-    router.push("/dashboard/");
-    router.refresh();
+    // Full navigation (like the rest of the site's links) so the header's
+    // session state is fresh on arrival.
+    window.location.assign("/dashboard/");
   }
 
   async function onDiscord() {

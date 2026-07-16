@@ -1401,3 +1401,18 @@ button.ff-nav__link:hover {
   border-radius: inherit;
   object-fit: cover;
 }
+
+/* Short pages (login/signup/dashboard opt in via ff-main--fill): stretch
+   the main area so the footer pins to the viewport bottom instead of
+   leaving a background band under it on tall windows. Scoped with :has()
+   so the ported WP article pages (multiple top-level blocks, margin
+   collapsing) are untouched. */
+.wp-site-blocks:has(> .ff-main--fill) {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+.ff-main--fill {
+  flex: 1 0 auto;
+}

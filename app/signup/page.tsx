@@ -22,7 +22,7 @@ export default async function SignupPage() {
   }
 
   return (
-    <main id="wp--skip-link--target" className="ff-main">
+    <main id="wp--skip-link--target" className="ff-main ff-main--fill">
       <div className="ff-container ff-section">
         <div className="ff-auth ff-card">
           <h1 className="ff-auth__title">Create an account</h1>

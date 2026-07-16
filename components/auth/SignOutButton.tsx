@@ -1,20 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { authClient } from "@/lib/auth-client";
 
 export function SignOutButton() {
-  const router = useRouter();
   const [pending, setPending] = useState(false);
 
   async function onSignOut() {
     if (pending) return;
     setPending(true);
     await authClient.signOut();
-    router.push("/login/");
-    router.refresh();
+    // Full navigation so the header's session state is fresh on arrival.
+    window.location.assign("/login/");
   }
 
   return (

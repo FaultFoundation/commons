@@ -20,7 +20,7 @@ export default async function DashboardPage() {
   }
 
   return (
-    <main id="wp--skip-link--target" className="ff-main">
+    <main id="wp--skip-link--target" className="ff-main ff-main--fill">
       <div className="ff-container ff-section">
         <div className="ff-auth ff-auth--wide ff-card">
           <h1 className="ff-auth__title">Member area</h1>

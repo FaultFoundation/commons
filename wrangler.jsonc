@@ -14,10 +14,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "fault-foundation-db",
-      // Placeholder until `wrangler d1 create fault-foundation-db` is run
-      // (see docs/cloudflare-setup.md). Local dev/preview works as-is.
-      "database_id": "REPLACE_WITH_D1_ID",
+      "database_name": "website-sql",
+      "database_id": "5268b495-2952-4570-bd37-295e9d452753",
       "migrations_dir": "drizzle"
     }
   ],

@@ -3,7 +3,8 @@
 /**
  * Site navigation, redesigned (ff- classes, styles/theme.css §6).
  * Same items/links as the original WP menu: About, Policies, News
- * (submenu: College Esports News + Fault Foundation), Join Today!.
+ * (submenu: College Esports News + Fault Foundation), Join Today! —
+ * plus the Sign In button (member login, added post-port).
  *
  * - Desktop: inline links right of the brand, News dropdown, CTA pill.
  * - Mobile (<782px): hamburger opens a full-screen overlay; Escape and
@@ -104,6 +105,13 @@ function NavLinks() {
       <li className="ff-nav__cta">
         <a className="ff-btn" href="https://discord.com/invite/76D4TAdymH">
           Join Today!
+        </a>
+      </li>
+      <li className="ff-nav__cta">
+        {/* Static link keeps every page prerenderable; /login/ forwards
+            already-signed-in members to /dashboard/. */}
+        <a className="ff-btn ff-btn--outline" href="/login/">
+          Sign In
         </a>
       </li>
     </>

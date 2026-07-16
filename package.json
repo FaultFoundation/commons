@@ -10,8 +10,8 @@
     "lint": "next lint",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:local": "wrangler d1 migrations apply fault-foundation-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply fault-foundation-db --remote"
+    "db:migrate:local": "wrangler d1 migrations apply website-sql --local",
+    "db:migrate:remote": "wrangler d1 migrations apply website-sql --remote"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.20.1",

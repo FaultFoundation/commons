@@ -1,6 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
+
 import { authClient } from "@/lib/auth-client";
+import { setAuthHint } from "@/lib/auth-hint";
 
 function UserSilhouette() {
   return (
@@ -17,33 +20,36 @@ function UserSilhouette() {
 }
 
 /**
- * Header slot right of "Join Today!": the Sign In pill for visitors, a
- * default user icon linking to the member area once a session exists.
- * Session state resolves client-side so every page stays prerenderable.
+ * Header slot right of "Join Today!". Both controls are in the DOM; CSS on
+ * html[data-auth] (stamped pre-paint from the localStorage hint) decides
+ * which one shows, so there's no signed-out flash on page load. useSession
+ * then verifies against the server and corrects the hint if it was stale.
  */
 export function HeaderAuthButton() {
-  const { data: session } = authClient.useSession();
+  const { data: session, isPending } = authClient.useSession();
 
-  if (session) {
-    return (
+  useEffect(() => {
+    if (isPending) return;
+    setAuthHint(Boolean(session));
+  }, [session, isPending]);
+
+  return (
+    <>
+      <a className="ff-btn ff-btn--outline ff-auth-when-out" href="/login/">
+        Sign In
+      </a>
       <a
-        className="ff-nav__avatar"
+        className="ff-nav__avatar ff-auth-when-in"
         href="/dashboard/"
         aria-label="Member area"
         title="Member area"
       >
-        {session.user.image ? (
+        {session?.user.image ? (
           <img src={session.user.image} alt="" />
         ) : (
           <UserSilhouette />
         )}
       </a>
-    );
-  }
-
-  return (
-    <a className="ff-btn ff-btn--outline" href="/login/">
-      Sign In
-    </a>
+    </>
   );
 }

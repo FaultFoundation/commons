@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 
 import { authClient } from "@/lib/auth-client";
+import { setAuthHint } from "@/lib/auth-hint";
 
 type Props = {
   mode: "login" | "signup";
@@ -47,8 +48,9 @@ export function AuthForm({ mode, discordEnabled }: Props) {
       return;
     }
 
-    // Full navigation (like the rest of the site's links) so the header's
-    // session state is fresh on arrival.
+    // Full navigation (like the rest of the site's links); the hint makes
+    // the destination paint the avatar immediately.
+    setAuthHint(true);
     window.location.assign("/dashboard/");
   }
 

@@ -1416,3 +1416,13 @@ button.ff-nav__link:hover {
 .ff-main--fill {
   flex: 1 0 auto;
 }
+
+/* Which header auth control shows is decided pre-paint by the data-auth
+   attribute (inline script in app/layout.tsx + lib/auth-hint.ts), so the
+   right one paints immediately on every full page load. */
+html[data-auth="in"] .ff-auth-when-out {
+  display: none;
+}
+html:not([data-auth="in"]) .ff-auth-when-in {
+  display: none;
+}

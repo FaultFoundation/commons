@@ -44,12 +44,20 @@ gtag("set", "developer_id.dZTNiMT", true);
 gtag("config", "GT-TNSMBN4N");
 window._googlesitekit = window._googlesitekit || {}; window._googlesitekit.throttledEvents = []; window._googlesitekit.gtagEvent = (name, data) => { var key = JSON.stringify( { name, data } ); if ( !! window._googlesitekit.throttledEvents[ key ] ) { return; } window._googlesitekit.throttledEvents[ key ] = true; setTimeout( () => { delete window._googlesitekit.throttledEvents[ key ]; }, 5 ); gtag( "event", name, { ...data, event_source: "site-kit" } ); };`;
 
+// Parser-blocking, runs before the header paints: stamps the cached
+// signed-in hint (lib/auth-hint.ts) onto <html> so CSS can show the right
+// header control immediately instead of flashing "Sign In" on every load.
+const AUTH_HINT_INLINE = `try{document.documentElement.dataset.auth=localStorage.getItem("ff-auth")==="1"?"in":"out"}catch(e){document.documentElement.dataset.auth="out"}`;
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en-US">
+    // suppressHydrationWarning: the auth-hint script below mutates <html>
+    // (data-auth) before React hydrates.
+    <html lang="en-US" suppressHydrationWarning>
       <body className="wp-custom-logo wp-embed-responsive wp-theme-twentytwentyfive">
+        <script dangerouslySetInnerHTML={{ __html: AUTH_HINT_INLINE }} />
         {/* Floating donation widget, as on the live site */}
         <givebutter-widget id="pEZdY1"></givebutter-widget>
         <div className="wp-site-blocks">

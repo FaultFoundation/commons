@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
+import { setAuthHint } from "@/lib/auth-hint";
 
 export function SignOutButton() {
   const [pending, setPending] = useState(false);
@@ -11,7 +12,9 @@ export function SignOutButton() {
     if (pending) return;
     setPending(true);
     await authClient.signOut();
-    // Full navigation so the header's session state is fresh on arrival.
+    // Full navigation; clearing the hint makes the destination paint the
+    // Sign In pill immediately.
+    setAuthHint(false);
     window.location.assign("/login/");
   }
 

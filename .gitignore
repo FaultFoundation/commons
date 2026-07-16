@@ -26,3 +26,4 @@ wordpress site/
 .vscode/
 logs/
 temp/
+.claude/

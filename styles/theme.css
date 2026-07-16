@@ -1426,3 +1426,141 @@ html[data-auth="in"] .ff-auth-when-out {
 html:not([data-auth="in"]) .ff-auth-when-in {
   display: none;
 }
+
+/* ---------- 16. Dashboard portal (sidebar rail + card grid) ---------- */
+
+.ff-dash {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: clamp(24px, 4vw, 48px);
+  align-items: start;
+}
+.ff-dash__nav {
+  position: sticky;
+  top: calc(var(--ff-header-h) + 20px);
+  padding: 16px;
+}
+.ff-dash__nav nav {
+  display: grid;
+  gap: 4px;
+}
+.ff-dash__link {
+  display: block;
+  padding: 10px 14px;
+  border-radius: var(--ff-radius-md);
+  color: #dfe9f4;
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    background var(--ff-transition),
+    color var(--ff-transition);
+}
+a.ff-dash__link:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+}
+.ff-dash__link[aria-current="page"] {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ff-accent);
+}
+.ff-dash__link--soon {
+  color: var(--ff-text-dim);
+  opacity: 0.5;
+  cursor: default;
+}
+.ff-dash__foot {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ff-border);
+}
+.ff-dash__foot .ff-btn {
+  width: 100%;
+}
+.ff-dash__head {
+  margin: 0 0 20px;
+}
+.ff-dash__title {
+  margin: 0;
+  font-size: var(--wp--preset--font-size--x-large);
+}
+.ff-dash__hint {
+  margin: 0.25em 0 0;
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--small);
+}
+.ff-dash__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: stretch;
+}
+.ff-dash-card {
+  padding: clamp(20px, 3vw, 28px);
+}
+.ff-dash-card--bracket {
+  grid-row: span 2;
+  display: flex;
+  flex-direction: column;
+}
+.ff-dash-card--bracket .ff-dash-card__wip {
+  flex: 1 0 auto;
+  min-height: 260px;
+}
+.ff-dash-card__title {
+  margin: 0 0 0.75em;
+  font-size: var(--wp--preset--font-size--large);
+}
+.ff-dash-card__wip {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  padding: 24px;
+  border: 1px dashed var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--small);
+}
+/* Tablet: rail collapses to a horizontal pill row above the content
+   (same breakpoint as the policy TOC). */
+@media (max-width: 1023.98px) {
+  .ff-dash {
+    grid-template-columns: 1fr;
+  }
+  .ff-dash__nav {
+    position: static;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+  }
+  .ff-dash__nav nav {
+    display: flex;
+    gap: 6px;
+  }
+  .ff-dash__link {
+    padding: 8px 14px;
+    border-radius: var(--ff-radius-pill);
+    white-space: nowrap;
+  }
+  .ff-dash__foot {
+    margin: 0 0 0 auto;
+    padding: 0 0 0 14px;
+    border-top: 0;
+    border-left: 1px solid var(--ff-border);
+  }
+  .ff-dash__foot .ff-btn {
+    width: auto;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 781.98px) {
+  .ff-dash__grid {
+    grid-template-columns: 1fr;
+  }
+  .ff-dash-card--bracket {
+    grid-row: auto;
+  }
+  .ff-dash-card--bracket .ff-dash-card__wip {
+    min-height: 160px;
+  }
+}

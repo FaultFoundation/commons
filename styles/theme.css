@@ -1,0 +1,1262 @@
+/* ============================================================
+   fault.foundation — "ff" redesign theme
+   Layered ON TOP of the ported WordPress CSS (wp-globals.css /
+   wp-blocks.css), which must stay untouched: the article pages
+   still render verbatim WP markup. Every selector here is
+   namespaced with `ff-`; redesigned pages use only ff- classes.
+   Brand tokens alias the existing --wp--preset--* values so the
+   old and new surfaces stay consistent.
+   ============================================================ */
+
+/* ---------- 1. Tokens ---------- */
+:root {
+  /* surfaces */
+  --ff-bg: var(--wp--preset--color--custom-blue-main); /* #003167 */
+  --ff-blue: var(--wp--preset--color--custom-blue-side); /* #0074a6 */
+  --ff-navy-900: #001d3d;
+  --ff-surface-1: #06407e;
+  --ff-surface-2: rgba(255, 255, 255, 0.06);
+  --ff-border: rgba(255, 255, 255, 0.1);
+  --ff-grad-brand: linear-gradient(90deg, rgb(0, 49, 103) 0%, rgb(0, 116, 166) 100%);
+  --ff-grad-brand-rev: linear-gradient(90deg, rgb(0, 116, 166) 0%, rgb(0, 49, 103) 100%);
+  --ff-accent: var(--wp--preset--color--accent-1); /* #FFEE58 */
+  --ff-text-dim: #b8c7d9;
+
+  /* radii — 20px is the site's established motif */
+  --ff-radius-md: 12px;
+  --ff-radius-lg: 20px;
+  --ff-radius-xl: 28px;
+  --ff-radius-pill: 999px;
+
+  /* shadows */
+  --ff-shadow-card: 0 8px 30px rgba(0, 0, 0, 0.35);
+  --ff-shadow-float: var(--wp--preset--shadow--deep);
+  --ff-shadow-nav: 0 2px 14px rgba(0, 0, 0, 0.45);
+
+  /* the radial brand backdrop used by hero bands, the footer, and
+     behind transparent artwork */
+  --ff-circle-gradient: url("/wp-content/uploads/2025/10/Fault-Foundation-Images-1.png");
+
+  /* layout */
+  --ff-header-h: 64px;
+  --ff-header-offset: 10px; /* floating header gap from the viewport edge */
+  --ff-container: 1250px; /* = --wp--style--global--content-size */
+  --ff-wide: 1500px; /* = --wp--style--global--wide-size */
+  --ff-space-section: var(--wp--preset--spacing--70);
+  --ff-gutter: clamp(16px, 4vw, 32px);
+  --ff-transition: 180ms ease;
+}
+
+/* ---------- 2. Global adjustments ---------- */
+
+/* Anchor jumps must clear the floating sticky header (safe on article
+   pages too). */
+[id] {
+  scroll-margin-top: calc(var(--ff-header-h) + var(--ff-header-offset) + 20px);
+}
+
+/* Neutralize WP's default block-start margin on the new chrome/pages.
+   (Not the header — it owns its floating margins.) */
+.wp-site-blocks > .ff-main,
+.wp-site-blocks > .ff-footer {
+  margin-block-start: 0;
+}
+
+/* Mobile-menu scroll lock (replaces WP's html.has-modal-open). */
+html.ff-no-scroll {
+  overflow: hidden;
+}
+/* The floating donation widget would paint over the open menu overlay. */
+html.ff-no-scroll givebutter-widget {
+  visibility: hidden;
+}
+
+/* Visible focus for the redesigned surfaces. */
+.ff-header :focus-visible,
+.ff-main :focus-visible,
+.ff-footer :focus-visible {
+  outline: 2px solid var(--ff-accent);
+  outline-offset: 2px;
+}
+
+/* Skip link: visually hidden until focused. */
+.ff-skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 200;
+  padding: 0.6em 1.2em;
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-navy-900);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  transform: translateY(calc(-100% - 16px));
+}
+.ff-skip-link:focus-visible {
+  transform: none;
+}
+
+/* ---------- 3. Layout primitives ---------- */
+
+.ff-container {
+  max-width: var(--ff-container);
+  margin-inline: auto;
+  padding-inline: var(--ff-gutter);
+}
+.ff-container--wide {
+  max-width: var(--ff-wide);
+}
+.ff-section {
+  margin-block: var(--ff-space-section);
+}
+.ff-section--tight {
+  margin-block: var(--wp--preset--spacing--50);
+}
+.ff-stack > * + * {
+  margin-block-start: var(--wp--preset--spacing--50);
+}
+
+/* ---------- 4. Buttons & chips ---------- */
+
+.ff-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  padding: 0.7em 1.7em;
+  border: 0;
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-blue);
+  color: #fff;
+  font-family: inherit;
+  font-size: var(--wp--preset--font-size--medium);
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--ff-transition),
+    color var(--ff-transition),
+    transform var(--ff-transition);
+}
+.ff-btn:hover {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
+  transform: translateY(-1px);
+}
+.ff-btn--outline {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+.ff-btn--outline:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  box-shadow: inset 0 0 0 1.5px #fff;
+}
+
+.ff-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25em 0.9em;
+  border-radius: var(--ff-radius-pill);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background var(--ff-transition),
+    color var(--ff-transition);
+}
+.ff-chip:hover {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
+}
+
+/* ---------- 5. Cards ---------- */
+
+.ff-card {
+  border-radius: var(--ff-radius-lg);
+  background: var(--ff-surface-2);
+  border: 1px solid var(--ff-border);
+  box-shadow: var(--ff-shadow-card);
+}
+.ff-card--gradient {
+  background: var(--ff-grad-brand);
+  border: 0;
+}
+.ff-card--gradient-rev {
+  background: var(--ff-grad-brand-rev);
+  border: 0;
+}
+
+/* ---------- 6. Header / nav ---------- */
+
+.ff-header {
+  position: sticky;
+  top: var(--ff-header-offset);
+  z-index: 50;
+  width: calc(100% - 2 * var(--ff-gutter));
+  max-width: var(--ff-wide);
+  margin: var(--ff-header-offset) auto 0 !important; /* beats the WP child-margin reset */
+  border-radius: 16px;
+  box-shadow: var(--ff-shadow-nav);
+}
+/* Glass background lives on a pseudo-element: backdrop-filter on the
+   header itself would turn it into the containing block for the
+   position:fixed mobile menu overlay. */
+.ff-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: rgba(0, 24, 50, 0.92);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.ff-header__inner {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-height: var(--ff-header-h);
+  max-width: var(--ff-wide);
+  margin-inline: auto;
+  padding-inline: var(--ff-gutter);
+}
+.ff-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  min-width: 0;
+}
+.ff-header__brand img {
+  width: auto;
+  height: 40px;
+}
+.ff-header__title {
+  margin: 0;
+  color: #fff;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+}
+.ff-header__brand:hover .ff-header__title {
+  color: var(--ff-accent);
+}
+
+.ff-nav {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+.ff-nav__list {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ff-nav__link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.5em 0.9em;
+  border-radius: 10px;
+  color: #fff;
+  font-size: var(--wp--preset--font-size--medium);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background var(--ff-transition);
+}
+.ff-nav__link:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+}
+/* Dropdown triggers are <button>s sharing the link look. */
+button.ff-nav__link {
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+}
+button.ff-nav__link:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+.ff-nav__link svg {
+  transition: transform var(--ff-transition);
+}
+.ff-nav__group.is-open > .ff-nav__link svg {
+  transform: rotate(180deg);
+}
+.ff-nav__link.is-current::after,
+.ff-nav__link[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  left: 0.9em;
+  right: 0.9em;
+  bottom: 0.15em;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--ff-accent);
+}
+
+/* News dropdown */
+.ff-nav__group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.ff-nav__submenu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 60;
+  min-width: 240px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-navy-900);
+  border: 1px solid var(--ff-border);
+  box-shadow: var(--ff-shadow-card);
+}
+.ff-nav__group.is-open > .ff-nav__submenu {
+  display: block;
+}
+.ff-nav__submenu a {
+  display: block;
+  padding: 0.6em 0.9em;
+  border-radius: 8px;
+  color: #fff;
+  font-size: var(--wp--preset--font-size--medium);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background var(--ff-transition);
+}
+.ff-nav__submenu a:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+}
+
+/* CTA pill */
+.ff-nav__cta {
+  margin-left: 12px;
+}
+.ff-nav__cta .ff-btn {
+  padding: 0.55em 1.4em;
+}
+
+/* Hamburger / overlay close buttons */
+.ff-nav__open,
+.ff-nav__close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+.ff-nav__open:hover,
+.ff-nav__close:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+/* Mobile: the nav container becomes a full-screen overlay. */
+@media (min-width: 782px) {
+  .ff-nav__container {
+    display: contents;
+  }
+}
+@media (max-width: 781.98px) {
+  .ff-nav__open {
+    display: inline-flex;
+    margin-left: auto;
+  }
+  .ff-nav {
+    margin-left: auto;
+  }
+  .ff-nav__container {
+    display: none;
+  }
+  .ff-nav__container.is-open {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    padding: var(--ff-gutter);
+    overflow-y: auto;
+    background: linear-gradient(180deg, #001d3d 0%, #003167 100%);
+  }
+  .ff-nav__container.is-open .ff-nav__close {
+    display: inline-flex;
+    align-self: flex-end;
+  }
+  .ff-nav__list {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 24px;
+  }
+  .ff-nav__link {
+    font-size: var(--wp--preset--font-size--x-large);
+    font-weight: 800;
+  }
+  .ff-nav__link[aria-current="page"]::after {
+    bottom: 0.05em;
+    height: 3px;
+  }
+  .ff-nav__submenu {
+    display: none;
+    position: static;
+    min-width: 0;
+    margin: 4px 0 8px 12px;
+    padding: 0 0 0 16px;
+    border: 0;
+    border-left: 2px solid var(--ff-border);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .ff-nav__group.is-open > .ff-nav__submenu {
+    display: block;
+  }
+  .ff-nav__submenu a {
+    font-size: var(--wp--preset--font-size--large);
+    white-space: normal;
+  }
+  .ff-nav__cta {
+    margin: 20px 0 0;
+  }
+  .ff-nav__cta .ff-btn {
+    font-size: var(--wp--preset--font-size--large);
+  }
+}
+
+/* ---------- 7. Hero bands ---------- */
+
+.ff-hero {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--ff-radius-xl);
+  margin-top: var(--wp--preset--spacing--40);
+  padding: var(--wp--preset--spacing--80) var(--ff-gutter);
+  text-align: center;
+  background-position: 50% 50%;
+  background-size: cover;
+  box-shadow: var(--ff-shadow-float);
+}
+.ff-hero--compact {
+  padding: var(--wp--preset--spacing--60) var(--ff-gutter);
+}
+.ff-hero__inner {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+.ff-hero__title {
+  margin: 0;
+  font-size: var(--wp--preset--font-size--xx-large);
+}
+.ff-hero__subtitle {
+  margin: 0;
+  font-size: var(--wp--preset--font-size--x-large);
+  font-weight: 300;
+  font-style: italic;
+  color: #eaf2fb;
+}
+
+/* ---------- 8. Carousel (embla) ---------- */
+
+.ff-carousel {
+  position: relative;
+}
+.ff-carousel__viewport {
+  overflow: hidden;
+  border-radius: var(--ff-radius-xl);
+  box-shadow: var(--ff-shadow-float);
+}
+.ff-carousel__slides {
+  display: flex;
+  touch-action: pan-y pinch-zoom;
+}
+.ff-carousel__slide {
+  position: relative;
+  flex: 0 0 100%;
+  min-width: 0;
+}
+.ff-carousel__media {
+  aspect-ratio: 21 / 9;
+}
+.ff-carousel__media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ff-carousel__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: clamp(8px, 1.5vw, 18px);
+  padding: clamp(24px, 5vw, 72px);
+  background: linear-gradient(
+    90deg,
+    rgba(0, 24, 50, 0.94) 0%,
+    rgba(0, 24, 50, 0.62) 48%,
+    rgba(0, 24, 50, 0.18) 100%
+  );
+  text-align: left;
+}
+.ff-carousel__title {
+  margin: 0;
+  font-size: var(--wp--preset--font-size--xx-large);
+}
+.ff-carousel__tagline {
+  margin: 0;
+  font-size: var(--wp--preset--font-size--large);
+  font-style: italic;
+  color: #eaf2fb;
+}
+@media (max-width: 781.98px) {
+  .ff-carousel__media {
+    aspect-ratio: 4 / 3;
+  }
+  .ff-carousel__overlay {
+    justify-content: flex-end;
+    background: linear-gradient(
+      180deg,
+      rgba(0, 24, 50, 0.1) 0%,
+      rgba(0, 24, 50, 0.55) 45%,
+      rgba(0, 24, 50, 0.95) 100%
+    );
+  }
+}
+
+.ff-carousel__arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--ff-border);
+  border-radius: 50%;
+  background: rgba(0, 24, 50, 0.55);
+  color: #fff;
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition:
+    background var(--ff-transition),
+    color var(--ff-transition);
+}
+.ff-carousel__arrow:hover {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
+}
+.ff-carousel__arrow--prev {
+  left: 16px;
+}
+.ff-carousel__arrow--next {
+  right: 16px;
+}
+
+.ff-carousel__dots {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  gap: 8px;
+  transform: translateX(-50%);
+}
+.ff-carousel__dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ff-radius-pill);
+  background: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  transition:
+    background var(--ff-transition),
+    width var(--ff-transition);
+}
+.ff-carousel__dot.is-active {
+  width: 26px;
+  background: var(--ff-accent);
+}
+
+/* ---------- 9. Split feature (image + text card) ---------- */
+
+.ff-split {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: clamp(24px, 4vw, 48px);
+  align-items: center;
+  padding: clamp(24px, 4vw, 48px);
+}
+/* Images sit flat on the card background — the card itself already
+   floats, so no shadow of their own. */
+.ff-split__media img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--ff-radius-lg);
+}
+.ff-split__body {
+  display: grid;
+  gap: 16px;
+  justify-items: start;
+}
+.ff-split__body h2 {
+  margin: 0;
+}
+.ff-split__body p {
+  margin: 0;
+}
+/* Reversed: text left (wide track), image right (narrow track) — the
+   image column stays 5fr-sized either way. */
+.ff-split--reverse {
+  grid-template-columns: 7fr 5fr;
+}
+.ff-split--reverse .ff-split__media {
+  order: 2;
+}
+.ff-split--reverse .ff-split__body {
+  order: 1;
+}
+@media (max-width: 781.98px) {
+  .ff-split,
+  .ff-split--reverse {
+    grid-template-columns: 1fr;
+  }
+  .ff-split--reverse .ff-split__media {
+    order: 0;
+  }
+  .ff-split--reverse .ff-split__body {
+    order: 1;
+  }
+}
+
+/* ---------- 10. News cards ---------- */
+
+.ff-news-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+  gap: 28px;
+}
+.ff-news-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition:
+    transform var(--ff-transition),
+    box-shadow var(--ff-transition);
+}
+.ff-news-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--ff-shadow-float);
+}
+.ff-news-card__media {
+  aspect-ratio: 16 / 9;
+}
+.ff-news-card__media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ff-news-card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 20px 24px 24px;
+}
+.ff-news-card__title {
+  margin: 0;
+  font-size: var(--wp--preset--font-size--large);
+}
+/* Whole card is clickable via the stretched title link. */
+.ff-news-card__title a {
+  text-decoration: none;
+}
+.ff-news-card__title a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.ff-news-card__date {
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 600;
+}
+.ff-news-card__excerpt {
+  margin: 0;
+  color: #dfe9f4;
+  font-size: var(--wp--preset--font-size--medium);
+}
+.ff-news-card__tags {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+/* Featured (newest) card: full-width horizontal split. */
+@media (min-width: 782px) {
+  .ff-news-card--featured {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+  }
+  .ff-news-card--featured .ff-news-card__media {
+    aspect-ratio: auto;
+    min-height: 320px;
+  }
+  .ff-news-card--featured .ff-news-card__body {
+    padding: clamp(24px, 3vw, 40px);
+    justify-content: center;
+  }
+  .ff-news-card--featured .ff-news-card__title {
+    font-size: var(--wp--preset--font-size--x-large);
+  }
+}
+
+/* 404 card */
+.ff-notfound {
+  max-width: 640px;
+  padding: clamp(24px, 4vw, 40px);
+}
+.ff-notfound h1 {
+  margin: 0 0 12px;
+  font-size: var(--wp--preset--font-size--x-large);
+}
+.ff-notfound p {
+  margin: 0;
+}
+
+/* Centered section band heading (e.g. "Our History") */
+.ff-band-title {
+  margin: 0 0 var(--wp--preset--spacing--40);
+  text-align: center;
+  font-size: var(--wp--preset--font-size--x-large);
+}
+
+/* Team member cards */
+.ff-team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+  gap: 24px;
+  align-items: stretch;
+}
+.ff-team-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 28px 20px;
+  text-align: center;
+}
+.ff-team-card img {
+  width: 180px;
+  height: 180px;
+  margin-bottom: 12px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.ff-team-card h3 {
+  margin: 0;
+  font-size: var(--wp--preset--font-size--large);
+}
+.ff-team-card p {
+  margin: 0;
+}
+.ff-team-card__school {
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--medium);
+  font-style: italic;
+}
+
+/* Archive (tag/author) page heading */
+.ff-archive-title {
+  margin: var(--wp--preset--spacing--60) 0 var(--wp--preset--spacing--40);
+  font-size: var(--wp--preset--font-size--x-large);
+}
+.ff-archive-title span {
+  color: var(--ff-accent);
+}
+
+/* ---------- 11. Prose (clean content flow, replaces WP block spacing) ---------- */
+
+.ff-prose > * {
+  margin-block: 0;
+}
+.ff-prose > * + * {
+  margin-block-start: 0.9em;
+}
+.ff-prose h3 {
+  margin-block-start: 1.6em;
+}
+.ff-prose ul,
+.ff-prose ol {
+  padding-inline-start: 1.5em;
+}
+.ff-prose li {
+  margin-block-start: 0.4em;
+}
+
+/* Tables (wide ones scroll inside their wrapper) */
+.ff-table-wrap {
+  margin: 0;
+  overflow-x: auto;
+  border-radius: var(--ff-radius-md);
+  border: 1px solid var(--ff-border);
+}
+.ff-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--wp--preset--font-size--medium);
+}
+.ff-prose th,
+.ff-prose td {
+  padding: 10px 14px;
+  border: 1px solid var(--ff-border);
+  text-align: left;
+  vertical-align: top;
+}
+.ff-prose th {
+  background: rgba(255, 255, 255, 0.07);
+  font-weight: 700;
+}
+.ff-prose tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* ---------- 12. Policy layout: sticky TOC + collapsible articles ---------- */
+
+.ff-policy {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: clamp(24px, 4vw, 48px);
+  align-items: start;
+}
+.ff-toc {
+  position: sticky;
+  top: calc(var(--ff-header-h) + 20px);
+  padding: 20px;
+}
+.ff-toc__heading {
+  margin: 14px 0 4px;
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ff-toc__heading:first-child {
+  margin-top: 0;
+}
+.ff-toc ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ff-toc a {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: #dfe9f4;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background var(--ff-transition);
+}
+.ff-toc a:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+}
+.ff-toc a[aria-current="page"] {
+  color: var(--ff-accent);
+}
+@media (max-width: 1023.98px) {
+  .ff-policy {
+    grid-template-columns: 1fr;
+  }
+  .ff-toc {
+    position: static;
+  }
+}
+
+/* Content column: doc-title preamble heading above the section cards */
+.ff-policy__content > h2 {
+  margin: 0 0 18px;
+}
+
+/* Collapsible section card (native <details>) */
+.ff-collapse {
+  border-radius: var(--ff-radius-lg);
+  background: var(--ff-surface-2);
+  border: 1px solid var(--ff-border);
+  box-shadow: var(--ff-shadow-card);
+}
+.ff-collapse + .ff-collapse {
+  margin-top: 16px;
+}
+.ff-collapse__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  border-radius: var(--ff-radius-lg);
+  cursor: pointer;
+  list-style: none;
+  transition: background var(--ff-transition);
+}
+.ff-collapse__summary::-webkit-details-marker {
+  display: none;
+}
+.ff-collapse__summary:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.ff-collapse__summary > :is(h2, h3) {
+  margin: 0;
+  font-size: var(--wp--preset--font-size--large);
+}
+.ff-collapse__summary::after {
+  content: "";
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-right: 2.5px solid var(--ff-accent);
+  border-bottom: 2.5px solid var(--ff-accent);
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform var(--ff-transition);
+}
+.ff-collapse[open] > .ff-collapse__summary::after {
+  transform: rotate(225deg) translate(-2px, -2px);
+}
+.ff-collapse[open] > .ff-collapse__summary {
+  border-radius: var(--ff-radius-lg) var(--ff-radius-lg) 0 0;
+}
+.ff-collapse__body {
+  padding: 6px 24px 24px;
+}
+
+/* Policies hub: one card per document with per-ARTICLE anchor links.
+   CSS columns (vertical masonry) so short cards don't leave row gaps. */
+.ff-policy-hub {
+  columns: 3 320px;
+  column-gap: 28px;
+}
+.ff-policy-hub .ff-card {
+  break-inside: avoid;
+  margin-bottom: 28px;
+  padding: 24px 28px;
+}
+.ff-policy-hub h2 {
+  margin: 0 0 12px;
+  font-size: var(--wp--preset--font-size--large);
+}
+.ff-policy-hub h2 a {
+  text-decoration: none;
+}
+.ff-policy-hub ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ff-policy-hub ul a {
+  display: block;
+  padding: 5px 10px;
+  border-radius: 8px;
+  color: #dfe9f4;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background var(--ff-transition);
+}
+.ff-policy-hub ul a:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+}
+
+/* ---------- 13. Footer (full-bleed bar matching the header) ---------- */
+
+.ff-footer {
+  margin-top: var(--ff-space-section);
+  background: rgba(0, 24, 50, 0.92);
+  box-shadow: var(--ff-shadow-nav);
+}
+.ff-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: clamp(28px, 5vw, 56px);
+  max-width: var(--ff-wide);
+  margin-inline: auto;
+  padding: clamp(28px, 5vw, 44px) var(--ff-gutter);
+}
+.ff-footer__brand {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.ff-footer__brand img {
+  width: auto;
+  height: 52px;
+}
+.ff-footer__title {
+  margin: 0;
+  font-size: var(--wp--preset--font-size--large);
+  font-weight: 800;
+}
+.ff-footer__title a {
+  color: #fff;
+  text-decoration: none;
+}
+.ff-footer__title a:hover {
+  color: var(--ff-accent);
+}
+.ff-footer__tagline {
+  margin: 2px 0 0;
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--small);
+  font-style: italic;
+  font-weight: 300;
+}
+.ff-footer__cta {
+  margin: 14px 0 0;
+}
+.ff-footer__cta .ff-btn {
+  padding: 0.5em 1.3em;
+  font-size: var(--wp--preset--font-size--small);
+}
+
+/* Sitemap: pages grouped under their top-level nav item, small +
+   left-aligned so mobile stays neat. */
+.ff-footer__nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: clamp(20px, 4vw, 56px);
+  text-align: left;
+}
+.ff-footer__group-title {
+  margin: 0 0 8px;
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ff-footer__group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ff-footer__group a {
+  display: inline-block;
+  padding: 3px 0;
+  color: #dfe9f4;
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 600;
+  text-decoration: none;
+}
+.ff-footer__group a:hover {
+  color: var(--ff-accent);
+}
+@media (max-width: 781.98px) {
+  .ff-footer__inner {
+    flex-direction: column;
+  }
+  /* Groups stack vertically: About, then Policies, then News. */
+  .ff-footer__nav {
+    flex-direction: column;
+    width: 100%;
+    gap: 24px;
+  }
+}
+
+/* ---------- 15. Roadmap timeline (moved from the page's inline <style>) ---------- */
+
+.roadmap-timeline {
+  --roadmap-box-bg: var(--ff-surface-2);
+  --roadmap-spine-color: #ffffff;
+  position: relative;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+/* Center spine */
+.roadmap-timeline::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--roadmap-spine-color) 5%,
+    var(--roadmap-spine-color) 95%,
+    transparent
+  );
+  z-index: 1;
+}
+.roadmap-item {
+  position: relative;
+  width: 45%;
+  margin-bottom: 60px;
+}
+/* Alternating left and right positioning */
+.roadmap-item:nth-child(odd) {
+  margin-left: 0;
+  margin-right: auto;
+  text-align: right;
+}
+.roadmap-item:nth-child(even) {
+  margin-left: auto;
+  margin-right: 0;
+  text-align: left;
+}
+/* Horizontal connector lines - positioned behind dots */
+.roadmap-item::before {
+  content: "";
+  position: absolute;
+  top: 24px;
+  width: 26px;
+  height: 2px;
+  background: var(--roadmap-spine-color);
+  z-index: 1;
+}
+.roadmap-item:nth-child(odd)::before {
+  right: -26px;
+}
+.roadmap-item:nth-child(even)::before {
+  left: -26px;
+}
+/* Connector dots on the spine - positioned in front of lines */
+.roadmap-item::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  top: 19px;
+  z-index: 2;
+}
+.roadmap-item:nth-child(odd)::after {
+  right: -32px;
+}
+.roadmap-item:nth-child(even)::after {
+  left: -32px;
+}
+/* Text box styling */
+.roadmap-box {
+  display: inline-block;
+  max-width: 100%;
+  padding: 24px 28px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-lg);
+  background: var(--roadmap-box-bg);
+  box-shadow: var(--ff-shadow-card);
+  text-align: left;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
+}
+.roadmap-box:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ff-shadow-float);
+}
+.roadmap-box h2 {
+  margin: 0 0 6px 0;
+  color: #ffffff;
+  font-size: 1.4rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.roadmap-time {
+  margin-bottom: 16px;
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+.roadmap-box p {
+  margin: 0;
+  color: #ffffff;
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+.roadmap-box p + p {
+  margin-top: 12px;
+}
+@media (max-width: 768px) {
+  .roadmap-timeline::before {
+    left: 20px;
+  }
+  .roadmap-item {
+    width: calc(100% - 50px);
+    margin-left: 50px !important;
+    margin-right: 0 !important;
+    text-align: left !important;
+  }
+  .roadmap-item::before {
+    left: -26px !important;
+    right: auto !important;
+  }
+  .roadmap-item::after {
+    left: -32px !important;
+    right: auto !important;
+  }
+}
+
+/* ---------- 14. Reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .ff-header *,
+  .ff-main *,
+  .ff-footer *,
+  .ff-carousel *,
+  .ff-collapse * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

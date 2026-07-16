@@ -1,0 +1,5 @@
+# Old WordPress URLs -> new static-site equivalents
+/sitemap_index.xml /sitemap.xml 301
+/home/ / 301
+# pre-rename slug of the Discord post (still 301s on the live WP site)
+/2025/12/taboo-discord-and-sharing-personal-information/ /2025/12/discord-and-sharing-personal-information/ 301

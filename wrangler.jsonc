@@ -1,0 +1,13 @@
+// Cloudflare Workers config: serve the Next.js static export (out/) as-is.
+// The presence of this file stops `wrangler deploy` from auto-detecting
+// "Next.js" and trying to convert the app to OpenNext (server runtime),
+// which fails because this project is a pure static export.
+{
+  "name": "website",
+  "compatibility_date": "2026-07-15",
+  "assets": {
+    "directory": "./out",
+    // Serve out/404.html for unknown paths (Next export emits it).
+    "not_found_handling": "404-page"
+  }
+}

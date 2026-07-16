@@ -1,0 +1,21 @@
+# dependencies / build
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# live-site reference captures (transcription source, not shipped)
+reference/
+
+# original WordPress export + theme copy (private migration source material,
+# referenced by the regeneration pipeline but not published)
+wordpress site/
+
+# wrangler local state
+.wrangler/
+
+# misc
+.DS_Store
+.vscode/
+logs/

@@ -26,12 +26,15 @@ function UserSilhouette() {
  * then verifies against the server and corrects the hint if it was stale.
  */
 export function HeaderAuthButton() {
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session, isPending, error } = authClient.useSession();
 
   useEffect(() => {
-    if (isPending) return;
+    // Only sync the hint on a definitive answer. A failed/ambiguous check
+    // (network hiccup, deploy propagation) must not wipe a valid hint —
+    // that would repaint the wrong control on the next page load.
+    if (isPending || error) return;
     setAuthHint(Boolean(session));
-  }, [session, isPending]);
+  }, [session, isPending, error]);
 
   return (
     <>

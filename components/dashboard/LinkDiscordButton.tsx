@@ -5,7 +5,12 @@ import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
 
 /** Starts the Discord OAuth link flow (full-page redirect, like AuthForm). */
-export function LinkDiscordButton() {
+export function LinkDiscordButton({
+  callbackURL = "/dashboard/",
+}: {
+  /** Where Discord sends the member back — pass the page the button is on. */
+  callbackURL?: string;
+}) {
   const [pending, setPending] = useState(false);
 
   async function onLink() {
@@ -13,7 +18,7 @@ export function LinkDiscordButton() {
     setPending(true);
     const result = await authClient.linkSocial({
       provider: "discord",
-      callbackURL: "/dashboard/",
+      callbackURL,
     });
     if (result.error) {
       setPending(false);

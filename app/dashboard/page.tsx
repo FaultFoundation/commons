@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { SetupCard } from "@/components/dashboard/SetupCard";
+import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { getAuth } from "@/lib/auth";
 
 // Session-gated: always rendered per request.
@@ -21,21 +21,15 @@ export default async function DashboardPage() {
   }
 
   return (
-    <DashboardShell active="home">
-      <header className="ff-dash__head">
-        <h1 className="ff-dash__title">Welcome back, {session.user.name}</h1>
-        <p className="ff-dash__hint">{session.user.email}</p>
-      </header>
-      <div className="ff-dash__grid">
-        <section className="ff-card ff-dash-card ff-dash-card--bracket">
-          <h2 className="ff-dash-card__title">My bracket</h2>
-          <div className="ff-dash-card__wip">Work in progress</div>
-        </section>
-        <SetupCard userId={session.user.id} />
-        <section className="ff-card ff-dash-card">
-          <h2 className="ff-dash-card__title">Team</h2>
-          <div className="ff-dash-card__wip">Work in progress</div>
-        </section>
+    <DashboardShell active="home" setupUserId={session.user.id}>
+      <h1 className="screen-reader-text">Dashboard</h1>
+      <div className="ff-bubble-grid">
+        <Bubble title="My Bracket">
+          <div className="ff-bubble__wip">Work in progress</div>
+        </Bubble>
+        <Bubble title="My Team">
+          <div className="ff-bubble__wip">Work in progress</div>
+        </Bubble>
       </div>
     </DashboardShell>
   );

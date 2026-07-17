@@ -22,6 +22,12 @@
   --ff-accent: var(--wp--preset--color--accent-1); /* #FFEE58 */
   --ff-text-dim: #b8c7d9;
 
+  /* danger / destructive surfaces (same palette as .ff-auth__error) */
+  --ff-danger: #ff6363;
+  --ff-danger-text: #ffb4b4;
+  --ff-danger-border: rgba(255, 99, 99, 0.45);
+  --ff-danger-bg: rgba(255, 99, 99, 0.14);
+
   /* radii — 20px is the site's established motif */
   --ff-radius-md: 12px;
   --ff-radius-lg: 20px;
@@ -1430,10 +1436,28 @@ html:not([data-auth="in"]) .ff-auth-when-in {
 /* ---------- 16. Dashboard portal (sidebar rail + card grid) ---------- */
 
 .ff-dash {
+  /* Deliberate app-UI type scale — fixed sizes, not the marketing clamp
+     scale. Everything the shell renders (tabs, register flow, dialogs)
+     inherits these; see docs/dashboard-guide.md before adding sizes. */
+  --ff-dash-text-xs: 0.75rem; /* 12px — locked notes, fine print */
+  --ff-dash-text-sm: 0.8125rem; /* 13px — row labels, hints, strip, meta */
+  --ff-dash-text-md: 0.9375rem; /* 15px — body, values, inputs, buttons */
+  --ff-dash-text-lg: 1.0625rem; /* 17px — bubble titles */
+  --ff-dash-text-xl: 1.375rem; /* 22px — register step titles, empty states */
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
   gap: clamp(24px, 4vw, 48px);
   align-items: start;
+  font-size: var(--ff-dash-text-md);
+  line-height: 1.5;
+}
+.ff-dash .ff-btn {
+  font-size: var(--ff-dash-text-md);
+}
+.ff-dash .ff-auth__label,
+.ff-dash .ff-auth__hint,
+.ff-dash .ff-auth__error {
+  font-size: var(--ff-dash-text-sm);
 }
 .ff-dash__nav {
   position: sticky;
@@ -1476,50 +1500,6 @@ a.ff-dash__link:hover {
 .ff-dash__foot .ff-btn {
   width: 100%;
 }
-.ff-dash__head {
-  margin: 0 0 20px;
-}
-.ff-dash__title {
-  margin: 0;
-  font-size: var(--wp--preset--font-size--x-large);
-}
-.ff-dash__hint {
-  margin: 0.25em 0 0;
-  color: var(--ff-text-dim);
-  font-size: var(--wp--preset--font-size--small);
-}
-.ff-dash__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
-  gap: 24px;
-  align-items: stretch;
-}
-.ff-dash-card {
-  padding: clamp(20px, 3vw, 28px);
-}
-.ff-dash-card--bracket {
-  grid-row: span 2;
-  display: flex;
-  flex-direction: column;
-}
-.ff-dash-card--bracket .ff-dash-card__wip {
-  flex: 1 0 auto;
-  min-height: 260px;
-}
-.ff-dash-card__title {
-  margin: 0 0 0.75em;
-  font-size: var(--wp--preset--font-size--large);
-}
-.ff-dash-card__wip {
-  display: grid;
-  place-items: center;
-  min-height: 120px;
-  padding: 24px;
-  border: 1px dashed var(--ff-border);
-  border-radius: var(--ff-radius-md);
-  color: var(--ff-text-dim);
-  font-size: var(--wp--preset--font-size--small);
-}
 /* Tablet: rail collapses to a horizontal pill row above the content
    (same breakpoint as the policy TOC). */
 @media (max-width: 1023.98px) {
@@ -1553,17 +1533,6 @@ a.ff-dash__link:hover {
     white-space: nowrap;
   }
 }
-@media (max-width: 781.98px) {
-  .ff-dash__grid {
-    grid-template-columns: 1fr;
-  }
-  .ff-dash-card--bracket {
-    grid-row: auto;
-  }
-  .ff-dash-card--bracket .ff-dash-card__wip {
-    min-height: 160px;
-  }
-}
 
 /* ---------- 17. Registration flow + setup checklist ---------- */
 
@@ -1573,7 +1542,7 @@ a.ff-dash__link:hover {
 }
 .ff-reg__title {
   margin: 0 0 0.5em;
-  font-size: var(--wp--preset--font-size--x-large);
+  font-size: var(--ff-dash-text-xl);
 }
 
 /* Numbered progress rail */
@@ -1595,7 +1564,7 @@ a.ff-dash__link:hover {
   border-radius: var(--ff-radius-pill);
   border: 1px solid var(--ff-border);
   color: var(--ff-text-dim);
-  font-size: var(--wp--preset--font-size--small);
+  font-size: var(--ff-dash-text-sm);
   font-weight: 600;
 }
 .ff-reg__step::before {
@@ -1657,7 +1626,7 @@ a.ff-dash__link:hover {
 }
 .ff-reg__choice span {
   color: var(--ff-text-dim);
-  font-size: var(--wp--preset--font-size--small);
+  font-size: var(--ff-dash-text-sm);
 }
 
 .ff-reg__nav {
@@ -1687,7 +1656,7 @@ a.ff-dash__link:hover {
   background: none;
   color: var(--ff-text-dim);
   font: inherit;
-  font-size: var(--wp--preset--font-size--small);
+  font-size: var(--ff-dash-text-sm);
   text-decoration: underline;
   cursor: pointer;
 }
@@ -1742,66 +1711,234 @@ a.ff-dash__link:hover {
   font-size: var(--wp--preset--font-size--small);
 }
 
-/* Setup checklist (dashboard home card) */
-.ff-setup__list {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+@media (max-width: 781.98px) {
+  .ff-reg__choices {
+    grid-template-columns: 1fr;
+  }
 }
-.ff-setup__item {
+
+/* ---------- 18. Dashboard bubbles (universal card template) ----------
+   Every dashboard tab is a .ff-bubble-grid of .ff-bubble cards — no
+   page-level titles. See docs/dashboard-guide.md for the component API
+   and the recipes for adding tabs/bubbles. */
+
+.ff-bubble-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.ff-bubble {
+  display: flex;
+  flex-direction: column;
+  padding: clamp(18px, 2.5vw, 26px);
+}
+.ff-bubble--full {
+  grid-column: 1 / -1;
+}
+.ff-bubble__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 12px;
+  margin: 0 0 14px;
+}
+.ff-bubble__title {
+  margin: 0;
+  font-size: var(--ff-dash-text-lg);
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+.ff-bubble__body {
+  display: grid;
+  gap: 10px;
+}
+.ff-bubble__wip {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  padding: 24px;
+  border: 1px dashed var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-sm);
+  text-align: center;
+}
+.ff-bubble--wip .ff-bubble__title {
+  color: var(--ff-text-dim);
+}
+.ff-bubble--danger {
+  border-color: var(--ff-danger-border);
+}
+.ff-bubble--danger .ff-bubble__title {
+  color: var(--ff-danger-text);
+}
+
+/* Label / value / action rows inside bubbles */
+.ff-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 12px;
+  padding: 12px 14px;
   border: 1px solid var(--ff-border);
   border-radius: var(--ff-radius-md);
 }
-.ff-setup__item--soon {
-  opacity: 0.5;
+.ff-row__main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
-.ff-setup__label {
-  display: flex;
+.ff-row__label {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-sm);
   font-weight: 600;
 }
-.ff-setup__mark {
+.ff-row__value {
+  color: #fff;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.ff-row__note {
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-xs);
+}
+.ff-row__action {
+  grid-column: 2;
+  grid-row: 1;
+  white-space: nowrap;
+}
+.ff-row__editor {
+  grid-column: 1 / -1;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--ff-border);
+}
+.ff-row__buttons {
+  display: flex;
+  gap: 10px;
+}
+.ff-row--locked {
+  background: rgba(255, 255, 255, 0.03);
+}
+.ff-row__lock {
+  width: 12px;
+  height: 12px;
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+/* Compact + danger button variants */
+.ff-btn--sm {
+  padding: 0.45em 1.1em;
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-dash .ff-btn--sm {
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-btn--danger {
+  background: var(--ff-danger-bg);
+  color: var(--ff-danger-text);
+  box-shadow: inset 0 0 0 1.5px var(--ff-danger-border);
+}
+.ff-btn--danger:hover {
+  background: var(--ff-danger);
+  color: #fff;
+  transform: translateY(-1px);
+}
+.ff-btn[disabled] {
+  opacity: 0.55;
+  cursor: default;
+}
+.ff-btn[disabled]:hover {
+  transform: none;
+}
+
+/* Setup progress strip (shell-owned, above every tab's bubbles until
+   all steps are done — then it unmounts) */
+.ff-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
+  margin: 0 0 20px;
+  padding: 10px 16px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-lg);
+  background: var(--ff-surface-2);
+  box-shadow: var(--ff-shadow-card);
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-strip__count {
+  font-weight: 800;
+}
+.ff-strip__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ff-text-dim);
+}
+.ff-strip__item--done {
+  color: #dfe9f4;
+}
+.ff-strip__mark {
   display: inline-grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 16px;
+  height: 16px;
   border-radius: var(--ff-radius-pill);
   background: rgba(255, 255, 255, 0.12);
-  color: var(--ff-text-dim);
-  font-size: 0.8rem;
+  font-size: 0.65rem;
   font-weight: 800;
   flex-shrink: 0;
 }
-.ff-setup__mark--done {
+.ff-strip__mark--done {
   background: var(--ff-accent);
   color: var(--ff-navy-900);
 }
-.ff-setup__state {
-  color: var(--ff-text-dim);
-  font-size: var(--wp--preset--font-size--small);
-  white-space: nowrap;
-}
-.ff-setup__state a {
+.ff-strip__item a {
   color: #fff;
   font-weight: 700;
 }
-.ff-setup__state a:hover {
+.ff-strip__item a:hover {
   color: var(--ff-accent);
 }
-.ff-setup__cta {
-  margin: 14px 0 0;
+
+/* Confirm dialog (native <dialog>; top layer, still inside .ff-dash so
+   the type tokens resolve) */
+.ff-dialog {
+  width: min(420px, calc(100% - 32px));
+  padding: 24px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-lg);
+  background: var(--ff-navy-900);
+  color: #fff;
+  box-shadow: var(--ff-shadow-float);
+}
+.ff-dialog::backdrop {
+  background: rgba(0, 10, 25, 0.6);
+}
+.ff-dialog__title {
+  margin: 0 0 8px;
+  font-size: var(--ff-dash-text-lg);
+}
+.ff-dialog__text {
+  margin: 0 0 16px;
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
 }
 
 @media (max-width: 781.98px) {
-  .ff-reg__choices {
+  .ff-bubble-grid {
     grid-template-columns: 1fr;
   }
 }

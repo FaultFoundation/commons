@@ -188,7 +188,7 @@ export function RegisterFlow({ initial }: { initial: RegisterInitialState }) {
 
       {step === 1 ? (
         <>
-          <h2 className="ff-reg__title">Tell us about you</h2>
+          <h2 className="ff-reg__title">Tell Us About You</h2>
           <div className="ff-reg__choices" role="radiogroup" aria-label="Membership type">
             {USER_TYPES.map((type) => (
               <button
@@ -239,7 +239,7 @@ export function RegisterFlow({ initial }: { initial: RegisterInitialState }) {
 
       {step === 2 && isNone ? (
         <>
-          <h2 className="ff-reg__title">A bit of context</h2>
+          <h2 className="ff-reg__title">A Bit of Context</h2>
           <p className="ff-auth__hint">
             Non-students are welcome by referral. A staff member reviews these by
             hand, so the more context the better.
@@ -283,7 +283,7 @@ export function RegisterFlow({ initial }: { initial: RegisterInitialState }) {
 
       {step === 2 && !isNone ? (
         <>
-          <h2 className="ff-reg__title">Your school</h2>
+          <h2 className="ff-reg__title">Your School</h2>
           <label className="ff-auth__field">
             <span className="ff-auth__label">Country</span>
             <select
@@ -389,7 +389,7 @@ export function RegisterFlow({ initial }: { initial: RegisterInitialState }) {
 
       {step === 3 ? (
         <>
-          <h2 className="ff-reg__title">Your school email</h2>
+          <h2 className="ff-reg__title">Your School Email</h2>
           <p className="ff-auth__hint">
             We&rsquo;ll send a verification code to prove you&rsquo;re part of{" "}
             <strong>{schoolName || "your school"}</strong>. School inboxes only —
@@ -424,7 +424,7 @@ export function RegisterFlow({ initial }: { initial: RegisterInitialState }) {
 
       {step === 4 ? (
         <>
-          <h2 className="ff-reg__title">Check your inbox</h2>
+          <h2 className="ff-reg__title">Check Your Inbox</h2>
           <p className="ff-auth__hint">
             We sent a code to <strong>{schoolEmail || "your school email"}</strong>.
             It expires in 24 hours.
@@ -476,7 +476,7 @@ export function RegisterFlow({ initial }: { initial: RegisterInitialState }) {
 
       {step === "review" ? (
         <>
-          <h2 className="ff-reg__title">We&rsquo;re on it</h2>
+          <h2 className="ff-reg__title">We&rsquo;re On It</h2>
           <p>
             Your registration is with our staff for a manual look — this happens
             when we can&rsquo;t automatically match your details to a school.
@@ -495,7 +495,7 @@ export function RegisterFlow({ initial }: { initial: RegisterInitialState }) {
 
       {step === "done" ? (
         <>
-          <h2 className="ff-reg__title">You&rsquo;re verified! 🎉</h2>
+          <h2 className="ff-reg__title">You&rsquo;re Verified! 🎉</h2>
           <p>
             Your school email checks out. Next up: link your Discord account from
             the dashboard so we can get you your roles.

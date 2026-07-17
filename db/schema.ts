@@ -96,6 +96,9 @@ export const profiles = sqliteTable("profiles", {
     .unique()
     .references(() => user.id, { onDelete: "set null" }),
   discordId: text("discord_id").unique(),
+  // Display name captured at link time (best effort — null for accounts
+  // linked before this column existed, or when the fetch failed).
+  discordUsername: text("discord_username"),
   battleTag: text("battle_tag"),
   steamFriendCode: text("steam_friend_code"),
   userType: text("user_type"),

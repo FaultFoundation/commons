@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import { SetupStrip } from "@/components/dashboard/SetupStrip";
 
 export type DashboardNavKey = "home" | "bracket" | "team" | "accounts";
 
@@ -9,7 +10,7 @@ const NAV_ITEMS: { key: DashboardNavKey; label: string; href?: string }[] = [
   { key: "home", label: "Home", href: "/dashboard/" },
   { key: "bracket", label: "Bracket" },
   { key: "team", label: "My Team" },
-  { key: "accounts", label: "Accounts" },
+  { key: "accounts", label: "Accounts", href: "/dashboard/accounts/" },
 ];
 
 /**
@@ -20,10 +21,14 @@ const NAV_ITEMS: { key: DashboardNavKey; label: string; href?: string }[] = [
  */
 export function DashboardShell({
   active,
+  setupUserId,
   children,
 }: {
   /** Omit for portal pages reached from cards rather than the nav. */
   active?: DashboardNavKey;
+  /** When set, the setup-progress strip renders above the tab's bubbles.
+      Omit on pages that ARE a setup step (register). */
+  setupUserId?: string;
   children: ReactNode;
 }) {
   return (
@@ -57,7 +62,10 @@ export function DashboardShell({
             <SignOutButton />
           </div>
         </aside>
-        <div className="ff-dash__content">{children}</div>
+        <div className="ff-dash__content">
+          {setupUserId ? <SetupStrip userId={setupUserId} /> : null}
+          {children}
+        </div>
       </div>
     </main>
   );

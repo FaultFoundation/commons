@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDb } from "@/lib/db";
-import { mirrorDiscordIdToProfile } from "@/lib/registration";
+import { fetchDiscordUsername, mirrorDiscordIdToProfile } from "@/lib/registration";
 
 // Server-side Better Auth instance. Built per-request because the D1 binding
 // and secrets only exist on the request's Cloudflare context.
@@ -27,6 +27,23 @@ export function getAuth() {
       // Flip to true once an email provider (e.g. Resend) is wired up.
       requireEmailVerification: false,
     },
+    user: {
+      changeEmail: {
+        enabled: true,
+        // No verification sender is wired yet, and better-auth rejects
+        // every change without one unless this flag is set. It only
+        // applies while user.emailVerified is false, so wiring
+        // verification emails later upgrades the flow automatically.
+        updateEmailWithoutVerification: true,
+      },
+      // Self-serve deletion from the Accounts tab. Better Auth removes
+      // the user's sessions and accounts itself; the D1 FKs then set
+      // profiles.user_id NULL (row kept for staff/anti-abuse history)
+      // and cascade school_email_verifications.
+      deleteUser: {
+        enabled: true,
+      },
+    },
     account: {
       accountLinking: {
         trustedProviders: ["discord"],
@@ -43,7 +60,12 @@ export function getAuth() {
           // place a Discord account row appears. Mirror never throws.
           after: async (account) => {
             if (account.providerId === "discord") {
-              await mirrorDiscordIdToProfile(account.userId, account.accountId);
+              const username = await fetchDiscordUsername(account.accessToken);
+              await mirrorDiscordIdToProfile(
+                account.userId,
+                account.accountId,
+                username,
+              );
             }
           },
         },

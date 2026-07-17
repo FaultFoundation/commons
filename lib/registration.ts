@@ -152,18 +152,47 @@ export async function getProfileByUserId(userId: string) {
 }
 
 /**
- * Mirrors a linked Discord account into profiles.discordId. Runs from the
- * better-auth account-created hook, covering explicit linking and Discord
- * sign-in/up. Must never throw: a mirror failure must not fail the OAuth
- * flow — conflicts get recorded in staff notes instead.
+ * Best-effort Discord display name for the just-linked account. Called
+ * from the account-created hook while the OAuth access token is fresh.
+ * Never throws — a miss just means the Accounts tab shows "Connected".
+ */
+export async function fetchDiscordUsername(
+  accessToken: string | null | undefined,
+): Promise<string | null> {
+  if (!accessToken) return null;
+  try {
+    const res = await fetch("https://discord.com/api/users/@me", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return null;
+    const me = (await res.json()) as {
+      username?: string;
+      global_name?: string | null;
+    };
+    return me.global_name || me.username || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Mirrors a linked Discord account into profiles.discordId (and the
+ * display name, when the fetch got one — null never clobbers a stored
+ * name). Runs from the better-auth account-created hook, covering
+ * explicit linking and Discord sign-in/up. Must never throw: a mirror
+ * failure must not fail the OAuth flow — conflicts get recorded in
+ * staff notes instead.
  */
 export async function mirrorDiscordIdToProfile(
   userId: string,
   discordId: string,
+  discordUsername?: string | null,
 ): Promise<void> {
   try {
     const db = getDb();
     const now = new Date();
+    const nameUpdate = discordUsername ? { discordUsername } : {};
 
     // A legacy import row carrying this Discord ID (userId still null)
     // gets adopted by the signing-in user.
@@ -189,19 +218,27 @@ export async function mirrorDiscordIdToProfile(
           .where(eq(profiles.id, legacy[0].id));
         await db
           .update(profiles)
-          .set({ discordId, updatedAt: now })
+          .set({ discordId, ...nameUpdate, updatedAt: now })
           .where(eq(profiles.id, own.id));
       } else {
         await db
           .update(profiles)
-          .set({ userId, updatedAt: now })
+          .set({ userId, ...nameUpdate, updatedAt: now })
           .where(eq(profiles.id, legacy[0].id));
       }
       return;
     }
 
     if (own) {
-      if (own.discordId === discordId) return;
+      if (own.discordId === discordId) {
+        if (discordUsername && own.discordUsername !== discordUsername) {
+          await db
+            .update(profiles)
+            .set({ discordUsername, updatedAt: now })
+            .where(eq(profiles.id, own.id));
+        }
+        return;
+      }
       // Unique-violation guard: some other profile already owns this ID.
       const taken = await db
         .select({ id: profiles.id })
@@ -220,7 +257,7 @@ export async function mirrorDiscordIdToProfile(
       }
       await db
         .update(profiles)
-        .set({ discordId, updatedAt: now })
+        .set({ discordId, ...nameUpdate, updatedAt: now })
         .where(eq(profiles.id, own.id));
       return;
     }
@@ -229,6 +266,7 @@ export async function mirrorDiscordIdToProfile(
       id: crypto.randomUUID(),
       userId,
       discordId,
+      discordUsername: discordUsername ?? null,
     });
   } catch (error) {
     console.error("discordId mirror failed:", error);

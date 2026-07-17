@@ -40,7 +40,7 @@ export default async function RegisterPage() {
     return (
       <DashboardShell>
         <div className="ff-card ff-reg">
-          <h1 className="ff-reg__title">You&rsquo;re verified</h1>
+          <h1 className="ff-reg__title">You&rsquo;re Verified</h1>
           <p>
             <strong>{profile?.schoolName}</strong> — verified
             {profile?.verifiedAt
@@ -62,7 +62,7 @@ export default async function RegisterPage() {
     return (
       <DashboardShell>
         <div className="ff-card ff-reg">
-          <h1 className="ff-reg__title">Registration on hold</h1>
+          <h1 className="ff-reg__title">Registration On Hold</h1>
           <p>
             Your registration can&rsquo;t be changed from here. Reach out to the
             staff on Discord or email support@fault.foundation.
@@ -113,12 +113,7 @@ export default async function RegisterPage() {
 
   return (
     <DashboardShell>
-      <header className="ff-dash__head">
-        <h1 className="ff-dash__title">Member registration</h1>
-        <p className="ff-dash__hint">
-          Quick school check, then you&rsquo;re in. Takes about two minutes.
-        </p>
-      </header>
+      <h1 className="screen-reader-text">Member Registration</h1>
       <RegisterFlow initial={initial} />
     </DashboardShell>
   );

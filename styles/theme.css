@@ -1735,6 +1735,13 @@ a.ff-dash__link:hover {
   color: #fff;
 }
 
+/* Sign-out failure notice (sidebar foot) */
+.ff-signout__error {
+  margin: 8px 0 0;
+  color: #ffb4b4;
+  font-size: var(--wp--preset--font-size--small);
+}
+
 /* Setup checklist (dashboard home card) */
 .ff-setup__list {
   display: grid;

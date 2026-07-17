@@ -32,9 +32,10 @@ Deleting/recreating the Worker detached the domain.
 3. Enter `fault.foundation` → **Add domain**. (Repeat for `www.fault.foundation`
    if it was attached before.)
 
-Sign-in only works on `https://fault.foundation` (requests from other
-origins, including workers.dev, are rejected by the auth origin check — the
-`BETTER_AUTH_URL` var in `wrangler.jsonc` defines the allowed origin).
+Sign-in works on `https://fault.foundation` (the `BETTER_AUTH_URL` var in
+`wrangler.jsonc`) and on the workers.dev staging URL, which is explicitly
+trusted in `lib/auth.ts` `trustedOrigins`. Any other origin is rejected by
+the auth origin check with a 403.
 
 ### 2. Auto-deploy on push (Workers Builds)
 

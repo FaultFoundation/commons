@@ -3,6 +3,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // WordPress permalinks all end in "/" — keep /about/ style URLs.
   trailingSlash: true,
+  // But handle the actual redirect in middleware.ts: Next's built-in one
+  // also rewrites /api/* to trailing-slash URLs, which better-auth's router
+  // 404s (breaking sign-in/out under `next dev`). Middleware exempts /api/.
+  skipTrailingSlashRedirect: true,
   // Markup uses plain <img> ported from WP; no Next image optimization.
   images: { unoptimized: true },
   // Formerly public/_redirects (Pages-style); served by the app now that the

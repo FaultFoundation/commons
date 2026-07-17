@@ -69,6 +69,32 @@ otherwise its builds fight over the same repo.
    ```
    (each command waits for you to paste the value and press Enter)
 
+### 4. Registration emails (Resend) + schools directory
+
+The in-portal registration flow (school-email verification codes) needs two
+one-time steps in production:
+
+1. **Seed the schools directory** (university typeahead data):
+   ```sh
+   npm run db:migrate:remote   # if the 0001 migration isn't applied yet
+   npm run db:seed:remote      # loads db/seed/schools.sql (~10k universities)
+   ```
+   Regenerate the seed file any time with `npm run db:seed:generate`
+   (pulls the latest Hipo university-domains-list dataset).
+
+2. **Resend** (verification-code emails):
+   1. Create a free account at <https://resend.com> → **Domains** → add
+      `fault.foundation` → add the DKIM/SPF records it shows to Cloudflare
+      DNS → wait for "Verified".
+   2. Create an API key, then in the project terminal:
+      ```sh
+      npx wrangler secret put RESEND_API_KEY
+      ```
+   Until the key is set, codes are **logged to the Worker console instead
+   of emailed** (`npx wrangler tail website` shows them) — fine for testing,
+   not for members. The from-address is the `EMAIL_FROM` var in
+   `wrangler.jsonc`.
+
 ## Later / optional
 
 - **Email verification:** flip `requireEmailVerification` in `lib/auth.ts`

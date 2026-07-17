@@ -22,7 +22,8 @@ export function DashboardShell({
   active,
   children,
 }: {
-  active: DashboardNavKey;
+  /** Omit for portal pages reached from cards rather than the nav. */
+  active?: DashboardNavKey;
   children: ReactNode;
 }) {
   return (

@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { SetupCard } from "@/components/dashboard/SetupCard";
 import { getAuth } from "@/lib/auth";
 
 // Session-gated: always rendered per request.
@@ -30,10 +31,7 @@ export default async function DashboardPage() {
           <h2 className="ff-dash-card__title">My bracket</h2>
           <div className="ff-dash-card__wip">Work in progress</div>
         </section>
-        <section className="ff-card ff-dash-card">
-          <h2 className="ff-dash-card__title">Setup</h2>
-          <div className="ff-dash-card__wip">Work in progress</div>
-        </section>
+        <SetupCard userId={session.user.id} />
         <section className="ff-card ff-dash-card">
           <h2 className="ff-dash-card__title">Team</h2>
           <div className="ff-dash-card__wip">Work in progress</div>

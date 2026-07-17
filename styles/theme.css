@@ -1564,3 +1564,237 @@ a.ff-dash__link:hover {
     min-height: 160px;
   }
 }
+
+/* ---------- 17. Registration flow + setup checklist ---------- */
+
+.ff-reg {
+  max-width: 720px;
+  padding: clamp(24px, 4vw, 36px);
+}
+.ff-reg__title {
+  margin: 0 0 0.5em;
+  font-size: var(--wp--preset--font-size--x-large);
+}
+
+/* Numbered progress rail */
+.ff-reg__steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 22px;
+  padding: 0;
+  list-style: none;
+  counter-reset: ff-step;
+}
+.ff-reg__step {
+  counter-increment: ff-step;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: var(--ff-radius-pill);
+  border: 1px solid var(--ff-border);
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 600;
+}
+.ff-reg__step::before {
+  content: counter(ff-step);
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--ff-radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+.ff-reg__step--current {
+  border-color: var(--ff-accent);
+  color: #fff;
+}
+.ff-reg__step--current::before {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
+}
+.ff-reg__step--done {
+  color: #dfe9f4;
+}
+.ff-reg__step--done::before {
+  content: "✓";
+  background: var(--ff-blue);
+  color: #fff;
+}
+
+/* Membership-type radio cards */
+.ff-reg__choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0 0 18px;
+}
+.ff-reg__choice {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--ff-transition),
+    background var(--ff-transition);
+}
+.ff-reg__choice:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+.ff-reg__choice--selected {
+  border-color: var(--ff-accent);
+  background: rgba(255, 238, 88, 0.08);
+}
+.ff-reg__choice span {
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--small);
+}
+
+.ff-reg__nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+}
+.ff-reg__textarea {
+  resize: vertical;
+  min-height: 110px;
+}
+.ff-reg__code {
+  max-width: 240px;
+  font-family: var(--wp--preset--font-family--fira-code);
+  font-size: 1.3rem;
+  letter-spacing: 0.18em;
+  text-align: center;
+  text-transform: uppercase;
+}
+/* Quiet link-style button ("my school isn't listed", "change email") */
+.ff-reg__alt {
+  margin: -6px 0 16px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ff-text-dim);
+  font: inherit;
+  font-size: var(--wp--preset--font-size--small);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ff-reg__alt:hover {
+  color: var(--ff-accent);
+}
+.ff-reg__alt--inline {
+  margin: 0;
+}
+
+/* Typeahead listbox */
+.ff-typeahead {
+  position: relative;
+}
+.ff-typeahead__list {
+  position: absolute;
+  z-index: 30;
+  inset-inline: 0;
+  top: calc(100% + 4px);
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-navy-900);
+  box-shadow: var(--ff-shadow-card);
+  max-height: 280px;
+  overflow-y: auto;
+}
+.ff-typeahead__option {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: #dfe9f4;
+  font: inherit;
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+}
+.ff-typeahead__option--active {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+/* Setup checklist (dashboard home card) */
+.ff-setup__list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ff-setup__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+}
+.ff-setup__item--soon {
+  opacity: 0.5;
+}
+.ff-setup__label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+.ff-setup__mark {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--ff-radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ff-text-dim);
+  font-size: 0.8rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.ff-setup__mark--done {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
+}
+.ff-setup__state {
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--small);
+  white-space: nowrap;
+}
+.ff-setup__state a {
+  color: #fff;
+  font-weight: 700;
+}
+.ff-setup__state a:hover {
+  color: var(--ff-accent);
+}
+.ff-setup__cta {
+  margin: 14px 0 0;
+}
+
+@media (max-width: 781.98px) {
+  .ff-reg__choices {
+    grid-template-columns: 1fr;
+  }
+}

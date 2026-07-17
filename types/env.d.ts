@@ -4,4 +4,8 @@
 interface CloudflareEnv {
   DISCORD_CLIENT_ID?: string;
   DISCORD_CLIENT_SECRET?: string;
+  // Registration verification-code emails. Without the key, emails are
+  // logged to the console instead of sent (dev mode).
+  RESEND_API_KEY?: string;
+  EMAIL_FROM?: string;
 }

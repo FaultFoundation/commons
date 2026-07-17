@@ -14,3 +14,7 @@ BETTER_AUTH_URL=http://localhost:3999
 # as an OAuth2 redirect.
 # DISCORD_CLIENT_ID=
 # DISCORD_CLIENT_SECRET=
+
+# Optional — sends real registration verification emails via Resend. Leave
+# unset locally: codes are printed to the server terminal instead.
+# RESEND_API_KEY=

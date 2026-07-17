@@ -11,7 +11,10 @@
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply website-sql --local",
-    "db:migrate:remote": "wrangler d1 migrations apply website-sql --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply website-sql --remote",
+    "db:seed:generate": "node scripts/gen-schools-seed.mjs",
+    "db:seed:local": "wrangler d1 execute website-sql --local --file=db/seed/schools.sql",
+    "db:seed:remote": "wrangler d1 execute website-sql --remote --file=db/seed/schools.sql"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.20.1",

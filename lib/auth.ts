@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDb } from "@/lib/db";
+import { mirrorDiscordIdToProfile } from "@/lib/registration";
 
 // Server-side Better Auth instance. Built per-request because the D1 binding
 // and secrets only exist on the request's Cloudflare context.
@@ -22,6 +23,28 @@ export function getAuth() {
       enabled: true,
       // Flip to true once an email provider (e.g. Resend) is wired up.
       requireEmailVerification: false,
+    },
+    account: {
+      accountLinking: {
+        trustedProviders: ["discord"],
+        // Members' Discord emails rarely match their site email; linking is
+        // only reachable with an authenticated session, so the different-
+        // email check adds no real protection here.
+        allowDifferentEmails: true,
+      },
+    },
+    databaseHooks: {
+      account: {
+        create: {
+          // Fires for explicit linkSocial AND Discord sign-in/up — the one
+          // place a Discord account row appears. Mirror never throws.
+          after: async (account) => {
+            if (account.providerId === "discord") {
+              await mirrorDiscordIdToProfile(account.userId, account.accountId);
+            }
+          },
+        },
+      },
     },
     // Discord sign-in lights up only when the OAuth app is configured
     // (secrets via `wrangler secret put` / .dev.vars) — email/password

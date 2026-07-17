@@ -1,1 +1,0 @@
-ALTER TABLE `profiles` ADD `discord_username` text;

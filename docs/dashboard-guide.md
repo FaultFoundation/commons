@@ -102,7 +102,7 @@ confirms, Esc/Cancel closes. Use `danger` for red confirm buttons. See
 every tab that passes `setupUserId`. Shows "Setup n/3" (Email ·
 Battle.net · Discord) and unmounts once all three are done. Don't pass
 `setupUserId` on pages that *are* a setup step (register). Battle.net
-counts as done when `profiles.battleTag` is set — real OAuth is still
+counts as done when a `battlenet` row exists in `platform_identities` — real OAuth is still
 todo, so new users keep the strip until that ships.
 
 ## Recipe: add a new tab

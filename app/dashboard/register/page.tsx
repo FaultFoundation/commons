@@ -13,7 +13,7 @@ import { schools, schoolEmailVerifications } from "@/db/schema";
 import {
   MAX_ATTEMPTS,
   RESEND_COOLDOWN_MS,
-  getProfileByUserId,
+  getRegistrationState,
 } from "@/lib/registration";
 import { eq } from "drizzle-orm";
 
@@ -32,8 +32,8 @@ export default async function RegisterPage() {
   }
 
   const db = getDb();
-  const profile = await getProfileByUserId(session.user.id);
-  const status = profile?.status ?? null;
+  const reg = await getRegistrationState(session.user.id);
+  const status = reg?.status ?? null;
 
   // Terminal / staff-owned statuses never render the form.
   if (status === "VERIFIED") {
@@ -42,9 +42,9 @@ export default async function RegisterPage() {
         <div className="ff-card ff-reg">
           <h1 className="ff-reg__title">You&rsquo;re Verified</h1>
           <p>
-            <strong>{profile?.schoolName}</strong> — verified
-            {profile?.verifiedAt
-              ? ` on ${profile.verifiedAt.toLocaleDateString("en-US", { dateStyle: "long" })}`
+            <strong>{reg?.schoolName}</strong> — verified
+            {reg?.verifiedAt
+              ? ` on ${reg.verifiedAt.toLocaleDateString("en-US", { dateStyle: "long" })}`
               : ""}
             . Nothing more to do here.
           </p>
@@ -100,13 +100,13 @@ export default async function RegisterPage() {
 
   const initial: RegisterInitialState = {
     status,
-    userType: profile?.userType ?? null,
-    ageRange: profile?.ageRange ?? null,
-    country: profile?.country ?? null,
-    schoolName: profile?.schoolName ?? null,
-    schoolWebsite: profile?.schoolWebsite ?? null,
-    schoolEmail: profile?.schoolEmail ?? null,
-    graduationDate: profile?.graduationDate ?? null,
+    userType: reg?.userType ?? null,
+    ageRange: reg?.ageRange ?? null,
+    country: reg?.country ?? null,
+    schoolName: reg?.schoolName ?? null,
+    schoolWebsite: reg?.schoolWebsite ?? null,
+    schoolEmail: reg?.schoolEmail ?? null,
+    graduationDate: reg?.graduationDate ?? null,
     countries: countryRows.map((r) => r.country),
     verification,
   };

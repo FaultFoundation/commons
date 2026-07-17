@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 
 import { account } from "@/db/schema";
 import { getDb } from "@/lib/db";
-import { getProfileByUserId } from "@/lib/registration";
+import { getPlatformIdentity, getRegistrationState } from "@/lib/registration";
 
 /**
  * Slim setup-progress bar the DashboardShell renders above every tab's
@@ -12,20 +12,21 @@ import { getProfileByUserId } from "@/lib/registration";
  */
 export async function SetupStrip({ userId }: { userId: string }) {
   const db = getDb();
-  const profile = await getProfileByUserId(userId);
-  const discordLinked =
-    (
-      await db
-        .select({ id: account.id })
-        .from(account)
-        .where(and(eq(account.userId, userId), eq(account.providerId, "discord")))
-        .limit(1)
-    ).length > 0;
+  const [reg, battleNet, discordRows] = await Promise.all([
+    getRegistrationState(userId),
+    getPlatformIdentity(userId, "battlenet"),
+    db
+      .select({ id: account.id })
+      .from(account)
+      .where(and(eq(account.userId, userId), eq(account.providerId, "discord")))
+      .limit(1),
+  ]);
+  const discordLinked = discordRows.length > 0;
 
-  const status = profile?.status ?? null;
+  const status = reg?.status ?? null;
   const emailDone = status === "VERIFIED";
-  // Battle.net OAuth doesn't exist yet; legacy imports carry a BattleTag.
-  const battleNetDone = Boolean(profile?.battleTag);
+  // Battle.net OAuth doesn't exist yet; a battlenet platform identity marks it done.
+  const battleNetDone = Boolean(battleNet);
   const done = Number(emailDone) + Number(battleNetDone) + Number(discordLinked);
   if (done === 3) return null;
 

@@ -16,8 +16,9 @@ export const AGE_RANGES = [
   "26 years and older",
 ] as const;
 
-// profiles.status values the site writes. The vocabulary matches the legacy
-// sheet so the Discord bot can consume D1 rows later without translation.
+// program_memberships.status values the site writes. The vocabulary matches
+// the legacy sheet so the Discord bot can consume D1 rows later without
+// translation.
 export type RegistrationStatus =
   | "EMAIL_SENT"
   | "MANUAL_REVIEW"

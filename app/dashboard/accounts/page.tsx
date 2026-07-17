@@ -16,7 +16,7 @@ import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { account } from "@/db/schema";
 import { discordAuthEnabled, getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { getProfileByUserId } from "@/lib/registration";
+import { getPlatformIdentity, getRegistrationState } from "@/lib/registration";
 
 // Session-gated: always rendered per request.
 export const dynamic = "force-dynamic";
@@ -33,16 +33,19 @@ export default async function AccountsPage() {
   }
 
   const db = getDb();
-  const profile = await getProfileByUserId(session.user.id);
-  const accountRows = await db
-    .select({ providerId: account.providerId })
-    .from(account)
-    .where(eq(account.userId, session.user.id));
+  const [reg, discordIdentity, accountRows] = await Promise.all([
+    getRegistrationState(session.user.id),
+    getPlatformIdentity(session.user.id, "discord"),
+    db
+      .select({ providerId: account.providerId })
+      .from(account)
+      .where(eq(account.userId, session.user.id)),
+  ]);
   const hasPassword = accountRows.some((r) => r.providerId === "credential");
   const discordLinked = accountRows.some((r) => r.providerId === "discord");
 
-  const status = profile?.status ?? null;
-  const hasSchool = Boolean(profile?.schoolName);
+  const status = reg?.status ?? null;
+  const hasSchool = Boolean(reg?.schoolName);
 
   return (
     <DashboardShell active="accounts" setupUserId={session.user.id}>
@@ -62,10 +65,10 @@ export default async function AccountsPage() {
           )}
           {hasSchool ? (
             <>
-              <BubbleRow label="School" value={profile?.schoolName} locked />
+              <BubbleRow label="School" value={reg?.schoolName} locked />
               <BubbleRow
                 label="School Email"
-                value={profile?.schoolEmail ?? undefined}
+                value={reg?.schoolEmail ?? undefined}
                 locked
               />
             </>
@@ -102,7 +105,7 @@ export default async function AccountsPage() {
           />
           <DiscordRow
             linked={discordLinked}
-            username={profile?.discordUsername ?? null}
+            username={discordIdentity?.handle ?? null}
             discordEnabled={discordAuthEnabled()}
           />
         </Bubble>

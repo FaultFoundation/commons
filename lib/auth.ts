@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDb } from "@/lib/db";
-import { fetchDiscordUsername, mirrorDiscordIdToProfile } from "@/lib/registration";
+import { fetchDiscordUsername, mirrorDiscordIdentity } from "@/lib/registration";
 
 // Server-side Better Auth instance. Built per-request because the D1 binding
 // and secrets only exist on the request's Cloudflare context.
@@ -37,9 +37,10 @@ export function getAuth() {
         updateEmailWithoutVerification: true,
       },
       // Self-serve deletion from the Accounts tab. Better Auth removes
-      // the user's sessions and accounts itself; the D1 FKs then set
-      // profiles.user_id NULL (row kept for staff/anti-abuse history)
-      // and cascade school_email_verifications.
+      // the user's sessions and accounts itself; the D1 FKs then cascade the
+      // user's satellite rows (profile, memberships, identities, …).
+      // moderation_actions.user_id is set NULL instead (its subject_* columns
+      // keep the anti-abuse record after deletion).
       deleteUser: {
         enabled: true,
       },
@@ -61,7 +62,7 @@ export function getAuth() {
           after: async (account) => {
             if (account.providerId === "discord") {
               const username = await fetchDiscordUsername(account.accessToken);
-              await mirrorDiscordIdToProfile(
+              await mirrorDiscordIdentity(
                 account.userId,
                 account.accountId,
                 username,

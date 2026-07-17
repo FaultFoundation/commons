@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1784192962449,
-      "tag": "0000_dashing_eddie_brock",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1784250884348,
-      "tag": "0001_eminent_spectrum",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1784286982446,
-      "tag": "0002_white_captain_america",
+      "when": 1784325580227,
+      "tag": "0000_past_virginia_dare",
       "breakpoints": true
     }
   ]

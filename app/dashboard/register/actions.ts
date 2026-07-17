@@ -6,7 +6,12 @@ import { and, eq, ne, sql } from "drizzle-orm";
 
 import { getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { profiles, schools, schoolEmailVerifications } from "@/db/schema";
+import {
+  schools,
+  schoolEmailVerifications,
+  programMemberships,
+  collegiateRegistrations,
+} from "@/db/schema";
 import { sendVerificationCodeEmail } from "@/lib/email";
 import {
   AGE_RANGES,
@@ -15,23 +20,29 @@ import {
   MAX_SENDS_PER_WINDOW,
   RESEND_COOLDOWN_MS,
   USER_TYPES,
-  type UserType,
   emailDomain,
+  ensureCollegiateMembership,
+  ensureProfile,
   formatCode,
   generateCode,
-  getProfileByUserId,
+  getOrCreateCollege,
+  getRegistrationState,
   hashCode,
   hashesEqual,
   hostnameOf,
-  isFreeEmailDomain,
   normalizeCodeInput,
   schoolEmailMatches,
+  upsertCollegiateRegistration,
 } from "@/lib/registration";
 
 // ---------------------------------------------------------------------------
 // Server actions for the registration flow. Every action re-checks the
 // session and re-validates inputs — client state is presentation only.
 // Results are plain serializable objects; nothing throws across the boundary.
+//
+// Writes fan out across three tables: the slim `profiles` (age/country), the
+// generic `program_memberships` (status), and `collegiate_registrations`
+// (school detail) hanging off it — via the helpers in lib/registration.ts.
 // ---------------------------------------------------------------------------
 
 export type SchoolHit = { id: number; name: string; website: string };
@@ -204,8 +215,8 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
   const userId = await requireUserId();
   if (!userId) return { ok: false, error: "You need to be signed in." };
 
-  const profile = await getProfileByUserId(userId);
-  if (profile && !isOpenStatus(profile.status)) {
+  const state = await getRegistrationState(userId);
+  if (state && !isOpenStatus(state.status)) {
     return { ok: false, error: "Your registration can't be changed — contact staff." };
   }
 
@@ -216,22 +227,22 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
   if (!ageRange) return { ok: false, error: "Pick an age range." };
 
   const db = getDb();
-  const base = {
-    userType,
-    ageRange,
-    updatedAt: new Date(),
-  };
+  const memberCountry = country.slice(0, 100) || null;
 
+  // Persist person profile + membership status + collegiate detail in one shot.
   const finish = async (
-    fields: Partial<typeof profiles.$inferInsert>,
+    detail: {
+      collegeId?: string | null;
+      schoolEmail?: string | null;
+      graduationDate?: string | null;
+      referrer?: string | null;
+      circumstances?: string | null;
+    },
     status: "EMAIL_SENT" | "MANUAL_REVIEW",
   ) => {
-    const values = { ...base, ...fields, status };
-    if (profile) {
-      await db.update(profiles).set(values).where(eq(profiles.id, profile.id));
-    } else {
-      await db.insert(profiles).values({ id: crypto.randomUUID(), userId, ...values });
-    }
+    await ensureProfile(userId, { ageRange, country: memberCountry });
+    const membershipId = await ensureCollegiateMembership(userId, { status });
+    await upsertCollegiateRegistration(membershipId, { userType, ...detail });
     revalidatePath("/dashboard/");
     revalidatePath("/dashboard/register/");
   };
@@ -245,11 +256,9 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
     }
     await finish(
       {
-        country: country.slice(0, 100) || null,
+        collegeId: null,
         referrer: referrer || null,
         circumstances,
-        schoolName: null,
-        schoolWebsite: null,
         schoolEmail: null,
         graduationDate: null,
       },
@@ -273,9 +282,8 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
     return { ok: false, error: "Enter your expected graduation date." };
   }
 
-  let schoolName: string;
-  let schoolWebsite: string;
-  let schoolCountry = country.slice(0, 100);
+  // Build the durable college record + decide whether the email domain matches.
+  let collegeInput: Parameters<typeof getOrCreateCollege>[0];
   let matched: boolean;
 
   if (isUniversity && input.schoolId != null) {
@@ -291,58 +299,72 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
     if (!school) {
       return { ok: false, error: "School not found — search and select it again." };
     }
-    let candidates: string[] = [];
-    let firstPage = "";
+    let domains: string[] = [];
+    let pages: string[] = [];
     try {
-      const domains = JSON.parse(school.domains) as string[];
-      const pages = JSON.parse(school.webPages) as string[];
-      firstPage = pages[0] ?? "";
-      candidates = [
-        ...domains,
-        ...pages.map((p) => hostnameOf(p) ?? "").filter(Boolean),
-      ];
+      domains = JSON.parse(school.domains) as string[];
+      pages = JSON.parse(school.webPages) as string[];
     } catch {
-      candidates = [];
+      domains = [];
+      pages = [];
     }
-    schoolName = school.name;
-    schoolWebsite = (input.schoolWebsite ?? "").trim().slice(0, 300) || firstPage;
-    schoolCountry = school.country;
+    const candidates = [
+      ...domains,
+      ...pages.map((p) => hostnameOf(p) ?? "").filter(Boolean),
+    ];
+    collegeInput = {
+      name: school.name,
+      country: school.country,
+      alphaTwoCode: school.alphaTwoCode,
+      stateProvince: school.stateProvince,
+      domains,
+      webPages: pages,
+    };
     matched = schoolEmailMatches(schoolEmail, candidates);
   } else {
-    // Manual entry (high school, or "my school isn't listed"): the entered
-    // website is the only domain evidence, and free mailboxes never pass.
-    schoolName = (input.schoolName ?? "").trim().slice(0, 200);
-    schoolWebsite = (input.schoolWebsite ?? "").trim().slice(0, 300);
+    // Manual entry (high school, or "my school isn't listed"). The only domain
+    // evidence here is the user-entered website — checking a user-supplied
+    // email against a user-supplied domain is circular, so a member could
+    // "verify" any domain they control. Never auto-verify: always route to
+    // human review. (Closes the self-verify hole before the Discord bot reads
+    // status as a membership gate.)
+    const schoolName = (input.schoolName ?? "").trim().slice(0, 200);
+    const schoolWebsite = (input.schoolWebsite ?? "").trim().slice(0, 300);
     if (!schoolName) return { ok: false, error: "Enter your school's name." };
-    const siteHost = hostnameOf(schoolWebsite);
-    matched =
-      !isFreeEmailDomain(domain) &&
-      siteHost !== null &&
-      !isFreeEmailDomain(siteHost) &&
-      schoolEmailMatches(schoolEmail, [siteHost]);
+    collegeInput = {
+      name: schoolName,
+      country: memberCountry,
+      webPages: schoolWebsite ? [schoolWebsite] : [],
+    };
+    matched = false;
   }
 
   // Someone else already verified with this school email → human review
   // (legacy imports may hold dupes, so no unique constraint).
   if (matched) {
     const dupe = await db
-      .select({ id: profiles.id })
-      .from(profiles)
+      .select({ id: collegiateRegistrations.id })
+      .from(collegiateRegistrations)
+      .innerJoin(
+        programMemberships,
+        eq(programMemberships.id, collegiateRegistrations.membershipId),
+      )
       .where(
         and(
-          eq(profiles.schoolEmail, schoolEmail),
-          eq(profiles.status, "VERIFIED"),
-          profile ? ne(profiles.id, profile.id) : undefined,
+          eq(collegiateRegistrations.schoolEmail, schoolEmail),
+          eq(programMemberships.status, "VERIFIED"),
+          state?.membershipId
+            ? ne(collegiateRegistrations.membershipId, state.membershipId)
+            : undefined,
         ),
       )
       .limit(1);
     if (dupe[0]) matched = false;
   }
 
-  const fields = {
-    country: schoolCountry,
-    schoolName,
-    schoolWebsite: schoolWebsite || null,
+  const collegeId = await getOrCreateCollege(collegeInput);
+  const detail = {
+    collegeId,
     schoolEmail,
     graduationDate: graduationDate || null,
     referrer: null,
@@ -350,13 +372,13 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
   };
 
   if (!matched) {
-    await finish(fields, "MANUAL_REVIEW");
+    await finish(detail, "MANUAL_REVIEW");
     return { ok: true, outcome: "MANUAL_REVIEW" };
   }
 
   const sent = await issueCode(userId, schoolEmail);
   if (sent.ok) {
-    await finish(fields, "EMAIL_SENT");
+    await finish(detail, "EMAIL_SENT");
   }
   return sent;
 }
@@ -365,12 +387,12 @@ export async function resendCode(): Promise<ResendResult> {
   const userId = await requireUserId();
   if (!userId) return { ok: false, error: "You need to be signed in." };
 
-  const profile = await getProfileByUserId(userId);
-  if (profile?.status !== "EMAIL_SENT" || !profile.schoolEmail) {
+  const state = await getRegistrationState(userId);
+  if (state?.status !== "EMAIL_SENT" || !state.schoolEmail) {
     return { ok: false, error: "Nothing to resend — submit the form first." };
   }
 
-  const result = await issueCode(userId, profile.schoolEmail);
+  const result = await issueCode(userId, state.schoolEmail);
   if (!result.ok) {
     // Preserve the cooldown hint for the client countdown.
     const m = result.error.match(/wait (\d+)s/);
@@ -387,8 +409,8 @@ export async function verifyCode(input: string): Promise<VerifyResult> {
   const userId = await requireUserId();
   if (!userId) return { ok: false, error: "You need to be signed in." };
 
-  const profile = await getProfileByUserId(userId);
-  if (profile?.status !== "EMAIL_SENT") {
+  const state = await getRegistrationState(userId);
+  if (state?.status !== "EMAIL_SENT" || !state.membershipId) {
     return { ok: false, error: "No verification in progress." };
   }
 
@@ -446,9 +468,9 @@ export async function verifyCode(input: string): Promise<VerifyResult> {
     .set({ verifiedAt: now, updatedAt: now })
     .where(eq(schoolEmailVerifications.userId, userId));
   await db
-    .update(profiles)
+    .update(programMemberships)
     .set({ status: "VERIFIED", verifiedAt: now, updatedAt: now })
-    .where(eq(profiles.id, profile.id));
+    .where(eq(programMemberships.id, state.membershipId));
 
   revalidatePath("/dashboard/");
   revalidatePath("/dashboard/register/");

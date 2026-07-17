@@ -1,7 +1,14 @@
-import { and, eq, isNull, ne } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
-import { profiles } from "@/db/schema";
+import {
+  profiles,
+  colleges,
+  platformIdentities,
+  programMemberships,
+  collegiateRegistrations,
+} from "@/db/schema";
+import { PROGRAM_COLLEGIATE_ID } from "@/lib/programs";
 
 // ---------------------------------------------------------------------------
 // Registration constants (mirroring the legacy sheet/Apps Script flow).
@@ -138,10 +145,11 @@ export function schoolEmailMatches(email: string, candidates: string[]): boolean
 }
 
 // ---------------------------------------------------------------------------
-// profiles helpers
+// Read helpers
 // ---------------------------------------------------------------------------
 
-export async function getProfileByUserId(userId: string) {
+/** Slim cross-program person row (country / age range / dm pref), or null. */
+export async function getProfile(userId: string) {
   const db = getDb();
   const rows = await db
     .select()
@@ -151,10 +159,269 @@ export async function getProfileByUserId(userId: string) {
   return rows[0] ?? null;
 }
 
+/** A single connected platform identity (discord / battlenet / …), or null. */
+export async function getPlatformIdentity(userId: string, provider: string) {
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(platformIdentities)
+    .where(
+      and(
+        eq(platformIdentities.userId, userId),
+        eq(platformIdentities.provider, provider),
+      ),
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export type RegistrationState = {
+  membershipId: string | null;
+  status: string | null;
+  verifiedAt: Date | null;
+  userType: string | null;
+  ageRange: string | null;
+  country: string | null;
+  schoolName: string | null;
+  schoolWebsite: string | null;
+  schoolEmail: string | null;
+  graduationDate: string | null;
+  referrer: string | null;
+  circumstances: string | null;
+  collegeId: string | null;
+};
+
 /**
- * Best-effort Discord display name for the just-linked account. Called
- * from the account-created hook while the OAuth access token is fresh.
- * Never throws — a miss just means the Accounts tab shows "Connected".
+ * Composed view the dashboard reads: the member's collegiate-program
+ * membership + its detail row + the affiliated college, plus person-level
+ * profile fields. Returns null when the member has neither a profile nor a
+ * membership yet.
+ */
+export async function getRegistrationState(
+  userId: string,
+): Promise<RegistrationState | null> {
+  const db = getDb();
+  const [profile, rows] = await Promise.all([
+    getProfile(userId),
+    db
+      .select({
+        membershipId: programMemberships.id,
+        status: programMemberships.status,
+        verifiedAt: programMemberships.verifiedAt,
+        userType: collegiateRegistrations.userType,
+        schoolEmail: collegiateRegistrations.schoolEmail,
+        graduationDate: collegiateRegistrations.graduationDate,
+        referrer: collegiateRegistrations.referrer,
+        circumstances: collegiateRegistrations.circumstances,
+        collegeId: collegiateRegistrations.collegeId,
+        collegeName: colleges.name,
+        collegeWebPages: colleges.webPages,
+      })
+      .from(programMemberships)
+      .leftJoin(
+        collegiateRegistrations,
+        eq(collegiateRegistrations.membershipId, programMemberships.id),
+      )
+      .leftJoin(colleges, eq(colleges.id, collegiateRegistrations.collegeId))
+      .where(
+        and(
+          eq(programMemberships.userId, userId),
+          eq(programMemberships.programId, PROGRAM_COLLEGIATE_ID),
+        ),
+      )
+      .limit(1),
+  ]);
+
+  const row = rows[0];
+  if (!profile && !row) return null;
+
+  let schoolWebsite: string | null = null;
+  if (row?.collegeWebPages) {
+    try {
+      schoolWebsite = (JSON.parse(row.collegeWebPages) as string[])[0] ?? null;
+    } catch {
+      // corrupt college row: leave website empty
+    }
+  }
+
+  return {
+    membershipId: row?.membershipId ?? null,
+    status: row?.status ?? null,
+    verifiedAt: row?.verifiedAt ?? null,
+    userType: row?.userType ?? null,
+    ageRange: profile?.ageRange ?? null,
+    country: profile?.country ?? null,
+    schoolName: row?.collegeName ?? null,
+    schoolWebsite,
+    schoolEmail: row?.schoolEmail ?? null,
+    graduationDate: row?.graduationDate ?? null,
+    referrer: row?.referrer ?? null,
+    circumstances: row?.circumstances ?? null,
+    collegeId: row?.collegeId ?? null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Write helpers (registration flow). Each ensures its row exists then patches.
+// ---------------------------------------------------------------------------
+
+/** Upsert the slim person profile; returns its id. */
+export async function ensureProfile(
+  userId: string,
+  fields: { ageRange?: string | null; country?: string | null },
+): Promise<string> {
+  const db = getDb();
+  const now = new Date();
+  const existing = await getProfile(userId);
+  if (existing) {
+    await db
+      .update(profiles)
+      .set({ ...fields, updatedAt: now })
+      .where(eq(profiles.id, existing.id));
+    return existing.id;
+  }
+  const id = crypto.randomUUID();
+  await db.insert(profiles).values({ id, userId, ...fields });
+  return id;
+}
+
+/** Upsert the user's collegiate-program membership; returns its id. */
+export async function ensureCollegiateMembership(
+  userId: string,
+  patch: { status?: string | null; verifiedAt?: Date | null },
+): Promise<string> {
+  const db = getDb();
+  const now = new Date();
+  const existing = (
+    await db
+      .select({ id: programMemberships.id })
+      .from(programMemberships)
+      .where(
+        and(
+          eq(programMemberships.userId, userId),
+          eq(programMemberships.programId, PROGRAM_COLLEGIATE_ID),
+        ),
+      )
+      .limit(1)
+  )[0];
+  if (existing) {
+    await db
+      .update(programMemberships)
+      .set({ ...patch, updatedAt: now })
+      .where(eq(programMemberships.id, existing.id));
+    return existing.id;
+  }
+  const id = crypto.randomUUID();
+  await db.insert(programMemberships).values({
+    id,
+    userId,
+    programId: PROGRAM_COLLEGIATE_ID,
+    ...patch,
+  });
+  return id;
+}
+
+/** Upsert the collegiate detail row hanging off a membership. */
+export async function upsertCollegiateRegistration(
+  membershipId: string,
+  fields: {
+    collegeId?: string | null;
+    userType?: string | null;
+    schoolEmail?: string | null;
+    graduationDate?: string | null;
+    referrer?: string | null;
+    circumstances?: string | null;
+  },
+): Promise<string> {
+  const db = getDb();
+  const now = new Date();
+  const existing = (
+    await db
+      .select({ id: collegiateRegistrations.id })
+      .from(collegiateRegistrations)
+      .where(eq(collegiateRegistrations.membershipId, membershipId))
+      .limit(1)
+  )[0];
+  if (existing) {
+    await db
+      .update(collegiateRegistrations)
+      .set({ ...fields, updatedAt: now })
+      .where(eq(collegiateRegistrations.id, existing.id));
+    return existing.id;
+  }
+  const id = crypto.randomUUID();
+  await db.insert(collegiateRegistrations).values({ id, membershipId, ...fields });
+  return id;
+}
+
+/**
+ * Resolve a durable `colleges` row for a school, creating it on first use.
+ * Deduped by primary_domain so re-affiliations reuse the row; manual entries
+ * with no resolvable domain always create a fresh row.
+ */
+export async function getOrCreateCollege(input: {
+  name: string;
+  country?: string | null;
+  alphaTwoCode?: string | null;
+  stateProvince?: string | null;
+  domains?: string[] | null;
+  webPages?: string[] | null;
+}): Promise<string> {
+  const db = getDb();
+  const domains = input.domains ?? [];
+  const webPages = input.webPages ?? [];
+  const primaryDomain =
+    (domains[0] ? domains[0].toLowerCase().replace(/^www\./, "") : null) ??
+    (webPages[0] ? hostnameOf(webPages[0]) : null);
+
+  if (primaryDomain) {
+    const existing = (
+      await db
+        .select({ id: colleges.id })
+        .from(colleges)
+        .where(eq(colleges.primaryDomain, primaryDomain))
+        .limit(1)
+    )[0];
+    if (existing) return existing.id;
+  }
+
+  const id = crypto.randomUUID();
+  try {
+    await db.insert(colleges).values({
+      id,
+      name: input.name,
+      country: input.country ?? null,
+      alphaTwoCode: input.alphaTwoCode ?? null,
+      stateProvince: input.stateProvince ?? null,
+      primaryDomain,
+      domains: domains.length ? JSON.stringify(domains) : null,
+      webPages: webPages.length ? JSON.stringify(webPages) : null,
+    });
+    return id;
+  } catch (error) {
+    // Lost a race on the unique primary_domain — reuse the winner.
+    if (primaryDomain) {
+      const again = (
+        await db
+          .select({ id: colleges.id })
+          .from(colleges)
+          .where(eq(colleges.primaryDomain, primaryDomain))
+          .limit(1)
+      )[0];
+      if (again) return again.id;
+    }
+    throw error;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Platform identity helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Best-effort Discord display name for the just-linked account. Called from
+ * the account-created hook while the OAuth access token is fresh. Never
+ * throws — a miss just means the Accounts tab shows "Connected".
  */
 export async function fetchDiscordUsername(
   accessToken: string | null | undefined,
@@ -177,14 +444,13 @@ export async function fetchDiscordUsername(
 }
 
 /**
- * Mirrors a linked Discord account into profiles.discordId (and the
- * display name, when the fetch got one — null never clobbers a stored
- * name). Runs from the better-auth account-created hook, covering
- * explicit linking and Discord sign-in/up. Must never throw: a mirror
- * failure must not fail the OAuth flow — conflicts get recorded in
- * staff notes instead.
+ * Mirrors a linked Discord account into platform_identities (provider
+ * "discord"). Runs from the better-auth account-created hook, covering explicit
+ * linking and Discord sign-in/up. Must never throw: a mirror failure must not
+ * fail the OAuth flow. A Discord ID already claimed by another user is left
+ * alone (the unique constraint would reject it anyway).
  */
-export async function mirrorDiscordIdToProfile(
+export async function mirrorDiscordIdentity(
   userId: string,
   discordId: string,
   discordUsername?: string | null,
@@ -192,83 +458,48 @@ export async function mirrorDiscordIdToProfile(
   try {
     const db = getDb();
     const now = new Date();
-    const nameUpdate = discordUsername ? { discordUsername } : {};
 
-    // A legacy import row carrying this Discord ID (userId still null)
-    // gets adopted by the signing-in user.
-    const legacy = await db
-      .select({ id: profiles.id })
-      .from(profiles)
-      .where(and(eq(profiles.discordId, discordId), isNull(profiles.userId)))
-      .limit(1);
-
-    const own = await getProfileByUserId(userId);
-
-    if (legacy[0]) {
-      if (own) {
-        // Rare: the user already has a row (started registration on the
-        // site before linking). Keep the site row as source of truth and
-        // flag the legacy row for staff to merge by hand.
-        await db
-          .update(profiles)
-          .set({
-            notes: `Legacy row for Discord ${discordId} superseded by site profile ${own.id} (${now.toISOString()})`,
-            updatedAt: now,
-          })
-          .where(eq(profiles.id, legacy[0].id));
-        await db
-          .update(profiles)
-          .set({ discordId, ...nameUpdate, updatedAt: now })
-          .where(eq(profiles.id, own.id));
-      } else {
-        await db
-          .update(profiles)
-          .set({ userId, ...nameUpdate, updatedAt: now })
-          .where(eq(profiles.id, legacy[0].id));
-      }
-      return;
-    }
-
-    if (own) {
-      if (own.discordId === discordId) {
-        if (discordUsername && own.discordUsername !== discordUsername) {
-          await db
-            .update(profiles)
-            .set({ discordUsername, updatedAt: now })
-            .where(eq(profiles.id, own.id));
-        }
-        return;
-      }
-      // Unique-violation guard: some other profile already owns this ID.
-      const taken = await db
-        .select({ id: profiles.id })
-        .from(profiles)
-        .where(and(eq(profiles.discordId, discordId), ne(profiles.id, own.id)))
-        .limit(1);
-      if (taken[0]) {
-        await db
-          .update(profiles)
-          .set({
-            notes: `${own.notes ? `${own.notes}\n` : ""}Discord ${discordId} already claimed by profile ${taken[0].id} (${now.toISOString()})`,
-            updatedAt: now,
-          })
-          .where(eq(profiles.id, own.id));
-        return;
-      }
+    const taken = (
       await db
-        .update(profiles)
-        .set({ discordId, ...nameUpdate, updatedAt: now })
-        .where(eq(profiles.id, own.id));
+        .select({ userId: platformIdentities.userId })
+        .from(platformIdentities)
+        .where(
+          and(
+            eq(platformIdentities.provider, "discord"),
+            eq(platformIdentities.externalId, discordId),
+          ),
+        )
+        .limit(1)
+    )[0];
+    if (taken && taken.userId !== userId) {
+      console.error(`discord ${discordId} already linked to another user`);
       return;
     }
 
-    await db.insert(profiles).values({
+    const existing = await getPlatformIdentity(userId, "discord");
+    if (existing) {
+      await db
+        .update(platformIdentities)
+        .set({
+          externalId: discordId,
+          handle: discordUsername ?? existing.handle,
+          verified: true,
+          updatedAt: now,
+        })
+        .where(eq(platformIdentities.id, existing.id));
+      return;
+    }
+
+    await db.insert(platformIdentities).values({
       id: crypto.randomUUID(),
       userId,
-      discordId,
-      discordUsername: discordUsername ?? null,
+      provider: "discord",
+      externalId: discordId,
+      handle: discordUsername ?? null,
+      verified: true,
+      connectedAt: now,
     });
   } catch (error) {
-    console.error("discordId mirror failed:", error);
+    console.error("discord identity mirror failed:", error);
   }
 }

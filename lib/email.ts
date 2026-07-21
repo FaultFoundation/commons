@@ -29,6 +29,15 @@ export async function sendVerificationCodeEmail({
   const supportEmail = env.SUPPORT_EMAIL ?? DEFAULT_SUPPORT_EMAIL;
 
   if (!env.SUPPORT_EMAIL_APP_PASSWORD) {
+    // Only ever pretend to send outside production. Reporting success in a
+    // real deployment would mark the member EMAIL_SENT and park them on the
+    // code page waiting for mail that was never sent.
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "SUPPORT_EMAIL_APP_PASSWORD is not set — cannot send verification codes.",
+      );
+      return { ok: false };
+    }
     console.log(`[email:dev] verification code for ${to}: ${code}`);
     return { ok: true };
   }

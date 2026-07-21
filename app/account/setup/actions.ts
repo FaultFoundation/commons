@@ -187,21 +187,28 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
   const db = getDb();
   const memberCountry = country.slice(0, 100) || null;
 
-  // Persist person profile + membership status + collegiate detail in one shot.
-  const finish = async (
-    detail: {
-      collegeId?: string | null;
-      schoolEmail?: string | null;
-      graduationDate?: string | null;
-      referrer?: string | null;
-      circumstances?: string | null;
-      domainMatched?: boolean | null;
-    },
-    status: "EMAIL_SENT" | "MANUAL_REVIEW",
-  ) => {
+  /**
+   * Persist everything the member typed. Deliberately does NOT set a status:
+   * the details must be safely stored before any email goes out, so that a
+   * failing send (or any later error) can't strand someone on a status with
+   * nothing saved behind it — they'd come back to an empty form.
+   */
+  const save = async (detail: {
+    collegeId?: string | null;
+    schoolEmail?: string | null;
+    graduationDate?: string | null;
+    referrer?: string | null;
+    circumstances?: string | null;
+    domainMatched?: boolean | null;
+  }) => {
     await ensureProfile(userId, { ageRange, country: memberCountry });
-    const membershipId = await ensureCollegiateMembership(userId, { status });
+    const membershipId = await ensureCollegiateMembership(userId, {});
     await upsertCollegiateRegistration(membershipId, { userType, ...detail });
+  };
+
+  /** Commit the outcome once everything that can fail already has. */
+  const setStatus = async (status: "EMAIL_SENT" | "MANUAL_REVIEW") => {
+    await ensureCollegiateMembership(userId, { status });
     revalidatePath("/home/", "layout");
     revalidatePath("/account/", "layout");
   };
@@ -213,17 +220,15 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
     if (!circumstances) {
       return { ok: false, error: "Tell us a bit about your circumstances." };
     }
-    await finish(
-      {
-        collegeId: null,
-        referrer: referrer || null,
-        circumstances,
-        schoolEmail: null,
-        graduationDate: null,
-        domainMatched: null,
-      },
-      "MANUAL_REVIEW",
-    );
+    await save({
+      collegeId: null,
+      referrer: referrer || null,
+      circumstances,
+      schoolEmail: null,
+      graduationDate: null,
+      domainMatched: null,
+    });
+    await setStatus("MANUAL_REVIEW");
     return { ok: true, outcome: "MANUAL_REVIEW" };
   }
 
@@ -337,14 +342,17 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
     domainMatched: matched,
   };
 
+  // Everything the member typed lands in D1 first — see `save` above.
+  await save(detail);
+
   if (dupe[0]) {
-    await finish(detail, "MANUAL_REVIEW");
+    await setStatus("MANUAL_REVIEW");
     return { ok: true, outcome: "MANUAL_REVIEW" };
   }
 
   const sent = await issueCode(userId, schoolEmail);
   if (sent.ok) {
-    await finish(detail, "EMAIL_SENT");
+    await setStatus("EMAIL_SENT");
   }
   return sent;
 }

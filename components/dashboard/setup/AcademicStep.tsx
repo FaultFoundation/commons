@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { submitRegistration } from "@/app/account/setup/actions";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
+import { SETUP_DRAFT_KEY } from "@/components/dashboard/setup/draft";
 import { SchoolTypeahead, type SchoolHit } from "@/components/dashboard/SchoolTypeahead";
 import { AGE_RANGES, USER_TYPES } from "@/lib/registration-shared";
 
@@ -50,6 +51,75 @@ export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
   const [manualSchool, setManualSchool] = useState(false);
   const [referrer, setReferrer] = useState("");
   const [circumstances, setCircumstances] = useState("");
+
+  // Draft persistence. Coming back from the code page ("change email") or via
+  // the browser's Back button must not wipe what was typed — the server only
+  // knows what was last submitted, and nothing at all before the first submit.
+  // sessionStorage (not local) so the draft dies with the tab.
+  const [draftLoaded, setDraftLoaded] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(SETUP_DRAFT_KEY);
+      if (raw) {
+        const d = JSON.parse(raw) as Record<string, unknown>;
+        const str = (v: unknown) => (typeof v === "string" ? v : null);
+        if (str(d.userType)) setUserType(d.userType as string);
+        if (str(d.ageRange)) setAgeRange(d.ageRange as string);
+        if (str(d.country)) setCountry(d.country as string);
+        if (str(d.schoolName)) setSchoolName(d.schoolName as string);
+        if (str(d.schoolWebsite)) setSchoolWebsite(d.schoolWebsite as string);
+        if (str(d.schoolEmail)) setSchoolEmail(d.schoolEmail as string);
+        if (str(d.graduationDate)) setGraduationDate(d.graduationDate as string);
+        if (str(d.referrer)) setReferrer(d.referrer as string);
+        if (str(d.circumstances)) setCircumstances(d.circumstances as string);
+        if (typeof d.schoolId === "number") setSchoolId(d.schoolId);
+        if (typeof d.manualSchool === "boolean") setManualSchool(d.manualSchool);
+      }
+    } catch {
+      // Unparseable or unavailable storage: fall back to the server values.
+    }
+    setDraftLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    // Guarded on draftLoaded so the initial render can't clobber the draft
+    // before it's been read back.
+    if (!draftLoaded) return;
+    try {
+      sessionStorage.setItem(
+        SETUP_DRAFT_KEY,
+        JSON.stringify({
+          userType,
+          ageRange,
+          country,
+          schoolId,
+          schoolName,
+          schoolWebsite,
+          schoolEmail,
+          graduationDate,
+          manualSchool,
+          referrer,
+          circumstances,
+        }),
+      );
+    } catch {
+      // Storage full or blocked — the form still works, just without a draft.
+    }
+  }, [
+    draftLoaded,
+    userType,
+    ageRange,
+    country,
+    schoolId,
+    schoolName,
+    schoolWebsite,
+    schoolEmail,
+    graduationDate,
+    manualSchool,
+    referrer,
+    circumstances,
+  ]);
 
   const isNone = userType === "None of the above";
   const isHighSchool = userType === "High school student";
@@ -310,8 +380,11 @@ export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
                     ? "Expected graduation"
                     : "Graduation year (roughly is fine)"}
                 </span>
+                {/* Native month picker: shows MM and YYYY segments and stores
+                    "YYYY-MM". Segment order follows the browser's locale and
+                    can't be overridden. */}
                 <input
-                  className="ff-auth__input"
+                  className="ff-auth__input ff-auth__input--date"
                   type="month"
                   value={graduationDate}
                   onChange={(e) => setGraduationDate(e.target.value)}

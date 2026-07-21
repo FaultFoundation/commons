@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 
 import { resendCode, verifyCode } from "@/app/account/setup/actions";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
+import { clearSetupDraft } from "@/components/dashboard/setup/draft";
 import { CODE_LENGTH } from "@/lib/registration-shared";
 
 /**
@@ -39,6 +40,8 @@ export function CodeStep({
     startTransition(async () => {
       const result = await verifyCode(code);
       if (result.ok) {
+        // Verified — the D1 row is the source of truth from here on.
+        clearSetupDraft();
         router.push("/account/setup/integrations/");
         return;
       }

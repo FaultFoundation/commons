@@ -40,13 +40,19 @@ the auth origin check with a 403.
 ### 2. Auto-deploy on push (Workers Builds)
 
 1. **Workers & Pages** → **website** → **Settings** tab → **Build** section.
-2. Connect the GitHub repo `FaultFoundation/website`
-   (if GitHub asks, grant the Cloudflare Workers app access to that repo).
+2. Connect the GitHub repo `FaultFoundation/commons` (renamed from `website`;
+   the Worker itself is still named `website`, per `wrangler.jsonc`). If GitHub
+   asks, grant the Cloudflare Workers app access to that repo.
 3. Set exactly:
-   - **Branch:** `login` (switch to `main` once this branch merges)
+   - **Branch:** `main`
    - **Build command:** `npm run build`
    - **Deploy command:** `npx wrangler deploy`
    - **Version command:** `npx wrangler deploy`
+
+   `npm run build` is `opennextjs-cloudflare build`, which emits
+   `.open-next/worker.js` for the deploy step to upload. Do not point it at
+   `next build` alone — that only writes `.next/`, and `wrangler deploy` then
+   fails on the missing entry point.
 4. Builds trigger on the **next push** to that branch — changing settings or
    branches never starts a build by itself. To test: push any commit, then
    watch **Workers & Pages → website → Deployments** (each build shows logs

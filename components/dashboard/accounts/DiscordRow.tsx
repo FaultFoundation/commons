@@ -11,12 +11,15 @@ export function DiscordRow({
   linked,
   username,
   discordEnabled,
+  callbackURL = "/account/",
 }: {
   linked: boolean;
   /** Captured at link time; null for links made before that shipped. */
   username: string | null;
   /** Server-decided: Discord OAuth secrets are configured. */
   discordEnabled: boolean;
+  /** Where Discord returns the member — pass the page this row is on. */
+  callbackURL?: string;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -48,7 +51,7 @@ export function DiscordRow({
         note={discordEnabled ? undefined : "Unavailable right now"}
         action={
           discordEnabled ? (
-            <LinkDiscordButton callbackURL="/dashboard/accounts/" />
+            <LinkDiscordButton callbackURL={callbackURL} />
           ) : undefined
         }
       />

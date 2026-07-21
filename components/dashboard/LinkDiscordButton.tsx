@@ -6,7 +6,7 @@ import { authClient } from "@/lib/auth-client";
 
 /** Starts the Discord OAuth link flow (full-page redirect, like AuthForm). */
 export function LinkDiscordButton({
-  callbackURL = "/dashboard/",
+  callbackURL = "/home/",
 }: {
   /** Where Discord sends the member back — pass the page the button is on. */
   callbackURL?: string;

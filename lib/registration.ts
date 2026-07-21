@@ -9,6 +9,7 @@ import {
   collegiateRegistrations,
 } from "@/db/schema";
 import { PROGRAM_COLLEGIATE_ID } from "@/lib/programs";
+import { CODE_LENGTH } from "@/lib/registration-shared";
 
 // ---------------------------------------------------------------------------
 // Registration constants (mirroring the legacy sheet/Apps Script flow).
@@ -21,6 +22,7 @@ export const MAX_SENDS_PER_WINDOW = 5; // per CODE_TTL_MS window
 
 export {
   AGE_RANGES,
+  CODE_LENGTH,
   USER_TYPES,
   type RegistrationStatus,
   type UserType,
@@ -28,13 +30,14 @@ export {
 
 // ---------------------------------------------------------------------------
 // Verification codes. Plaintext is never stored: only sha256(userId:CODE),
-// so a D1 leak doesn't expose usable codes. ~40 bits of entropy is fine for
-// a 24h-TTL code capped at 5 online guesses.
+// so a D1 leak doesn't expose usable codes. 31^6 ≈ 8.9e8 is plenty for a
+// 24h-TTL code capped at 5 online guesses.
 // ---------------------------------------------------------------------------
 
-// No 0/O/1/I/L to keep hand-typed codes unambiguous.
+// Uppercase letters + digits only (no symbols), minus 0/O/1/I/L so hand-typed
+// codes are unambiguous. CODE_LENGTH is re-exported above from the
+// client-safe module — the entry field needs it too.
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-const CODE_LENGTH = 8;
 
 export function generateCode(): string {
   const limit = 256 - (256 % CODE_ALPHABET.length); // rejection sampling
@@ -50,11 +53,7 @@ export function generateCode(): string {
   return code;
 }
 
-/** XXXX-XXXX presentation used in emails and the entry field hint. */
-export function formatCode(code: string): string {
-  return `${code.slice(0, 4)}-${code.slice(4)}`;
-}
-
+/** Codes are typed as shown; spaces and stray dashes from a paste are dropped. */
 export function normalizeCodeInput(input: string): string {
   return input.toUpperCase().replace(/[\s-]/g, "");
 }
@@ -331,6 +330,7 @@ export async function upsertCollegiateRegistration(
     graduationDate?: string | null;
     referrer?: string | null;
     circumstances?: string | null;
+    domainMatched?: boolean | null;
   },
 ): Promise<string> {
   const db = getDb();

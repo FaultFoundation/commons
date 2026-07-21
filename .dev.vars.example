@@ -15,6 +15,15 @@ BETTER_AUTH_URL=http://localhost:3999
 # DISCORD_CLIENT_ID=
 # DISCORD_CLIENT_SECRET=
 
-# Optional — sends real registration verification emails via Resend. Leave
-# unset locally: codes are printed to the server terminal instead.
-# RESEND_API_KEY=
+# Optional — the 16-char Google app password for support@fault.foundation.
+# Set it and real verification emails go out; leave it unset and codes are
+# printed to the server terminal instead. Only `npm run preview` (:3999, real
+# workerd) can actually send — `next dev` runs in Node, which has no sockets.
+# SUPPORT_EMAIL_APP_PASSWORD=
+
+# Override the sending mailbox (defaults to support@fault.foundation) or the
+# server (defaults to smtp.gmail.com:465, implicit TLS).
+# SUPPORT_EMAIL=
+# EMAIL_FROM=
+# SMTP_HOST=
+# SMTP_PORT=

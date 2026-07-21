@@ -1,6 +1,10 @@
 // Registration constants shared by server code and client components.
 // This module must stay free of server-only imports (db, cloudflare context).
 
+// Verification-code length. Lives here because the code entry field needs it
+// too; the alphabet and generator stay server-side in lib/registration.ts.
+export const CODE_LENGTH = 6;
+
 export const USER_TYPES = [
   "University student",
   "University alumnus",

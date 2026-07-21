@@ -23,7 +23,6 @@ import {
   emailDomain,
   ensureCollegiateMembership,
   ensureProfile,
-  formatCode,
   generateCode,
   getOrCreateCollege,
   getRegistrationState,
@@ -163,7 +162,7 @@ async function issueCode(userId: string, email: string): Promise<SubmitResult> {
     });
   }
 
-  const sent = await sendVerificationCodeEmail({ to: email, code: formatCode(code) });
+  const sent = await sendVerificationCodeEmail({ to: email, code });
   if (!sent.ok) {
     return { ok: false, error: "We couldn't send the email — try again in a minute." };
   }
@@ -196,14 +195,15 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
       graduationDate?: string | null;
       referrer?: string | null;
       circumstances?: string | null;
+      domainMatched?: boolean | null;
     },
     status: "EMAIL_SENT" | "MANUAL_REVIEW",
   ) => {
     await ensureProfile(userId, { ageRange, country: memberCountry });
     const membershipId = await ensureCollegiateMembership(userId, { status });
     await upsertCollegiateRegistration(membershipId, { userType, ...detail });
-    revalidatePath("/dashboard/");
-    revalidatePath("/dashboard/register/");
+    revalidatePath("/home/", "layout");
+    revalidatePath("/account/", "layout");
   };
 
   // --- "None of the above": straight to manual review, no school/email. ---
@@ -220,6 +220,7 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
         circumstances,
         schoolEmail: null,
         graduationDate: null,
+        domainMatched: null,
       },
       "MANUAL_REVIEW",
     );
@@ -289,10 +290,8 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
   } else {
     // Manual entry (high school, or "my school isn't listed"). The only domain
     // evidence here is the user-entered website — checking a user-supplied
-    // email against a user-supplied domain is circular, so a member could
-    // "verify" any domain they control. Never auto-verify: always route to
-    // human review. (Closes the self-verify hole before the Discord bot reads
-    // status as a membership gate.)
+    // email against a user-supplied domain is circular, so this path can never
+    // count as a domain match, however the two strings compare.
     const schoolName = (input.schoolName ?? "").trim().slice(0, 200);
     const schoolWebsite = (input.schoolWebsite ?? "").trim().slice(0, 300);
     if (!schoolName) return { ok: false, error: "Enter your school's name." };
@@ -304,28 +303,27 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
     matched = false;
   }
 
-  // Someone else already verified with this school email → human review
-  // (legacy imports may hold dupes, so no unique constraint).
-  if (matched) {
-    const dupe = await db
-      .select({ id: collegiateRegistrations.id })
-      .from(collegiateRegistrations)
-      .innerJoin(
-        programMemberships,
-        eq(programMemberships.id, collegiateRegistrations.membershipId),
-      )
-      .where(
-        and(
-          eq(collegiateRegistrations.schoolEmail, schoolEmail),
-          eq(programMemberships.status, "VERIFIED"),
-          state?.membershipId
-            ? ne(collegiateRegistrations.membershipId, state.membershipId)
-            : undefined,
-        ),
-      )
-      .limit(1);
-    if (dupe[0]) matched = false;
-  }
+  // Someone else already verified with this school email. That's a genuine
+  // conflict between two people rather than weak evidence, so it's the one
+  // school-path case that still can't self-serve. (Legacy imports may hold
+  // dupes, hence no unique constraint.)
+  const dupe = await db
+    .select({ id: collegiateRegistrations.id })
+    .from(collegiateRegistrations)
+    .innerJoin(
+      programMemberships,
+      eq(programMemberships.id, collegiateRegistrations.membershipId),
+    )
+    .where(
+      and(
+        eq(collegiateRegistrations.schoolEmail, schoolEmail),
+        eq(programMemberships.status, "VERIFIED"),
+        state?.membershipId
+          ? ne(collegiateRegistrations.membershipId, state.membershipId)
+          : undefined,
+      ),
+    )
+    .limit(1);
 
   const collegeId = await getOrCreateCollege(collegeInput);
   const detail = {
@@ -334,9 +332,12 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
     graduationDate: graduationDate || null,
     referrer: null,
     circumstances: null,
+    // Recorded, not enforced: a mismatch still gets a code today. The admin
+    // layer sweeps `false` rows once it exists.
+    domainMatched: matched,
   };
 
-  if (!matched) {
+  if (dupe[0]) {
     await finish(detail, "MANUAL_REVIEW");
     return { ok: true, outcome: "MANUAL_REVIEW" };
   }
@@ -437,7 +438,7 @@ export async function verifyCode(input: string): Promise<VerifyResult> {
     .set({ status: "VERIFIED", verifiedAt: now, updatedAt: now })
     .where(eq(programMemberships.id, state.membershipId));
 
-  revalidatePath("/dashboard/");
-  revalidatePath("/dashboard/register/");
+  revalidatePath("/home/", "layout");
+  revalidatePath("/account/", "layout");
   return { ok: true };
 }

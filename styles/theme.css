@@ -922,7 +922,7 @@ a.ff-dash__link:hover {
   min-height: 110px;
 }
 .ff-reg__code {
-  max-width: 240px;
+  max-width: 200px;
   font-family: var(--wp--preset--font-family--fira-code);
   font-size: 1.3rem;
   letter-spacing: 0.18em;
@@ -1017,6 +1017,11 @@ a.ff-dash__link:hover {
 .ff-bubble--full {
   grid-column: 1 / -1;
 }
+/* Setup steps read top-to-bottom as a form, not as a two-up card wall. */
+.ff-bubble-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 720px;
+}
 .ff-bubble__head {
   display: flex;
   align-items: center;
@@ -1105,6 +1110,39 @@ a.ff-dash__link:hover {
 .ff-row--locked {
   background: rgba(255, 255, 255, 0.03);
 }
+
+/* Collapsible row (<details>) — same shell as .ff-row, body expands */
+.ff-disclosure {
+  display: block;
+  padding: 0;
+}
+.ff-disclosure__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+.ff-disclosure__summary::-webkit-details-marker {
+  display: none;
+}
+.ff-disclosure__summary:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--ff-radius-md);
+}
+.ff-disclosure__chevron {
+  color: var(--ff-text-dim);
+  flex-shrink: 0;
+  transition: transform var(--ff-transition);
+}
+.ff-disclosure[open] .ff-disclosure__chevron {
+  transform: rotate(180deg);
+}
+.ff-disclosure__body {
+  padding: 0 14px 14px;
+}
 .ff-row__lock {
   width: 12px;
   height: 12px;
@@ -1138,54 +1176,24 @@ a.ff-dash__link:hover {
   transform: none;
 }
 
-/* Setup progress strip (shell-owned, above every tab's bubbles until
-   all steps are done — then it unmounts) */
-.ff-strip {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 18px;
+/* "Action required" banner (shell-owned, above every tab's bubbles until
+   setup + team + tournament all hold — then it unmounts) */
+.ff-banner {
   margin: 0 0 20px;
-  padding: 10px 16px;
-  border: 1px solid var(--ff-border);
+  padding: 12px 20px;
   border-radius: var(--ff-radius-lg);
-  background: var(--ff-surface-2);
-  box-shadow: var(--ff-shadow-card);
-  font-size: var(--ff-dash-text-sm);
-}
-.ff-strip__count {
-  font-weight: 800;
-}
-.ff-strip__item {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--ff-text-dim);
-}
-.ff-strip__item--done {
-  color: #dfe9f4;
-}
-.ff-strip__mark {
-  display: inline-grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  border-radius: var(--ff-radius-pill);
-  background: rgba(255, 255, 255, 0.12);
-  font-size: 0.65rem;
-  font-weight: 800;
-  flex-shrink: 0;
-}
-.ff-strip__mark--done {
-  background: var(--ff-accent);
-  color: var(--ff-navy-900);
-}
-.ff-strip__item a {
+  background: #a1701d;
   color: #fff;
-  font-weight: 700;
+  font-weight: 600;
+  box-shadow: var(--ff-shadow-card);
 }
-.ff-strip__item a:hover {
-  color: var(--ff-accent);
+.ff-banner a {
+  color: #fff;
+  font-weight: 800;
+  text-decoration: underline;
+}
+.ff-banner a:hover {
+  color: var(--ff-navy-900);
 }
 
 /* Confirm dialog (native <dialog>; top layer, still inside .ff-dash so

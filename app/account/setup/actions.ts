@@ -13,6 +13,7 @@ import {
   collegiateRegistrations,
 } from "@/db/schema";
 import { sendVerificationCodeEmail } from "@/lib/email";
+import { syncRoleConnection } from "@/lib/integrations";
 import {
   AGE_RANGES,
   CODE_TTL_MS,
@@ -445,6 +446,11 @@ export async function verifyCode(input: string): Promise<VerifyResult> {
     .update(programMemberships)
     .set({ status: "VERIFIED", verifiedAt: now, updatedAt: now })
     .where(eq(programMemberships.id, state.membershipId));
+
+  // The moment the claim becomes true, tell Discord — that's what the server's
+  // Linked Role gates on. Best-effort by design: verification stands whether or
+  // not Discord is linked or reachable.
+  await syncRoleConnection(userId, await headers());
 
   revalidatePath("/home/", "layout");
   revalidatePath("/account/", "layout");

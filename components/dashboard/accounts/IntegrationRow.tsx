@@ -4,21 +4,40 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
-import { LinkDiscordButton } from "@/components/dashboard/LinkDiscordButton";
+import {
+  LinkProviderButton,
+  type LinkableProvider,
+} from "@/components/dashboard/LinkProviderButton";
 import { authClient } from "@/lib/auth-client";
 
-export function DiscordRow({
+/**
+ * One connected-account row (Discord, Blizzard, …): link when disconnected,
+ * unlink when connected. Unlinking is a sensitive action, so better-auth
+ * requires a fresh session for it.
+ */
+export function IntegrationRow({
+  provider,
+  label,
   linked,
-  username,
-  discordEnabled,
+  handle,
+  enabled,
+  note,
+  linkLabel = "Connect",
   callbackURL = "/account/",
 }: {
+  provider: LinkableProvider;
+  /** Row label, e.g. "Discord". */
+  label: string;
   linked: boolean;
   /** Captured at link time; null for links made before that shipped. */
-  username: string | null;
-  /** Server-decided: Discord OAuth secrets are configured. */
-  discordEnabled: boolean;
-  /** Where Discord returns the member — pass the page this row is on. */
+  handle: string | null;
+  /** Server-decided: this provider's OAuth secrets are configured. */
+  enabled: boolean;
+  /** Fine print under the value — e.g. the Discord server-membership hint. */
+  note?: string;
+  /** Text on the connect button. */
+  linkLabel?: string;
+  /** Where the provider returns the member — pass the page this row is on. */
   callbackURL?: string;
 }) {
   const router = useRouter();
@@ -29,7 +48,7 @@ export function DiscordRow({
     if (pending) return;
     setError(null);
     setPending(true);
-    const result = await authClient.unlinkAccount({ providerId: "discord" });
+    const result = await authClient.unlinkAccount({ providerId: provider });
     setPending(false);
     if (result.error) {
       // 403 = the session isn't fresh enough for this sensitive action.
@@ -46,12 +65,16 @@ export function DiscordRow({
   if (!linked) {
     return (
       <BubbleRow
-        label="Discord"
+        label={label}
         value="Not connected"
-        note={discordEnabled ? undefined : "Unavailable right now"}
+        note={enabled ? note : "Unavailable right now"}
         action={
-          discordEnabled ? (
-            <LinkDiscordButton callbackURL={callbackURL} />
+          enabled ? (
+            <LinkProviderButton
+              provider={provider}
+              label={linkLabel}
+              callbackURL={callbackURL}
+            />
           ) : undefined
         }
       />
@@ -60,8 +83,9 @@ export function DiscordRow({
 
   return (
     <BubbleRow
-      label="Discord"
-      value={`${username ?? "Connected"} ✓`}
+      label={label}
+      value={`${handle ?? "Connected"} ✓`}
+      note={note}
       action={
         <button
           className="ff-btn ff-btn--outline ff-btn--sm"

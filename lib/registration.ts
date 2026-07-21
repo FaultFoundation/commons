@@ -4,7 +4,6 @@ import { getDb } from "@/lib/db";
 import {
   profiles,
   colleges,
-  platformIdentities,
   programMemberships,
   collegiateRegistrations,
 } from "@/db/schema";
@@ -154,22 +153,6 @@ export async function getProfile(userId: string) {
     .select()
     .from(profiles)
     .where(eq(profiles.userId, userId))
-    .limit(1);
-  return rows[0] ?? null;
-}
-
-/** A single connected platform identity (discord / battlenet / …), or null. */
-export async function getPlatformIdentity(userId: string, provider: string) {
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(platformIdentities)
-    .where(
-      and(
-        eq(platformIdentities.userId, userId),
-        eq(platformIdentities.provider, provider),
-      ),
-    )
     .limit(1);
   return rows[0] ?? null;
 }
@@ -411,95 +394,5 @@ export async function getOrCreateCollege(input: {
       if (again) return again.id;
     }
     throw error;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Platform identity helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Best-effort Discord display name for the just-linked account. Called from
- * the account-created hook while the OAuth access token is fresh. Never
- * throws — a miss just means the Accounts tab shows "Connected".
- */
-export async function fetchDiscordUsername(
-  accessToken: string | null | undefined,
-): Promise<string | null> {
-  if (!accessToken) return null;
-  try {
-    const res = await fetch("https://discord.com/api/users/@me", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      signal: AbortSignal.timeout(3000),
-    });
-    if (!res.ok) return null;
-    const me = (await res.json()) as {
-      username?: string;
-      global_name?: string | null;
-    };
-    return me.global_name || me.username || null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Mirrors a linked Discord account into platform_identities (provider
- * "discord"). Runs from the better-auth account-created hook, covering explicit
- * linking and Discord sign-in/up. Must never throw: a mirror failure must not
- * fail the OAuth flow. A Discord ID already claimed by another user is left
- * alone (the unique constraint would reject it anyway).
- */
-export async function mirrorDiscordIdentity(
-  userId: string,
-  discordId: string,
-  discordUsername?: string | null,
-): Promise<void> {
-  try {
-    const db = getDb();
-    const now = new Date();
-
-    const taken = (
-      await db
-        .select({ userId: platformIdentities.userId })
-        .from(platformIdentities)
-        .where(
-          and(
-            eq(platformIdentities.provider, "discord"),
-            eq(platformIdentities.externalId, discordId),
-          ),
-        )
-        .limit(1)
-    )[0];
-    if (taken && taken.userId !== userId) {
-      console.error(`discord ${discordId} already linked to another user`);
-      return;
-    }
-
-    const existing = await getPlatformIdentity(userId, "discord");
-    if (existing) {
-      await db
-        .update(platformIdentities)
-        .set({
-          externalId: discordId,
-          handle: discordUsername ?? existing.handle,
-          verified: true,
-          updatedAt: now,
-        })
-        .where(eq(platformIdentities.id, existing.id));
-      return;
-    }
-
-    await db.insert(platformIdentities).values({
-      id: crypto.randomUUID(),
-      userId,
-      provider: "discord",
-      externalId: discordId,
-      handle: discordUsername ?? null,
-      verified: true,
-      connectedAt: now,
-    });
-  } catch (error) {
-    console.error("discord identity mirror failed:", error);
   }
 }

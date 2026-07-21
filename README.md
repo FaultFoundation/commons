@@ -63,8 +63,9 @@ editing `wrangler.jsonc` or `.dev.vars`, rerun `npm run cf-typegen`.
 
 `npm run deploy` builds with OpenNext and deploys the `commons` Worker.
 Pushes to `main` auto-deploy once Workers Builds is connected. Full
-account-side setup — D1 database, secrets, Discord OAuth, custom domain — is
-in [docs/cloudflare-setup.md](docs/cloudflare-setup.md).
+account-side setup — D1 database, secrets, custom domain — is in
+[docs/cloudflare-setup.md](docs/cloudflare-setup.md); the Discord and Blizzard
+developer-portal walkthrough is in [docs/oauth-setup.md](docs/oauth-setup.md).
 
 ## Licensing / provenance
 

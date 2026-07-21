@@ -3,14 +3,14 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 
-import { DiscordRow } from "@/components/dashboard/accounts/DiscordRow";
+import { IntegrationRow } from "@/components/dashboard/accounts/IntegrationRow";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
-import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { SetupShell } from "@/components/dashboard/setup/SetupShell";
 import { account } from "@/db/schema";
-import { discordAuthEnabled, getAuth } from "@/lib/auth";
+import { battlenetAuthEnabled, discordAuthEnabled, getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { getPlatformIdentity } from "@/lib/registration";
+import { discordServerNote, loadDiscordIntegration } from "@/lib/integrations";
+import { getPlatformIdentity } from "@/lib/platform-identities";
 
 // Session-gated: always rendered per request.
 export const dynamic = "force-dynamic";
@@ -26,15 +26,17 @@ export default async function IntegrationsSetupPage() {
     redirect("/login/");
   }
 
-  const [discordIdentity, discordRows] = await Promise.all([
-    getPlatformIdentity(session.user.id, "discord"),
+  const [discord, battlenetIdentity, battlenetRows] = await Promise.all([
+    // Also refreshes the stored Discord handle when it has gone stale.
+    loadDiscordIntegration(session.user.id, await headers()),
+    getPlatformIdentity(session.user.id, "battlenet"),
     getDb()
       .select({ id: account.id })
       .from(account)
       .where(
         and(
           eq(account.userId, session.user.id),
-          eq(account.providerId, "discord"),
+          eq(account.providerId, "battlenet"),
         ),
       )
       .limit(1),
@@ -44,21 +46,23 @@ export default async function IntegrationsSetupPage() {
     <SetupShell step={2}>
       <div className="ff-bubble-grid ff-bubble-grid--single">
         <Bubble title="Your Integrations (Required)" span="full">
-          <DiscordRow
-            linked={discordRows.length > 0}
-            username={discordIdentity?.handle ?? null}
-            discordEnabled={discordAuthEnabled()}
+          <IntegrationRow
+            provider="discord"
+            label="Discord"
+            linked={discord.linked}
+            handle={discord.handle}
+            enabled={discordAuthEnabled()}
+            note={discordServerNote(discord.inGuild)}
+            linkLabel="Link Discord"
             callbackURL="/account/setup/integrations/"
           />
-          <BubbleRow
+          <IntegrationRow
+            provider="battlenet"
             label="Blizzard"
-            value="Not connected"
-            note="Coming Soon"
-            action={
-              <button className="ff-btn ff-btn--sm" type="button" disabled>
-                Connect
-              </button>
-            }
+            linked={battlenetRows.length > 0}
+            handle={battlenetIdentity?.handle ?? null}
+            enabled={battlenetAuthEnabled()}
+            callbackURL="/account/setup/integrations/"
           />
           <div className="ff-reg__nav">
             <a className="ff-btn ff-btn--outline" href="/account/setup/academic/">

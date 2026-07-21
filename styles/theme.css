@@ -1,11 +1,10 @@
 /* ============================================================
-   fault.foundation — "ff" redesign theme
-   Layered ON TOP of the ported WordPress CSS (wp-globals.css /
-   wp-blocks.css), which must stay untouched: the article pages
-   still render verbatim WP markup. Every selector here is
-   namespaced with `ff-`; redesigned pages use only ff- classes.
-   Brand tokens alias the existing --wp--preset--* values so the
-   old and new surfaces stay consistent.
+   The Commons — "ff" theme
+   Layered ON TOP of wp-globals.css, which must stay untouched:
+   it carries the --wp--preset--* brand tokens (and the body /
+   element base styles) that the --ff-* tokens below alias, so
+   the Commons and fault.foundation stay visually consistent.
+   Every selector here is namespaced with `ff-`.
    ============================================================ */
 
 /* ---------- 1. Tokens ---------- */
@@ -38,10 +37,6 @@
   --ff-shadow-card: 0 8px 30px rgba(0, 0, 0, 0.35);
   --ff-shadow-float: var(--wp--preset--shadow--deep);
   --ff-shadow-nav: 0 2px 14px rgba(0, 0, 0, 0.45);
-
-  /* the radial brand backdrop used by hero bands, the footer, and
-     behind transparent artwork */
-  --ff-circle-gradient: url("/wp-content/uploads/2025/10/Fault-Foundation-Images-1.png");
 
   /* layout */
   --ff-header-h: 64px;
@@ -85,6 +80,20 @@ html.ff-no-scroll givebutter-widget {
   outline-offset: 2px;
 }
 
+/* Visually hidden but read aloud. Ported from wp-blocks.css (deleted with
+   the WordPress article pages); the dashboard uses it for the per-tab h1. */
+.screen-reader-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip-path: inset(50%);
+  word-wrap: normal;
+}
+
 /* Skip link: visually hidden until focused. */
 .ff-skip-link {
   position: fixed;
@@ -119,11 +128,8 @@ html.ff-no-scroll givebutter-widget {
 .ff-section--tight {
   margin-block: var(--wp--preset--spacing--50);
 }
-.ff-stack > * + * {
-  margin-block-start: var(--wp--preset--spacing--50);
-}
 
-/* ---------- 4. Buttons & chips ---------- */
+/* ---------- 4. Buttons ---------- */
 
 .ff-btn {
   display: inline-flex;
@@ -159,25 +165,6 @@ html.ff-no-scroll givebutter-widget {
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
   box-shadow: inset 0 0 0 1.5px #fff;
-}
-
-.ff-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25em 0.9em;
-  border-radius: var(--ff-radius-pill);
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  font-size: var(--wp--preset--font-size--small);
-  font-weight: 600;
-  text-decoration: none;
-  transition:
-    background var(--ff-transition),
-    color var(--ff-transition);
-}
-.ff-chip:hover {
-  background: var(--ff-accent);
-  color: var(--ff-navy-900);
 }
 
 /* ---------- 5. Cards ---------- */
@@ -452,571 +439,7 @@ button.ff-nav__link:hover {
   }
 }
 
-/* ---------- 7. Hero bands ---------- */
-
-.ff-hero {
-  position: relative;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border-radius: var(--ff-radius-xl);
-  margin-top: var(--wp--preset--spacing--40);
-  padding: var(--wp--preset--spacing--80) var(--ff-gutter);
-  text-align: center;
-  background-position: 50% 50%;
-  background-size: cover;
-  box-shadow: var(--ff-shadow-float);
-}
-.ff-hero--compact {
-  padding: var(--wp--preset--spacing--60) var(--ff-gutter);
-}
-.ff-hero__inner {
-  display: grid;
-  gap: 10px;
-  justify-items: center;
-}
-.ff-hero__title {
-  margin: 0;
-  font-size: var(--wp--preset--font-size--xx-large);
-}
-.ff-hero__subtitle {
-  margin: 0;
-  font-size: var(--wp--preset--font-size--x-large);
-  font-weight: 300;
-  font-style: italic;
-  color: #eaf2fb;
-}
-
-/* ---------- 8. Carousel (embla) ---------- */
-
-.ff-carousel {
-  position: relative;
-}
-.ff-carousel__viewport {
-  overflow: hidden;
-  border-radius: var(--ff-radius-xl);
-  box-shadow: var(--ff-shadow-float);
-}
-.ff-carousel__slides {
-  display: flex;
-  touch-action: pan-y pinch-zoom;
-}
-.ff-carousel__slide {
-  position: relative;
-  flex: 0 0 100%;
-  min-width: 0;
-}
-.ff-carousel__media {
-  aspect-ratio: 21 / 9;
-}
-.ff-carousel__media img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.ff-carousel__overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: flex-start;
-  gap: clamp(8px, 1.5vw, 18px);
-  padding: clamp(24px, 5vw, 72px);
-  background: linear-gradient(
-    90deg,
-    rgba(0, 24, 50, 0.94) 0%,
-    rgba(0, 24, 50, 0.62) 48%,
-    rgba(0, 24, 50, 0.18) 100%
-  );
-  text-align: left;
-}
-.ff-carousel__title {
-  margin: 0;
-  font-size: var(--wp--preset--font-size--xx-large);
-}
-.ff-carousel__tagline {
-  margin: 0;
-  font-size: var(--wp--preset--font-size--large);
-  font-style: italic;
-  color: #eaf2fb;
-}
-@media (max-width: 781.98px) {
-  .ff-carousel__media {
-    aspect-ratio: 4 / 3;
-  }
-  .ff-carousel__overlay {
-    justify-content: flex-end;
-    background: linear-gradient(
-      180deg,
-      rgba(0, 24, 50, 0.1) 0%,
-      rgba(0, 24, 50, 0.55) 45%,
-      rgba(0, 24, 50, 0.95) 100%
-    );
-  }
-}
-
-.ff-carousel__arrow {
-  position: absolute;
-  top: 50%;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 1px solid var(--ff-border);
-  border-radius: 50%;
-  background: rgba(0, 24, 50, 0.55);
-  color: #fff;
-  cursor: pointer;
-  transform: translateY(-50%);
-  transition:
-    background var(--ff-transition),
-    color var(--ff-transition);
-}
-.ff-carousel__arrow:hover {
-  background: var(--ff-accent);
-  color: var(--ff-navy-900);
-}
-.ff-carousel__arrow--prev {
-  left: 16px;
-}
-.ff-carousel__arrow--next {
-  right: 16px;
-}
-
-.ff-carousel__dots {
-  position: absolute;
-  bottom: 14px;
-  left: 50%;
-  z-index: 2;
-  display: flex;
-  gap: 8px;
-  transform: translateX(-50%);
-}
-.ff-carousel__dot {
-  width: 9px;
-  height: 9px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--ff-radius-pill);
-  background: rgba(255, 255, 255, 0.45);
-  cursor: pointer;
-  transition:
-    background var(--ff-transition),
-    width var(--ff-transition);
-}
-.ff-carousel__dot.is-active {
-  width: 26px;
-  background: var(--ff-accent);
-}
-
-/* ---------- 9. Split feature (image + text card) ---------- */
-
-.ff-split {
-  display: grid;
-  grid-template-columns: 5fr 7fr;
-  gap: clamp(24px, 4vw, 48px);
-  align-items: center;
-  padding: clamp(24px, 4vw, 48px);
-}
-/* Images sit flat on the card background — the card itself already
-   floats, so no shadow of their own. */
-.ff-split__media img {
-  display: block;
-  width: 100%;
-  height: auto;
-  border-radius: var(--ff-radius-lg);
-}
-.ff-split__body {
-  display: grid;
-  gap: 16px;
-  justify-items: start;
-}
-.ff-split__body h2 {
-  margin: 0;
-}
-.ff-split__body p {
-  margin: 0;
-}
-/* Reversed: text left (wide track), image right (narrow track) — the
-   image column stays 5fr-sized either way. */
-.ff-split--reverse {
-  grid-template-columns: 7fr 5fr;
-}
-.ff-split--reverse .ff-split__media {
-  order: 2;
-}
-.ff-split--reverse .ff-split__body {
-  order: 1;
-}
-@media (max-width: 781.98px) {
-  .ff-split,
-  .ff-split--reverse {
-    grid-template-columns: 1fr;
-  }
-  .ff-split--reverse .ff-split__media {
-    order: 0;
-  }
-  .ff-split--reverse .ff-split__body {
-    order: 1;
-  }
-}
-
-/* ---------- 10. News cards ---------- */
-
-.ff-news-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
-  gap: 28px;
-}
-.ff-news-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  transition:
-    transform var(--ff-transition),
-    box-shadow var(--ff-transition);
-}
-.ff-news-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--ff-shadow-float);
-}
-.ff-news-card__media {
-  aspect-ratio: 16 / 9;
-}
-.ff-news-card__media img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.ff-news-card__body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 20px 24px 24px;
-}
-.ff-news-card__title {
-  margin: 0;
-  font-size: var(--wp--preset--font-size--large);
-}
-/* Whole card is clickable via the stretched title link. */
-.ff-news-card__title a {
-  text-decoration: none;
-}
-.ff-news-card__title a::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-}
-.ff-news-card__date {
-  color: var(--ff-text-dim);
-  font-size: var(--wp--preset--font-size--small);
-  font-weight: 600;
-}
-.ff-news-card__excerpt {
-  margin: 0;
-  color: #dfe9f4;
-  font-size: var(--wp--preset--font-size--medium);
-}
-.ff-news-card__tags {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: auto;
-  padding-top: 6px;
-}
-
-/* Featured (newest) card: full-width horizontal split. */
-@media (min-width: 782px) {
-  .ff-news-card--featured {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: 3fr 2fr;
-  }
-  .ff-news-card--featured .ff-news-card__media {
-    aspect-ratio: auto;
-    min-height: 320px;
-  }
-  .ff-news-card--featured .ff-news-card__body {
-    padding: clamp(24px, 3vw, 40px);
-    justify-content: center;
-  }
-  .ff-news-card--featured .ff-news-card__title {
-    font-size: var(--wp--preset--font-size--x-large);
-  }
-}
-
-/* 404 card */
-.ff-notfound {
-  max-width: 640px;
-  padding: clamp(24px, 4vw, 40px);
-}
-.ff-notfound h1 {
-  margin: 0 0 12px;
-  font-size: var(--wp--preset--font-size--x-large);
-}
-.ff-notfound p {
-  margin: 0;
-}
-
-/* Centered section band heading (e.g. "Our History") */
-.ff-band-title {
-  margin: 0 0 var(--wp--preset--spacing--40);
-  text-align: center;
-  font-size: var(--wp--preset--font-size--x-large);
-}
-
-/* Team member cards */
-.ff-team-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
-  gap: 24px;
-  align-items: stretch;
-}
-.ff-team-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 28px 20px;
-  text-align: center;
-}
-.ff-team-card img {
-  width: 180px;
-  height: 180px;
-  margin-bottom: 12px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-.ff-team-card h3 {
-  margin: 0;
-  font-size: var(--wp--preset--font-size--large);
-}
-.ff-team-card p {
-  margin: 0;
-}
-.ff-team-card__school {
-  color: var(--ff-text-dim);
-  font-size: var(--wp--preset--font-size--medium);
-  font-style: italic;
-}
-
-/* Archive (tag/author) page heading */
-.ff-archive-title {
-  margin: var(--wp--preset--spacing--60) 0 var(--wp--preset--spacing--40);
-  font-size: var(--wp--preset--font-size--x-large);
-}
-.ff-archive-title span {
-  color: var(--ff-accent);
-}
-
-/* ---------- 11. Prose (clean content flow, replaces WP block spacing) ---------- */
-
-.ff-prose > * {
-  margin-block: 0;
-}
-.ff-prose > * + * {
-  margin-block-start: 0.9em;
-}
-.ff-prose h3 {
-  margin-block-start: 1.6em;
-}
-.ff-prose ul,
-.ff-prose ol {
-  padding-inline-start: 1.5em;
-}
-.ff-prose li {
-  margin-block-start: 0.4em;
-}
-
-/* Tables (wide ones scroll inside their wrapper) */
-.ff-table-wrap {
-  margin: 0;
-  overflow-x: auto;
-  border-radius: var(--ff-radius-md);
-  border: 1px solid var(--ff-border);
-}
-.ff-prose table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--wp--preset--font-size--medium);
-}
-.ff-prose th,
-.ff-prose td {
-  padding: 10px 14px;
-  border: 1px solid var(--ff-border);
-  text-align: left;
-  vertical-align: top;
-}
-.ff-prose th {
-  background: rgba(255, 255, 255, 0.07);
-  font-weight: 700;
-}
-.ff-prose tr:nth-child(even) td {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-/* ---------- 12. Policy layout: sticky TOC + collapsible articles ---------- */
-
-.ff-policy {
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: clamp(24px, 4vw, 48px);
-  align-items: start;
-}
-.ff-toc {
-  position: sticky;
-  top: calc(var(--ff-header-h) + 20px);
-  padding: 20px;
-}
-.ff-toc__heading {
-  margin: 14px 0 4px;
-  color: var(--ff-text-dim);
-  font-size: var(--wp--preset--font-size--small);
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.ff-toc__heading:first-child {
-  margin-top: 0;
-}
-.ff-toc ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.ff-toc a {
-  display: block;
-  padding: 6px 10px;
-  border-radius: 8px;
-  color: #dfe9f4;
-  font-size: 0.92rem;
-  font-weight: 600;
-  text-decoration: none;
-  transition: background var(--ff-transition);
-}
-.ff-toc a:hover {
-  background: rgba(255, 255, 255, 0.09);
-  color: #fff;
-}
-.ff-toc a[aria-current="page"] {
-  color: var(--ff-accent);
-}
-@media (max-width: 1023.98px) {
-  .ff-policy {
-    grid-template-columns: 1fr;
-  }
-  .ff-toc {
-    position: static;
-  }
-}
-
-/* Content column: doc-title preamble heading above the section cards */
-.ff-policy__content > h2 {
-  margin: 0 0 18px;
-}
-
-/* Collapsible section card (native <details>) */
-.ff-collapse {
-  border-radius: var(--ff-radius-lg);
-  background: var(--ff-surface-2);
-  border: 1px solid var(--ff-border);
-  box-shadow: var(--ff-shadow-card);
-}
-.ff-collapse + .ff-collapse {
-  margin-top: 16px;
-}
-.ff-collapse__summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px 24px;
-  border-radius: var(--ff-radius-lg);
-  cursor: pointer;
-  list-style: none;
-  transition: background var(--ff-transition);
-}
-.ff-collapse__summary::-webkit-details-marker {
-  display: none;
-}
-.ff-collapse__summary:hover {
-  background: rgba(255, 255, 255, 0.05);
-}
-.ff-collapse__summary > :is(h2, h3) {
-  margin: 0;
-  font-size: var(--wp--preset--font-size--large);
-}
-.ff-collapse__summary::after {
-  content: "";
-  flex: 0 0 auto;
-  width: 10px;
-  height: 10px;
-  border-right: 2.5px solid var(--ff-accent);
-  border-bottom: 2.5px solid var(--ff-accent);
-  transform: rotate(45deg) translate(-2px, -2px);
-  transition: transform var(--ff-transition);
-}
-.ff-collapse[open] > .ff-collapse__summary::after {
-  transform: rotate(225deg) translate(-2px, -2px);
-}
-.ff-collapse[open] > .ff-collapse__summary {
-  border-radius: var(--ff-radius-lg) var(--ff-radius-lg) 0 0;
-}
-.ff-collapse__body {
-  padding: 6px 24px 24px;
-}
-
-/* Policies hub: one card per document with per-ARTICLE anchor links.
-   CSS columns (vertical masonry) so short cards don't leave row gaps. */
-.ff-policy-hub {
-  columns: 3 320px;
-  column-gap: 28px;
-}
-.ff-policy-hub .ff-card {
-  break-inside: avoid;
-  margin-bottom: 28px;
-  padding: 24px 28px;
-}
-.ff-policy-hub h2 {
-  margin: 0 0 12px;
-  font-size: var(--wp--preset--font-size--large);
-}
-.ff-policy-hub h2 a {
-  text-decoration: none;
-}
-.ff-policy-hub ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.ff-policy-hub ul a {
-  display: block;
-  padding: 5px 10px;
-  border-radius: 8px;
-  color: #dfe9f4;
-  font-size: 0.92rem;
-  font-weight: 600;
-  text-decoration: none;
-  transition: background var(--ff-transition);
-}
-.ff-policy-hub ul a:hover {
-  background: rgba(255, 255, 255, 0.09);
-  color: #fff;
-}
-
-/* ---------- 13. Footer (full-bleed bar matching the header) ---------- */
+/* ---------- 7. Footer (full-bleed bar matching the header) ---------- */
 
 .ff-footer {
   margin-top: var(--ff-space-section);
@@ -1114,160 +537,18 @@ button.ff-nav__link:hover {
   }
 }
 
-/* ---------- 15. Roadmap timeline (moved from the page's inline <style>) ---------- */
-
-.roadmap-timeline {
-  --roadmap-box-bg: var(--ff-surface-2);
-  --roadmap-spine-color: #ffffff;
-  position: relative;
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 40px 20px;
-}
-/* Center spine */
-.roadmap-timeline::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    var(--roadmap-spine-color) 5%,
-    var(--roadmap-spine-color) 95%,
-    transparent
-  );
-  z-index: 1;
-}
-.roadmap-item {
-  position: relative;
-  width: 45%;
-  margin-bottom: 60px;
-}
-/* Alternating left and right positioning */
-.roadmap-item:nth-child(odd) {
-  margin-left: 0;
-  margin-right: auto;
-  text-align: right;
-}
-.roadmap-item:nth-child(even) {
-  margin-left: auto;
-  margin-right: 0;
-  text-align: left;
-}
-/* Horizontal connector lines - positioned behind dots */
-.roadmap-item::before {
-  content: "";
-  position: absolute;
-  top: 24px;
-  width: 26px;
-  height: 2px;
-  background: var(--roadmap-spine-color);
-  z-index: 1;
-}
-.roadmap-item:nth-child(odd)::before {
-  right: -26px;
-}
-.roadmap-item:nth-child(even)::before {
-  left: -26px;
-}
-/* Connector dots on the spine - positioned in front of lines */
-.roadmap-item::after {
-  content: "";
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  background: #ffffff;
-  border: 2px solid #ffffff;
-  border-radius: 50%;
-  top: 19px;
-  z-index: 2;
-}
-.roadmap-item:nth-child(odd)::after {
-  right: -32px;
-}
-.roadmap-item:nth-child(even)::after {
-  left: -32px;
-}
-/* Text box styling */
-.roadmap-box {
-  display: inline-block;
-  max-width: 100%;
-  padding: 24px 28px;
-  border: 1px solid var(--ff-border);
-  border-radius: var(--ff-radius-lg);
-  background: var(--roadmap-box-bg);
-  box-shadow: var(--ff-shadow-card);
-  text-align: left;
-  transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
-}
-.roadmap-box:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--ff-shadow-float);
-}
-.roadmap-box h2 {
-  margin: 0 0 6px 0;
-  color: #ffffff;
-  font-size: 1.4rem;
-  font-weight: 600;
-  line-height: 1.3;
-}
-.roadmap-time {
-  margin-bottom: 16px;
-  color: #ffffff;
-  font-size: 0.85rem;
-  font-style: italic;
-  font-weight: 400;
-  letter-spacing: 0.02em;
-}
-.roadmap-box p {
-  margin: 0;
-  color: #ffffff;
-  font-size: 0.95rem;
-  line-height: 1.65;
-}
-.roadmap-box p + p {
-  margin-top: 12px;
-}
-@media (max-width: 768px) {
-  .roadmap-timeline::before {
-    left: 20px;
-  }
-  .roadmap-item {
-    width: calc(100% - 50px);
-    margin-left: 50px !important;
-    margin-right: 0 !important;
-    text-align: left !important;
-  }
-  .roadmap-item::before {
-    left: -26px !important;
-    right: auto !important;
-  }
-  .roadmap-item::after {
-    left: -32px !important;
-    right: auto !important;
-  }
-}
-
-/* ---------- 14. Reduced motion ---------- */
+/* ---------- 8. Reduced motion ---------- */
 
 @media (prefers-reduced-motion: reduce) {
   .ff-header *,
   .ff-main *,
-  .ff-footer *,
-  .ff-carousel *,
-  .ff-collapse * {
+  .ff-footer * {
     transition: none !important;
     animation: none !important;
   }
 }
 
-/* ---------- 13. Auth pages (login / signup / dashboard) ---------- */
+/* ---------- 9. Auth pages (login / signup / dashboard) ---------- */
 
 .ff-auth {
   max-width: 440px;
@@ -1433,7 +714,7 @@ html:not([data-auth="in"]) .ff-auth-when-in {
   display: none;
 }
 
-/* ---------- 16. Dashboard portal (sidebar rail + card grid) ---------- */
+/* ---------- 10. Dashboard portal (sidebar rail + card grid) ---------- */
 
 .ff-dash {
   /* Deliberate app-UI type scale — fixed sizes, not the marketing clamp
@@ -1534,7 +815,7 @@ a.ff-dash__link:hover {
   }
 }
 
-/* ---------- 17. Registration flow + setup checklist ---------- */
+/* ---------- 11. Registration flow + setup checklist ---------- */
 
 .ff-reg {
   max-width: 720px;
@@ -1717,7 +998,7 @@ a.ff-dash__link:hover {
   }
 }
 
-/* ---------- 18. Dashboard bubbles (universal card template) ----------
+/* ---------- 12. Dashboard bubbles (universal card template) ----------
    Every dashboard tab is a .ff-bubble-grid of .ff-bubble cards — no
    page-level titles. See docs/dashboard-guide.md for the component API
    and the recipes for adding tabs/bubbles. */

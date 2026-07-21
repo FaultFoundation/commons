@@ -17,7 +17,7 @@ const NAV_ITEMS: { key: DashboardNavKey; label: string; href?: string }[] = [
  * Shared shell for the member portal: sidebar rail (nav + sign out)
  * beside the page content, inside the regular site header/footer.
  * Active state comes from a prop — portal pages are server components
- * reached by full-page navigations, same pattern as PolicyLayout.
+ * reached by full-page navigations.
  */
 export function DashboardShell({
   active,

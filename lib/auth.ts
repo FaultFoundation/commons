@@ -16,12 +16,16 @@ export function getAuth() {
     baseURL: env.BETTER_AUTH_URL,
     // `next dev` serves on :3000 while BETTER_AUTH_URL points at :3999
     // (the wrangler preview port) — trust both origins in development.
-    // In production the baseURL origin (fault.foundation) is always trusted;
-    // the workers.dev URL is the staging alias, without which auth POSTs
-    // from it are rejected 403 by the origin check.
+    // In production the baseURL origin is always trusted; listing both the
+    // workers.dev alias and the eventual custom domain means the DNS cutover
+    // is a wrangler.jsonc var change with no code edit. Without this, auth
+    // POSTs from the non-baseURL origin are rejected 403 by the origin check.
     trustedOrigins: isDev
       ? ["http://localhost:3000", "http://localhost:3999"]
-      : ["https://website.oscarlabit9729.workers.dev"],
+      : [
+          "https://commons.fault.foundation",
+          "https://commons.oscarlabit9729.workers.dev",
+        ],
     emailAndPassword: {
       enabled: true,
       // Flip to true once an email provider (e.g. Resend) is wired up.

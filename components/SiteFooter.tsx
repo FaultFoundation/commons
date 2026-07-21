@@ -1,30 +1,40 @@
-import { policyDocs } from "@/lib/policies";
-
 /**
  * Full-bleed footer bar matching the header's look. Lists every page
  * grouped under its top-level nav item (sitemap style), plus the brand
  * block and Discord CTA.
+ *
+ * Only the Commons group is served by this app; everything else lives in
+ * the fault.foundation website repo, so those links are absolute.
  */
+
+const SITE = "https://fault.foundation";
 
 const groups: { title: string; links: { label: string; href: string }[] }[] = [
   {
+    title: "Commons",
+    links: [{ label: "Commons", href: "/" }],
+  },
+  {
     title: "About",
     links: [
-      { label: "About", href: "/about/" },
-      { label: "Roadmap", href: "/roadmap/" },
+      { label: "About", href: `${SITE}/about/` },
+      { label: "Roadmap", href: `${SITE}/roadmap/` },
     ],
   },
   {
     title: "Policies",
     links: [
-      { label: "Policies", href: "/policies/" },
-      ...policyDocs.map((doc) => ({ label: doc.title, href: doc.path })),
+      { label: "Policies", href: `${SITE}/policies/` },
+      { label: "Bylaws", href: `${SITE}/bylaws/` },
+      { label: "Privacy Policy", href: `${SITE}/privacy-policy/` },
+      { label: "Disciplinary Policy", href: `${SITE}/disciplinary-policy/` },
+      { label: "Overfault Rulebook", href: `${SITE}/overfault-rulebook/` },
     ],
   },
   {
     title: "News",
     links: [
-      { label: "Fault Foundation", href: "/news/" },
+      { label: "Fault Foundation", href: `${SITE}/news/` },
       { label: "College Esports News", href: "https://collegeesportsnews.org/news/" },
     ],
   },

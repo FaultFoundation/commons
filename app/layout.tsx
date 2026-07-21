@@ -4,13 +4,13 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 
 import "@/styles/fonts.css";
-import "@/styles/wp-blocks.css";
+// Brand tokens + element base styles; theme.css aliases its presets.
 import "@/styles/wp-globals.css";
-// Redesign layer — must come last so ff-* rules win specificity ties.
+// Theme layer — must come last so ff-* rules win specificity ties.
 import "@/styles/theme.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://fault.foundation"),
+  metadataBase: new URL("https://commons.fault.foundation"),
   title: {
     default: "The Fault Foundation",
     // Matches the live Yoast title format: "<Page> - The Fault Foundation"

@@ -123,7 +123,7 @@ enforces the exclusive-or) and single/double-elimination routing through
 | App concept | Table | Key mappings |
 |---|---|---|
 | Cross-program person record | `profiles` | 1:1 with `user`; `country`, `age_range`, `dm_preference` only |
-| Connected accounts | `platform_identities` | one row per `provider`: `discord` → `external_id` = Discord id + `handle` = username (mirrored from the Better-Auth account-created hook via `mirrorDiscordIdentity`); `battlenet` → `handle` = BattleTag; `steam` → `handle` = friend code. `UNIQUE(user_id, provider)` and `UNIQUE(provider, external_id)` |
+| Connected accounts | `platform_identities` | one row per `provider`, mirrored from the Better-Auth account-created hook via `mirrorPlatformIdentity`: `discord` → `external_id` = Discord id + `handle` = display name; `battlenet` → `external_id` = Blizzard account id + `handle` = BattleTag; `steam` → `handle` = friend code. `refreshed_at` records the last provider re-read (see `loadDiscordIntegration`) — Blizzard is never re-read, since it issues no refresh token. `UNIQUE(user_id, provider)` and `UNIQUE(provider, external_id)` |
 
 ### Collegiate registration & school-email verification
 

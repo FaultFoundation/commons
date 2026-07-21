@@ -1,23 +1,29 @@
 import type { ReactNode } from "react";
 
 import { SignOutButton } from "@/components/auth/SignOutButton";
-import { SetupStrip } from "@/components/dashboard/SetupStrip";
+import { SetupBanner } from "@/components/dashboard/SetupBanner";
 
-export type DashboardNavKey = "home" | "bracket" | "team" | "accounts";
+export type DashboardNavKey =
+  | "home"
+  | "schedule"
+  | "tournaments"
+  | "teams"
+  | "account";
 
 /** Items without an href have no page yet: rendered dimmed and inert. */
 const NAV_ITEMS: { key: DashboardNavKey; label: string; href?: string }[] = [
-  { key: "home", label: "Home", href: "/dashboard/" },
-  { key: "bracket", label: "Bracket" },
-  { key: "team", label: "My Team" },
-  { key: "accounts", label: "Accounts", href: "/dashboard/accounts/" },
+  { key: "home", label: "Home", href: "/home/" },
+  { key: "schedule", label: "Schedule", href: "/schedule/" },
+  { key: "tournaments", label: "Tournaments", href: "/tournaments/" },
+  { key: "teams", label: "Teams", href: "/teams/" },
+  { key: "account", label: "Account", href: "/account/" },
 ];
 
 /**
  * Shared shell for the member portal: sidebar rail (nav + sign out)
  * beside the page content, inside the regular site header/footer.
  * Active state comes from a prop — portal pages are server components
- * reached by full-page navigations, same pattern as PolicyLayout.
+ * reached by full-page navigations.
  */
 export function DashboardShell({
   active,
@@ -26,8 +32,8 @@ export function DashboardShell({
 }: {
   /** Omit for portal pages reached from cards rather than the nav. */
   active?: DashboardNavKey;
-  /** When set, the setup-progress strip renders above the tab's bubbles.
-      Omit on pages that ARE a setup step (register). */
+  /** When set, the "action required" banner renders above the tab's
+      bubbles. Omit on pages that ARE a setup step. */
   setupUserId?: string;
   children: ReactNode;
 }) {
@@ -63,7 +69,7 @@ export function DashboardShell({
           </div>
         </aside>
         <div className="ff-dash__content">
-          {setupUserId ? <SetupStrip userId={setupUserId} /> : null}
+          {setupUserId ? <SetupBanner userId={setupUserId} /> : null}
           {children}
         </div>
       </div>

@@ -2,9 +2,9 @@
 
 /**
  * Site navigation, redesigned (ff- classes, styles/theme.css §6).
- * Same items/links as the original WP menu: About, Policies, News
- * (submenu: College Esports News + Fault Foundation), Join Today! —
- * plus the Sign In button (member login, added post-port).
+ * Commons is this app's own page; About, Policies, and News live in the
+ * fault.foundation website repo and are linked absolutely. Join Today! and
+ * the Sign In button round it out.
  *
  * - Desktop: inline links right of the brand, News dropdown, CTA pill.
  * - Mobile (<782px): hamburger opens a full-screen overlay; Escape and
@@ -56,6 +56,7 @@ function NavLinks() {
     };
   }, [submenuOpen]);
 
+  /** A route served by this app — gets aria-current when it's the one shown. */
   const pageItem = (href: string, label: string) => {
     const current = pathname === href;
     return (
@@ -71,21 +72,29 @@ function NavLinks() {
     );
   };
 
+  /** A page on the marketing site. Pathname matching doesn't apply. */
+  const siteItem = (href: string, label: string) => (
+    <li>
+      <a className="ff-nav__link" href={href}>
+        {label}
+      </a>
+    </li>
+  );
+
   return (
     <>
-      {pageItem("/about/", "About")}
-      {pageItem("/policies/", "Policies")}
+      {pageItem("/", "Commons")}
+      {siteItem("https://fault.foundation/about/", "About")}
+      {siteItem("https://fault.foundation/policies/", "Policies")}
       <li
         ref={groupRef}
         className={`ff-nav__group${submenuOpen ? " is-open" : ""}`}
       >
-        {/* The whole item toggles the dropdown; /news/ is reached via
-            the "Fault Foundation" entry inside it. */}
+        {/* The whole item toggles the dropdown; both destinations are
+            off-site, so nothing here is ever the current page. */}
         <button
           type="button"
-          className={`ff-nav__link${
-            pathname === "/news/" ? " is-current" : ""
-          }`}
+          className="ff-nav__link"
           aria-haspopup="true"
           aria-expanded={submenuOpen}
           onClick={() => setSubmenuOpen((open) => !open)}
@@ -100,7 +109,7 @@ function NavLinks() {
             </a>
           </li>
           <li>
-            <a href="/news/">Fault Foundation</a>
+            <a href="https://fault.foundation/news/">Fault Foundation</a>
           </li>
         </ul>
       </li>

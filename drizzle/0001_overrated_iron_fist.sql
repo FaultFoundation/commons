@@ -1,0 +1,1 @@
+ALTER TABLE `collegiate_registrations` ADD `domain_matched` integer;

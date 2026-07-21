@@ -4,7 +4,13 @@ export const dynamic = "force-static";
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: [{ userAgent: "*", allow: "/" }],
-    sitemap: "https://fault.foundation/sitemap.xml",
+    rules: [
+      {
+        userAgent: "*",
+        allow: "/",
+        disallow: ["/home/", "/schedule/", "/tournaments/", "/teams/", "/account/", "/login/", "/signup/", "/api/"],
+      },
+    ],
+    sitemap: "https://commons.fault.foundation/sitemap.xml",
   };
 }

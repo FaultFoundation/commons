@@ -1146,34 +1146,11 @@ a.ff-dash__link:hover {
   align-items: center;
   gap: 10px;
 }
-<<<<<<< HEAD
-.ff-integration__logo {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  color: #fff;
-}
-.ff-integration__logo svg {
-  display: block;
-  width: 20px;
-  height: 20px;
-}
-.ff-integration__logo--discord {
-  background: #5865f2; /* Discord blurple */
-}
-.ff-integration__logo--battlenet {
-  background: #148eff; /* Battle.net blue */
-=======
 /* Brand artwork sits directly on the card — no tinted tile — because the two
    marks have different aspect ratios (Discord ships a square glyph, Blizzard a
-   wide wordmark). Fixing the HEIGHT and letting width follow keeps them
-   optically balanced without distorting either. */
-/* Fixed slot height, whatever the artwork's own height, so every card's head
-   occupies the same band and the status lines below them stay on one baseline
-   across the row. */
+   wide wordmark). The slot's height is fixed regardless of the artwork's own,
+   so every card's head occupies the same band and the status lines below stay
+   on one baseline across the row. */
 .ff-integration__logo {
   display: flex;
   align-items: center;
@@ -1198,7 +1175,6 @@ a.ff-dash__link:hover {
    variant, so it keeps its own blue. */
 .ff-integration__logo--discord {
   color: #fff;
->>>>>>> c0290eb (UX bug fixes)
 }
 .ff-integration__name {
   color: #fff;

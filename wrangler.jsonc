@@ -3,7 +3,7 @@
 // entry + prerendered assets into .open-next/.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "website",
+  "name": "commons",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-07-15",
   "compatibility_flags": ["nodejs_compat"],

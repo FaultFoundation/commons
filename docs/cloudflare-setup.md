@@ -44,8 +44,9 @@ the auth origin check with a 403.
    (if GitHub asks, grant the Cloudflare Workers app access to that repo).
 3. Set exactly:
    - **Branch:** `login` (switch to `main` once this branch merges)
-   - **Build command:** `npx opennextjs-cloudflare build`
-   - **Deploy command:** `npx opennextjs-cloudflare deploy`
+   - **Build command:** `npm run build`
+   - **Deploy command:** `npx wrangler deploy`
+   - **Version command:** `npx wrangler deploy`
 4. Builds trigger on the **next push** to that branch — changing settings or
    branches never starts a build by itself. To test: push any commit, then
    watch **Workers & Pages → website → Deployments** (each build shows logs

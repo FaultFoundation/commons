@@ -1,7 +1,7 @@
 // Regenerates db/seed/schools.sql from the Hipo university-domains-list
 // dataset (MIT licensed): https://github.com/Hipo/university-domains-list
 //
-//   npm run db:seed:generate     # writes db/seed/schools.sql (commit it)
+//   npm run db:seed:generate     # writes db/seed/schools.sql + public/schools.json
 //   npm run db:seed:local        # applies to the local D1
 //   npm run db:seed:remote       # applies to production D1
 //
@@ -16,8 +16,11 @@ const SOURCE_URL =
   "https://raw.githubusercontent.com/Hipo/university-domains-list/master/world_universities_and_domains.json";
 const ROWS_PER_INSERT = 500;
 
-const outDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "db", "seed");
-const outFile = path.join(outDir, "schools.sql");
+const rootDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const seedDir = path.join(rootDir, "db", "seed");
+const sqlFile = path.join(seedDir, "schools.sql");
+const publicDir = path.join(rootDir, "public");
+const jsonFile = path.join(publicDir, "schools.json");
 
 const res = await fetch(SOURCE_URL);
 if (!res.ok) {
@@ -32,7 +35,7 @@ if (!Array.isArray(data) || data.length < 1000) {
 
 const q = (s) => `'${String(s).replace(/'/g, "''")}'`;
 
-const rows = [];
+const schools = [];
 for (const entry of data) {
   const { name, country, alpha_two_code: alpha, domains, web_pages: webPages } = entry;
   if (
@@ -45,11 +48,52 @@ for (const entry of data) {
     console.error("Skipping malformed entry:", JSON.stringify(entry).slice(0, 200));
     continue;
   }
-  const state = entry["state-province"];
-  rows.push(
-    `(${rows.length + 1},${q(name)},${q(country)},${q(alpha)},` +
-      `${state == null ? "NULL" : q(state)},${q(JSON.stringify(domains))},${q(JSON.stringify(webPages))})`,
+  schools.push({
+    name,
+    country,
+    alphaTwoCode: alpha,
+    stateProvince: entry["state-province"] ?? null,
+    domains,
+    webPages,
+  });
+}
+
+const records = schools.map((school, index) => ({
+  id: index + 1,
+  ...school,
+}));
+
+const directory = records
+  .map((school) => ({
+    id: school.id,
+    country: school.country,
+    name: school.name,
+    website: school.webPages[0] ?? "",
+  }))
+  .sort(
+    (a, b) =>
+      a.country.localeCompare(b.country, "en", { sensitivity: "base" }) ||
+      a.name.localeCompare(b.name, "en", { sensitivity: "base" }) ||
+      a.id - b.id,
   );
+
+if (
+  directory.length !== records.length ||
+  new Set(directory.map((school) => school.id)).size !== directory.length ||
+  directory.some((school) => school.id < 1 || school.id > directory.length)
+) {
+  throw new Error("Generated school directory has invalid ids.");
+}
+
+const rows = records.map(
+  (school) =>
+    `(${school.id},${q(school.name)},${q(school.country)},${q(school.alphaTwoCode)},` +
+    `${school.stateProvince == null ? "NULL" : q(school.stateProvince)},` +
+    `${q(JSON.stringify(school.domains))},${q(JSON.stringify(school.webPages))})`,
+);
+
+if (rows.length !== directory.length) {
+  throw new Error("Generated school SQL and static directory have different record counts.");
 }
 
 const statements = [];
@@ -68,6 +112,14 @@ DELETE FROM schools;
 ${statements.join("\n")}
 `;
 
-await mkdir(outDir, { recursive: true });
-await writeFile(outFile, sql);
-console.log(`Wrote ${outFile}: ${rows.length} schools, ${statements.length + 1} statements.`);
+await Promise.all([
+  mkdir(seedDir, { recursive: true }),
+  mkdir(publicDir, { recursive: true }),
+]);
+await Promise.all([
+  writeFile(sqlFile, sql),
+  writeFile(jsonFile, `${JSON.stringify(directory)}\n`),
+]);
+console.log(
+  `Wrote ${sqlFile} and ${jsonFile}: ${directory.length} schools, ${statements.length + 1} SQL statements.`,
+);

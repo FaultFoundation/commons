@@ -80,8 +80,14 @@ one-time steps in production:
    npm run db:migrate:remote   # if the 0001 migration isn't applied yet
    npm run db:seed:remote      # loads db/seed/schools.sql (~10k universities)
    ```
-   Regenerate the seed file any time with `npm run db:seed:generate`
-   (pulls the latest Hipo university-domains-list dataset).
+   Regenerate the directory any time with `npm run db:seed:generate`
+   (pulls the latest Hipo university-domains-list dataset). It writes both
+   `db/seed/schools.sql` and `public/schools.json`; commit and deploy both
+   generated artifacts from the same run because the static typeahead uses the
+   transient ids assigned by the SQL seed. For a refresh, regenerate, apply the
+   remote seed, and deploy the Worker immediately afterward. The registration
+   submit action rejects a stale directory selection rather than validating the
+   wrong school.
 
 2. **Resend** (verification-code emails):
    1. Create a free account at <https://resend.com> → **Domains** → add

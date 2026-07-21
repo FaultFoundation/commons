@@ -6,9 +6,8 @@ import {
   resendCode,
   submitRegistration,
   verifyCode,
-  type SchoolHit,
 } from "@/app/dashboard/register/actions";
-import { SchoolTypeahead } from "./SchoolTypeahead";
+import { SchoolTypeahead, type SchoolHit } from "./SchoolTypeahead";
 import { AGE_RANGES, USER_TYPES } from "@/lib/registration-shared";
 
 export type RegisterInitialState = {

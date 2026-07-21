@@ -45,8 +45,6 @@ import {
 // (school detail) hanging off it — via the helpers in lib/registration.ts.
 // ---------------------------------------------------------------------------
 
-export type SchoolHit = { id: number; name: string; website: string };
-
 export type SubmitInput = {
   userType: string;
   ageRange: string;
@@ -82,45 +80,6 @@ async function requireUserId(): Promise<string | null> {
 // legacy KICKED/…) is read-only from the site.
 function isOpenStatus(status: string | null): boolean {
   return status === null || status === "EMAIL_SENT" || status === "MANUAL_REVIEW";
-}
-
-export async function searchSchools(
-  country: string,
-  query: string,
-): Promise<{ ok: boolean; hits: SchoolHit[] }> {
-  const userId = await requireUserId();
-  if (!userId) return { ok: false, hits: [] };
-
-  const q = query.trim();
-  if (!country || q.length < 2 || q.length > 120) return { ok: true, hits: [] };
-
-  const pattern = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-  const db = getDb();
-  const rows = await db
-    .select({
-      id: schools.id,
-      name: schools.name,
-      webPages: schools.webPages,
-    })
-    .from(schools)
-    .where(
-      and(eq(schools.country, country), sql`${schools.name} LIKE ${pattern} ESCAPE '\\'`),
-    )
-    .orderBy(schools.name)
-    .limit(8);
-
-  return {
-    ok: true,
-    hits: rows.map((r) => {
-      let website = "";
-      try {
-        website = (JSON.parse(r.webPages) as string[])[0] ?? "";
-      } catch {
-        // corrupt seed row: leave website empty
-      }
-      return { id: r.id, name: r.name, website };
-    }),
-  };
 }
 
 /**
@@ -298,6 +257,12 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
     )[0];
     if (!school) {
       return { ok: false, error: "School not found — search and select it again." };
+    }
+    if (school.name !== (input.schoolName ?? "").trim() || school.country !== country) {
+      return {
+        ok: false,
+        error: "The school directory changed. Reload this page and select your school again.",
+      };
     }
     let domains: string[] = [];
     let pages: string[] = [];

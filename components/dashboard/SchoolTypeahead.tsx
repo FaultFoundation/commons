@@ -1,8 +1,62 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
-import { searchSchools, type SchoolHit } from "@/app/dashboard/register/actions";
+export type SchoolHit = { id: number; name: string; website: string };
+
+type SchoolDirectoryEntry = SchoolHit & {
+  country: string;
+  normalizedName: string;
+};
+
+let directoryPromise: Promise<SchoolDirectoryEntry[]> | null = null;
+
+function parseDirectory(data: unknown): SchoolDirectoryEntry[] {
+  if (!Array.isArray(data)) throw new Error("School directory is not an array.");
+
+  const ids = new Set<number>();
+  return data.map((entry) => {
+    if (typeof entry !== "object" || entry === null) {
+      throw new Error("School directory contains an invalid entry.");
+    }
+    const { id, country, name, website } = entry as Record<string, unknown>;
+    if (
+      typeof id !== "number" ||
+      !Number.isInteger(id) ||
+      id < 1 ||
+      ids.has(id) ||
+      typeof country !== "string" ||
+      typeof name !== "string" ||
+      typeof website !== "string"
+    ) {
+      throw new Error("School directory contains malformed data.");
+    }
+    ids.add(id);
+    return {
+      id,
+      country,
+      name,
+      website,
+      normalizedName: name.toLocaleLowerCase(),
+    };
+  });
+}
+
+function loadDirectory(): Promise<SchoolDirectoryEntry[]> {
+  if (!directoryPromise) {
+    directoryPromise = fetch("/schools.json")
+      .then((response) => {
+        if (!response.ok) throw new Error(`School directory request failed: ${response.status}`);
+        return response.json();
+      })
+      .then(parseDirectory)
+      .catch((error: unknown) => {
+        directoryPromise = null;
+        throw error;
+      });
+  }
+  return directoryPromise;
+}
 
 /**
  * Combobox over the seeded universities directory. Free typing is allowed;
@@ -24,35 +78,57 @@ export function SchoolTypeahead({
   const [hits, setHits] = useState<SchoolHit[]>([]);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const queryRef = useRef("");
+  const [directory, setDirectory] = useState<SchoolDirectoryEntry[] | null>(null);
+  const [directoryError, setDirectoryError] = useState(false);
+  const [pickedSchool, setPickedSchool] = useState<SchoolDirectoryEntry | null>(null);
   const listId = useId();
 
   useEffect(() => {
+    let mounted = true;
+    loadDirectory()
+      .then((loadedDirectory) => {
+        if (mounted) setDirectory(loadedDirectory);
+      })
+      .catch(() => {
+        if (mounted) setDirectoryError(true);
+      });
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      mounted = false;
     };
   }, []);
 
-  function search(text: string) {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    queryRef.current = text;
-    if (text.trim().length < 2 || !country) {
+  useEffect(() => {
+    if (pickedSchool?.name === value && pickedSchool.country === country) {
       setHits([]);
       setOpen(false);
+      setActiveIndex(-1);
       return;
     }
-    debounceRef.current = setTimeout(async () => {
-      const result = await searchSchools(country, text);
-      // Ignore responses that raced a newer keystroke.
-      if (queryRef.current !== text) return;
-      setHits(result.hits);
-      setActiveIndex(result.hits.length > 0 ? 0 : -1);
-      setOpen(result.hits.length > 0);
-    }, 200);
-  }
+
+    const query = value.trim();
+    if (!directory || directoryError || !country || query.length < 2 || query.length > 120) {
+      setHits([]);
+      setOpen(false);
+      setActiveIndex(-1);
+      return;
+    }
+
+    const normalizedQuery = query.toLocaleLowerCase();
+    const nextHits: SchoolHit[] = [];
+    for (const school of directory) {
+      if (school.country === country && school.normalizedName.includes(normalizedQuery)) {
+        nextHits.push({ id: school.id, name: school.name, website: school.website });
+        if (nextHits.length === 8) break;
+      }
+    }
+    setHits(nextHits);
+    setActiveIndex(nextHits.length > 0 ? 0 : -1);
+    setOpen(nextHits.length > 0);
+  }, [country, directory, directoryError, pickedSchool, value]);
 
   function pick(hit: SchoolHit) {
+    const selected = directory?.find((school) => school.id === hit.id) ?? null;
+    setPickedSchool(selected);
     setOpen(false);
     setHits([]);
     onPick(hit);
@@ -75,7 +151,7 @@ export function SchoolTypeahead({
   }
 
   return (
-    <div className="ff-typeahead">
+    <div className="ff-typeahead" aria-busy={directory === null && !directoryError}>
       <input
         className="ff-auth__input"
         type="text"
@@ -87,8 +163,8 @@ export function SchoolTypeahead({
         aria-autocomplete="list"
         autoComplete="off"
         onChange={(e) => {
+          setPickedSchool(null);
           onChange(e.target.value);
-          search(e.target.value);
         }}
         onKeyDown={onKeyDown}
         onBlur={() => {
@@ -96,6 +172,16 @@ export function SchoolTypeahead({
           setTimeout(() => setOpen(false), 150);
         }}
       />
+      {directory === null && !directoryError ? (
+        <span className="screen-reader-text" role="status">
+          Loading school suggestions.
+        </span>
+      ) : null}
+      {directoryError ? (
+        <p className="ff-auth__hint" role="status">
+          School suggestions are unavailable. Use “My school isn&apos;t listed” below.
+        </p>
+      ) : null}
       {open ? (
         <ul className="ff-typeahead__list" id={listId} role="listbox">
           {hits.map((hit, i) => (

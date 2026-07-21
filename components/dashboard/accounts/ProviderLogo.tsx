@@ -25,28 +25,6 @@ function DiscordMark() {
 }
 
 /**
-<<<<<<< HEAD
- * PLACEHOLDER — a generic portal glyph, not Blizzard's trademark.
- *
- * Battle.net's real mark isn't reproduced here on purpose: hand-drawing an
- * approximation of someone else's logo tends to ship a subtly wrong version
- * that then sticks. Download the official SVG from Blizzard's brand/press kit
- * and replace this function's contents with its <path> — the tile, sizing and
- * colour around it already work.
- */
-function BattleNetMark() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" role="presentation">
-      <circle cx="12" cy="12" r="8.25" stroke="currentColor" strokeWidth="1.75" />
-      <path
-        d="M12 6.75c2.9 0 5.25 2.35 5.25 5.25"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-      />
-      <circle cx="12" cy="12" r="2.25" fill="currentColor" />
-    </svg>
-=======
  * Official Blizzard Entertainment wordmark, dark-background variant, supplied
  * by the org. A wordmark rather than a square glyph, so it's height-matched to
  * the Discord mark and left to find its own width — never squeezed into a
@@ -61,6 +39,5 @@ function BattleNetMark() {
       width={240}
       height={140}
     />
->>>>>>> c0290eb (UX bug fixes)
   );
 }

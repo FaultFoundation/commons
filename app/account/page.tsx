@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { DeleteAccount } from "@/components/dashboard/accounts/DeleteAccount";
-import { IntegrationRow } from "@/components/dashboard/accounts/IntegrationRow";
+import { IntegrationCard } from "@/components/dashboard/accounts/IntegrationCard";
 import {
   EmailRow,
   NameRow,
@@ -113,24 +113,27 @@ export default async function AccountPage() {
         </Bubble>
 
         <Bubble title="Integrations">
-          <IntegrationRow
-            provider="discord"
-            label="Discord"
-            linked={discord.linked}
-            handle={discord.handle}
-            enabled={discordAuthEnabled()}
-            note={discordServerNote(discord.inGuild)}
-            linkLabel="Link Discord"
-            callbackURL="/account/"
-          />
-          <IntegrationRow
-            provider="battlenet"
-            label="Blizzard"
-            linked={battlenetLinked}
-            handle={battlenetIdentity?.handle ?? null}
-            enabled={battlenetAuthEnabled()}
-            callbackURL="/account/"
-          />
+          <div className="ff-integrations">
+            <IntegrationCard
+              provider="discord"
+              label="Discord"
+              linked={discord.linked}
+              handle={discord.handle}
+              enabled={discordAuthEnabled()}
+              note={discordServerNote(discord.inGuild)}
+              linkLabel="Link Discord"
+              callbackURL="/account/"
+            />
+            <IntegrationCard
+              provider="battlenet"
+              label="Blizzard"
+              linked={battlenetLinked}
+              handle={battlenetIdentity?.handle ?? null}
+              enabled={battlenetAuthEnabled()}
+              linkLabel="Link Blizzard"
+              callbackURL="/account/"
+            />
+          </div>
         </Bubble>
 
         <Bubble title="Danger Zone" variant="danger" span="full">

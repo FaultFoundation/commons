@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import {
+  account,
   profiles,
   colleges,
   programMemberships,
@@ -240,6 +241,46 @@ export async function getRegistrationState(
     referrer: row?.referrer ?? null,
     circumstances: row?.circumstances ?? null,
     collegeId: row?.collegeId ?? null,
+  };
+}
+
+/** Which setup steps are actually finished, in step-rail order. */
+export type SetupProgress = {
+  /** Step 1 — academic email verified. */
+  academic: boolean;
+  /** Step 2 — every required platform account linked. */
+  integrations: boolean;
+  /** Step 3 — team / tournaments. */
+  team: boolean;
+};
+
+/** Platform accounts a member must link before setup counts as done. */
+export const REQUIRED_PROVIDERS = ["discord", "battlenet"] as const;
+
+/**
+ * Single source of truth for setup completion: drives both the step rail's
+ * checkmarks (SetupShell) and the resume redirect (/account/setup/), so the two
+ * can't drift apart and send someone to a step the rail calls finished.
+ */
+export async function getSetupProgress(userId: string): Promise<SetupProgress> {
+  const [reg, accountRows] = await Promise.all([
+    getRegistrationState(userId),
+    getDb()
+      .select({ providerId: account.providerId })
+      .from(account)
+      .where(eq(account.userId, userId)),
+  ]);
+  const linked = new Set(accountRows.map((r) => r.providerId));
+
+  return {
+    academic: reg?.status === "VERIFIED",
+    // Every program we run today is Overwatch, so a verified BattleTag is as
+    // load-bearing as Discord. If the site ever runs events for other games,
+    // this is the line to make per-game (e.g. required only once someone
+    // registers for a tournament that needs that platform).
+    integrations: REQUIRED_PROVIDERS.every((p) => linked.has(p)),
+    // Nothing in step 3 is required yet — team and tournaments are still WIP.
+    team: false,
   };
 }
 

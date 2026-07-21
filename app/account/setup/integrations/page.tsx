@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 
-import { IntegrationRow } from "@/components/dashboard/accounts/IntegrationRow";
+import { IntegrationCard } from "@/components/dashboard/accounts/IntegrationCard";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { SetupShell } from "@/components/dashboard/setup/SetupShell";
 import { account } from "@/db/schema";
@@ -45,25 +45,28 @@ export default async function IntegrationsSetupPage() {
   return (
     <SetupShell step={2}>
       <div className="ff-bubble-grid ff-bubble-grid--single">
-        <Bubble title="Your Integrations (Required)" span="full">
-          <IntegrationRow
-            provider="discord"
-            label="Discord"
-            linked={discord.linked}
-            handle={discord.handle}
-            enabled={discordAuthEnabled()}
-            note={discordServerNote(discord.inGuild)}
-            linkLabel="Link Discord"
-            callbackURL="/account/setup/integrations/"
-          />
-          <IntegrationRow
-            provider="battlenet"
-            label="Blizzard"
-            linked={battlenetRows.length > 0}
-            handle={battlenetIdentity?.handle ?? null}
-            enabled={battlenetAuthEnabled()}
-            callbackURL="/account/setup/integrations/"
-          />
+        <Bubble title="Your Required Integrations" span="full">
+          <div className="ff-integrations">
+            <IntegrationCard
+              provider="discord"
+              label="Discord"
+              linked={discord.linked}
+              handle={discord.handle}
+              enabled={discordAuthEnabled()}
+              note={discordServerNote(discord.inGuild)}
+              linkLabel="Link Discord"
+              callbackURL="/account/setup/integrations/"
+            />
+            <IntegrationCard
+              provider="battlenet"
+              label="Blizzard"
+              linked={battlenetRows.length > 0}
+              handle={battlenetIdentity?.handle ?? null}
+              enabled={battlenetAuthEnabled()}
+              linkLabel="Link Blizzard"
+              callbackURL="/account/setup/integrations/"
+            />
+          </div>
           <div className="ff-reg__nav">
             <a className="ff-btn ff-btn--outline" href="/account/setup/academic/">
               Back
@@ -74,7 +77,7 @@ export default async function IntegrationsSetupPage() {
           </div>
         </Bubble>
 
-        <Bubble title="Your Integrations (Optional)" span="full" variant="wip">
+        <Bubble title="Your Optional Integrations" span="full" variant="wip">
           <div className="ff-bubble__wip">Work in progress</div>
         </Bubble>
       </div>

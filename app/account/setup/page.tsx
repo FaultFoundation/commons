@@ -1,11 +1,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
 
-import { account } from "@/db/schema";
 import { getAuth } from "@/lib/auth";
-import { getDb } from "@/lib/db";
-import { getRegistrationState } from "@/lib/registration";
+import { getRegistrationState, getSetupProgress } from "@/lib/registration";
 
 // Session-gated: always rendered per request.
 export const dynamic = "force-dynamic";
@@ -30,19 +27,11 @@ export default async function SetupPage() {
   // page renders the appropriate standing message.
   if (status !== "VERIFIED") redirect("/account/setup/academic/");
 
-  const discordRows = await getDb()
-    .select({ id: account.id })
-    .from(account)
-    .where(
-      and(
-        eq(account.userId, session.user.id),
-        eq(account.providerId, "discord"),
-      ),
-    )
-    .limit(1);
+  // Same helper the step rail reads, so "finished" means one thing site-wide.
+  const progress = await getSetupProgress(session.user.id);
 
   redirect(
-    discordRows.length > 0
+    progress.integrations
       ? "/account/setup/team/"
       : "/account/setup/integrations/",
   );

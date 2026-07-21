@@ -876,6 +876,7 @@ a.ff-dash__link:hover {
   list-style: none;
   counter-reset: ff-step;
 }
+/* Chips are links — the rail navigates as well as reports progress. */
 .ff-reg__step {
   counter-increment: ff-step;
   display: inline-flex;
@@ -887,6 +888,15 @@ a.ff-dash__link:hover {
   color: var(--ff-text-dim);
   font-size: var(--ff-dash-text-sm);
   font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.ff-reg__step:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
 }
 .ff-reg__step::before {
   content: counter(ff-step);
@@ -907,6 +917,8 @@ a.ff-dash__link:hover {
   background: var(--ff-accent);
   color: var(--ff-navy-900);
 }
+/* --done means the step's requirements are actually met, NOT merely that it
+   sits behind the current one. Only then does the number become a ✓. */
 .ff-reg__step--done {
   color: #dfe9f4;
 }
@@ -914,6 +926,15 @@ a.ff-dash__link:hover {
   content: "✓";
   background: var(--ff-blue);
   color: #fff;
+}
+/* A step can be both current and complete: keep the "you are here" accent and
+   still show the ✓. Must follow both rules above to win the cascade. */
+.ff-reg__step--current.ff-reg__step--done {
+  color: #fff;
+}
+.ff-reg__step--current.ff-reg__step--done::before {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
 }
 
 /* Membership-type radio cards */
@@ -1057,10 +1078,10 @@ a.ff-dash__link:hover {
 .ff-bubble--full {
   grid-column: 1 / -1;
 }
-/* Setup steps read top-to-bottom as a form, not as a two-up card wall. */
+/* Setup steps read top-to-bottom as a form, not as a two-up card wall — but
+   they still span the full content width, like every other tab's bubbles. */
 .ff-bubble-grid--single {
   grid-template-columns: minmax(0, 1fr);
-  max-width: 720px;
 }
 .ff-bubble__head {
   display: flex;
@@ -1098,6 +1119,72 @@ a.ff-dash__link:hover {
 }
 .ff-bubble--danger .ff-bubble__title {
   color: var(--ff-danger-text);
+}
+
+/* ---------- Connected-account cards (Discord / Blizzard / …) ----------
+   Even-sized blocks tiled into a grid rather than full-width rows, so a
+   growing list of platforms stays scannable. auto-fit means the same markup
+   gives two-up inside a wide setup bubble and one-up in the narrow Account
+   tab bubble, with no per-page variants. */
+.ff-integrations {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.ff-integration {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+}
+.ff-integration__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ff-integration__logo {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: #fff;
+}
+.ff-integration__logo svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+.ff-integration__logo--discord {
+  background: #5865f2; /* Discord blurple */
+}
+.ff-integration__logo--battlenet {
+  background: #148eff; /* Battle.net blue */
+}
+.ff-integration__name {
+  color: #fff;
+  font-size: var(--ff-dash-text-md);
+  font-weight: 700;
+}
+.ff-integration__status {
+  margin: 0;
+  color: #fff;
+  font-size: var(--ff-dash-text-sm);
+  overflow-wrap: anywhere;
+}
+.ff-integration__note {
+  margin: 0;
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-xs);
+}
+/* Pin the button to the bottom so buttons line up across cards of differing
+   text length — that's what makes the row read as even blocks. */
+.ff-integration__action {
+  margin-top: auto;
+  padding-top: 12px;
 }
 
 /* Label / value / action rows inside bubbles */

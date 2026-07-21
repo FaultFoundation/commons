@@ -1,7 +1,29 @@
 # Dashboard Guide
 
-How the member dashboard is built and how to extend it without breaking
-anything. The core ideas:
+How the member portal is built and how to extend it without breaking
+anything.
+
+## Routes
+
+The portal lives at the top level (it used to sit under `/dashboard`, which
+now 308s via `middleware.ts`). `/` stays the public Commons landing page.
+
+| Route                          | Tab         | What                         |
+| ------------------------------ | ----------- | ---------------------------- |
+| `/home/`                       | Home        | Condensed widget views       |
+| `/schedule/`                   | Schedule    | WIP                          |
+| `/tournaments/`                | Tournaments | WIP (`#overfault` anchor)    |
+| `/teams/`                      | Teams       | WIP                          |
+| `/account/`                    | Account     | Profile / integrations       |
+| `/account/setup/`              | —           | Resolver → current step      |
+| `/account/setup/academic/`     | —           | Step 1                       |
+| `/account/setup/code/`         | —           | Code entry (part of step 1)  |
+| `/account/setup/integrations/` | —           | Step 2                       |
+| `/account/setup/team/`         | —           | Step 3                       |
+
+Sign-up lands on `/account/setup/`; sign-in lands on `/home/`.
+
+The core ideas:
 
 - **Everything is a bubble.** Tabs have no page titles — each tab is a
   `.ff-bubble-grid` of `Bubble` cards (plus an invisible
@@ -96,18 +118,34 @@ The parent owns all state, including any input passed as children; Enter
 confirms, Esc/Cancel closes. Use `danger` for red confirm buttons. See
 `DeleteAccount.tsx` for the full pattern.
 
-### `SetupStrip` — onboarding progress
+### `Disclosure` — collapsible row
 
-`components/dashboard/SetupStrip.tsx`, rendered by `DashboardShell` on
-every tab that passes `setupUserId`. Shows "Setup n/3" (Email ·
-Battle.net · Discord) and unmounts once all three are done. Don't pass
-`setupUserId` on pages that *are* a setup step (register). Battle.net
-counts as done when a `battlenet` row exists in `platform_identities` — real OAuth is still
-todo, so new users keep the strip until that ships.
+`components/dashboard/bubbles/Disclosure.tsx`. Same shell as `BubbleRow`,
+but the body expands on click. Native `<details>`, so no client directive
+and it works without JS. Used for the team options in setup step 3.
+
+### `SetupBanner` — the amber "action required" bar
+
+`components/dashboard/SetupBanner.tsx`, rendered by `DashboardShell` on
+every tab that passes `setupUserId`. Exactly one prompt shows, in priority
+order:
+
+1. academic email not `VERIFIED`, or Discord not linked → finish setup
+2. set up but on no team → create or join a team
+3. on a team but entered in nothing → join a tournament
+
+Renders nothing once all three hold. Don't pass `setupUserId` on pages that
+*are* a setup step — `SetupShell` already omits it.
+
+### `SetupShell` — chrome for the setup wizard
+
+`components/dashboard/setup/SetupShell.tsx`. Wraps `DashboardShell` (Account
+tab active, no banner) and draws the numbered step rail. Takes `step: 1 | 2
+| 3`; the code-entry page passes `1` because it belongs to step 1.
 
 ## Recipe: add a new tab
 
-1. Create `app/dashboard/<tab>/page.tsx` from this skeleton:
+1. Create `app/<tab>/page.tsx` from this skeleton:
 
    ```tsx
    import type { Metadata } from "next";
@@ -164,8 +202,23 @@ shell.
 
 - Account mutations (name/email/password/unlink/delete) are Better Auth
   client calls — no custom endpoints. Server actions
-  (`app/dashboard/register/actions.ts`) exist only for domain logic
-  Better Auth doesn't own.
+  (`app/account/setup/actions.ts`) exist only for domain logic Better Auth
+  doesn't own.
+- Verification codes are 6 uppercase alphanumerics. D1 only ever stores
+  `sha256(userId:code)` (`lib/registration.ts`), compared in constant time,
+  with a 24h TTL, a 5-attempt cap, and 60s/5-per-24h send throttling.
+- A school-email domain that doesn't match the school still gets a code;
+  the outcome is recorded as `collegiate_registrations.domain_matched` for
+  the future admin layer. The two paths that still can't self-serve are
+  "None of the above" and an email another member already verified with —
+  both land in `MANUAL_REVIEW`.
+- Emails go out over Gmail SMTP from inside the Worker — `lib/email.ts`
+  (policy + copy) on `lib/smtp.ts` (a small `node:tls` client, port 465
+  implicit TLS). It's deliberately not a `cloudflare:sockets` library:
+  OpenNext bundles the server with esbuild, which can't resolve that scheme
+  and exposes no hook to mark it external, so such a library fails the
+  build. Without `SUPPORT_EMAIL_APP_PASSWORD` the code is logged instead; use
+  `npm run preview` to exercise a real send.
 - Email change works without verification only while emails are
   unverified (`updateEmailWithoutVerification` in `lib/auth.ts`); a
   "taken" email reports success without changing anything, so the UI
@@ -181,6 +234,7 @@ shell.
 `npm run lint` && `npm run build`, then `npm run dev` (:3000) for the
 fast loop or `npm run preview` (:3999) for the production-like Workers
 runtime. Discord flows need `DISCORD_CLIENT_ID/SECRET` in `.dev.vars`;
-registration codes print to the terminal without `RESEND_API_KEY`.
+verification codes print to the terminal without
+`SUPPORT_EMAIL_APP_PASSWORD`.
 Inspect local D1 with
 `wrangler d1 execute website-sql --local --command "SELECT …"`.

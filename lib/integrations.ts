@@ -1,0 +1,174 @@
+import { and, eq } from "drizzle-orm";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+
+import { account } from "@/db/schema";
+import { getAuth } from "@/lib/auth";
+import { getDb } from "@/lib/db";
+import {
+  fetchDiscordUsername,
+  fetchIsInGuild,
+  getPlatformIdentity,
+  hasScope,
+  markIdentityRefreshed,
+  pushRoleConnection,
+} from "@/lib/platform-identities";
+
+// ---------------------------------------------------------------------------
+// Session-aware integration reads. Imports lib/auth.ts (for token access), so
+// nothing in lib/auth.ts may import this module — see the note in
+// lib/platform-identities.ts.
+// ---------------------------------------------------------------------------
+
+/**
+ * How long a mirrored Discord handle is trusted before we re-read it.
+ *
+ * Display names change, but the Discord ID never does — the handle is
+ * cosmetic, so this is refreshed lazily when a member actually loads their
+ * account page rather than swept by a cron. (A cron would also mean a custom
+ * worker entry: OpenNext generates .open-next/worker.js, so there is nowhere
+ * to hang a `scheduled` handler without a wrapper or a second Worker.) If this
+ * ever needs to be real-time, the answer is the Discord bot consuming
+ * USER_UPDATE gateway events, not a polling loop.
+ */
+const HANDLE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export type DiscordIntegration = {
+  linked: boolean;
+  /** Display name captured at link time and refreshed lazily. */
+  handle: string | null;
+  /** true in / false out / null unknown (no guild configured, scope missing,
+      authorization revoked, or the call failed). */
+  inGuild: boolean | null;
+};
+
+const NOT_LINKED: DiscordIntegration = {
+  linked: false,
+  handle: null,
+  inGuild: null,
+};
+
+/**
+ * Fine print for the Discord row. `null` server status stays silent rather than
+ * guessing — an unknown answer shown as "not in the server" would send members
+ * chasing a problem they don't have.
+ */
+export function discordServerNote(inGuild: boolean | null): string | undefined {
+  if (inGuild === true) return "You're in the Discord server.";
+  if (inGuild === false) return "You haven't joined the Discord server yet.";
+  return undefined;
+}
+
+/** The linked Discord account row, or null. */
+async function getDiscordAccount(userId: string) {
+  const rows = await getDb()
+    .select({ accountId: account.accountId, scope: account.scope })
+    .from(account)
+    .where(and(eq(account.userId, userId), eq(account.providerId, "discord")))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * A currently-valid Discord access token, refreshing and persisting it first if
+ * it expired. Discord refresh tokens don't expire until the member revokes the
+ * app, so this keeps working indefinitely; a revoked app throws, which we
+ * translate to null.
+ */
+async function getDiscordAccessToken(
+  userId: string,
+  accountId: string,
+  requestHeaders: Headers,
+): Promise<string | null> {
+  try {
+    const result = await getAuth().api.getAccessToken({
+      body: { providerId: "discord", accountId, userId },
+      headers: requestHeaders,
+    });
+    return result?.accessToken ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Everything the dashboard shows about a member's Discord link, refreshing the
+ * stored handle when it has gone stale. Never throws: a provider outage
+ * degrades to the last-known handle and an unknown server status.
+ */
+export async function loadDiscordIntegration(
+  userId: string,
+  requestHeaders: Headers,
+): Promise<DiscordIntegration> {
+  const [discordAccount, identity] = await Promise.all([
+    getDiscordAccount(userId),
+    getPlatformIdentity(userId, "discord"),
+  ]);
+  if (!discordAccount) return NOT_LINKED;
+
+  const { env } = getCloudflareContext();
+  const guildId = env.DISCORD_GUILD_ID || null;
+
+  const stale =
+    !identity?.refreshedAt ||
+    Date.now() - identity.refreshedAt.getTime() > HANDLE_TTL_MS;
+  // guilds.members.read is only present on accounts linked after that scope
+  // shipped; older links skip the lookup instead of taking a 403.
+  const canCheckGuild =
+    Boolean(guildId) && hasScope(discordAccount.scope, "guilds.members.read");
+
+  // Only pay for a token when something actually needs one.
+  if (!stale && !canCheckGuild) {
+    return { linked: true, handle: identity?.handle ?? null, inGuild: null };
+  }
+
+  const accessToken = await getDiscordAccessToken(
+    userId,
+    discordAccount.accountId,
+    requestHeaders,
+  );
+
+  let handle = identity?.handle ?? null;
+  if (stale && identity) {
+    const fresh = accessToken ? await fetchDiscordUsername(accessToken) : null;
+    // Bookkeep even on failure, so a revoked authorization defers the next
+    // attempt by a full TTL instead of retrying on every render.
+    await markIdentityRefreshed(identity.id, fresh);
+    handle = fresh ?? handle;
+  }
+
+  const inGuild = canCheckGuild ? await fetchIsInGuild(accessToken, guildId) : null;
+
+  return { linked: true, handle, inGuild };
+}
+
+/**
+ * Push the member's verification state onto their Discord connection (Linked
+ * Roles), so the server can gate roles on it. No-op when Discord isn't linked,
+ * the scope is absent, or Discord OAuth isn't configured. Fire-and-forget:
+ * being verified on the site never depends on Discord accepting the write.
+ */
+export async function syncRoleConnection(
+  userId: string,
+  requestHeaders: Headers,
+): Promise<void> {
+  try {
+    const { env } = getCloudflareContext();
+    if (!env.DISCORD_CLIENT_ID) return;
+
+    const discordAccount = await getDiscordAccount(userId);
+    if (!discordAccount) return;
+    if (!hasScope(discordAccount.scope, "role_connections.write")) return;
+
+    const accessToken = await getDiscordAccessToken(
+      userId,
+      discordAccount.accountId,
+      requestHeaders,
+    );
+    if (!accessToken) return;
+
+    // The Discord Application ID and the OAuth client ID are the same value.
+    await pushRoleConnection(accessToken, env.DISCORD_CLIENT_ID, userId);
+  } catch (error) {
+    console.error("role connection sync failed:", error);
+  }
+}

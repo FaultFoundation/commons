@@ -15,6 +15,30 @@ BETTER_AUTH_URL=http://localhost:3999
 # DISCORD_CLIENT_ID=
 # DISCORD_CLIENT_SECRET=
 
-# Optional — sends real registration verification emails via Resend. Leave
-# unset locally: codes are printed to the server terminal instead.
-# RESEND_API_KEY=
+# Optional — the Fault Foundation server's snowflake. Set it and the account
+# page shows whether the member has actually joined the Discord (needs the
+# guilds.members.read scope, which is requested at link time). Production
+# reads it from wrangler.jsonc "vars" instead; it isn't a secret.
+# DISCORD_GUILD_ID=
+
+# Optional — enables the Blizzard "Connect" button locally. Create a client at
+# https://develop.battle.net/access/clients and add
+# http://localhost:3999/api/auth/oauth2/callback/battlenet as a redirect URI
+# (note the /oauth2/ segment — generic-OAuth providers use a different callback
+# path than Discord's). Link-only: Blizzard returns no email, so it can never
+# create an account on its own.
+# BATTLENET_CLIENT_ID=
+# BATTLENET_CLIENT_SECRET=
+
+# Optional — the 16-char Google app password for support@fault.foundation.
+# Set it and real verification emails go out; leave it unset and codes are
+# printed to the server terminal instead. Only `npm run preview` (:3999, real
+# workerd) can actually send — `next dev` runs in Node, which has no sockets.
+# SUPPORT_EMAIL_APP_PASSWORD=
+
+# Override the sending mailbox (defaults to support@fault.foundation) or the
+# server (defaults to smtp.gmail.com:465, implicit TLS).
+# SUPPORT_EMAIL=
+# EMAIL_FROM=
+# SMTP_HOST=
+# SMTP_PORT=

@@ -7,8 +7,23 @@ import { NextResponse, type NextRequest } from "next/server";
  * OpenNext worker never applied the redirect to API routes, hence prod
  * worked). skipTrailingSlashRedirect hands the job to us instead.
  */
+/** The portal used to live under /dashboard; keep those URLs working. */
+const LEGACY_PATHS: Record<string, string> = {
+  "/dashboard/": "/home/",
+  "/dashboard/accounts/": "/account/",
+  "/dashboard/register/": "/account/setup/",
+};
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  const moved = LEGACY_PATHS[pathname];
+  if (moved) {
+    const url = new URL(request.url);
+    url.pathname = moved;
+    return NextResponse.redirect(url, 308);
+  }
+
   if (
     !pathname.endsWith("/") &&
     !pathname.startsWith("/api/") &&

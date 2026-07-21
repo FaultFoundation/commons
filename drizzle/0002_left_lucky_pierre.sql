@@ -1,0 +1,1 @@
+ALTER TABLE `platform_identities` ADD `refreshed_at` integer;

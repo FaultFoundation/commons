@@ -3,6 +3,9 @@
 // entry + prerendered assets into .open-next/.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
+  // Must stay "commons": the "website" Worker is the separate marketing-site
+  // repo (fault.foundation). Deploying this repo under that name would
+  // overwrite the static site.
   "name": "commons",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-07-15",
@@ -19,14 +22,25 @@
       "migrations_dir": "drizzle"
     }
   ],
-  // Non-secret runtime config. Secrets (BETTER_AUTH_SECRET, DISCORD_*) are
-  // set with `wrangler secret put` in production and .dev.vars locally.
+  // Non-secret runtime config. Secrets (BETTER_AUTH_SECRET, DISCORD_CLIENT_*,
+  // BATTLENET_CLIENT_*, SUPPORT_EMAIL_APP_PASSWORD) are set with
+  // `wrangler secret put` in production and .dev.vars locally.
   "vars": {
-    "BETTER_AUTH_URL": "https://fault.foundation",
-    "EMAIL_FROM": "The Fault Foundation <no-reply@fault.foundation>"
+    // The origin the Commons is actually served from. Flip to
+    // https://commons.fault.foundation once that DNS record is live —
+    // lib/auth.ts already trusts both, so no code change is needed.
+    "BETTER_AUTH_URL": "https://commons.oscarlabit9729.workers.dev",
+    // The mailbox verification codes are sent from — also the SMTP account
+    // we authenticate as (its app password is the SUPPORT_EMAIL_APP_PASSWORD
+    // secret). Sender and account match, so Gmail leaves the From header be.
+    "SUPPORT_EMAIL": "support@fault.foundation",
+    "EMAIL_FROM": "The Fault Foundation <support@fault.foundation>",
+    // The Fault Foundation Discord server. Public identifier, not a secret —
+    // gates the "are they actually in the server?" lookup on the account page.
+    // Fill in with the server's snowflake (Discord → right-click server →
+    // Copy Server ID, with Developer Mode on); left empty the check is skipped.
+    "DISCORD_GUILD_ID": "1431492264668037153"
   },
-  // Port 3999 so scripts/extract-text.mjs and screenshot-compare.mjs work
-  // against `npm run preview` unchanged.
   "dev": {
     "port": 3999
   },

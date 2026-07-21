@@ -2,13 +2,14 @@ import { and, eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import {
+  account,
   profiles,
   colleges,
-  platformIdentities,
   programMemberships,
   collegiateRegistrations,
 } from "@/db/schema";
 import { PROGRAM_COLLEGIATE_ID } from "@/lib/programs";
+import { CODE_LENGTH } from "@/lib/registration-shared";
 
 // ---------------------------------------------------------------------------
 // Registration constants (mirroring the legacy sheet/Apps Script flow).
@@ -21,6 +22,7 @@ export const MAX_SENDS_PER_WINDOW = 5; // per CODE_TTL_MS window
 
 export {
   AGE_RANGES,
+  CODE_LENGTH,
   USER_TYPES,
   type RegistrationStatus,
   type UserType,
@@ -28,13 +30,14 @@ export {
 
 // ---------------------------------------------------------------------------
 // Verification codes. Plaintext is never stored: only sha256(userId:CODE),
-// so a D1 leak doesn't expose usable codes. ~40 bits of entropy is fine for
-// a 24h-TTL code capped at 5 online guesses.
+// so a D1 leak doesn't expose usable codes. 31^6 ≈ 8.9e8 is plenty for a
+// 24h-TTL code capped at 5 online guesses.
 // ---------------------------------------------------------------------------
 
-// No 0/O/1/I/L to keep hand-typed codes unambiguous.
+// Uppercase letters + digits only (no symbols), minus 0/O/1/I/L so hand-typed
+// codes are unambiguous. CODE_LENGTH is re-exported above from the
+// client-safe module — the entry field needs it too.
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-const CODE_LENGTH = 8;
 
 export function generateCode(): string {
   const limit = 256 - (256 % CODE_ALPHABET.length); // rejection sampling
@@ -50,11 +53,7 @@ export function generateCode(): string {
   return code;
 }
 
-/** XXXX-XXXX presentation used in emails and the entry field hint. */
-export function formatCode(code: string): string {
-  return `${code.slice(0, 4)}-${code.slice(4)}`;
-}
-
+/** Codes are typed as shown; spaces and stray dashes from a paste are dropped. */
 export function normalizeCodeInput(input: string): string {
   return input.toUpperCase().replace(/[\s-]/g, "");
 }
@@ -159,22 +158,6 @@ export async function getProfile(userId: string) {
   return rows[0] ?? null;
 }
 
-/** A single connected platform identity (discord / battlenet / …), or null. */
-export async function getPlatformIdentity(userId: string, provider: string) {
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(platformIdentities)
-    .where(
-      and(
-        eq(platformIdentities.userId, userId),
-        eq(platformIdentities.provider, provider),
-      ),
-    )
-    .limit(1);
-  return rows[0] ?? null;
-}
-
 export type RegistrationState = {
   membershipId: string | null;
   status: string | null;
@@ -261,6 +244,46 @@ export async function getRegistrationState(
   };
 }
 
+/** Which setup steps are actually finished, in step-rail order. */
+export type SetupProgress = {
+  /** Step 1 — academic email verified. */
+  academic: boolean;
+  /** Step 2 — every required platform account linked. */
+  integrations: boolean;
+  /** Step 3 — team / tournaments. */
+  team: boolean;
+};
+
+/** Platform accounts a member must link before setup counts as done. */
+export const REQUIRED_PROVIDERS = ["discord", "battlenet"] as const;
+
+/**
+ * Single source of truth for setup completion: drives both the step rail's
+ * checkmarks (SetupShell) and the resume redirect (/account/setup/), so the two
+ * can't drift apart and send someone to a step the rail calls finished.
+ */
+export async function getSetupProgress(userId: string): Promise<SetupProgress> {
+  const [reg, accountRows] = await Promise.all([
+    getRegistrationState(userId),
+    getDb()
+      .select({ providerId: account.providerId })
+      .from(account)
+      .where(eq(account.userId, userId)),
+  ]);
+  const linked = new Set(accountRows.map((r) => r.providerId));
+
+  return {
+    academic: reg?.status === "VERIFIED",
+    // Every program we run today is Overwatch, so a verified BattleTag is as
+    // load-bearing as Discord. If the site ever runs events for other games,
+    // this is the line to make per-game (e.g. required only once someone
+    // registers for a tournament that needs that platform).
+    integrations: REQUIRED_PROVIDERS.every((p) => linked.has(p)),
+    // Nothing in step 3 is required yet — team and tournaments are still WIP.
+    team: false,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Write helpers (registration flow). Each ensures its row exists then patches.
 // ---------------------------------------------------------------------------
@@ -331,6 +354,7 @@ export async function upsertCollegiateRegistration(
     graduationDate?: string | null;
     referrer?: string | null;
     circumstances?: string | null;
+    domainMatched?: boolean | null;
   },
 ): Promise<string> {
   const db = getDb();
@@ -411,95 +435,5 @@ export async function getOrCreateCollege(input: {
       if (again) return again.id;
     }
     throw error;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Platform identity helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Best-effort Discord display name for the just-linked account. Called from
- * the account-created hook while the OAuth access token is fresh. Never
- * throws — a miss just means the Accounts tab shows "Connected".
- */
-export async function fetchDiscordUsername(
-  accessToken: string | null | undefined,
-): Promise<string | null> {
-  if (!accessToken) return null;
-  try {
-    const res = await fetch("https://discord.com/api/users/@me", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      signal: AbortSignal.timeout(3000),
-    });
-    if (!res.ok) return null;
-    const me = (await res.json()) as {
-      username?: string;
-      global_name?: string | null;
-    };
-    return me.global_name || me.username || null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Mirrors a linked Discord account into platform_identities (provider
- * "discord"). Runs from the better-auth account-created hook, covering explicit
- * linking and Discord sign-in/up. Must never throw: a mirror failure must not
- * fail the OAuth flow. A Discord ID already claimed by another user is left
- * alone (the unique constraint would reject it anyway).
- */
-export async function mirrorDiscordIdentity(
-  userId: string,
-  discordId: string,
-  discordUsername?: string | null,
-): Promise<void> {
-  try {
-    const db = getDb();
-    const now = new Date();
-
-    const taken = (
-      await db
-        .select({ userId: platformIdentities.userId })
-        .from(platformIdentities)
-        .where(
-          and(
-            eq(platformIdentities.provider, "discord"),
-            eq(platformIdentities.externalId, discordId),
-          ),
-        )
-        .limit(1)
-    )[0];
-    if (taken && taken.userId !== userId) {
-      console.error(`discord ${discordId} already linked to another user`);
-      return;
-    }
-
-    const existing = await getPlatformIdentity(userId, "discord");
-    if (existing) {
-      await db
-        .update(platformIdentities)
-        .set({
-          externalId: discordId,
-          handle: discordUsername ?? existing.handle,
-          verified: true,
-          updatedAt: now,
-        })
-        .where(eq(platformIdentities.id, existing.id));
-      return;
-    }
-
-    await db.insert(platformIdentities).values({
-      id: crypto.randomUUID(),
-      userId,
-      provider: "discord",
-      externalId: discordId,
-      handle: discordUsername ?? null,
-      verified: true,
-      connectedAt: now,
-    });
-  } catch (error) {
-    console.error("discord identity mirror failed:", error);
   }
 }

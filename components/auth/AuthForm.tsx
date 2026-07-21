@@ -49,9 +49,10 @@ export function AuthForm({ mode, discordEnabled }: Props) {
     }
 
     // Full navigation (like the rest of the site's links); the hint makes
-    // the destination paint the avatar immediately.
+    // the destination paint the avatar immediately. A brand-new account
+    // goes straight into setup; returning members land on the portal home.
     setAuthHint(true);
-    window.location.assign("/dashboard/");
+    window.location.assign(mode === "signup" ? "/account/setup/" : "/home/");
   }
 
   async function onDiscord() {
@@ -60,7 +61,9 @@ export function AuthForm({ mode, discordEnabled }: Props) {
     setPending(true);
     const result = await authClient.signIn.social({
       provider: "discord",
-      callbackURL: "/dashboard/",
+      // Can't tell a new Discord user from a returning one here; the
+      // "action required" banner on /home catches anyone still unset-up.
+      callbackURL: "/home/",
     });
     if (result.error) {
       setError(result.error.message ?? "Discord sign-in failed. Please try again.");

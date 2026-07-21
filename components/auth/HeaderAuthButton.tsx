@@ -43,7 +43,7 @@ export function HeaderAuthButton() {
       </a>
       <a
         className="ff-nav__avatar ff-auth-when-in"
-        href="/dashboard/"
+        href="/home/"
         aria-label="Member area"
         title="Member area"
       >

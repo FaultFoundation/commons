@@ -22,11 +22,13 @@ import { getPlatformIdentity, getRegistrationState } from "@/lib/registration";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Accounts",
+  title: "Account",
   robots: { index: false },
 };
 
-export default async function AccountsPage() {
+const SCHOOL_LOCK_NOTE = "Schools can only be changed by a support member";
+
+export default async function AccountPage() {
   const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) {
     redirect("/login/");
@@ -48,8 +50,8 @@ export default async function AccountsPage() {
   const hasSchool = Boolean(reg?.schoolName);
 
   return (
-    <DashboardShell active="accounts" setupUserId={session.user.id}>
-      <h1 className="screen-reader-text">Accounts</h1>
+    <DashboardShell active="account" setupUserId={session.user.id}>
+      <h1 className="screen-reader-text">Account</h1>
       <div className="ff-bubble-grid">
         <Bubble title="Profile">
           <NameRow initialName={session.user.name} />
@@ -65,11 +67,19 @@ export default async function AccountsPage() {
           )}
           {hasSchool ? (
             <>
-              <BubbleRow label="School" value={reg?.schoolName} locked />
               <BubbleRow
-                label="School Email"
+                label="School"
+                value={reg?.schoolName}
+                locked
+                note={SCHOOL_LOCK_NOTE}
+                lockTitle={SCHOOL_LOCK_NOTE}
+              />
+              <BubbleRow
+                label="Academic Email"
                 value={reg?.schoolEmail ?? undefined}
                 locked
+                note={SCHOOL_LOCK_NOTE}
+                lockTitle={SCHOOL_LOCK_NOTE}
               />
             </>
           ) : status === "MANUAL_REVIEW" ? (
@@ -81,20 +91,32 @@ export default async function AccountsPage() {
           ) : (
             <BubbleRow
               label="School"
-              value="Not registered"
-              note="Verify your school to become a member."
+              value="Not verified"
+              note="Verify your academic email to become a member."
               action={
-                <a className="ff-btn ff-btn--sm" href="/dashboard/register/">
-                  Register
+                <a className="ff-btn ff-btn--sm" href="/account/setup/">
+                  Verify
                 </a>
               }
             />
           )}
         </Bubble>
 
+        {/* Reserved slot — keeps the grid balanced until whatever goes
+            here (player stats, Discord roles) is designed. */}
+        <Bubble title="Coming Soon" variant="wip">
+          <div className="ff-bubble__wip" />
+        </Bubble>
+
         <Bubble title="Integrations">
+          <DiscordRow
+            linked={discordLinked}
+            username={discordIdentity?.handle ?? null}
+            discordEnabled={discordAuthEnabled()}
+            callbackURL="/account/"
+          />
           <BubbleRow
-            label="Battle.net"
+            label="Blizzard"
             value="Not connected"
             note="Coming Soon"
             action={
@@ -103,23 +125,6 @@ export default async function AccountsPage() {
               </button>
             }
           />
-          <DiscordRow
-            linked={discordLinked}
-            username={discordIdentity?.handle ?? null}
-            discordEnabled={discordAuthEnabled()}
-          />
-        </Bubble>
-
-        <Bubble title="Player Stats (WIP)" variant="wip">
-          <div className="ff-bubble__wip">
-            Record · Maps Played · Heroes — Coming Soon
-          </div>
-        </Bubble>
-
-        <Bubble title="Discord (WIP)" variant="wip">
-          <div className="ff-bubble__wip">
-            Roles · Server Activity — shows once your Discord is connected
-          </div>
         </Bubble>
 
         <Bubble title="Danger Zone" variant="danger" span="full">

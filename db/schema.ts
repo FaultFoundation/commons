@@ -328,6 +328,11 @@ export const collegiateRegistrations = sqliteTable(
     userType: text("user_type"),
     schoolEmail: text("school_email"),
     graduationDate: text("graduation_date"),
+    // Whether the academic email's domain matched a domain the school is known
+    // by, recorded at submission. NULL on rows written before this shipped.
+    // Not a gate — everyone gets a code either way; the admin layer reviews
+    // the `false` rows retroactively.
+    domainMatched: integer("domain_matched", { mode: "boolean" }),
     // "None of the above" path only.
     referrer: text("referrer"),
     circumstances: text("circumstances"),

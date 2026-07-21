@@ -96,10 +96,10 @@ gets attached, its builds fight over the same repo.
    ```
    (each command waits for you to paste the value and press Enter)
 
-### 4. Registration emails (Resend) + schools directory
+### 4. Verification emails (Gmail SMTP) + schools directory
 
-The in-portal registration flow (school-email verification codes) needs two
-one-time steps in production:
+The academic-verification flow (`/account/setup`) needs two one-time steps in
+production:
 
 1. **Seed the schools directory** (university typeahead data):
    ```sh
@@ -115,23 +115,49 @@ one-time steps in production:
    submit action rejects a stale directory selection rather than validating the
    wrong school.
 
-2. **Resend** (verification-code emails):
-   1. Create a free account at <https://resend.com> → **Domains** → add
-      `fault.foundation` → add the DKIM/SPF records it shows to Cloudflare
-      DNS → wait for "Verified".
-   2. Create an API key, then in the project terminal:
+2. **Gmail SMTP** (verification-code emails). `lib/email.ts` + `lib/smtp.ts`
+   talk SMTP directly from the Worker over `node:tls` (the `nodejs_compat`
+   flag), so no third-party email API is in the path.
+
+   Mail is sent from **support@fault.foundation**, authenticating as that
+   same Google account.
+
+   1. On the `support@fault.foundation` Google account, turn on 2-Step
+      Verification, then create an **App password** (Google Account →
+      Security → App passwords). It's 16 characters.
+   2. In the project terminal:
       ```sh
-      npx wrangler secret put RESEND_API_KEY
+      npx wrangler secret put SUPPORT_EMAIL_APP_PASSWORD
       ```
-   Until the key is set, codes are **logged to the Worker console instead
-   of emailed** (`npx wrangler tail commons` shows them) — fine for testing,
-   not for members. The from-address is the `EMAIL_FROM` var in
-   `wrangler.jsonc`.
+      (the address itself is the non-secret `SUPPORT_EMAIL` var in
+      `wrangler.jsonc` — only the password is a secret)
+
+   Until it's set, codes are **logged to the Worker console instead of
+   emailed** (`npx wrangler tail commons` shows them) — fine for testing, not
+   for members.
+
+   Things that bite:
+
+   - **From address.** Because we send from the same address we authenticate
+     as, Gmail leaves the `From` header alone and no alias setup is needed.
+     If you ever point `EMAIL_FROM` at a *different* address, that address
+     must first be a verified alias on the account (Gmail → Settings →
+     Accounts and Import → **Send mail as**) or Gmail will silently rewrite
+     the header back.
+   - **Quota.** ~100–500 recipients/day on a consumer Gmail account, 2,000/day
+     on Workspace. Past that Google rejects sends for up to 24 hours.
+   - **Ports.** Workers block outbound port 25. We use 465 (implicit TLS),
+     which is open and needs no STARTTLS upgrade. `lib/smtp.ts` assumes TLS
+     from the first byte, so don't point `SMTP_PORT` at 587.
+   - **Local testing.** Real sends need `npm run preview` (:3999, actual
+     workerd) plus the values in `.dev.vars`. Under `npm run dev` the code is
+     printed to the terminal instead.
 
 ## Later / optional
 
-- **Email verification:** flip `requireEmailVerification` in `lib/auth.ts`
-  once an email provider (e.g. Resend) can send the links.
+- **Email verification:** flip `requireEmailVerification` in `lib/auth.ts` and
+  point Better Auth's sender at `lib/email.ts` to verify sign-up addresses too
+  (today only academic emails get a code).
 - **Legacy member import:** the `profiles` table accepts the old
   verification sheet (rows may exist before a member registers; linked by
   Discord ID once they sign in with Discord).

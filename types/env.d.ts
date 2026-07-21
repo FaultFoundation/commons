@@ -4,8 +4,17 @@
 interface CloudflareEnv {
   DISCORD_CLIENT_ID?: string;
   DISCORD_CLIENT_SECRET?: string;
-  // Registration verification-code emails. Without the key, emails are
-  // logged to the console instead of sent (dev mode).
-  RESEND_API_KEY?: string;
+  // Verification-code emails, sent over SMTP (see lib/email.ts). The Google
+  // app password for SUPPORT_EMAIL — without it the code is logged to the
+  // console instead (dev mode).
+  SUPPORT_EMAIL_APP_PASSWORD?: string;
+  // The mailbox we authenticate as AND send from. Defaults to
+  // support@fault.foundation.
+  SUPPORT_EMAIL?: string;
+  // Optional display-name form of the From header; defaults to
+  // "The Fault Foundation <SUPPORT_EMAIL>".
   EMAIL_FROM?: string;
+  // Default to Gmail submission; override to point at another provider.
+  SMTP_HOST?: string;
+  SMTP_PORT?: string;
 }

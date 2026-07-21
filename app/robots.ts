@@ -8,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/dashboard/", "/login/", "/signup/", "/api/"],
+        disallow: ["/home/", "/schedule/", "/tournaments/", "/teams/", "/account/", "/login/", "/signup/", "/api/"],
       },
     ],
     sitemap: "https://commons.fault.foundation/sitemap.xml",

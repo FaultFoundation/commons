@@ -20,3 +20,7 @@ next-env.d.ts
 logs/
 temp/
 .claude/
+
+# local-only reference material (not part of the commons app)
+reference/
+wordpress site/

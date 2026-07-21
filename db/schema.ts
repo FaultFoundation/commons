@@ -170,8 +170,8 @@ export const profiles = sqliteTable("profiles", {
 // never a schema change. Discord also lives in Better Auth `account`; mirrored
 // here for uniform querying + the future Discord-bot join.
 //   provider "discord"  -> external_id = Discord ID, handle = username
-//   provider "battlenet"-> handle = BattleTag (no external id)
-//   provider "steam"    -> handle = friend code
+//   provider "battlenet"-> external_id = Blizzard account id, handle = BattleTag
+//   provider "steam"    -> handle = friend code (no external id)
 // ===========================================================================
 
 export const platformIdentities = sqliteTable(
@@ -186,6 +186,10 @@ export const platformIdentities = sqliteTable(
     handle: text("handle"),
     verified: integer("verified", { mode: "boolean" }).notNull().default(false),
     connectedAt: integer("connected_at", { mode: "timestamp_ms" }),
+    // Last time the provider profile was successfully re-read (or the attempt
+    // was given up on) — distinct from updated_at, which any write bumps. Sole
+    // input to the handle-staleness gate in refreshDiscordIdentity.
+    refreshedAt: integer("refreshed_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -200,9 +204,9 @@ export const platformIdentities = sqliteTable(
       t.userId,
       t.provider,
     ),
-    // A given external account (e.g. a Discord ID) links to one user only.
-    // external_id NULL rows (battlenet/steam) don't collide — SQLite treats
-    // NULLs as distinct.
+    // A given external account (e.g. a Discord ID, a Blizzard account id) links
+    // to one user only. external_id NULL rows (steam) don't collide — SQLite
+    // treats NULLs as distinct.
     uniqueIndex("platform_identities_provider_external_unique").on(
       t.provider,
       t.externalId,

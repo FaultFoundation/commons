@@ -80,21 +80,24 @@ other origin is rejected by the auth origin check with a 403.
 Only the `commons` Worker may be connected to this repo — if a second one
 gets attached, its builds fight over the same repo.
 
-### 3. Discord sign-in (optional — button stays hidden until done)
+### 3. Discord + Blizzard OAuth (optional — rows stay disabled until done)
 
-1. <https://discord.com/developers/applications> → your app (the
-   verification bot works) → **OAuth2**.
-2. Add redirect URLs:
-   - `https://commons.fault.foundation/api/auth/callback/discord`
-   - `https://commons.oscarlabit9729.workers.dev/api/auth/callback/discord`
-   - `http://localhost:3999/api/auth/callback/discord` (local testing; also
-     put the id/secret in `.dev.vars`)
-3. In the project terminal:
-   ```sh
-   npx wrangler secret put DISCORD_CLIENT_ID
-   npx wrangler secret put DISCORD_CLIENT_SECRET
-   ```
-   (each command waits for you to paste the value and press Enter)
+Moved to its own doc: **[oauth-setup.md](oauth-setup.md)**. It covers both
+providers end to end — redirect URLs, Linked Roles, the server id, and the
+one-time metadata script.
+
+The production secrets it has you set, for reference:
+
+```sh
+npx wrangler secret put DISCORD_CLIENT_ID
+npx wrangler secret put DISCORD_CLIENT_SECRET
+npx wrangler secret put BATTLENET_CLIENT_ID
+npx wrangler secret put BATTLENET_CLIENT_SECRET
+```
+
+(each command waits for you to paste the value and press Enter)
+
+`DISCORD_GUILD_ID` is **not** a secret — it goes in `wrangler.jsonc` → `vars`.
 
 ### 4. Verification emails (Gmail SMTP) + schools directory
 

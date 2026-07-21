@@ -857,8 +857,10 @@ a.ff-dash__link:hover {
 
 /* ---------- 11. Registration flow + setup checklist ---------- */
 
+/* Full content width, like every other dashboard card — the setup cards
+   ("You're Verified", "Verification On Hold", the academic form) used to be
+   pinned to 720px and stopped short of the bubbles on every other tab. */
 .ff-reg {
-  max-width: 720px;
   padding: clamp(24px, 4vw, 36px);
 }
 .ff-reg__title {
@@ -1144,6 +1146,7 @@ a.ff-dash__link:hover {
   align-items: center;
   gap: 10px;
 }
+<<<<<<< HEAD
 .ff-integration__logo {
   display: grid;
   place-items: center;
@@ -1163,6 +1166,39 @@ a.ff-dash__link:hover {
 }
 .ff-integration__logo--battlenet {
   background: #148eff; /* Battle.net blue */
+=======
+/* Brand artwork sits directly on the card — no tinted tile — because the two
+   marks have different aspect ratios (Discord ships a square glyph, Blizzard a
+   wide wordmark). Fixing the HEIGHT and letting width follow keeps them
+   optically balanced without distorting either. */
+/* Fixed slot height, whatever the artwork's own height, so every card's head
+   occupies the same band and the status lines below them stay on one baseline
+   across the row. */
+.ff-integration__logo {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 38px;
+}
+.ff-integration__logo svg {
+  display: block;
+  width: 28px;
+  height: 28px;
+}
+/* Sized for optical, not literal, parity: the wordmark stacks "BLIZZARD" over
+   "ENTERTAINMENT", so matching Discord's 28px glyph height would leave its
+   lettering visibly punier than the neighbouring mark. */
+.ff-integration__logo img {
+  display: block;
+  width: auto;
+  height: 38px;
+}
+/* Discord's guidelines call for the white mark on dark backgrounds (the
+   blurple one is for light). Blizzard's asset is already the dark-background
+   variant, so it keeps its own blue. */
+.ff-integration__logo--discord {
+  color: #fff;
+>>>>>>> c0290eb (UX bug fixes)
 }
 .ff-integration__name {
   color: #fff;

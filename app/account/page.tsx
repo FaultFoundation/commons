@@ -53,7 +53,7 @@ export default async function AccountPage() {
     <DashboardShell active="account" setupUserId={session.user.id}>
       <h1 className="screen-reader-text">Account</h1>
       <div className="ff-bubble-grid">
-        <Bubble title="Profile">
+        <Bubble title="Profile" span="full">
           <NameRow initialName={session.user.name} />
           <EmailRow initialEmail={session.user.email} />
           {hasPassword ? (

@@ -765,12 +765,50 @@ html:not([data-auth="in"]) .ff-auth-when-in {
   --ff-dash-text-md: 0.9375rem; /* 15px — body, values, inputs, buttons */
   --ff-dash-text-lg: 1.0625rem; /* 17px — bubble titles */
   --ff-dash-text-xl: 1.375rem; /* 22px — register step titles, empty states */
+
+  /* Bubble density — the "cozy" default. Every gap and pad inside a bubble
+     resolves through these, so the member's Display setting is one attribute
+     swap (see [data-density] below) and no rule hardcodes a spacing value. */
+  --ff-bubble-pad: clamp(16px, 2vw, 20px);
+  --ff-bubble-head-gap: 10px; /* head → body */
+  --ff-bubble-body-gap: 6px; /* row → row */
+  --ff-row-pad-y: 8px;
+  --ff-row-pad-x: 12px;
+  --ff-row-editor-gap: 8px; /* expanded editors, nested forms */
+  --ff-tile-pad: 12px; /* integration cards, action panels */
+  --ff-field-gap: 0.6em; /* .ff-auth__field, dashboard only */
+  --ff-reg-pad: clamp(20px, 3vw, 28px);
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
   gap: clamp(24px, 4vw, 48px);
   align-items: start;
   font-size: var(--ff-dash-text-md);
   line-height: 1.5;
+}
+/* Density presets. "Cozy" is the .ff-dash base above, so an absent or
+   unrecognized attribute lands on the default; "comfortable" restores the
+   spacing the dashboard shipped with before the tokens existed. */
+.ff-dash[data-density="compact"] {
+  --ff-bubble-pad: clamp(14px, 1.6vw, 18px);
+  --ff-bubble-head-gap: 8px;
+  --ff-bubble-body-gap: 4px;
+  --ff-row-pad-y: 6px;
+  --ff-row-pad-x: 10px;
+  --ff-row-editor-gap: 6px;
+  --ff-tile-pad: 10px;
+  --ff-field-gap: 0.5em;
+  --ff-reg-pad: clamp(16px, 2.5vw, 22px);
+}
+.ff-dash[data-density="comfortable"] {
+  --ff-bubble-pad: clamp(18px, 2.5vw, 26px);
+  --ff-bubble-head-gap: 14px;
+  --ff-bubble-body-gap: 10px;
+  --ff-row-pad-y: 12px;
+  --ff-row-pad-x: 14px;
+  --ff-row-editor-gap: 10px;
+  --ff-tile-pad: 16px;
+  --ff-field-gap: 1em;
+  --ff-reg-pad: clamp(24px, 4vw, 36px);
 }
 .ff-dash .ff-btn {
   font-size: var(--ff-dash-text-md);
@@ -779,6 +817,11 @@ html:not([data-auth="in"]) .ff-auth-when-in {
 .ff-dash .ff-auth__hint,
 .ff-dash .ff-auth__error {
   font-size: var(--ff-dash-text-sm);
+}
+/* The marketing login/signup pages keep the roomier 1em — only the portal's
+   forms (setup steps, invite panel, score reporter) follow the density. */
+.ff-dash .ff-auth__field {
+  margin-block-end: var(--ff-field-gap);
 }
 .ff-dash__nav {
   position: sticky;
@@ -861,7 +904,7 @@ a.ff-dash__link:hover {
    ("You're Verified", "Verification On Hold", the academic form) used to be
    pinned to 720px and stopped short of the bubbles on every other tab. */
 .ff-reg {
-  padding: clamp(24px, 4vw, 36px);
+  padding: var(--ff-reg-pad);
 }
 .ff-reg__title {
   margin: 0 0 0.5em;
@@ -1064,7 +1107,12 @@ a.ff-dash__link:hover {
 /* ---------- 12. Dashboard bubbles (universal card template) ----------
    Every dashboard tab is a .ff-bubble-grid of .ff-bubble cards — no
    page-level titles. See docs/dashboard-guide.md for the component API
-   and the recipes for adding tabs/bubbles. */
+   and the recipes for adding tabs/bubbles.
+
+   Spacing *inside* a bubble never hardcodes a value: it resolves through the
+   density tokens on .ff-dash (section 10) so the member's Display setting can
+   swap all of it at once. The grid gap below is the exception — the distance
+   between bubbles is fixed by design. */
 
 .ff-bubble-grid {
   display: grid;
@@ -1075,7 +1123,7 @@ a.ff-dash__link:hover {
 .ff-bubble {
   display: flex;
   flex-direction: column;
-  padding: clamp(18px, 2.5vw, 26px);
+  padding: var(--ff-bubble-pad);
 }
 .ff-bubble--full {
   grid-column: 1 / -1;
@@ -1090,7 +1138,7 @@ a.ff-dash__link:hover {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 0 0 14px;
+  margin: 0 0 var(--ff-bubble-head-gap);
 }
 .ff-bubble__title {
   margin: 0;
@@ -1098,9 +1146,16 @@ a.ff-dash__link:hover {
   font-weight: 800;
   letter-spacing: -0.2px;
 }
+/* The header's right slot can hold more than one control (reorder arrows
+   beside a role badge), so it lays them out rather than stacking them. */
+.ff-bubble__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .ff-bubble__body {
   display: grid;
-  gap: 10px;
+  gap: var(--ff-bubble-body-gap);
 }
 .ff-bubble__wip {
   display: grid;
@@ -1137,7 +1192,7 @@ a.ff-dash__link:hover {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 16px;
+  padding: var(--ff-tile-pad);
   border: 1px solid var(--ff-border);
   border-radius: var(--ff-radius-md);
 }
@@ -1205,7 +1260,7 @@ a.ff-dash__link:hover {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 2px 12px;
-  padding: 12px 14px;
+  padding: var(--ff-row-pad-y) var(--ff-row-pad-x);
   border: 1px solid var(--ff-border);
   border-radius: var(--ff-radius-md);
 }
@@ -1238,8 +1293,8 @@ a.ff-dash__link:hover {
 }
 .ff-row__editor {
   grid-column: 1 / -1;
-  margin-top: 10px;
-  padding-top: 12px;
+  margin-top: var(--ff-row-editor-gap);
+  padding-top: calc(var(--ff-row-editor-gap) + 2px);
   border-top: 1px dashed var(--ff-border);
 }
 .ff-row__buttons {
@@ -1260,7 +1315,7 @@ a.ff-dash__link:hover {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
+  padding: var(--ff-row-pad-y) var(--ff-row-pad-x);
   cursor: pointer;
   list-style: none;
 }
@@ -1279,14 +1334,52 @@ a.ff-dash__link:hover {
 .ff-disclosure[open] .ff-disclosure__chevron {
   transform: rotate(180deg);
 }
+/* Grid, not block: the rows inside an expanded panel need the same row→row
+   rhythm as a bubble body, or they sit flush against one another. */
 .ff-disclosure__body {
-  padding: 0 14px 14px;
+  display: grid;
+  gap: var(--ff-bubble-body-gap);
+  padding: 0 var(--ff-row-pad-x) var(--ff-row-pad-x);
 }
 .ff-row__lock {
   width: 12px;
   height: 12px;
   opacity: 0.8;
   flex-shrink: 0;
+}
+
+/* Segmented control (Account → Display density). A row of small pills where
+   exactly one is pressed — cheaper on space inside a row's action slot than
+   three separate buttons or a select. */
+.ff-segment {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-pill);
+}
+.ff-segment__btn {
+  padding: 0.35em 0.9em;
+  border: 0;
+  border-radius: var(--ff-radius-pill);
+  background: none;
+  color: var(--ff-text-dim);
+  font: inherit;
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--ff-transition), color var(--ff-transition);
+}
+.ff-segment__btn:hover:not([disabled]) {
+  color: #fff;
+}
+.ff-segment__btn[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.ff-segment__btn[disabled] {
+  opacity: 0.55;
+  cursor: default;
 }
 
 /* Compact + danger button variants */
@@ -1377,12 +1470,71 @@ a.ff-dash__link:hover {
 }
 .ff-actions__panel {
   margin-top: 12px;
-  padding: 16px 18px;
+  padding: var(--ff-tile-pad) calc(var(--ff-tile-pad) + 2px);
 }
 
 /* Buttons that lead somewhere else, above a bubble's own content. */
 .ff-bubble__nav {
   margin-bottom: 4px;
+}
+
+/* Reorderable team cards (/teams/). Pointer drag is the fast path; the
+   Move up / Move down buttons in each card's header are the keyboard and
+   screen-reader path, and they drive the same reorder. */
+.ff-bubble--draggable {
+  cursor: grab;
+}
+.ff-bubble--draggable:active {
+  cursor: grabbing;
+}
+.ff-bubble--dragging {
+  opacity: 0.45;
+}
+/* Outline rather than a shifted layout: reflowing the grid under the pointer
+   makes the drop target guess where it is going. */
+.ff-bubble--dropzone {
+  border-color: var(--ff-accent);
+  box-shadow: var(--ff-shadow-card), inset 0 0 0 1px var(--ff-accent);
+}
+.ff-bubble--draggable {
+  transition: opacity var(--ff-transition), box-shadow var(--ff-transition);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ff-bubble--draggable {
+    transition: none;
+  }
+}
+/* Reorder arrows sit with the role badge in the card header. */
+.ff-reorder {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ff-reorder__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: none;
+  color: var(--ff-text-dim);
+  cursor: pointer;
+  transition: color var(--ff-transition), border-color var(--ff-transition);
+}
+.ff-reorder__btn:hover:not([disabled]) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.ff-reorder__btn[disabled] {
+  opacity: 0.35;
+  cursor: default;
+}
+.ff-reorder__btn svg {
+  width: 12px;
+  height: 12px;
 }
 
 /* Standalone splash (an invite opened while signed out) — no sidebar, so the
@@ -1448,7 +1600,7 @@ a.ff-dash__link:hover {
    disclosure. */
 .ff-invite__form {
   margin-top: 4px;
-  padding-top: 12px;
+  padding-top: calc(var(--ff-row-editor-gap) + 2px);
   border-top: 1px dashed var(--ff-border);
 }
 
@@ -1457,7 +1609,7 @@ a.ff-dash__link:hover {
 .ff-score {
   display: grid;
   gap: 8px;
-  margin: 4px 0 14px;
+  margin: 4px 0 calc(var(--ff-row-editor-gap) + 4px);
 }
 .ff-score__head,
 .ff-score__row {

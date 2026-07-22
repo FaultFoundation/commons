@@ -24,7 +24,8 @@ export default async function HomePage() {
     <DashboardShell active="home" setupUserId={session.user.id}>
       <h1 className="screen-reader-text">Home</h1>
       <div className="ff-bubble-grid">
-        <Bubble title="My Tournaments" variant="wip">
+        {/* The top bubble of a tab always spans the grid — see the guide. */}
+        <Bubble title="My Tournaments" variant="wip" span="full">
           <div className="ff-bubble__wip">Work in progress</div>
         </Bubble>
         <Bubble title="My Team" variant="wip">

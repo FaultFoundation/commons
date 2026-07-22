@@ -32,6 +32,12 @@ The core ideas:
   `screen-reader-text` h1 for accessibility). Think CarPlay: each tab is
   its own thing; the Home tab will eventually show condensed widget views
   of the other tabs.
+- **The top bubble always stretches.** The first `Bubble` in a
+  `.ff-bubble-grid` gets `span="full"`, on every page, always. A tab opens
+  on one thing, not on two half things — the first card is what the tab *is*,
+  and everything under it is detail. This is a convention, not a CSS
+  `:first-child` rule, so a page can still opt out deliberately; if you find
+  yourself opting out, the page probably wants a different first card.
 - **Two clicks max.** Any action is reachable as: nav tab click → bubble
   control click. If a flow needs more, redesign it.
 - **Title Case headers.** Every heading — nav items, bubble titles —
@@ -57,6 +63,51 @@ renders (tabs, register flow, dialogs) inherits them:
 Need a new size? Don't. Pick the nearest token; only extend the scale if
 a whole new tier of hierarchy appears, and document it here.
 
+## Density (spacing) scale
+
+Same idea, same place: spacing *inside* a bubble is a token on `.ff-dash`, so
+a member can pick how tightly the portal packs. **Never hardcode a padding or
+gap inside a bubble** — use one of these, exactly as with the type scale.
+
+| Token                    | Cozy (default)      | Controls                              |
+| ------------------------ | ------------------- | ------------------------------------- |
+| `--ff-bubble-pad`        | `clamp(16,2vw,20)`  | `.ff-bubble` padding                  |
+| `--ff-bubble-head-gap`   | 10px                | header → body                         |
+| `--ff-bubble-body-gap`   | 6px                 | row → row (and disclosure bodies)     |
+| `--ff-row-pad-y/-x`      | 8px / 12px          | `.ff-row`, `.ff-disclosure__summary`  |
+| `--ff-row-editor-gap`    | 8px                 | expanded editors, nested forms        |
+| `--ff-tile-pad`          | 12px                | `.ff-integration`, `.ff-actions__panel` |
+| `--ff-field-gap`         | 0.6em               | `.ff-auth__field` **inside the dash** |
+| `--ff-reg-pad`           | `clamp(20,3vw,28)`  | `.ff-reg` setup cards                 |
+
+The gap *between* bubbles (`.ff-bubble-grid { gap: 20px }`) is deliberately
+**not** a density token — that rhythm is fixed.
+
+Three presets, selected by `data-density` on the `.ff-dash` element:
+`compact`, `cozy` (the `.ff-dash` base — no override block, so an absent or
+unknown value lands here), and `comfortable` (the spacing the dashboard
+shipped with before the tokens existed).
+
+`.ff-auth__field` is shared with the public login/signup pages, so only the
+`.ff-dash`-scoped override follows the density — never touch the base rule.
+
+### Where the preference lives
+
+`profiles.density` in D1 is the source of truth; the `ff-density` cookie caches
+it so `DashboardShell` doesn't query on every render. `lib/density.ts` holds
+the names, labels, and `asDensity()` normalizer, shared by both sides.
+
+- **Read** — `DashboardShell` checks the cookie, and only on a miss resolves
+  the session and reads the profile. It stamps `data-density` on `.ff-dash`
+  and renders `DensityCookie`, a client no-op that writes the cookie (a server
+  component may not).
+- **Write** — `setDensity` in `app/account/actions.ts` updates the row *and*
+  the cookie (a server action is the one server context allowed to set one),
+  so the cache can't lag. `DensityRow` flips the attribute locally first for an
+  instant preview.
+- Deliberately not on `<html>`: the root layout is shared with the public
+  marketing pages, and reading `cookies()` there would make them all dynamic.
+
 ## The template components
 
 All in `components/dashboard/bubbles/`. `Bubble` and `BubbleRow` are
@@ -78,8 +129,8 @@ import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 - `title` — Title Case, rendered as an `h2`.
 - `variant` — `"default"` | `"danger"` (red border/title) | `"wip"`
   (dimmed title; pair with a `.ff-bubble__wip` placeholder body).
-- `span="full"` — spans the whole grid row (use for Danger Zone-style
-  footers).
+- `span="full"` — spans the whole grid row. **Required on every page's first
+  bubble** (see the rule above); also used for Danger Zone-style footers.
 - `actions` — optional right side of the header (a badge or small button).
 
 ### `BubbleRow` — label / value / action rows
@@ -171,7 +222,8 @@ tab active, no banner) and draws the numbered step rail. Takes `step: 1 | 2
        <DashboardShell active="mytab" setupUserId={session.user.id}>
          <h1 className="screen-reader-text">My Tab</h1>
          <div className="ff-bubble-grid">
-           <Bubble title="First Bubble">…</Bubble>
+           {/* The first bubble always spans the grid. */}
+           <Bubble title="First Bubble" span="full">…</Bubble>
          </div>
        </DashboardShell>
      );

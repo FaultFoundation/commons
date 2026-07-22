@@ -590,6 +590,49 @@ export async function leaveTeam(teamId: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+/**
+ * Store the member's own arrangement of their team cards (drag-and-drop, or the
+ * Move up / Move down buttons — same path either way).
+ *
+ * Purely presentational, so there's no capability to check: `sort_order` lives
+ * on the caller's own membership rows and can't affect what anyone else sees.
+ * The client's list is still only a *hint* — ids are intersected with the
+ * memberships actually read back from D1, so a tampered payload can at worst
+ * reorder teams the caller is already on.
+ */
+export async function reorderMyTeams(teamIds: string[]): Promise<ActionResult> {
+  const userId = await requireUserId();
+  if (!userId) return { ok: false, error: "You need to be signed in." };
+
+  const db = getDb();
+  const mine = await db
+    .select({ id: teamMembers.id, teamId: teamMembers.teamId })
+    .from(teamMembers)
+    .where(and(eq(teamMembers.userId, userId), eq(teamMembers.status, "active")));
+
+  const membershipByTeam = new Map(mine.map((row) => [row.teamId, row.id]));
+  const ordered = teamIds
+    .map((teamId) => membershipByTeam.get(teamId))
+    .filter((id): id is string => Boolean(id));
+
+  if (!ordered.length) return { ok: true };
+
+  const [first, ...rest] = ordered.map((membershipId, index) =>
+    db
+      .update(teamMembers)
+      .set({ sortOrder: index })
+      .where(eq(teamMembers.id, membershipId)),
+  );
+
+  // One batch, not transaction(): D1 rejects the raw BEGIN drizzle emits.
+  // Destructured rather than passed as an array — batch() wants a non-empty
+  // tuple, which a .map() result can't prove it is.
+  await db.batch([first, ...rest]);
+
+  revalidateTeams();
+  return { ok: true };
+}
+
 // ---------------------------------------------------------------------------
 // Tournament entry
 // ---------------------------------------------------------------------------

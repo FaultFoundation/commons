@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { DeleteAccount } from "@/components/dashboard/accounts/DeleteAccount";
+import { DensityRow } from "@/components/dashboard/accounts/DensityRow";
 import { IntegrationCard } from "@/components/dashboard/accounts/IntegrationCard";
 import {
   EmailRow,
@@ -16,9 +17,10 @@ import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { account } from "@/db/schema";
 import { battlenetAuthEnabled, discordAuthEnabled, getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { DENSITY_COOKIE, asDensity } from "@/lib/density";
 import { discordServerNote, loadDiscordIntegration } from "@/lib/integrations";
 import { getPlatformIdentity } from "@/lib/platform-identities";
-import { getRegistrationState } from "@/lib/registration";
+import { getProfile, getRegistrationState } from "@/lib/registration";
 
 // Session-gated: always rendered per request.
 export const dynamic = "force-dynamic";
@@ -36,8 +38,12 @@ export default async function AccountPage() {
     redirect("/login/");
   }
 
+  // Same cookie-first read as the shell — only the control needs the exact
+  // stored value, and it has to agree with the attribute already on .ff-dash.
+  const densityCookie = (await cookies()).get(DENSITY_COOKIE)?.value;
+
   const db = getDb();
-  const [reg, discord, battlenetIdentity, accountRows] = await Promise.all([
+  const [reg, discord, battlenetIdentity, accountRows, profile] = await Promise.all([
     getRegistrationState(session.user.id),
     // Also refreshes the stored Discord handle when it has gone stale.
     loadDiscordIntegration(session.user.id, await headers()),
@@ -46,9 +52,11 @@ export default async function AccountPage() {
       .select({ providerId: account.providerId })
       .from(account)
       .where(eq(account.userId, session.user.id)),
+    densityCookie ? null : getProfile(session.user.id),
   ]);
   const hasPassword = accountRows.some((r) => r.providerId === "credential");
   const battlenetLinked = accountRows.some((r) => r.providerId === "battlenet");
+  const density = asDensity(densityCookie ?? profile?.density);
 
   const status = reg?.status ?? null;
   const hasSchool = Boolean(reg?.schoolName);
@@ -106,10 +114,8 @@ export default async function AccountPage() {
           )}
         </Bubble>
 
-        {/* Reserved slot — keeps the grid balanced until whatever goes
-            here (player stats, Discord roles) is designed. */}
-        <Bubble title="Coming Soon" variant="wip">
-          <div className="ff-bubble__wip" />
+        <Bubble title="Display">
+          <DensityRow initial={density} />
         </Bubble>
 
         <Bubble title="Integrations">

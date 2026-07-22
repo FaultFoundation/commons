@@ -333,7 +333,15 @@ export type MyTeam = {
   inviteToken: string | null;
 };
 
-/** Every live team the member is active on — the Teams tab's whole payload. */
+/**
+ * Every live team the member is active on — the Teams tab's whole payload,
+ * in the member's own order.
+ *
+ * `sort_order` is their drag-and-drop arrangement (reorderMyTeams); NULL means
+ * "never dragged" and sorts after everything explicit, so a newly joined team
+ * appears at the end rather than jumping into the middle of an arrangement
+ * someone made on purpose. Alphabetical breaks the remaining ties.
+ */
 export async function listMyTeams(userId: string): Promise<MyTeam[]> {
   const db = getDb();
   const mine = await db
@@ -348,7 +356,11 @@ export async function listMyTeams(userId: string): Promise<MyTeam[]> {
     .innerJoin(teams, eq(teams.id, teamMembers.teamId))
     .leftJoin(colleges, eq(colleges.id, teams.collegeId))
     .where(and(activeMember(userId), isNull(teams.disbandedAt)))
-    .orderBy(teams.name);
+    .orderBy(
+      sql`${teamMembers.sortOrder} is null`,
+      teamMembers.sortOrder,
+      teams.name,
+    );
 
   if (!mine.length) return [];
   const ids = mine.map((t) => t.id);

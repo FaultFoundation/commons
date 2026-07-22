@@ -154,6 +154,10 @@ export const profiles = sqliteTable("profiles", {
   country: text("country"),
   ageRange: text("age_range"),
   dmPreference: text("dm_preference"),
+  // compact | cozy | comfortable — how tightly the dashboard packs a bubble's
+  // rows (lib/density.ts). Source of truth; the ff-density cookie caches it so
+  // the shell doesn't read D1 on every render.
+  density: text("density").notNull().default("cozy"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -415,6 +419,10 @@ export const teamMembers = sqliteTable(
     // Leaving flips this to inactive rather than deleting the row, so the
     // team/user unique index turns a rejoin into a reactivation.
     status: text("status").notNull().default("active"), // active | inactive
+    // This member's own ordering of their teams on /teams/ (drag to reorder).
+    // NULL = never reordered, and sorts after everything explicit; the (team,
+    // user) grain is exactly "one person's placement of one team".
+    sortOrder: integer("sort_order"),
     joinedAt: integer("joined_at", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),

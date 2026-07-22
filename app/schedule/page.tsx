@@ -24,7 +24,8 @@ export default async function SchedulePage() {
     <DashboardShell active="schedule" setupUserId={session.user.id}>
       <h1 className="screen-reader-text">Schedule</h1>
       <div className="ff-bubble-grid">
-        <Bubble title="Upcoming Matches" variant="wip">
+        {/* The top bubble of a tab always spans the grid — see the guide. */}
+        <Bubble title="Upcoming Matches" variant="wip" span="full">
           <div className="ff-bubble__wip">
             Your next matches land here once you&rsquo;re on a roster.
           </div>

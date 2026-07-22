@@ -320,7 +320,12 @@ export async function getSetupProgress(userId: string): Promise<SetupProgress> {
 /** Upsert the slim person profile; returns its id. */
 export async function ensureProfile(
   userId: string,
-  fields: { ageRange?: string | null; country?: string | null },
+  fields: {
+    ageRange?: string | null;
+    country?: string | null;
+    /** compact | cozy | comfortable — see lib/density.ts. */
+    density?: string;
+  },
 ): Promise<string> {
   const db = getDb();
   const now = new Date();

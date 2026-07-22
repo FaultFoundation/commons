@@ -36,6 +36,13 @@
       "when": 1784678721142,
       "tag": "0004_chilly_blue_blade",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1784686375832,
+      "tag": "0005_conscious_night_thrasher",
+      "breakpoints": true
     }
   ]
 }

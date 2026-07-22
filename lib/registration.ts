@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import {
@@ -7,6 +7,8 @@ import {
   colleges,
   programMemberships,
   collegiateRegistrations,
+  teamMembers,
+  teams,
 } from "@/db/schema";
 import { PROGRAM_COLLEGIATE_ID } from "@/lib/programs";
 import { CODE_LENGTH } from "@/lib/registration-shared";
@@ -263,12 +265,24 @@ export const REQUIRED_PROVIDERS = ["discord", "battlenet"] as const;
  * can't drift apart and send someone to a step the rail calls finished.
  */
 export async function getSetupProgress(userId: string): Promise<SetupProgress> {
-  const [reg, accountRows] = await Promise.all([
+  const [reg, accountRows, teamRows] = await Promise.all([
     getRegistrationState(userId),
     getDb()
       .select({ providerId: account.providerId })
       .from(account)
       .where(eq(account.userId, userId)),
+    getDb()
+      .select({ id: teamMembers.id })
+      .from(teamMembers)
+      .innerJoin(teams, eq(teams.id, teamMembers.teamId))
+      .where(
+        and(
+          eq(teamMembers.userId, userId),
+          eq(teamMembers.status, "active"),
+          isNull(teams.disbandedAt),
+        ),
+      )
+      .limit(1),
   ]);
   const linked = new Set(accountRows.map((r) => r.providerId));
 
@@ -279,8 +293,9 @@ export async function getSetupProgress(userId: string): Promise<SetupProgress> {
     // this is the line to make per-game (e.g. required only once someone
     // registers for a tournament that needs that platform).
     integrations: REQUIRED_PROVIDERS.every((p) => linked.has(p)),
-    // Nothing in step 3 is required yet — team and tournaments are still WIP.
-    team: false,
+    // Being on a roster is the whole of step 3; entering a tournament is a
+    // team decision, not a personal setup task.
+    team: teamRows.length > 0,
   };
 }
 

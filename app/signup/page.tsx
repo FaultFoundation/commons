@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { AuthForm } from "@/components/auth/AuthForm";
 import { getAuth, discordAuthEnabled } from "@/lib/auth";
+import { sanitizeNextPath, withNext } from "@/lib/next-path";
 
 // Rendered per request: reads the session and the Cloudflare env (Discord
 // button availability) — must not be prerendered at build time.
@@ -15,10 +16,15 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-export default async function SignupPage() {
+export default async function SignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
   const session = await getAuth().api.getSession({ headers: await headers() });
+  const next = sanitizeNextPath((await searchParams).next);
   if (session) {
-    redirect("/home/");
+    redirect(next ?? "/home/");
   }
 
   return (
@@ -27,9 +33,14 @@ export default async function SignupPage() {
         <div className="ff-auth ff-card">
           <h1 className="ff-auth__title">Create an account</h1>
           <p className="ff-auth__hint">
-            Already a member? <Link href="/login/">Sign in</Link>.
+            Already a member?{" "}
+            <Link href={withNext("/login/", next)}>Sign in</Link>.
           </p>
-          <AuthForm mode="signup" discordEnabled={discordAuthEnabled()} />
+          <AuthForm
+            mode="signup"
+            discordEnabled={discordAuthEnabled()}
+            next={next ?? undefined}
+          />
         </div>
       </div>
     </main>

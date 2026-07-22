@@ -1335,6 +1335,90 @@ a.ff-dash__link:hover {
   color: var(--ff-navy-900);
 }
 
+/* ---------------------------------------------------------------------------
+   Teams — role badges, invite links, the score reporter.
+   Everything here layers on .ff-row / .ff-bubble; no new type sizes.
+   --------------------------------------------------------------------------- */
+
+/* Role badge (bubble header + roster rows). Manager and captain carry the
+   accent so "who can act" is visible at a glance; coach and player stay
+   neutral. */
+.ff-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--ff-border);
+  border-radius: 999px;
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.ff-badge--manager {
+  border-color: var(--ff-danger-border);
+  background: var(--ff-danger-bg);
+  color: var(--ff-danger-text);
+}
+.ff-badge--captain {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+/* Roster row controls: the role select sits next to Remove and must not
+   stretch the row. */
+.ff-roster__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ff-roster__select {
+  width: auto;
+  min-width: 7.5em;
+  padding: 0.45em 0.6em;
+  font-size: var(--ff-dash-text-sm);
+}
+
+/* Invite links: long, unbreakable-looking URLs that still have to wrap. */
+.ff-copy__url {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--ff-dash-text-sm);
+  overflow-wrap: anywhere;
+}
+.ff-copy__input {
+  margin-top: 8px;
+}
+
+/* Score reporter: one row per game in the series. The grid is shared by the
+   header and the rows so the columns line up. */
+.ff-score {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 14px;
+}
+.ff-score__head,
+.ff-score__row {
+  display: grid;
+  grid-template-columns: 3em minmax(0, 2fr) 5em 5em minmax(0, 1.5fr);
+  align-items: center;
+  gap: 10px;
+}
+.ff-score__head {
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 600;
+}
+.ff-score__number {
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+}
+.ff-score .ff-auth__input {
+  margin: 0;
+  padding: 0.45em 0.6em;
+  font-size: var(--ff-dash-text-sm);
+}
+
 /* Confirm dialog (native <dialog>; top layer, still inside .ff-dash so
    the type tokens resolve) */
 .ff-dialog {
@@ -1368,5 +1452,41 @@ a.ff-dash__link:hover {
 @media (max-width: 781.98px) {
   .ff-bubble-grid {
     grid-template-columns: 1fr;
+  }
+  /* The score grid's five columns don't survive a phone: map and replay code
+     get their own lines, the two scores stay side by side. Placement is
+     explicit — auto-flow would drop a score into the game-number column. */
+  .ff-score__head {
+    display: none;
+  }
+  .ff-score__row {
+    grid-template-columns: 2em 1fr 1fr;
+    row-gap: 6px;
+  }
+  .ff-score__row > :nth-child(1) {
+    grid-area: 1 / 1;
+  }
+  .ff-score__row > :nth-child(2) {
+    grid-area: 1 / 2 / 1 / -1;
+  }
+  .ff-score__row > :nth-child(3) {
+    grid-area: 2 / 2;
+  }
+  .ff-score__row > :nth-child(4) {
+    grid-area: 2 / 3;
+  }
+  .ff-score__row > :nth-child(5) {
+    grid-area: 3 / 2 / 3 / -1;
+  }
+
+  /* An invite URL has no business sharing a line with its buttons on a
+     phone — let it use the full width and drop the controls beneath. */
+  .ff-row:has(.ff-copy__url) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ff-row:has(.ff-copy__url) .ff-row__action {
+    grid-column: 1;
+    grid-row: auto;
+    margin-top: 10px;
   }
 }

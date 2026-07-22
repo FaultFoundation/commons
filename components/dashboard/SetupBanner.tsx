@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { account, teamMembers, tournamentParticipants } from "@/db/schema";
 import { getDb } from "@/lib/db";
@@ -57,9 +57,12 @@ export async function SetupBanner({ userId }: { userId: string }) {
     .select({ id: tournamentParticipants.id })
     .from(tournamentParticipants)
     .where(
-      inArray(
-        tournamentParticipants.teamId,
-        teamRows.map((r) => r.teamId),
+      and(
+        inArray(
+          tournamentParticipants.teamId,
+          teamRows.map((r) => r.teamId),
+        ),
+        isNull(tournamentParticipants.withdrawnAt),
       ),
     )
     .limit(1);

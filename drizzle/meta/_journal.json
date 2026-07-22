@@ -22,6 +22,20 @@
       "when": 1784643207072,
       "tag": "0002_left_lucky_pierre",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1784678709510,
+      "tag": "0003_odd_maestro",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1784678721142,
+      "tag": "0004_chilly_blue_blade",
+      "breakpoints": true
     }
   ]
 }

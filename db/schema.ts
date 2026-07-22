@@ -355,6 +355,10 @@ export const collegiateRegistrations = sqliteTable(
 
 // ===========================================================================
 // LAYER 7 — Teams & rosters (college-affiliated or ad-hoc)
+//
+// Permissions live entirely on team_members.role (see lib/teams-shared.ts) —
+// there is deliberately no owner column, because a team can have several
+// managers and deleting one needs all of them to agree.
 // ===========================================================================
 
 export const teams = sqliteTable(
@@ -368,9 +372,19 @@ export const teams = sqliteTable(
     collegeId: text("college_id").references(() => colleges.id),
     name: text("name").notNull(),
     tag: text("tag"),
-    captainUserId: text("captain_user_id").references(() => user.id, {
+    description: text("description"),
+    // LFG matching inputs, also shown on the team card.
+    region: text("region"),
+    timezone: text("timezone"), // IANA zone
+    // Where "connect with this team" points (LFM).
+    discordInviteUrl: text("discord_invite_url"),
+    createdByUserId: text("created_by_user_id").references(() => user.id, {
       onDelete: "set null",
     }),
+    // Soft delete. A hard delete would NULL tournament_participants.team_id
+    // and orphan standings and match history, so disbanding only hides the
+    // team (and frees its name — hence no unique index on `name`).
+    disbandedAt: integer("disbanded_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -394,8 +408,12 @@ export const teamMembers = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    role: text("role").notNull().default("player"), // captain | player | coach | sub
+    // manager | captain | coach | player — the capability tiers in
+    // lib/teams-shared.ts. Distinct from `position`, which is the in-game role.
+    role: text("role").notNull().default("player"),
     position: text("position"), // e.g. tank | damage | support
+    // Leaving flips this to inactive rather than deleting the row, so the
+    // team/user unique index turns a rejoin into a reactivation.
     status: text("status").notNull().default("active"), // active | inactive
     joinedAt: integer("joined_at", { mode: "timestamp_ms" })
       .notNull()
@@ -406,6 +424,98 @@ export const teamMembers = sqliteTable(
     index("team_members_team_id_idx").on(t.teamId),
     index("team_members_user_id_idx").on(t.userId),
     uniqueIndex("team_members_team_user_unique").on(t.teamId, t.userId),
+  ],
+);
+
+/**
+ * Join links. Every team gets one reusable `link` invite (its newest
+ * non-revoked one is *the* invite link; rotating revokes and inserts);
+ * `targeted` invites are minted per person for a specific role, usually with
+ * maxUses = 1.
+ */
+export const teamInvites = sqliteTable(
+  "team_invites",
+  {
+    id: text("id").primaryKey(),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(),
+    kind: text("kind").notNull().default("link"), // link | targeted
+    // Role the redeemer lands on (see lib/teams-shared.ts).
+    role: text("role").notNull().default("player"),
+    // Free-text "who this is for" on targeted invites.
+    note: text("note"),
+    createdByUserId: text("created_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    maxUses: integer("max_uses"), // NULL = unlimited
+    useCount: integer("use_count").notNull().default(0),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+    revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [index("team_invites_team_id_idx").on(t.teamId)],
+);
+
+/**
+ * Multi-manager delete consent. A sole manager disbands immediately; with
+ * several, a request collects one vote per manager and only unanimous approval
+ * executes. Unanimity is judged against the CURRENT manager set, so promoting
+ * someone mid-vote correctly re-blocks the delete.
+ */
+export const teamDeleteRequests = sqliteTable(
+  "team_delete_requests",
+  {
+    id: text("id").primaryKey(),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    requestedByUserId: text("requested_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    reason: text("reason"),
+    // open | approved | declined | cancelled | expired. At most one `open` row
+    // per team (enforced in the action, not the schema).
+    status: text("status").notNull().default("open"),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+    resolvedAt: integer("resolved_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [index("team_delete_requests_team_id_idx").on(t.teamId)],
+);
+
+export const teamDeleteVotes = sqliteTable(
+  "team_delete_votes",
+  {
+    id: text("id").primaryKey(),
+    requestId: text("request_id")
+      .notNull()
+      .references(() => teamDeleteRequests.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    decision: text("decision").notNull(), // approve | decline
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [
+    index("team_delete_votes_request_id_idx").on(t.requestId),
+    uniqueIndex("team_delete_votes_request_user_unique").on(
+      t.requestId,
+      t.userId,
+    ),
   ],
 );
 
@@ -467,8 +577,16 @@ export const tournamentParticipants = sqliteTable(
     // Exactly one of teamId / userId (team tournaments vs solo).
     teamId: text("team_id").references(() => teams.id, { onDelete: "set null" }),
     userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    registeredByUserId: text("registered_by_user_id").references(
+      () => user.id,
+      { onDelete: "set null" },
+    ),
     seed: integer("seed"),
     checkedInAt: integer("checked_in_at", { mode: "timestamp_ms" }),
+    // Withdrawing keeps the row (and its standings history) but drops it out
+    // of every "who is entered" query — including the one-team-per-tournament
+    // conflict check in lib/teams.ts.
+    withdrawnAt: integer("withdrawn_at", { mode: "timestamp_ms" }),
     // Standings, updated on match confirmation.
     wins: integer("wins").notNull().default(0),
     losses: integer("losses").notNull().default(0),
@@ -520,6 +638,12 @@ export const matches = sqliteTable(
     status: text("status").notNull().default("pending"),
     scheduledAt: integer("scheduled_at", { mode: "timestamp_ms" }),
     playedAt: integer("played_at", { mode: "timestamp_ms" }),
+    // Who filed the score that stands. Reports apply instantly (no opponent
+    // confirmation step), so this is the audit trail staff correct against.
+    reportedByUserId: text("reported_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    reportedAt: integer("reported_at", { mode: "timestamp_ms" }),
     // Winner routing for elimination brackets.
     nextMatchId: text("next_match_id").references(
       (): AnySQLiteColumn => matches.id,
@@ -555,6 +679,10 @@ export const matchGames = sqliteTable(
     ),
     replayCode: text("replay_code"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    // Re-reporting a match overwrites these rows rather than adding to them.
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
   },
@@ -619,4 +747,144 @@ export const schoolEmailVerifications = sqliteTable(
       .$defaultFn(() => new Date()),
   },
   (t) => [index("school_email_verifications_email_idx").on(t.email)],
+);
+
+// ===========================================================================
+// LAYER 9 — Matchmaking (LFG / LFT / LFM)
+//
+// Two sides of one market: `lfg_profiles` is a player advertising themselves,
+// `team_listings` is a team advertising open slots, and `lfg_connections` is
+// the handshake between them (which is also what the "connect over Discord"
+// button records). Matching is availability + skill-range overlap, so both
+// sides carry the same shape of those fields.
+//
+// The columns are here ahead of the UI on purpose: the browse/apply screens
+// are still WIP, and shipping the tables now means building them later needs
+// no migration. `positions` and `availability` are JSON strings whose shape is
+// owned by lib/lfg-shared.ts — parse them through those helpers, never ad hoc.
+// ===========================================================================
+
+export const lfgProfiles = sqliteTable(
+  "lfg_profiles",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    programId: text("program_id")
+      .notNull()
+      .references(() => programs.id),
+    gameId: text("game_id").references(() => games.id),
+    // open | paused | placed
+    status: text("status").notNull().default("open"),
+    // Current and peak skill rating (Overwatch SR), used against a listing's
+    // skillMin/skillMax.
+    skillRating: integer("skill_rating"),
+    peakRating: integer("peak_rating"),
+    positions: text("positions"), // JSON string array
+    availability: text("availability"), // JSON, see lib/lfg-shared.ts
+    timezone: text("timezone"), // IANA zone
+    region: text("region"),
+    description: text("description"),
+    // discord | site — how the player wants to be reached.
+    contactPreference: text("contact_preference"),
+    // Freshness signal for sorting; distinct from updatedAt, which any edit
+    // bumps.
+    bumpedAt: integer("bumped_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [
+    // One advertisement per person per game.
+    uniqueIndex("lfg_profiles_user_program_game_unique").on(
+      t.userId,
+      t.programId,
+      t.gameId,
+    ),
+    index("lfg_profiles_program_status_idx").on(t.programId, t.status),
+  ],
+);
+
+export const teamListings = sqliteTable(
+  "team_listings",
+  {
+    id: text("id").primaryKey(),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    createdByUserId: text("created_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    programId: text("program_id")
+      .notNull()
+      .references(() => programs.id),
+    gameId: text("game_id").references(() => games.id),
+    // open | closed | filled
+    status: text("status").notNull().default("open"),
+    positions: text("positions"), // JSON string array of what's needed
+    skillMin: integer("skill_min"),
+    skillMax: integer("skill_max"),
+    slotsOpen: integer("slots_open"),
+    availability: text("availability"), // JSON, see lib/lfg-shared.ts
+    timezone: text("timezone"),
+    region: text("region"),
+    description: text("description"),
+    // Overrides teams.discord_invite_url for this listing only.
+    contactUrl: text("contact_url"),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+    bumpedAt: integer("bumped_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [
+    index("team_listings_team_id_idx").on(t.teamId),
+    index("team_listings_program_status_idx").on(t.programId, t.status),
+  ],
+);
+
+export const lfgConnections = sqliteTable(
+  "lfg_connections",
+  {
+    id: text("id").primaryKey(),
+    // Whichever side started it; both are nullable because a team can reach
+    // out to a player who has no profile, and vice versa.
+    listingId: text("listing_id").references(() => teamListings.id, {
+      onDelete: "cascade",
+    }),
+    profileId: text("profile_id").references(() => lfgProfiles.id, {
+      onDelete: "cascade",
+    }),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // player_to_team | team_to_player
+    direction: text("direction").notNull(),
+    // open | accepted | declined | withdrawn
+    status: text("status").notNull().default("open"),
+    message: text("message"),
+    respondedAt: integer("responded_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [
+    index("lfg_connections_team_status_idx").on(t.teamId, t.status),
+    index("lfg_connections_user_status_idx").on(t.userId, t.status),
+    // One approach per player per listing (re-approaching updates the row).
+    uniqueIndex("lfg_connections_listing_user_unique").on(t.listingId, t.userId),
+  ],
 );

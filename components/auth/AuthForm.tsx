@@ -5,14 +5,18 @@ import Link from "next/link";
 
 import { authClient } from "@/lib/auth-client";
 import { setAuthHint } from "@/lib/auth-hint";
+import { withNext } from "@/lib/next-path";
 
 type Props = {
   mode: "login" | "signup";
   /** Server-decided: Discord OAuth secrets are configured. */
   discordEnabled: boolean;
+  /** Where to land afterwards instead of the default, e.g. an invite the
+      member opened while signed out. Already sanitized by the page. */
+  next?: string;
 };
 
-export function AuthForm({ mode, discordEnabled }: Props) {
+export function AuthForm({ mode, discordEnabled, next }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -51,8 +55,12 @@ export function AuthForm({ mode, discordEnabled }: Props) {
     // Full navigation (like the rest of the site's links); the hint makes
     // the destination paint the avatar immediately. A brand-new account
     // goes straight into setup; returning members land on the portal home.
+    // Either is overridden by a `next` (an invite link, say), which then
+    // explains for itself whatever is still missing.
     setAuthHint(true);
-    window.location.assign(mode === "signup" ? "/account/setup/" : "/home/");
+    window.location.assign(
+      next ?? (mode === "signup" ? "/account/setup/" : "/home/"),
+    );
   }
 
   async function onDiscord() {
@@ -63,7 +71,7 @@ export function AuthForm({ mode, discordEnabled }: Props) {
       provider: "discord",
       // Can't tell a new Discord user from a returning one here; the
       // "action required" banner on /home catches anyone still unset-up.
-      callbackURL: "/home/",
+      callbackURL: next ?? "/home/",
     });
     if (result.error) {
       setError(result.error.message ?? "Discord sign-in failed. Please try again.");
@@ -80,7 +88,7 @@ export function AuthForm({ mode, discordEnabled }: Props) {
           {mode === "login" ? (
             <p>
               Don&rsquo;t have an account?{" "}
-              <Link href="/signup/">Register one here</Link>.
+              <Link href={withNext("/signup/", next)}>Register one here</Link>.
             </p>
           ) : null}
         </div>

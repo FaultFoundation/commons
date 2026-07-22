@@ -13,7 +13,9 @@ now 308s via `middleware.ts`). `/` stays the public Commons landing page.
 | `/home/`                       | Home        | Condensed widget views       |
 | `/schedule/`                   | Schedule    | WIP                          |
 | `/tournaments/`                | Tournaments | WIP (`#overfault` anchor)    |
-| `/teams/`                      | Teams       | WIP                          |
+| `/teams/`                      | Teams       | Your teams + create          |
+| `/teams/<teamId>/`             | Teams       | One team: roster, invites, settings, scores |
+| `/join/<token>/`               | —           | Invite landing (join a team) |
 | `/account/`                    | Account     | Profile / integrations       |
 | `/account/setup/`              | —           | Resolver → current step      |
 | `/account/setup/academic/`     | —           | Step 1                       |
@@ -198,6 +200,54 @@ shell.
    lives. That's what makes the future Home widget view possible —
    condensed variants of these same bubbles.
 
+## Team roles
+
+`team_members.role` is the permission tier — `manager | captain | coach |
+player` — and `lib/teams-shared.ts` owns the whole model:
+
+| Capability         | manager | captain | coach | player |
+| ------------------ | :-----: | :-----: | :---: | :----: |
+| `viewStats`        |    ✅    |    ✅    |   ✅   |   ✅    |
+| `reportScores`     |    ✅    |    ✅    |       |        |
+| `editSettings`     |    ✅    |    ✅    |       |        |
+| `manageRoster`     |    ✅    |    ✅    |       |        |
+| `manageInvites`    |    ✅    |    ✅    |       |        |
+| `enterTournaments` |    ✅    |    ✅    |       |        |
+| `deleteTeam`       |    ✅    |         |       |        |
+
+Rules that live in code rather than the table:
+
+- **Never compare role names** (`role === "manager"`) in a page or component.
+  Gate on `can(role, capability)`; a new capability is a new entry in
+  `TEAM_CAPABILITIES` plus the action and bubble that honor it.
+- Actions open with `requireTeamCapability(userId, teamId, capability)`
+  (`lib/teams.ts`), which re-reads the membership from D1 every time.
+- Only managers mint managers (`assignableRoles`), nobody may act on someone
+  who `outranks` them, and a team always keeps at least one manager — the last
+  one can't be demoted, removed, or leave.
+- Deleting a team with several managers opens a vote in
+  `team_delete_requests` / `team_delete_votes`: every *current* manager must
+  approve, and one decline cancels it. A sole manager deletes outright.
+- Deletion is a **soft delete** (`teams.disbanded_at`): tournament entries and
+  match history survive. Every team query filters `disbanded_at IS NULL`,
+  memberships to `status = 'active'`, and entries to `withdrawn_at IS NULL`.
+- A member may be on many teams but only one per tournament. Both directions
+  of that check are `joinConflicts` / `entryConflicts` in `lib/teams.ts` —
+  call them from anything new that adds a player or enters an event.
+
+Invites are `team_invites` rows: one reusable `kind = 'link'` per team (the
+newest un-revoked one wins; rotating revokes and re-inserts) plus single-use
+`kind = 'targeted'` invites that carry a role. `/join/<token>/` is the landing
+page; signed-out visitors go through `/login/?next=…` and come back.
+
+## Score reporting
+
+`lib/scoring.ts`. Either team's manager or captain reports, and the report
+applies immediately — there is no opponent confirmation. `matches.status`
+goes straight to `confirmed`, and `recomputeStandings` rebuilds
+`wins/losses/map_diff/points` for the whole tournament from its confirmed
+matches, so re-reporting a corrected score replaces rather than accumulates.
+
 ## Backend notes
 
 - Account mutations (name/email/password/unlink/delete) are Better Auth
@@ -228,6 +278,15 @@ shell.
 - Schema changes: edit `db/schema.ts`, then `npm run db:generate`,
   `npm run db:migrate:local`, and at deploy time
   `npm run db:migrate:remote` **before** `npm run deploy`.
+- **D1 has no interactive transactions.** Drizzle's `transaction()` emits a
+  raw `BEGIN`, which D1 rejects — use `db.batch([...])` for writes that must
+  land together (see `createTeam` in `app/teams/actions.ts`).
+- Two migration gotchas, both hit while adding teams: `drizzle-kit generate`
+  asks whether a dropped + added column on one table is a rename (it needs a
+  TTY — split the change into two generates if you can't answer), and its
+  table-rebuild output uses `PRAGMA foreign_keys`, which D1 refuses. Swap that
+  for `PRAGMA defer_foreign_keys=on` (see `drizzle/0004_*.sql`). SQLite also
+  won't `ADD` a `NOT NULL` column without a default.
 
 ## Verifying changes
 

@@ -30,12 +30,16 @@ Ships to `commons.fault.foundation`. The public marketing site is a
 | Path | What it is |
 |---|---|
 | `app/page.tsx` | The Commons landing page (blank for now — tabs land here) |
-| `app/{login,signup}/` | Auth pages |
-| `app/dashboard/` | Session-gated member area (`register/`, `accounts/`) |
+| `app/{login,signup}/` | Auth pages (honor `?next=` after signing in) |
+| `app/{home,schedule,tournaments,teams,account}/` | Session-gated member portal tabs |
+| `app/teams/[teamId]/`, `app/join/[token]/` | Team management and the invite landing |
 | `app/api/auth/[...all]/` | Better Auth route handler |
 | `components/` | Site chrome (`SiteHeader`/`SiteFooter`/`MainNav`) + `auth/` + `dashboard/` |
 | `lib/auth.ts`, `lib/db.ts` | Per-request Better Auth / Drizzle-D1 instances (bindings only exist on the request context) |
 | `lib/registration.ts` | Registration flow: school-email verification, Discord identity mirroring |
+| `lib/teams.ts`, `lib/teams-shared.ts` | Team reads + the role/capability model (managers, captains, coaches, players) |
+| `lib/scoring.ts` | Match reporting and standings recomputation |
+| `lib/lfg-shared.ts` | Shapes for the matchmaking (LFG/LFM) JSON columns |
 | `db/schema.ts` | Drizzle schema: Better Auth tables + `profiles` |
 | `drizzle/` | Generated SQL migrations (`npm run db:generate`), applied with `npm run db:migrate:*` |
 | `styles/theme.css` | The `ff-` design system (imported last) |

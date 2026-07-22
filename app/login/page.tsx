@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { AuthForm } from "@/components/auth/AuthForm";
 import { getAuth, discordAuthEnabled } from "@/lib/auth";
+import { sanitizeNextPath, withNext } from "@/lib/next-path";
 
 // Rendered per request: reads the session and the Cloudflare env (Discord
 // button availability) — must not be prerendered at build time.
@@ -15,10 +16,17 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  /** `?next=` survives the round trip, so an invite link opened while signed
+      out still lands where it meant to. */
+  searchParams: Promise<{ next?: string }>;
+}) {
   const session = await getAuth().api.getSession({ headers: await headers() });
+  const next = sanitizeNextPath((await searchParams).next);
   if (session) {
-    redirect("/home/");
+    redirect(next ?? "/home/");
   }
 
   return (
@@ -27,9 +35,14 @@ export default async function LoginPage() {
         <div className="ff-auth ff-card">
           <h1 className="ff-auth__title">Sign in</h1>
           <p className="ff-auth__hint">
-            New to The Fault Foundation? <Link href="/signup/">Create an account</Link>.
+            New to The Fault Foundation?{" "}
+            <Link href={withNext("/signup/", next)}>Create an account</Link>.
           </p>
-          <AuthForm mode="login" discordEnabled={discordAuthEnabled()} />
+          <AuthForm
+            mode="login"
+            discordEnabled={discordAuthEnabled()}
+            next={next ?? undefined}
+          />
         </div>
       </div>
     </main>

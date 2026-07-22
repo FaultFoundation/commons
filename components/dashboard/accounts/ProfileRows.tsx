@@ -144,13 +144,11 @@ export function EmailRow({
       // password managers treat this settings row as a sign-in form and offer
       // to fill credentials on a page you are already signed in to.
       placeholder="you@example.com"
+      // No note: same rule as the locked rows. The warning glyph's hover says
+      // what's wrong and the link below says what to do about it, so a line of
+      // prose between them would only repeat both.
       status={verified ? "verified" : "warning"}
       statusLabel={verified ? "Verified" : "Not verified yet"}
-      note={
-        verified
-          ? undefined
-          : "Confirm this address so we can reach you about your account."
-      }
       savedNote={
         sent ? `Check ${sent} for a link to confirm the change.` : undefined
       }

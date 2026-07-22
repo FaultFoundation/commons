@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 
+import { TwoFactorChallenge } from "./TwoFactorChallenge";
 import { authClient } from "@/lib/auth-client";
 import { setAuthHint } from "@/lib/auth-hint";
 import { withNext } from "@/lib/next-path";
@@ -16,9 +17,44 @@ type Props = {
   next?: string;
 };
 
+/**
+ * Sign-in responses carry `twoFactorRedirect` instead of a session when the
+ * account has a second factor. The client plugin's own redirect options are
+ * deliberately unused (see lib/auth-client.ts), so this reads the flag off the
+ * body and swaps in the challenge step in place.
+ */
+function twoFactorMethodsOf(data: unknown): string[] | null {
+  if (!data || typeof data !== "object") return null;
+  const body = data as { twoFactorRedirect?: boolean; twoFactorMethods?: unknown };
+  if (!body.twoFactorRedirect) return null;
+  return Array.isArray(body.twoFactorMethods)
+    ? body.twoFactorMethods.filter((m): m is string => typeof m === "string")
+    : [];
+}
+
 export function AuthForm({ mode, discordEnabled, next }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  // Set once the password checks out but a second factor is still owed. Holds
+  // the email too, so the challenge can say where its codes are going.
+  const [challenge, setChallenge] = useState<{
+    methods: string[];
+    email: string;
+  } | null>(null);
+
+  /**
+   * Full navigation (like the rest of the site's links); the hint makes the
+   * destination paint the avatar immediately. A brand-new account goes straight
+   * into setup; returning members land on the portal home. Either is overridden
+   * by a `next` (an invite link, say), which then explains for itself whatever
+   * is still missing.
+   */
+  function land() {
+    setAuthHint(true);
+    window.location.assign(
+      next ?? (mode === "signup" ? "/account/setup/" : "/home/"),
+    );
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -52,14 +88,23 @@ export function AuthForm({ mode, discordEnabled, next }: Props) {
       return;
     }
 
-    // Full navigation (like the rest of the site's links); the hint makes
-    // the destination paint the avatar immediately. A brand-new account
-    // goes straight into setup; returning members land on the portal home.
-    // Either is overridden by a `next` (an invite link, say), which then
-    // explains for itself whatever is still missing.
-    setAuthHint(true);
-    window.location.assign(
-      next ?? (mode === "signup" ? "/account/setup/" : "/home/"),
+    const methods = twoFactorMethodsOf(result.data);
+    if (methods) {
+      setPending(false);
+      setChallenge({ methods, email });
+      return;
+    }
+
+    land();
+  }
+
+  if (challenge) {
+    return (
+      <TwoFactorChallenge
+        methods={challenge.methods}
+        email={challenge.email}
+        onVerified={land}
+      />
     );
   }
 

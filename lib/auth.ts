@@ -1,9 +1,11 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
+import { twoFactor } from "better-auth/plugins/two-factor";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { deleteAvatarByUrl } from "@/lib/avatars";
 import { getDb } from "@/lib/db";
+import { sendEmailVerificationLink, sendTwoFactorCodeEmail } from "@/lib/email";
 import {
   fetchBattleTag,
   fetchDiscordUsername,
@@ -17,6 +19,84 @@ import {
 export function getAuth() {
   const { env } = getCloudflareContext();
   const isDev = process.env.NODE_ENV === "development";
+
+  // Deliberately *not* annotated `BetterAuthPlugin[]`: the widened type erases
+  // each plugin's own inference, and with it `session.user.twoFactorEnabled`.
+  // Battle.net is spread in rather than pushed for the same reason — a `push`
+  // onto an inferred array would need the annotation back.
+  const plugins = [
+    twoFactor({
+      // What authenticator apps display beside the code.
+      issuer: "The Fault Foundation",
+      otpOptions: {
+        period: 5, // minutes
+        // A row in D1 must never be a live sign-in code.
+        storeOTP: "hashed",
+        // Configuring this is what makes email a second factor *at all*:
+        // unlike TOTP, which each member sets up themselves, email codes are
+        // offered to anyone with 2FA on as soon as a sender exists.
+        sendOTP: async ({ user, otp }) => {
+          await sendTwoFactorCodeEmail({ to: user.email, code: otp });
+        },
+      },
+      // Defaults kept deliberately: skipVerificationOnEnable stays false so a
+      // member can't lock themselves out by enrolling with an app they never
+      // tested, allowPasswordless stays false so changing 2FA always re-proves
+      // the password, and the account lockout stays on (10 consecutive failed
+      // verifications → 15 minutes).
+    }),
+    // Blizzard has no built-in better-auth provider, so it rides the
+    // generic-OAuth plugin. Unset secrets leave the integration dark rather
+    // than breaking getAuth().
+    ...(env.BATTLENET_CLIENT_ID && env.BATTLENET_CLIENT_SECRET
+      ? [
+          genericOAuth({
+            config: [
+              {
+                providerId: "battlenet",
+                clientId: env.BATTLENET_CLIENT_ID,
+                clientSecret: env.BATTLENET_CLIENT_SECRET,
+                // Region-neutral hosts, per oauth.battle.net's OIDC discovery
+                // document. The old us./eu./kr. hosts are legacy.
+                authorizationUrl: "https://oauth.battle.net/authorize",
+                tokenUrl: "https://oauth.battle.net/token",
+                userInfoUrl: "https://oauth.battle.net/userinfo",
+                // BattleTag and account id come back without any extra scope;
+                // the game-profile scopes (wow./sc2./d3.) would buy us nothing
+                // — Blizzard publishes no Overwatch API at all.
+                scopes: ["openid"],
+                pkce: true,
+                // Required, not optional: Blizzard returns no email address and
+                // user.email is NOT NULL, so an implicit sign-up would try to
+                // create a user with an empty email. Battle.net may only ever
+                // attach to an already-authenticated session.
+                disableSignUp: true,
+                getUserInfo: async (tokens) => {
+                  const profile = await fetchBattleNetProfile(tokens.accessToken);
+                  if (!profile) return null;
+                  return {
+                    id: profile.id,
+                    // Must be non-empty or the callback bails with
+                    // "name_is_missing". Only validated here — the link path
+                    // writes an account row, never the user's name.
+                    name: profile.battletag || `Battle.net ${profile.id}`,
+                    // Blizzard returns no email, but the generic-OAuth callback
+                    // rejects a blank one *before* it branches on link vs
+                    // sign-up, so disableSignUp alone wouldn't get us through.
+                    // .invalid is reserved by RFC 2606 and can never resolve,
+                    // so this is inert: with allowDifferentEmails the link path
+                    // never compares it, and disableSignUp means it is never
+                    // written to a user row.
+                    email: `${profile.id}@battlenet.invalid`,
+                    emailVerified: false,
+                  };
+                },
+              },
+            ],
+          }),
+        ]
+      : []),
+  ];
 
   return betterAuth({
     database: drizzleAdapter(getDb(), { provider: "sqlite" }),
@@ -36,17 +116,29 @@ export function getAuth() {
         ],
     emailAndPassword: {
       enabled: true,
-      // Flip to true once an email provider (e.g. Resend) is wired up.
+      // Stays false on purpose. Verification exists (below), but *requiring*
+      // it to sign in would lock out every member who registered before it
+      // shipped. The Account tab nags instead.
       requireEmailVerification: false,
+    },
+    emailVerification: {
+      sendVerificationEmail: async ({ user, url }) => {
+        await sendEmailVerificationLink({ to: user.email, url });
+      },
+      // MUST stay false. Better Auth signs the member in when it's true, which
+      // would make the verification link a second factor bypass for anyone who
+      // can read their inbox — including the address email 2FA codes go to.
+      autoSignInAfterVerification: false,
+      expiresIn: 60 * 60,
     },
     user: {
       changeEmail: {
         enabled: true,
-        // No verification sender is wired yet, and better-auth rejects
-        // every change without one unless this flag is set. It only
-        // applies while user.emailVerified is false, so wiring
-        // verification emails later upgrades the flow automatically.
-        updateEmailWithoutVerification: true,
+        // False, so every change is confirmed from the *new* address before it
+        // lands. With a sender wired this is the only sane setting: leaving it
+        // true would let a stolen session repoint the address that receives
+        // 2FA codes, instantly and unverified.
+        updateEmailWithoutVerification: false,
       },
       // Self-serve deletion from the Accounts tab. Better Auth removes
       // the user's sessions and accounts itself; the D1 FKs then cascade the
@@ -135,58 +227,7 @@ export function getAuth() {
             },
           }
         : undefined,
-    // Blizzard has no built-in better-auth provider, so it rides the
-    // generic-OAuth plugin. Same conditional shape as socialProviders above:
-    // unset secrets leave the integration dark rather than breaking getAuth().
-    plugins:
-      env.BATTLENET_CLIENT_ID && env.BATTLENET_CLIENT_SECRET
-        ? [
-          genericOAuth({
-            config: [
-              {
-                providerId: "battlenet",
-                clientId: env.BATTLENET_CLIENT_ID,
-                clientSecret: env.BATTLENET_CLIENT_SECRET,
-                // Region-neutral hosts, per oauth.battle.net's OIDC discovery
-                // document. The old us./eu./kr. hosts are legacy.
-                authorizationUrl: "https://oauth.battle.net/authorize",
-                tokenUrl: "https://oauth.battle.net/token",
-                userInfoUrl: "https://oauth.battle.net/userinfo",
-                // BattleTag and account id come back without any extra scope;
-                // the game-profile scopes (wow./sc2./d3.) would buy us nothing
-                // — Blizzard publishes no Overwatch API at all.
-                scopes: ["openid"],
-                pkce: true,
-                // Required, not optional: Blizzard returns no email address and
-                // user.email is NOT NULL, so an implicit sign-up would try to
-                // create a user with an empty email. Battle.net may only ever
-                // attach to an already-authenticated session.
-                disableSignUp: true,
-                getUserInfo: async (tokens) => {
-                  const profile = await fetchBattleNetProfile(tokens.accessToken);
-                  if (!profile) return null;
-                  return {
-                    id: profile.id,
-                    // Must be non-empty or the callback bails with
-                    // "name_is_missing". Only validated here — the link path
-                    // writes an account row, never the user's name.
-                    name: profile.battletag || `Battle.net ${profile.id}`,
-                    // Blizzard returns no email, but the generic-OAuth callback
-                    // rejects a blank one *before* it branches on link vs
-                    // sign-up, so disableSignUp alone wouldn't get us through.
-                    // .invalid is reserved by RFC 2606 and can never resolve, so
-                    // this is inert: with allowDifferentEmails the link path
-                    // never compares it, and disableSignUp means it is never
-                    // written to a user row.
-                    email: `${profile.id}@battlenet.invalid`,
-                    emailVerified: false,
-                  };
-                },
-              },
-            ],
-          }),
-        ]
-        : undefined,
+    plugins,
   });
 }
 

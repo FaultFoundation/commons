@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 
 import { removeTeamLogo, setTeamLogo, updateTeamSettings } from "@/app/teams/actions";
 import { AvatarUploadRow } from "@/components/dashboard/accounts/AvatarUploadRow";
-import { InlineEditRow } from "@/components/dashboard/accounts/InlineEditRow";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
+import { FieldRow } from "@/components/dashboard/bubbles/FieldRow";
 import { RegionRow } from "@/components/dashboard/teams/RegionRow";
 import { TimezoneRow } from "@/components/dashboard/teams/TimezoneRow";
 import {
@@ -49,7 +49,7 @@ export function TeamSettingsRows({
 }) {
   const router = useRouter();
 
-  /** InlineEditRow wants an error message or null — exactly what the action
+  /** FieldRow wants an error message or null — exactly what the action
       returns the contents of. */
   const save =
     (field: keyof Parameters<typeof updateTeamSettings>[1]) =>
@@ -89,26 +89,32 @@ export function TeamSettingsRows({
 
       {editable ? (
         <>
-          <InlineEditRow
+          {/* `?? ""` throughout: the field shows what's stored, so an unset
+              value has to be genuinely empty — a placeholder em-dash would be
+              real text the member has to delete before typing. */}
+          <FieldRow
             label="Name"
             value={name}
             inputLabel="Team name"
             maxLength={TEAM_NAME_MAX}
             onSave={save("name")}
           />
-          <InlineEditRow
+          <FieldRow
             label="Tag"
-            value={tag ?? "—"}
+            value={tag ?? ""}
             inputLabel="Short tag"
             maxLength={TEAM_TAG_MAX}
             placeholder="FLT"
+            required={false}
             onSave={save("tag")}
           />
-          <InlineEditRow
+          <FieldRow
             label="About"
-            value={description ?? "—"}
+            value={description ?? ""}
             inputLabel="What your team is about"
             maxLength={TEAM_DESCRIPTION_MAX}
+            placeholder="What your team is about"
+            required={false}
             onSave={save("description")}
           />
         </>
@@ -138,13 +144,14 @@ export function TeamSettingsRows({
       {/* Visiting the Discord is the header's button; this row is about
           setting the link, so it only exists for people who may. */}
       {editable ? (
-        <InlineEditRow
+        <FieldRow
           label="Discord invite"
-          value={discordInviteUrl ?? "—"}
+          value={discordInviteUrl ?? ""}
           inputLabel="Discord invite link"
           inputType="url"
           maxLength={300}
           placeholder="https://discord.gg/…"
+          required={false}
           onSave={save("discordInviteUrl")}
         />
       ) : null}

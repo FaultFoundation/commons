@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 export function BubbleRow({
   label,
   value,
+  field,
   locked,
   lockTitle,
   note,
@@ -18,6 +19,10 @@ export function BubbleRow({
 }: {
   label: string;
   value?: ReactNode;
+  /** Editable control shown *instead of* the static value (see `FieldRow`).
+      A block container rather than the value's `<span>`, because what goes in
+      here is a `<form>` — which may not live inside phrasing content. */
+  field?: ReactNode;
   /** Leading visual — an avatar or icon, left of the label/value stack. */
   media?: ReactNode;
   /** Read-only row: lock icon + muted background + default note. */
@@ -33,15 +38,25 @@ export function BubbleRow({
 }) {
   const noteText = note ?? (locked ? "Locked — contact support to change" : undefined);
 
+  const classes = ["ff-row"];
+  // Re-lays the row out: label across the top, field and its button side by
+  // side beneath it. See .ff-row--field in theme.css.
+  if (field) classes.push("ff-row--field");
+  if (locked) classes.push("ff-row--locked");
+
   return (
-    <div className={locked ? "ff-row ff-row--locked" : "ff-row"}>
+    <div className={classes.join(" ")}>
       {media ? <div className="ff-row__media">{media}</div> : null}
       <div className="ff-row__main">
         <span className="ff-row__label">
           {label}
           {locked ? <LockIcon title={lockTitle ?? noteText} /> : null}
         </span>
-        <span className="ff-row__value">{value ?? "—"}</span>
+        {field ? (
+          <div className="ff-row__field">{field}</div>
+        ) : (
+          <span className="ff-row__value">{value ?? "—"}</span>
+        )}
         {noteText ? <span className="ff-row__note">{noteText}</span> : null}
       </div>
       {action ? <div className="ff-row__action">{action}</div> : null}

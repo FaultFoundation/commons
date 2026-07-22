@@ -3,6 +3,8 @@
 import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
+import { APIError } from "better-auth/api";
+
 import { getAuth } from "@/lib/auth";
 import { deleteAvatarByUrl, keyFromUrl, putAvatar } from "@/lib/avatars";
 import {
@@ -18,7 +20,8 @@ import { ensureProfile } from "@/lib/registration";
 // plain serializable result rather than throwing across the boundary.
 //
 // Account *mutations* (name/email/password/unlink/delete) stay Better Auth
-// client calls — this file is only for preferences Better Auth doesn't own.
+// client calls — this file is only for preferences Better Auth doesn't own,
+// plus the one Better Auth endpoint that is server-only (setPassword).
 // ---------------------------------------------------------------------------
 
 export type ActionResult<T = object> =
@@ -48,6 +51,54 @@ export async function setDensity(value: string): Promise<ActionResult> {
 
   // Every tab's shell renders the attribute, so refresh the whole portal.
   revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/**
+ * Give a Discord-only account its first password.
+ *
+ * The one account mutation that can't be an `authClient` call: Better Auth
+ * marks `/set-password` server-only, because it is the single path that writes
+ * a credential without proving an existing one. What stands in for the old
+ * password is the session itself — the endpoint re-reads it authoritatively
+ * (bypassing the cookie cache), so a revoked session can't authorize this.
+ *
+ * Nothing here guards against overwriting an existing password: the endpoint
+ * refuses outright when a credential account already exists
+ * (PASSWORD_ALREADY_SET), which is what keeps this from becoming a password
+ * reset that skips knowing the current one.
+ */
+export async function setAccountPassword(
+  newPassword: string,
+): Promise<ActionResult> {
+  const requestHeaders = await headers();
+  const auth = getAuth();
+  const session = await auth.api.getSession({ headers: requestHeaders });
+  if (!session) return { ok: false, error: "Sign in to change this." };
+
+  try {
+    await auth.api.setPassword({
+      body: { newPassword },
+      headers: requestHeaders,
+    });
+  } catch (error) {
+    if (error instanceof APIError) {
+      if (error.statusCode === 401) {
+        return { ok: false, error: "Sign in to change this." };
+      }
+      // PASSWORD_TOO_SHORT / PASSWORD_TOO_LONG / PASSWORD_ALREADY_SET — all
+      // carry a message worth showing verbatim.
+      return {
+        ok: false,
+        error: error.body?.message ?? "That password can't be used.",
+      };
+    }
+    throw error;
+  }
+
+  // The Security bubble gates the password and 2FA rows on whether a
+  // credential account exists, and one just appeared.
+  revalidatePath("/account/", "page");
   return { ok: true };
 }
 

@@ -3,6 +3,11 @@
 # wrangler.jsonc "vars" — see docs/cloudflare-setup.md.
 
 # Any long random string locally; production: openssl rand -base64 32
+#
+# Not just a session key: it also encrypts every member's TOTP secret and
+# backup codes (the `two_factor` table). Changing it locks enrolled members out
+# of two-factor sign-in for good — see docs/cloudflare-setup.md before you
+# rotate it anywhere real.
 BETTER_AUTH_SECRET=replace-with-a-long-random-string
 
 # The origin the app is served from. 3999 = `npm run preview` (wrangler dev);
@@ -31,9 +36,11 @@ BETTER_AUTH_URL=http://localhost:3999
 # BATTLENET_CLIENT_SECRET=
 
 # Optional — the 16-char Google app password for support@fault.foundation.
-# Set it and real verification emails go out; leave it unset and codes are
-# printed to the server terminal instead. Only `npm run preview` (:3999, real
-# workerd) can actually send — `next dev` runs in Node, which has no sockets.
+# Set it and real mail goes out (academic-email codes, account-email
+# confirmation links, two-factor sign-in codes); leave it unset and the message
+# body is printed to the server terminal instead, which is usually what you
+# want locally. Only `npm run preview` (:3999, real workerd) can actually
+# send — `next dev` runs in Node, which has no sockets.
 # SUPPORT_EMAIL_APP_PASSWORD=
 
 # Override the sending mailbox (defaults to support@fault.foundation) or the

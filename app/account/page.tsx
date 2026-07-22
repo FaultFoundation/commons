@@ -12,10 +12,13 @@ import {
   EmailRow,
   NameRow,
   PasswordRow,
+  SetPasswordRow,
 } from "@/components/dashboard/accounts/ProfileRows";
+import { TwoFactorRows } from "@/components/dashboard/accounts/TwoFactorRows";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
-import { account } from "@/db/schema";
+import { FieldRow } from "@/components/dashboard/bubbles/FieldRow";
+import { account, twoFactor, user } from "@/db/schema";
 import { battlenetAuthEnabled, discordAuthEnabled, getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { DENSITY_COOKIE, asDensity } from "@/lib/density";
@@ -33,7 +36,21 @@ export const metadata: Metadata = {
 
 const SCHOOL_LOCK_NOTE = "Schools can only be changed by a support member";
 
-export default async function AccountPage() {
+/** Better Auth redirects here with `?error=` when a verification link fails,
+    rather than rendering an error of its own (see the callbackURL passed to
+    changeEmail / sendVerificationEmail). */
+const VERIFY_ERRORS: Record<string, string> = {
+  TOKEN_EXPIRED: "That confirmation link has expired. Send yourself a new one.",
+  INVALID_TOKEN: "That confirmation link isn't valid. Send yourself a new one.",
+  INVALID_USER: "That confirmation link was for a different account.",
+  USER_NOT_FOUND: "That confirmation link was for an account that no longer exists.",
+};
+
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) {
     redirect("/login/");
@@ -44,57 +61,82 @@ export default async function AccountPage() {
   const densityCookie = (await cookies()).get(DENSITY_COOKIE)?.value;
 
   const db = getDb();
-  const [reg, discord, battlenetIdentity, accountRows, profile] = await Promise.all([
-    getRegistrationState(session.user.id),
-    // Also refreshes the stored Discord handle when it has gone stale.
-    loadDiscordIntegration(session.user.id, await headers()),
-    getPlatformIdentity(session.user.id, "battlenet"),
-    db
-      .select({ providerId: account.providerId })
-      .from(account)
-      .where(eq(account.userId, session.user.id)),
-    densityCookie ? null : getProfile(session.user.id),
-  ]);
+  const [reg, discord, battlenetIdentity, accountRows, twoFactorRows, profile, params] =
+    await Promise.all([
+      getRegistrationState(session.user.id),
+      // Also refreshes the stored Discord handle when it has gone stale.
+      loadDiscordIntegration(session.user.id, await headers()),
+      getPlatformIdentity(session.user.id, "battlenet"),
+      db
+        .select({ providerId: account.providerId })
+        .from(account)
+        .where(eq(account.userId, session.user.id)),
+      // Read from D1 rather than the session: `user.two_factor_enabled` is
+      // what the sign-in challenge actually consults, and the session here can
+      // be served from Better Auth's cookie cache — enrolling in another tab
+      // would leave this bubble claiming 2FA is still off.
+      //
+      // Left join because the two flags mean different things. `enabled` is
+      // whether a second factor is required at all; `verified` is whether an
+      // authenticator app was ever proven, and enrolling by email leaves a row
+      // behind with it still false.
+      db
+        .select({
+          enabled: user.twoFactorEnabled,
+          totpVerified: twoFactor.verified,
+        })
+        .from(user)
+        .leftJoin(twoFactor, eq(twoFactor.userId, user.id))
+        .where(eq(user.id, session.user.id))
+        .limit(1),
+      densityCookie ? null : getProfile(session.user.id),
+      searchParams,
+    ]);
   const hasPassword = accountRows.some((r) => r.providerId === "credential");
   const battlenetLinked = accountRows.some((r) => r.providerId === "battlenet");
+  const twoFactorEnabled = twoFactorRows[0]?.enabled ?? false;
+  const hasTotp = Boolean(twoFactorRows[0]?.totpVerified);
   const density = asDensity(densityCookie ?? profile?.density);
 
   const status = reg?.status ?? null;
   const hasSchool = Boolean(reg?.schoolName);
+  const verifyError = params.error ? VERIFY_ERRORS[params.error] : undefined;
 
   return (
     <DashboardShell active="account" setupUserId={session.user.id}>
       <h1 className="screen-reader-text">Account</h1>
       <div className="ff-bubble-grid">
         <Bubble title="Profile" span="full">
+          {verifyError ? (
+            <div className="ff-auth__error" role="alert">
+              <p>{verifyError}</p>
+            </div>
+          ) : null}
           <AvatarRow
             name={session.user.name}
             initialImage={session.user.image ?? null}
           />
           <NameRow initialName={session.user.name} />
-          <EmailRow initialEmail={session.user.email} />
-          {hasPassword ? (
-            <PasswordRow />
-          ) : (
-            <BubbleRow
-              label="Password"
-              value="Not set"
-              note="You signed in with Discord — no password on this account."
-            />
-          )}
+          <EmailRow
+            initialEmail={session.user.email}
+            verified={session.user.emailVerified}
+          />
           {hasSchool ? (
             <>
-              <BubbleRow
+              <FieldRow
                 label="School"
-                value={reg?.schoolName}
+                value={reg?.schoolName ?? ""}
                 locked
                 note={SCHOOL_LOCK_NOTE}
                 lockTitle={SCHOOL_LOCK_NOTE}
               />
-              <BubbleRow
-                label="Academic Email"
-                value={reg?.schoolEmail ?? undefined}
+              <FieldRow
+                label="School email"
+                value={reg?.schoolEmail ?? ""}
+                inputType="email"
                 locked
+                status="verified"
+                statusLabel="Verified"
                 note={SCHOOL_LOCK_NOTE}
                 lockTitle={SCHOOL_LOCK_NOTE}
               />
@@ -117,6 +159,16 @@ export default async function AccountPage() {
               }
             />
           )}
+        </Bubble>
+
+        <Bubble title="Security">
+          {hasPassword ? <PasswordRow /> : <SetPasswordRow />}
+          <TwoFactorRows
+            enabled={twoFactorEnabled}
+            hasTotp={hasTotp}
+            hasPassword={hasPassword}
+            email={session.user.email}
+          />
         </Bubble>
 
         <Bubble title="Display">

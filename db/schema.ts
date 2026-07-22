@@ -26,6 +26,11 @@ export const user = sqliteTable("user", {
     .notNull()
     .default(false),
   image: text("image"),
+  // Owned by the two-factor plugin. One flag for both factors: it flips on the
+  // first successful verification during enrollment (see `twoFactor` below).
+  twoFactorEnabled: integer("two_factor_enabled", { mode: "boolean" })
+    .notNull()
+    .default(false),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
@@ -87,6 +92,42 @@ export const verification = sqliteTable(
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
   (t) => [index("verification_identifier_idx").on(t.identifier)],
+);
+
+/**
+ * Two-factor enrollment — one row per member, created by
+ * `authClient.twoFactor.enable()`. The export name must stay `twoFactor`: the
+ * drizzle adapter resolves Better Auth's models by export name, not by table
+ * name.
+ *
+ * `secret` and `backupCodes` are encrypted with BETTER_AUTH_SECRET, so rotating
+ * that secret makes every enrolled member's 2FA undecryptable — see
+ * docs/cloudflare-setup.md.
+ *
+ * `verified` is what separates the two factors. Enrolling always mints a TOTP
+ * secret, but it stays `false` until someone actually enters a code from their
+ * authenticator app; the sign-in challenge only offers TOTP once it's `true`.
+ * Members who enrolled with email codes therefore leave it `false` forever, and
+ * that is the flag telling the challenge to offer email only.
+ */
+export const twoFactor = sqliteTable(
+  "two_factor",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    secret: text("secret").notNull(),
+    backupCodes: text("backup_codes").notNull(),
+    verified: integer("verified", { mode: "boolean" }).notNull().default(true),
+    // Account-level lockout: consecutive failed second-factor verifications
+    // across challenges and factors, reset on success (NIST SP 800-63B §5.2.2).
+    failedVerificationCount: integer("failed_verification_count")
+      .notNull()
+      .default(0),
+    lockedUntil: integer("locked_until", { mode: "timestamp_ms" }),
+  },
+  (t) => [index("two_factor_user_id_idx").on(t.userId)],
 );
 
 // ===========================================================================

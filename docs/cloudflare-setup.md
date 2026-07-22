@@ -12,6 +12,15 @@ Terminal**, inside this project folder) — never in the Cloudflare dashboard.
 - `BETTER_AUTH_SECRET` set on the Worker (`wrangler secret put`).
 - First manual deploy succeeded.
 
+> **Never rotate `BETTER_AUTH_SECRET` casually.** Since two-factor
+> authentication shipped it isn't only a session-signing key: every enrolled
+> member's TOTP secret and backup codes in `two_factor` are encrypted with it.
+> Changing it makes them permanently undecryptable — those members can't
+> complete a sign-in challenge and can't use a backup code, and there is no
+> recovery tooling. Rotating means clearing the `two_factor` table and
+> `user.two_factor_enabled` in the same deploy, and telling everyone affected
+> to enroll again.
+
 ## Two Workers, two repos
 
 The account runs one Worker per repo. Don't mix them up:

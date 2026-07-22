@@ -4,9 +4,13 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { AvatarUploadRow } from "./AvatarUploadRow";
-import { InlineEditRow } from "./InlineEditRow";
-import { discardAvatar, uploadAvatar } from "@/app/account/actions";
+import {
+  discardAvatar,
+  setAccountPassword,
+  uploadAvatar,
+} from "@/app/account/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
+import { FieldRow } from "@/components/dashboard/bubbles/FieldRow";
 import { authClient } from "@/lib/auth-client";
 
 const GENERIC_ERROR = "Something went wrong. Please try again.";
@@ -77,10 +81,11 @@ export function AvatarRow({
 export function NameRow({ initialName }: { initialName: string }) {
   const router = useRouter();
   return (
-    <InlineEditRow
+    <FieldRow
       label="Username"
       value={initialName}
-      inputLabel="New username"
+      inputLabel="Username"
+      placeholder="Your display name"
       autoComplete="name"
       maxLength={80}
       onSave={async (name) => {
@@ -94,30 +99,93 @@ export function NameRow({ initialName }: { initialName: string }) {
   );
 }
 
-export function EmailRow({ initialEmail }: { initialEmail: string }) {
-  const router = useRouter();
+/**
+ * The account's email address, and whether it has been confirmed.
+ *
+ * Changing it never takes effect here. Better Auth mails a link to the *new*
+ * address and only swaps the row when that link is opened, so the honest thing
+ * to report is "check your inbox" — never a value the field could show. An
+ * address that already belongs to someone else takes the same path and reports
+ * the same thing, deliberately: telling them apart would turn this field into
+ * an "is this person a member?" oracle.
+ */
+export function EmailRow({
+  initialEmail,
+  verified,
+}: {
+  initialEmail: string;
+  verified: boolean;
+}) {
+  const [sent, setSent] = useState<string | null>(null);
+  const [resent, setResent] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
+
+  async function resend() {
+    if (resending) return;
+    setResending(true);
+    const result = await authClient.sendVerificationEmail({
+      email: initialEmail,
+      callbackURL: "/account/",
+    });
+    setResending(false);
+    setResent(
+      result.error
+        ? (result.error.message ?? GENERIC_ERROR)
+        : `Verification link sent to ${initialEmail}.`,
+    );
+  }
+
   return (
-    <InlineEditRow
+    <FieldRow
       label="Email"
       value={initialEmail}
-      inputLabel="New email"
+      inputLabel="Email"
       inputType="email"
       autoComplete="email"
       placeholder="you@example.com"
+      status={verified ? "verified" : "warning"}
+      statusLabel={verified ? "Verified" : "Not verified yet"}
+      note={
+        verified
+          ? undefined
+          : "Confirm this address so we can reach you about your account."
+      }
+      savedNote={
+        sent ? `Check ${sent} for a link to confirm the change.` : undefined
+      }
       onSave={async (email) => {
-        if (email.toLowerCase() === initialEmail.toLowerCase()) return null;
-        const result = await authClient.changeEmail({ newEmail: email });
-        if (result.error) return result.error.message ?? GENERIC_ERROR;
-        // Taken addresses report success without changing anything
-        // (anti-enumeration) — trust only what the session now says.
-        const session = await authClient.getSession();
-        if (session.data?.user.email?.toLowerCase() !== email.toLowerCase()) {
-          return "That email can't be used.";
+        if (email.toLowerCase() === initialEmail.toLowerCase()) {
+          return "That's already your email.";
         }
-        router.refresh();
+        const result = await authClient.changeEmail({
+          newEmail: email,
+          callbackURL: "/account/",
+        });
+        if (result.error) return result.error.message ?? GENERIC_ERROR;
+        setSent(email);
+        // Deliberately no router.refresh(): nothing has changed server-side
+        // yet, and refreshing would reset the field and hide the message.
         return null;
       }}
-    />
+    >
+      {verified ? null : (
+        <div className="ff-row__buttons">
+          <button
+            className="ff-btn ff-btn--outline ff-btn--sm"
+            type="button"
+            onClick={resend}
+            disabled={resending}
+          >
+            {resending ? "Sending…" : "Resend verification"}
+          </button>
+        </div>
+      )}
+      {resent ? (
+        <p className="ff-row__saved" role="status">
+          {resent}
+        </p>
+      ) : null}
+    </FieldRow>
   );
 }
 
@@ -189,6 +257,95 @@ export function PasswordRow() {
               required
             />
           </label>
+          <label className="ff-auth__field">
+            <span className="ff-auth__label">New password</span>
+            <input
+              className="ff-auth__input"
+              name="next"
+              type="password"
+              autoComplete="new-password"
+              placeholder="At least 8 characters"
+              minLength={8}
+              required
+            />
+          </label>
+          <div className="ff-row__buttons">
+            <button className="ff-btn ff-btn--sm" type="submit" disabled={pending}>
+              Save
+            </button>
+            <button
+              className="ff-btn ff-btn--outline ff-btn--sm"
+              type="button"
+              onClick={() => setEditing(false)}
+              disabled={pending}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : undefined}
+    </BubbleRow>
+  );
+}
+
+/**
+ * First password for an account that has only ever signed in with Discord.
+ *
+ * Worth offering rather than leaving those accounts as "Password: not set":
+ * two-factor authentication hangs off the credential provider, so without a
+ * password there is no second factor to add. Goes through a server action
+ * because Better Auth marks /set-password server-only (see
+ * app/account/actions.ts).
+ */
+export function SetPasswordRow() {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending) return;
+    setError(null);
+    const next = String(new FormData(event.currentTarget).get("next") ?? "");
+    setPending(true);
+    const result = await setAccountPassword(next);
+    setPending(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setEditing(false);
+    router.refresh();
+  }
+
+  return (
+    <BubbleRow
+      label="Password"
+      value="Not set"
+      note="You signed in with Discord. Add a password to sign in with your email — and to turn on two-factor authentication."
+      action={
+        !editing ? (
+          <button
+            className="ff-btn ff-btn--sm"
+            type="button"
+            onClick={() => {
+              setError(null);
+              setEditing(true);
+            }}
+          >
+            Set password
+          </button>
+        ) : undefined
+      }
+    >
+      {editing ? (
+        <form onSubmit={onSubmit}>
+          {error ? (
+            <div className="ff-auth__error" role="alert">
+              <p>{error}</p>
+            </div>
+          ) : null}
           <label className="ff-auth__field">
             <span className="ff-auth__label">New password</span>
             <input

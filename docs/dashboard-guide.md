@@ -178,16 +178,47 @@ import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
   stack. The row grows a third grid column via `:has()`, so adding one is a
   pure JSX change.
 - `action` — right-aligned control. Use `ff-btn--sm` inside rows.
-- `children` — an expanded editor area rendered full-width under the row
-  (see `InlineEditRow`).
+- `children` — an expanded editor area rendered full-width under the row.
+  **Pass `undefined`, not an always-truthy fragment**, when there is nothing
+  to show: the editor draws a top margin and a dashed rule for any truthy
+  value, and `<>{null}{null}</>` is truthy.
+- `field` — an editable control *instead of* the static value, which also
+  re-lays the row out (label across the top, control beside its button). A
+  block container rather than the value's `<span>`, because a `<form>` may not
+  live inside phrasing content. See `FieldRow`.
 
-### `InlineEditRow` — edit-in-place (client)
+### `FieldRow` — the always-editable row (client)
 
-`components/dashboard/accounts/InlineEditRow.tsx` wraps `BubbleRow` with
-an Edit button that expands into a single-field form. Pass
-`onSave: (value) => Promise<string | null>` — return an error message to
-show, or `null` on success. Multi-field editors (see `PasswordRow` in
-`ProfileRows.tsx`) are written bespoke on top of `BubbleRow` instead.
+`components/dashboard/bubbles/FieldRow.tsx`. The portal's standard
+single-value editor: a text field prefilled with what's stored, plus a Save
+Changes button that stays disabled until the value actually differs.
+
+```tsx
+<FieldRow
+  label="Username"
+  value={initialName}          // "" when unset — never a placeholder em-dash
+  placeholder="Your display name"
+  maxLength={80}
+  onSave={async (next) => { … }}   // error message, or null on success
+/>
+```
+
+- `value` is what's stored. **Never pass `?? "—"`** — the field shows it
+  verbatim, so a placeholder becomes real text the member has to delete.
+  Use `?? ""` with a `placeholder`, and `required={false}` if it may be blank.
+- `status` / `statusLabel` — a check or warning glyph inside the field's right
+  edge. The label is the accessible text; the colour is never the only signal.
+- `locked` — disabled input plus the lock affordance, for support-only values.
+- `savedNote` — shown after a successful save until the field is edited again,
+  for saves whose result isn't visible in the field (an email change lands in
+  an inbox, not in the row).
+- The `<form>` sits in the field slot and its submit button in the action
+  slot, joined by `form={id}` — they're in different grid columns, so one
+  can't wrap the other. Enter in the field submits that row alone.
+
+This replaced an `InlineEditRow` that hid each value behind an Edit button.
+Multi-field editors (`PasswordRow`, `TwoFactorRows`) are still written bespoke
+on top of `BubbleRow`.
 
 ### `ConfirmDialog` — destructive confirmations (client)
 
@@ -303,7 +334,7 @@ shell.
 2. Static content: compose `Bubble` + `BubbleRow` right in the page.
 3. Interactive content: add a `"use client"` component under
    `components/dashboard/<tab>/`, build it on `BubbleRow` /
-   `InlineEditRow` / `ConfirmDialog`, call Better Auth via
+   `FieldRow` / `ConfirmDialog`, call Better Auth via
    `authClient` (or a server action for domain logic), then
    `router.refresh()` so the server tree re-renders.
 4. Keep the bubble self-contained: it must not care where in the grid it
@@ -395,14 +426,67 @@ matches, so re-reporting a corrected score replaces rather than accumulates.
   implicit TLS). It's deliberately not a `cloudflare:sockets` library:
   OpenNext bundles the server with esbuild, which can't resolve that scheme
   and exposes no hook to mark it external, so such a library fails the
-  build. Without `SUPPORT_EMAIL_APP_PASSWORD` the code is logged instead; use
+  build. `lib/email.ts` is one private `sendMail` plus a named sender per
+  kind of message (school code, account-email link, two-factor code) — add
+  new mail as another sender, not another SMTP call. Without
+  `SUPPORT_EMAIL_APP_PASSWORD` the body is logged instead; use
   `npm run preview` to exercise a real send.
-- Email change works without verification only while emails are
-  unverified (`updateEmailWithoutVerification` in `lib/auth.ts`); a
-  "taken" email reports success without changing anything, so the UI
-  re-checks the session (see `EmailRow`).
+- **The account email is verified separately from the academic one.** The
+  academic email proves a school affiliation; `user.emailVerified` is just
+  "we can reach you here", and it matters because email 2FA codes go to that
+  address. It's a link, not a code, because Better Auth mints and consumes
+  the token itself at `/api/auth/verify-email`.
+- `updateEmailWithoutVerification` is **false**: every email change is
+  confirmed from the *new* address before it lands, so `EmailRow` reports
+  "check your inbox" rather than showing a changed value. An address that
+  already belongs to someone else takes the identical path and says the
+  identical thing — that anti-enumeration behaviour is Better Auth's, and the
+  UI must not try to distinguish the two.
+- `requireEmailVerification` stays **false** — turning it on would lock out
+  every member who registered before verification shipped.
 - Unlink and password-less delete need a fresh (<24h) session — map 403s
-  to a friendly "sign out and back in" message.
+  to a friendly "sign out and back in" message. Note that `setPassword`,
+  `changeEmail` and `twoFactor.disable` use the *sensitive* session
+  middleware instead, which re-reads the session authoritatively but has no
+  freshness bar: those return 401, not 403.
+
+### Two-factor authentication
+
+`twoFactor` (Better Auth plugin, wired in `lib/auth.ts`) with the enrollment
+UI in `components/dashboard/accounts/TwoFactorRows.tsx` and the sign-in step
+in `components/auth/TwoFactorChallenge.tsx`.
+
+- **One switch, two ways to satisfy it.** `user.two_factor_enabled` is whether
+  a second factor is required; `two_factor.verified` is whether an
+  authenticator app was ever proven. Enrolling *always* mints a TOTP secret,
+  so email-only members have a `two_factor` row with `verified = 0`, and that
+  is what makes the challenge offer email alone. Email codes need no per-member
+  setup — they're available to anyone with 2FA on because `otpOptions.sendOTP`
+  is configured server-side.
+- **Enrollment order matters**: `enable({password})` returns the TOTP URI and
+  backup codes but switches nothing on. The flag flips on the first successful
+  `verifyTotp` or `verifyOtp`, so abandoning setup halfway leaves 2FA off
+  rather than half-on.
+- **Discord sign-in bypasses 2FA entirely.** The plugin only hooks
+  `/sign-in/email`, `/sign-in/username` and `/sign-in/phone-number` — social
+  sign-in never sees the challenge. Say so in the UI rather than implying
+  cover we don't have. For the same reason **don't add the `email-otp`
+  plugin**: `/sign-in/email-otp` isn't hooked either, so it would be a
+  straight bypass for anyone holding the mailbox. Same caution before wiring
+  `sendResetPassword`.
+- **`emailVerification.autoSignInAfterVerification` must stay false** — it
+  creates a session on link click, which is the same bypass by another route.
+- `storeOTP: "hashed"` so a D1 read never yields a live code. Backup codes and
+  the TOTP secret are encrypted with **BETTER_AUTH_SECRET — rotating it breaks
+  every enrolled member's 2FA**, and no reset path exists.
+- Backup codes are shown exactly once, at generation. There is no admin
+  recovery tooling, so the sign-in challenge must always keep "use a backup
+  code" reachable.
+- QR codes come from `qrcode-generator` (MIT, zero dependencies) rendered as
+  inline SVG in `QrCode.tsx`. Don't switch to its `createSvgTag()` — that
+  returns an HTML string and would need `dangerouslySetInnerHTML`.
+- Error copy for both the enrollment rows and the sign-in challenge lives in
+  `lib/two-factor.ts`, so the two can't drift.
 - Images live in the `AVATARS` R2 bucket, not D1 — see the `Avatar` section
   above. The bucket is private and served through `/api/avatars/*`, which puts
   `caches.default` in front of R2 so repeat hits cost no Class B operations.

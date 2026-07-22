@@ -27,6 +27,11 @@
   --ff-danger-border: rgba(255, 99, 99, 0.45);
   --ff-danger-bg: rgba(255, 99, 99, 0.14);
 
+  /* status indicators — settled / needs attention. Never the sole carrier of
+     meaning: every use pairs them with text (see FieldRow's StatusIcon). */
+  --ff-ok: #5fd08a;
+  --ff-warn: #ffc453;
+
   /* radii — 20px is the site's established motif */
   --ff-radius-md: 12px;
   --ff-radius-lg: 20px;
@@ -699,6 +704,48 @@ select.ff-auth__input option {
   justify-content: space-between;
   margin-block-start: 1.5em;
 }
+/* Checkbox + label on one line — the only field on the auth pages whose label
+   belongs beside the control rather than above it. */
+.ff-auth__check {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  font-size: var(--wp--preset--font-size--small);
+}
+.ff-auth__check input {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  accent-color: var(--ff-blue);
+}
+/* The other ways through the two-factor challenge. A column, not a row: on a
+   phone these wrap into an unreadable ribbon otherwise. */
+.ff-auth__alts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5em;
+  margin-block-start: 1.2em;
+}
+/* A button that reads as a link — these change what's on screen rather than
+   navigating, so they must not be anchors. */
+.ff-link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ff-link-btn:hover {
+  color: var(--ff-accent);
+}
+.ff-link-btn[disabled] {
+  opacity: 0.6;
+  cursor: default;
+  text-decoration: none;
+}
 
 /* Header avatar (replaces Sign In when a session exists) */
 .ff-nav__avatar {
@@ -1217,6 +1264,70 @@ a.ff-dash__link:hover {
    growing list of platforms stays scannable. auto-fit means the same markup
    gives two-up inside a wide setup bubble and one-up in the narrow Account
    tab bubble, with no per-page variants. */
+/* Two-factor enrollment, inside a row's expanded editor. Everything here is
+   one step of a flow, so the vertical rhythm comes from --ff-row-editor-gap
+   like every other expanded editor rather than its own spacing. */
+.ff-2fa {
+  display: grid;
+  gap: var(--ff-row-editor-gap);
+}
+/* Each step is a form, so the rhythm has to hold inside one too — otherwise
+   the QR block sits flush against the code field. Grid rather than margins so
+   the density token is the only source of spacing. */
+.ff-2fa form {
+  display: grid;
+  gap: var(--ff-row-editor-gap);
+}
+.ff-2fa .ff-auth__field,
+.ff-2fa .ff-auth__error {
+  margin-block-end: 0;
+}
+.ff-2fa__lede {
+  margin: 0;
+}
+.ff-2fa__hint {
+  margin: 0;
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-2fa__setup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+/* Fixed rather than fluid: a QR below roughly 150px stops scanning reliably on
+   older phone cameras, and there's no reason for it to grow beyond that. */
+.ff-2fa__qr {
+  width: 160px;
+  height: 160px;
+  flex: none;
+  border-radius: var(--ff-radius-md);
+}
+.ff-2fa__key {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--ff-dash-text-md);
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.ff-2fa__codes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 6px 12px;
+  margin: 0;
+  padding: var(--ff-tile-pad);
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  list-style: none;
+}
+.ff-2fa__codes code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.06em;
+  user-select: all;
+}
+
 .ff-integrations {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -1375,6 +1486,68 @@ a.ff-dash__link:hover {
 }
 .ff-row__note {
   color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-xs);
+}
+/* Rows whose value is a live text field (FieldRow). The label goes across the
+   top and the field sits beside its Save button — so `.ff-row__main` collapses
+   to `display: contents` and its children are placed on the row's own grid.
+   Every cell is placed explicitly because source order (label, field, note,
+   THEN action) isn't the visual order. */
+.ff-row--field .ff-row__main {
+  display: contents;
+}
+.ff-row--field .ff-row__label {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+.ff-row--field .ff-row__field {
+  grid-column: 1;
+  grid-row: 2;
+}
+.ff-row--field .ff-row__action {
+  grid-column: 2;
+  grid-row: 2;
+}
+.ff-row--field .ff-row__note {
+  grid-column: 1 / -1;
+  grid-row: 3;
+}
+.ff-row--field .ff-row__editor {
+  grid-row: 4;
+}
+/* Relative so the status glyph can sit inside the input's right edge rather
+   than stealing a column from the field. */
+.ff-row__field {
+  position: relative;
+  min-width: 0;
+}
+.ff-row__field .ff-auth__input {
+  /* Room for the status glyph; the same inset the select chevrons use. */
+  padding-right: 2.6em;
+}
+.ff-row__field .ff-auth__input:disabled {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ff-text-dim);
+  cursor: not-allowed;
+}
+.ff-row__status {
+  position: absolute;
+  top: 50%;
+  right: 0.9em;
+  width: 14px;
+  height: 14px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.ff-row__status--verified {
+  color: var(--ff-ok);
+}
+.ff-row__status--warning {
+  color: var(--ff-warn);
+}
+.ff-row__saved {
+  margin: 0;
+  color: var(--ff-ok);
   font-size: var(--ff-dash-text-xs);
 }
 .ff-row__action {
@@ -1786,6 +1959,25 @@ a.ff-dash__link:hover {
 @media (max-width: 781.98px) {
   .ff-bubble-grid {
     grid-template-columns: 1fr;
+  }
+  /* An email address and a "Save Changes" button don't fit on one phone line.
+     The button drops under its field and stretches — the field keeps the full
+     width, which matters more than keeping the two on one row. */
+  .ff-row--field .ff-row__field {
+    grid-column: 1 / -1;
+  }
+  .ff-row--field .ff-row__action {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  .ff-row--field .ff-row__note {
+    grid-row: 4;
+  }
+  .ff-row--field .ff-row__editor {
+    grid-row: 5;
+  }
+  .ff-row--field .ff-row__action .ff-btn {
+    width: 100%;
   }
   /* The score grid's five columns don't survive a phone: map and replay code
      get their own lines, the two scores stay side by side. Placement is

@@ -757,58 +757,84 @@ html:not([data-auth="in"]) .ff-auth-when-in {
 /* ---------- 10. Dashboard portal (sidebar rail + card grid) ---------- */
 
 .ff-dash {
-  /* Deliberate app-UI type scale — fixed sizes, not the marketing clamp
+  /* Deliberate app-UI type scale — fixed ratios, not the marketing clamp
      scale. Everything the shell renders (tabs, register flow, dialogs)
-     inherits these; see docs/dashboard-guide.md before adding sizes. */
-  --ff-dash-text-xs: 0.75rem; /* 12px — locked notes, fine print */
-  --ff-dash-text-sm: 0.8125rem; /* 13px — row labels, hints, strip, meta */
-  --ff-dash-text-md: 0.9375rem; /* 15px — body, values, inputs, buttons */
-  --ff-dash-text-lg: 1.0625rem; /* 17px — bubble titles */
-  --ff-dash-text-xl: 1.375rem; /* 22px — register step titles, empty states */
+     inherits these; see docs/dashboard-guide.md before adding sizes.
+
+     One knob: --ff-text-scale shifts the whole scale with the density preset,
+     so the steps between tiers never drift. Type is most of a row's height,
+     so density that leaves it alone barely moves anything. */
+  --ff-text-scale: 1;
+  --ff-dash-text-xs: calc(0.75rem * var(--ff-text-scale)); /* 12px — fine print */
+  --ff-dash-text-sm: calc(0.8125rem * var(--ff-text-scale)); /* 13px — row labels, meta */
+  --ff-dash-text-md: calc(0.9375rem * var(--ff-text-scale)); /* 15px — body, values, inputs */
+  --ff-dash-text-lg: calc(1.0625rem * var(--ff-text-scale)); /* 17px — bubble titles */
+  --ff-dash-text-xl: calc(1.375rem * var(--ff-text-scale)); /* 22px — step titles */
+  --ff-dash-leading: 1.5;
 
   /* Bubble density — the "cozy" default. Every gap and pad inside a bubble
      resolves through these, so the member's Display setting is one attribute
      swap (see [data-density] below) and no rule hardcodes a spacing value. */
   --ff-bubble-pad: clamp(16px, 2vw, 20px);
-  --ff-bubble-head-gap: 10px; /* head → body */
-  --ff-bubble-body-gap: 6px; /* row → row */
-  --ff-row-pad-y: 8px;
-  --ff-row-pad-x: 12px;
-  --ff-row-editor-gap: 8px; /* expanded editors, nested forms */
-  --ff-tile-pad: 12px; /* integration cards, action panels */
-  --ff-field-gap: 0.6em; /* .ff-auth__field, dashboard only */
-  --ff-reg-pad: clamp(20px, 3vw, 28px);
+  --ff-bubble-head-gap: 12px; /* head → body */
+  --ff-bubble-body-gap: 8px; /* row → row */
+  --ff-row-pad-y: 9px;
+  --ff-row-pad-x: 13px;
+  --ff-row-editor-gap: 9px; /* expanded editors, nested forms */
+  --ff-tile-pad: 13px; /* integration cards, action panels */
+  --ff-field-gap: 0.65em; /* .ff-auth__field, dashboard only */
+  --ff-reg-pad: clamp(20px, 3vw, 26px);
+  /* Avatars scale too, or a fixed 56px picture sets the floor on row height
+     and compact stops being compact. */
+  --ff-avatar-sm: 28px;
+  --ff-avatar-md: 40px;
+  --ff-avatar-lg: 56px;
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
   gap: clamp(24px, 4vw, 48px);
   align-items: start;
   font-size: var(--ff-dash-text-md);
-  line-height: 1.5;
+  line-height: var(--ff-dash-leading);
 }
 /* Density presets. "Cozy" is the .ff-dash base above, so an absent or
-   unrecognized attribute lands on the default; "comfortable" restores the
-   spacing the dashboard shipped with before the tokens existed. */
+   unrecognized attribute lands on the default.
+
+   The steps are deliberately wide. An earlier pass moved every token by 2px
+   per preset, which measured as a 6% page-height difference between compact
+   and cozy — indistinguishable in use. Each preset now moves the card edges,
+   the head→body gap, the type scale and the leading together, because no one
+   of those carries enough of a row's height on its own. */
 .ff-dash[data-density="compact"] {
-  --ff-bubble-pad: clamp(14px, 1.6vw, 18px);
-  --ff-bubble-head-gap: 8px;
-  --ff-bubble-body-gap: 4px;
-  --ff-row-pad-y: 6px;
-  --ff-row-pad-x: 10px;
-  --ff-row-editor-gap: 6px;
-  --ff-tile-pad: 10px;
-  --ff-field-gap: 0.5em;
-  --ff-reg-pad: clamp(16px, 2.5vw, 22px);
+  --ff-text-scale: 0.92;
+  --ff-dash-leading: 1.4;
+  --ff-bubble-pad: clamp(10px, 1.1vw, 12px);
+  --ff-bubble-head-gap: 5px;
+  --ff-bubble-body-gap: 3px;
+  --ff-row-pad-y: 4px;
+  --ff-row-pad-x: 8px;
+  --ff-row-editor-gap: 5px;
+  --ff-tile-pad: 8px;
+  --ff-field-gap: 0.4em;
+  --ff-reg-pad: clamp(12px, 1.6vw, 16px);
+  --ff-avatar-sm: 22px;
+  --ff-avatar-md: 32px;
+  --ff-avatar-lg: 42px;
 }
 .ff-dash[data-density="comfortable"] {
-  --ff-bubble-pad: clamp(18px, 2.5vw, 26px);
-  --ff-bubble-head-gap: 14px;
-  --ff-bubble-body-gap: 10px;
-  --ff-row-pad-y: 12px;
-  --ff-row-pad-x: 14px;
-  --ff-row-editor-gap: 10px;
+  --ff-text-scale: 1.06;
+  --ff-dash-leading: 1.55;
+  --ff-bubble-pad: clamp(22px, 2.8vw, 28px);
+  --ff-bubble-head-gap: 17px;
+  --ff-bubble-body-gap: 12px;
+  --ff-row-pad-y: 13px;
+  --ff-row-pad-x: 16px;
+  --ff-row-editor-gap: 12px;
   --ff-tile-pad: 16px;
-  --ff-field-gap: 1em;
-  --ff-reg-pad: clamp(24px, 4vw, 36px);
+  --ff-field-gap: 0.95em;
+  --ff-reg-pad: clamp(26px, 3.6vw, 34px);
+  --ff-avatar-sm: 32px;
+  --ff-avatar-md: 44px;
+  --ff-avatar-lg: 60px;
 }
 .ff-dash .ff-btn {
   font-size: var(--ff-dash-text-md);
@@ -1290,18 +1316,18 @@ a.ff-dash__link:hover {
   border-radius: var(--ff-radius-md);
 }
 .ff-avatar--sm {
-  width: 28px;
-  height: 28px;
-  font-size: 0.6875rem;
+  width: var(--ff-avatar-sm);
+  height: var(--ff-avatar-sm);
+  font-size: var(--ff-dash-text-xs);
 }
 .ff-avatar--md {
-  width: 40px;
-  height: 40px;
+  width: var(--ff-avatar-md);
+  height: var(--ff-avatar-md);
   font-size: var(--ff-dash-text-sm);
 }
 .ff-avatar--lg {
-  width: 56px;
-  height: 56px;
+  width: var(--ff-avatar-lg);
+  height: var(--ff-avatar-lg);
   font-size: var(--ff-dash-text-md);
 }
 

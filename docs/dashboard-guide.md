@@ -43,16 +43,18 @@ The core ideas:
 - **Title Case headers.** Every heading — nav items, bubble titles —
   is authored in Title Case in the JSX ("My Bracket", "Danger Zone").
   Field labels and body copy stay sentence case ("New username").
-- **Fixed app-scale type.** The dashboard opts out of the marketing
-  site's fluid clamp scale. Use the tokens below; never hardcode a
-  font-size in dashboard CSS.
+- **App-scale type.** The dashboard opts out of the marketing site's fluid
+  clamp scale. Use the tokens below; never hardcode a font-size in dashboard
+  CSS.
 
 ## Type scale
 
 Defined on `.ff-dash` in `styles/theme.css`, so everything the shell
-renders (tabs, register flow, dialogs) inherits them:
+renders (tabs, register flow, dialogs) inherits them. Sizes below are at
+Cozy; the whole scale is multiplied by `--ff-text-scale`, which the density
+preset sets (see below):
 
-| Token               | Size          | Use for                              |
+| Token               | Size at Cozy  | Use for                              |
 | ------------------- | ------------- | ------------------------------------ |
 | `--ff-dash-text-xs` | 0.75rem / 12px | Locked notes, fine print            |
 | `--ff-dash-text-sm` | 0.8125rem / 13px | Row labels, hints, setup strip, meta |
@@ -60,8 +62,10 @@ renders (tabs, register flow, dialogs) inherits them:
 | `--ff-dash-text-lg` | 1.0625rem / 17px | Bubble titles                       |
 | `--ff-dash-text-xl` | 1.375rem / 22px | Register step titles, empty states  |
 
-Need a new size? Don't. Pick the nearest token; only extend the scale if
-a whole new tier of hierarchy appears, and document it here.
+The *ratios* are fixed — one multiplier moves the whole scale, so the tiers
+can never drift apart. Need a new size? Don't. Pick the nearest token; only
+extend the scale if a whole new tier of hierarchy appears, and document it
+here.
 
 ## Density (spacing) scale
 
@@ -69,24 +73,40 @@ Same idea, same place: spacing *inside* a bubble is a token on `.ff-dash`, so
 a member can pick how tightly the portal packs. **Never hardcode a padding or
 gap inside a bubble** — use one of these, exactly as with the type scale.
 
-| Token                    | Cozy (default)      | Controls                              |
-| ------------------------ | ------------------- | ------------------------------------- |
-| `--ff-bubble-pad`        | `clamp(16,2vw,20)`  | `.ff-bubble` padding                  |
-| `--ff-bubble-head-gap`   | 10px                | header → body                         |
-| `--ff-bubble-body-gap`   | 6px                 | row → row (and disclosure bodies)     |
-| `--ff-row-pad-y/-x`      | 8px / 12px          | `.ff-row`, `.ff-disclosure__summary`  |
-| `--ff-row-editor-gap`    | 8px                 | expanded editors, nested forms        |
-| `--ff-tile-pad`          | 12px                | `.ff-integration`, `.ff-actions__panel` |
-| `--ff-field-gap`         | 0.6em               | `.ff-auth__field` **inside the dash** |
-| `--ff-reg-pad`           | `clamp(20,3vw,28)`  | `.ff-reg` setup cards                 |
+| Token                    | Compact | Cozy (default)     | Comfortable        |
+| ------------------------ | ------- | ------------------ | ------------------ |
+| `--ff-text-scale`        | 0.92    | 1                  | 1.06               |
+| `--ff-dash-leading`      | 1.4     | 1.5                | 1.55               |
+| `--ff-bubble-pad`        | 10–12   | `clamp(16,2vw,20)` | `clamp(22,2.8vw,28)` |
+| `--ff-bubble-head-gap`   | 5px     | 12px               | 17px               |
+| `--ff-bubble-body-gap`   | 3px     | 8px                | 12px               |
+| `--ff-row-pad-y/-x`      | 4 / 8   | 9 / 13             | 13 / 16            |
+| `--ff-row-editor-gap`    | 5px     | 9px                | 12px               |
+| `--ff-tile-pad`          | 8px     | 13px               | 16px               |
+| `--ff-field-gap`         | 0.4em   | 0.65em             | 0.95em             |
+| `--ff-reg-pad`           | 12–16   | `clamp(20,3vw,26)` | `clamp(26,3.6vw,34)` |
+| `--ff-avatar-sm/md/lg`   | 22/32/42 | 28/40/56          | 32/44/60           |
+
+What each token controls: `--ff-bubble-pad` the card's own padding,
+`--ff-bubble-head-gap` header → body, `--ff-bubble-body-gap` row → row (and
+disclosure bodies), `--ff-row-pad-*` `.ff-row` and `.ff-disclosure__summary`,
+`--ff-tile-pad` `.ff-integration` and `.ff-actions__panel`, `--ff-field-gap`
+`.ff-auth__field` **inside the dash only**, `--ff-reg-pad` the setup cards.
+
+**Why the steps are this wide.** The first version moved every token by 2px
+per preset and left type alone. Measured, that was a 6% page-height difference
+between Compact and Cozy — the two were indistinguishable in use. Type is most
+of a row's height, and a fixed-size avatar sets a floor under it, so a preset
+has to move the card edges, the head→body gap, the type scale, the leading
+*and* the avatars together. It now measures ~734 / 950 / 1122px for the same
+Account page. If you retune, re-measure rather than eyeballing the CSS.
 
 The gap *between* bubbles (`.ff-bubble-grid { gap: 20px }`) is deliberately
 **not** a density token — that rhythm is fixed.
 
 Three presets, selected by `data-density` on the `.ff-dash` element:
 `compact`, `cozy` (the `.ff-dash` base — no override block, so an absent or
-unknown value lands here), and `comfortable` (the spacing the dashboard
-shipped with before the tokens existed).
+unknown value lands here), and `comfortable`.
 
 `.ff-auth__field` is shared with the public login/signup pages, so only the
 `.ff-dash`-scoped override follows the density — never touch the base rule.

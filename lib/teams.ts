@@ -190,6 +190,31 @@ export async function isVerifiedMember(userId: string): Promise<boolean> {
   return reg?.status === "VERIFIED";
 }
 
+/**
+ * A human region label for a college — "California, United States", or just
+ * the country when the directory has no state for it. Used to prefill a new
+ * team's region: the school is the one location fact we've already verified,
+ * so nobody has to be asked for it again.
+ */
+export async function getCollegeRegion(
+  collegeId: string | null | undefined,
+): Promise<string | null> {
+  if (!collegeId) return null;
+  const rows = await getDb()
+    .select({
+      country: colleges.country,
+      stateProvince: colleges.stateProvince,
+    })
+    .from(colleges)
+    .where(eq(colleges.id, collegeId))
+    .limit(1);
+  const college = rows[0];
+  if (!college?.country) return college?.stateProvince ?? null;
+  return college.stateProvince
+    ? `${college.stateProvince}, ${college.country}`
+    : college.country;
+}
+
 // ---------------------------------------------------------------------------
 // The one-team-per-tournament rule
 //

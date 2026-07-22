@@ -4,7 +4,6 @@ import { notFound, redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
-import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { DangerZonePanel } from "@/components/dashboard/teams/DangerZonePanel";
 import { InvitePanel } from "@/components/dashboard/teams/InvitePanel";
 import { RosterPanel } from "@/components/dashboard/teams/RosterPanel";
@@ -12,6 +11,7 @@ import { ScoreReporter } from "@/components/dashboard/teams/ScoreReporter";
 import { TeamSettingsRows } from "@/components/dashboard/teams/TeamSettingsRows";
 import { TournamentPanel } from "@/components/dashboard/teams/TournamentPanel";
 import { getAuth } from "@/lib/auth";
+import { listSchoolCountries } from "@/lib/registration";
 import {
   getTeamDetail,
   getTeamMembership,
@@ -28,10 +28,11 @@ export const metadata: Metadata = {
 };
 
 /**
- * One team's management page. Every bubble below the header is gated on a
- * capability from lib/teams-shared.ts — a coach sees the roster and the
- * schedule, a captain also sees settings and scores, a manager also sees the
- * danger zone.
+ * One team, as a single column in priority order: who's on it, how to invite
+ * more, then reporting a result. The header carries the team's identity and
+ * settings; every control below the surface is gated on a capability from
+ * lib/teams-shared.ts, so a coach sees the roster and schedule, a captain also
+ * sees settings and scores, a manager also sees the danger zone.
  */
 export default async function TeamPage({
   params,
@@ -57,34 +58,29 @@ export default async function TeamPage({
   if (!team) notFound();
 
   const role = membership.role;
-  const matches = can(role, "reportScores")
-    ? await listReportableMatches(teamId)
-    : [];
+  const editsSettings = can(role, "editSettings");
+  const [matches, countries] = await Promise.all([
+    can(role, "reportScores") ? listReportableMatches(teamId) : [],
+    // Only the region picker needs the directory — don't pay for it otherwise.
+    editsSettings ? listSchoolCountries() : [],
+  ]);
   const managerCount = team.roster.filter((m) => m.role === "manager").length;
 
   return (
     <DashboardShell active="teams" setupUserId={session.user.id}>
       <h1 className="screen-reader-text">{team.name}</h1>
-      <div className="ff-bubble-grid">
+      <div className="ff-bubble-grid ff-bubble-grid--single">
         <Bubble
           title={team.tag ? `${team.name} [${team.tag}]` : team.name}
-          span="full"
           actions={
             <span className={`ff-badge ff-badge--${role}`}>
               {TEAM_ROLE_LABELS[role]}
             </span>
           }
         >
-          <BubbleRow
-            label="School"
-            value={team.collegeName ?? "Unaffiliated"}
-            note={team.description ?? undefined}
-          />
-          <BubbleRow
-            label="Region"
-            value={[team.region, team.timezone].filter(Boolean).join(" · ") || "—"}
-          />
-          <div className="ff-row__buttons">
+          {/* Navigation first: trailing it after the settings list buries it
+              under the invite block. */}
+          <div className="ff-row__buttons ff-bubble__nav">
             <a className="ff-btn ff-btn--outline ff-btn--sm" href="/teams/">
               All Teams
             </a>
@@ -99,6 +95,27 @@ export default async function TeamPage({
               </a>
             ) : null}
           </div>
+          <TeamSettingsRows
+            teamId={team.id}
+            name={team.name}
+            tag={team.tag}
+            description={team.description}
+            collegeName={team.collegeName}
+            region={team.region}
+            timezone={team.timezone}
+            discordInviteUrl={team.discordInviteUrl}
+            countries={countries}
+            editable={editsSettings}
+          />
+          {can(role, "manageInvites") ? (
+            <InvitePanel
+              teamId={team.id}
+              linkToken={team.inviteLinkToken}
+              invites={team.invites}
+              viewerRole={role}
+              defaultOpen={invited === "1"}
+            />
+          ) : null}
         </Bubble>
 
         <Bubble
@@ -113,15 +130,9 @@ export default async function TeamPage({
           />
         </Bubble>
 
-        {can(role, "manageInvites") ? (
-          <Bubble title="Invite Players">
-            <InvitePanel
-              teamId={team.id}
-              linkToken={team.inviteLinkToken}
-              invites={team.invites}
-              viewerRole={role}
-              defaultOpen={invited === "1"}
-            />
+        {can(role, "reportScores") ? (
+          <Bubble title="Report a Score">
+            <ScoreReporter teamId={team.id} matches={matches} />
           </Bubble>
         ) : null}
 
@@ -134,28 +145,7 @@ export default async function TeamPage({
           />
         </Bubble>
 
-        {can(role, "reportScores") ? (
-          // Full width: the per-game score grid needs the room.
-          <Bubble title="Report a Score" span="full">
-            <ScoreReporter teamId={team.id} matches={matches} />
-          </Bubble>
-        ) : null}
-
-        {can(role, "editSettings") ? (
-          <Bubble title="Team Settings" span="full">
-            <TeamSettingsRows
-              teamId={team.id}
-              name={team.name}
-              tag={team.tag}
-              description={team.description}
-              region={team.region}
-              timezone={team.timezone}
-              discordInviteUrl={team.discordInviteUrl}
-            />
-          </Bubble>
-        ) : null}
-
-        <Bubble title="Danger Zone" variant="danger" span="full">
+        <Bubble title="Danger Zone" variant="danger">
           <DangerZonePanel
             teamId={team.id}
             teamName={team.name}

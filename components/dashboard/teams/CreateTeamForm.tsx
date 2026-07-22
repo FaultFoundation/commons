@@ -4,12 +4,16 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 
 import { createTeam } from "@/app/teams/actions";
+import { browserTimezone } from "@/components/dashboard/teams/TimezoneRow";
 import { TEAM_NAME_MAX, TEAM_TAG_MAX } from "@/lib/teams-shared";
 
 /**
  * Create a team in one submit. Lands on the new team's page with the invite
  * link already expanded (`?invited=1`) — that's the second of the two clicks
  * the Teams tab promises: create, then copy the link.
+ *
+ * Region and timezone are never asked for: the server takes the region from
+ * the creator's verified school, and the browser's own zone rides along here.
  *
  * Used on both the Teams tab and setup step 3.
  */
@@ -25,7 +29,7 @@ export function CreateTeamForm({ compact }: { compact?: boolean }) {
     if (pending) return;
     setError(null);
     startTransition(async () => {
-      const result = await createTeam({ name, tag });
+      const result = await createTeam({ name, tag, timezone: browserTimezone() });
       if (!result.ok) {
         setError(result.error);
         return;

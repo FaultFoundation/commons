@@ -237,8 +237,26 @@ Rules that live in code rather than the table:
 
 Invites are `team_invites` rows: one reusable `kind = 'link'` per team (the
 newest un-revoked one wins; rotating revokes and re-inserts) plus single-use
-`kind = 'targeted'` invites that carry a role. `/join/<token>/` is the landing
-page; signed-out visitors go through `/login/?next=…` and come back.
+`kind = 'targeted'` invites that carry a role. Links render **masked** with a
+reveal toggle — a screenshot or a stream must not hand out a join link — while
+the copy button always writes the real URL.
+
+`/join/<token>/` shows the team first and asks questions second: signed-out
+visitors get a splash (team, school, the role they'd join as, who invited
+them) with a **Sign in or register to join** button carrying `?next=` back to
+the invite. That page is the one portal route that must render **without**
+`DashboardShell` when there's no session — the shell's nav and Sign out button
+mean nothing to a signed-out visitor — so it falls back to the auth pages'
+container inside a plain `ff-dash` wrapper (`.ff-join`).
+
+Team layout: `/teams/` is an action row (`TeamsActions`) over the member's team
+cards; `/teams/<id>/` is a **single-column** `ff-bubble-grid--single` in
+priority order — header (identity + settings + the Invite Players disclosure),
+Roster, Report a Score, Tournaments, Danger Zone. There is no separate Team
+Settings bubble; `TeamSettingsRows` is the header's row set, and a team's
+region/timezone are prefilled at creation from the creator's verified college
+(`getCollegeRegion`) and their browser zone, then edited through dropdowns
+(`RegionRow` uses the same `schools` country list the registration form does).
 
 ## Score reporting
 

@@ -7,10 +7,8 @@ import {
   type AcademicInitialState,
 } from "@/components/dashboard/setup/AcademicStep";
 import { SetupShell } from "@/components/dashboard/setup/SetupShell";
-import { schools } from "@/db/schema";
 import { getAuth } from "@/lib/auth";
-import { getDb } from "@/lib/db";
-import { getRegistrationState } from "@/lib/registration";
+import { getRegistrationState, listSchoolCountries } from "@/lib/registration";
 
 // Session-gated: always rendered per request.
 export const dynamic = "force-dynamic";
@@ -69,10 +67,7 @@ export default async function AcademicSetupPage() {
     );
   }
 
-  const countryRows = await getDb()
-    .selectDistinct({ country: schools.country })
-    .from(schools)
-    .orderBy(schools.country);
+  const countries = await listSchoolCountries();
 
   const initial: AcademicInitialState = {
     status,
@@ -83,7 +78,7 @@ export default async function AcademicSetupPage() {
     schoolWebsite: reg?.schoolWebsite ?? null,
     schoolEmail: reg?.schoolEmail ?? null,
     graduationDate: reg?.graduationDate ?? null,
-    countries: countryRows.map((r) => r.country),
+    countries,
   };
 
   return (

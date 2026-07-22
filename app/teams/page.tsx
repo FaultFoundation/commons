@@ -6,7 +6,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { CopyInviteButton } from "@/components/dashboard/teams/CopyInviteButton";
-import { CreateTeamForm } from "@/components/dashboard/teams/CreateTeamForm";
+import { TeamsActions } from "@/components/dashboard/teams/TeamsActions";
 import { getAuth } from "@/lib/auth";
 import { isVerifiedMember, listMyTeams } from "@/lib/teams";
 import { TEAM_ROLE_LABELS } from "@/lib/teams-shared";
@@ -33,6 +33,11 @@ export default async function TeamsPage() {
   return (
     <DashboardShell active="teams" setupUserId={session.user.id}>
       <h1 className="screen-reader-text">Teams</h1>
+
+      {/* Starting, finding and recruiting are actions, not cards — the tab
+          itself is the member's teams. */}
+      <TeamsActions verified={verified} />
+
       <div className="ff-bubble-grid">
         {myTeams.map((team) => (
           <Bubble
@@ -67,37 +72,15 @@ export default async function TeamsPage() {
           </Bubble>
         ))}
 
-        <Bubble title={myTeams.length ? "Start Another Team" : "Create a Team"}>
-          {verified ? (
-            <CreateTeamForm />
-          ) : (
-            <BubbleRow
-              label="Membership"
-              value="Not verified yet"
-              note="Teams are for verified members — it only takes a minute."
-              action={
-                <a className="ff-btn ff-btn--sm" href="/account/setup/">
-                  Verify
-                </a>
-              }
-            />
-          )}
-        </Bubble>
-
-        {/* LFG/LFM: the database (lfg_profiles, team_listings,
-            lfg_connections) ships with this pass; these two surfaces are the
-            next one. */}
-        <Bubble title="Find a Team" variant="wip">
-          <div className="ff-bubble__wip">
-            Set your rank and availability to get matched with teams recruiting
-            — coming soon.
-          </div>
-        </Bubble>
-        <Bubble title="Looking for Players" variant="wip">
-          <div className="ff-bubble__wip">
-            Post the roles and skill range your team needs — coming soon.
-          </div>
-        </Bubble>
+        {myTeams.length === 0 ? (
+          <Bubble title="No Teams Yet" span="full">
+            <p className="ff-auth__hint">
+              Start a team above and invite your players with a link — or open
+              the invite link a captain sent you and you&rsquo;ll land on their
+              roster.
+            </p>
+          </Bubble>
+        ) : null}
       </div>
     </DashboardShell>
   );

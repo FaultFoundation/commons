@@ -1365,6 +1365,34 @@ a.ff-dash__link:hover {
   color: #fff;
 }
 
+/* Tab-level action row (Teams: start / find / recruit). Buttons first, and
+   at most one panel expanded beneath them. */
+.ff-actions {
+  margin: 0 0 20px;
+}
+.ff-actions__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.ff-actions__panel {
+  margin-top: 12px;
+  padding: 16px 18px;
+}
+
+/* Buttons that lead somewhere else, above a bubble's own content. */
+.ff-bubble__nav {
+  margin-bottom: 4px;
+}
+
+/* Standalone splash (an invite opened while signed out) — no sidebar, so the
+   .ff-dash grid has to collapse to one column. */
+.ff-join {
+  display: block;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
 /* Roster row controls: the role select sits next to Remove and must not
    stretch the row. */
 .ff-roster__controls {
@@ -1379,14 +1407,49 @@ a.ff-dash__link:hover {
   font-size: var(--ff-dash-text-sm);
 }
 
-/* Invite links: long, unbreakable-looking URLs that still have to wrap. */
+/* Invite links: long, unbreakable-looking URLs that still have to wrap.
+   Masked by default (a stream or a screenshot shouldn't hand out a join
+   link) with the eye toggle beside them. */
 .ff-copy__url {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: var(--ff-dash-text-sm);
   overflow-wrap: anywhere;
 }
+.ff-copy__mask {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ff-copy__reveal {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 4px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: none;
+  color: var(--ff-text-dim);
+  cursor: pointer;
+  transition: color var(--ff-transition), border-color var(--ff-transition);
+}
+.ff-copy__reveal svg {
+  width: 14px;
+  height: 14px;
+}
+.ff-copy__reveal:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
 .ff-copy__input {
   margin-top: 8px;
+}
+
+/* The role-invite form, under the links inside the Invite Players
+   disclosure. */
+.ff-invite__form {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--ff-border);
 }
 
 /* Score reporter: one row per game in the series. The grid is shared by the

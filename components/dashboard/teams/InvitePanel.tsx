@@ -32,10 +32,57 @@ export type InviteEntry = {
   expiresAt: number | null;
 };
 
+/** Enough of the token to tell two links apart, not enough to retype from a
+    screenshot or a stream. The clipboard always gets the real URL. */
+function maskedUrl(token: string): string {
+  const url = inviteUrl(token);
+  const visible = token.slice(0, 4);
+  return url.replace(token, `${visible}${"•".repeat(Math.max(token.length - 4, 0))}`);
+}
+
+/** Link display with a reveal toggle — masked by default, readable when
+    someone actually has to dictate it. */
+function InviteLink({ token }: { token: string }) {
+  const [revealed, setRevealed] = useState(false);
+  return (
+    <span className="ff-copy__mask">
+      <code className="ff-copy__url">
+        {revealed ? inviteUrl(token) : maskedUrl(token)}
+      </code>
+      <button
+        className="ff-copy__reveal"
+        type="button"
+        aria-pressed={revealed}
+        title={revealed ? "Hide the link" : "Show the link"}
+        onClick={() => setRevealed((current) => !current)}
+      >
+        <span className="screen-reader-text">
+          {revealed ? "Hide the invite link" : "Show the invite link"}
+        </span>
+        <EyeIcon off={revealed} />
+      </button>
+    </span>
+  );
+}
+
+function EyeIcon({ off }: { off: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+      <path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z" />
+      <circle cx="8" cy="8" r="2" />
+      {off ? <path d="M2.5 2.5l11 11" /> : null}
+    </svg>
+  );
+}
+
 /**
- * The team's shareable link plus any targeted invites. The link is the
- * headline: it exists from the moment the team is created, so inviting people
- * is one click from the Teams tab.
+ * Everything to do with getting people onto the roster, in one disclosure:
+ * the team's shareable link (masked, copyable, resettable) and single-use
+ * invites that land someone directly as a captain, coach, or manager.
+ *
+ * Lives inside the team header bubble, and opens itself right after the team
+ * is created (`?invited=1`) so "create a team" and "invite your players" stay
+ * two clicks apart.
  */
 export function InvitePanel({
   teamId,
@@ -48,7 +95,6 @@ export function InvitePanel({
   linkToken: string | null;
   invites: InviteEntry[];
   viewerRole: TeamRole;
-  /** Expanded straight after team creation (`/teams/<id>/?invited=1`). */
   defaultOpen?: boolean;
 }) {
   const router = useRouter();
@@ -74,7 +120,11 @@ export function InvitePanel({
   }
 
   return (
-    <>
+    <Disclosure
+      label="Invite Players"
+      note="Share the team link, or invite someone as staff."
+      defaultOpen={defaultOpen}
+    >
       {error ? (
         <div className="ff-auth__error" role="alert">
           <p>{error}</p>
@@ -83,13 +133,7 @@ export function InvitePanel({
 
       <BubbleRow
         label="Invite link"
-        value={
-          linkToken ? (
-            <code className="ff-copy__url">{inviteUrl(linkToken)}</code>
-          ) : (
-            "No active link"
-          )
-        }
+        value={linkToken ? <InviteLink token={linkToken} /> : "No active link"}
         note={
           linkToken
             ? "Anyone with this link joins as a player."
@@ -110,20 +154,44 @@ export function InvitePanel({
         }
       />
 
-      <Disclosure
-        label="Invite Someone as Staff"
-        note="A single-use link that lands them as a captain, coach, or manager."
-      >
-        {minted ? (
-          <BubbleRow
-            label="New invite"
-            value={<code className="ff-copy__url">{inviteUrl(minted)}</code>}
-            note="Single use, expires in 7 days."
-            action={<CopyInviteButton token={minted} label="Copy" small />}
-          />
-        ) : null}
+      {targeted.map((invite) => (
+        <BubbleRow
+          key={invite.id}
+          label={invite.note ?? TEAM_ROLE_LABELS[invite.role]}
+          value={<InviteLink token={invite.token} />}
+          note={`${TEAM_ROLE_LABELS[invite.role]} · single use · ${
+            invite.expiresAt
+              ? `expires ${new Date(invite.expiresAt).toLocaleDateString()}`
+              : "no expiry"
+          }`}
+          action={
+            <div className="ff-row__buttons">
+              <CopyInviteButton token={invite.token} label="Copy" small />
+              <button
+                className="ff-btn ff-btn--outline ff-btn--sm"
+                type="button"
+                disabled={pending}
+                onClick={() => run(() => revokeInvite(teamId, invite.id))}
+              >
+                Revoke
+              </button>
+            </div>
+          }
+        />
+      ))}
+
+      {minted ? (
+        <BubbleRow
+          label="New invite"
+          value={<InviteLink token={minted} />}
+          note="Single use, expires in 7 days."
+          action={<CopyInviteButton token={minted} label="Copy" small />}
+        />
+      ) : null}
+
+      <div className="ff-invite__form">
         <label className="ff-auth__field">
-          <span className="ff-auth__label">Role</span>
+          <span className="ff-auth__label">Invite as</span>
           <select
             className="ff-auth__input"
             value={role}
@@ -167,40 +235,7 @@ export function InvitePanel({
             {pending ? "Creating…" : "Create Invite"}
           </button>
         </div>
-      </Disclosure>
-
-      {targeted.map((invite) => (
-        <BubbleRow
-          key={invite.id}
-          label={invite.note ?? TEAM_ROLE_LABELS[invite.role]}
-          value={<code className="ff-copy__url">{inviteUrl(invite.token)}</code>}
-          note={`${TEAM_ROLE_LABELS[invite.role]} · ${
-            invite.expiresAt
-              ? `expires ${new Date(invite.expiresAt).toLocaleDateString()}`
-              : "no expiry"
-          }`}
-          action={
-            <div className="ff-row__buttons">
-              <CopyInviteButton token={invite.token} label="Copy" small />
-              <button
-                className="ff-btn ff-btn--outline ff-btn--sm"
-                type="button"
-                disabled={pending}
-                onClick={() => run(() => revokeInvite(teamId, invite.id))}
-              >
-                Revoke
-              </button>
-            </div>
-          }
-        />
-      ))}
-
-      {defaultOpen && linkToken ? (
-        <p className="ff-auth__hint">
-          Your team is live. Send that link to your players — they join
-          themselves, no approval needed.
-        </p>
-      ) : null}
-    </>
+      </div>
+    </Disclosure>
   );
 }

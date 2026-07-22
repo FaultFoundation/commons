@@ -8,15 +8,19 @@ import type { ReactNode } from "react";
 export function Disclosure({
   label,
   note,
+  defaultOpen,
   children,
 }: {
   label: string;
   /** Fine print on the closed row. */
   note?: string;
+  /** Rendered already expanded — for the one path that lands here to use it
+      (e.g. inviting players straight after creating a team). */
+  defaultOpen?: boolean;
   children: ReactNode;
 }) {
   return (
-    <details className="ff-row ff-disclosure">
+    <details className="ff-row ff-disclosure" open={defaultOpen}>
       <summary className="ff-disclosure__summary">
         <span className="ff-row__main">
           <span className="ff-row__value">{label}</span>

@@ -23,6 +23,7 @@ import {
   INVITE_PROBLEM_MESSAGES,
   entryConflicts,
   generateInviteToken,
+  getCollegeRegion,
   getInviteByToken,
   getManagerUserIds,
   getTeamMembership,
@@ -131,6 +132,9 @@ function cleanTimezone(input: string): string | null | undefined {
 export async function createTeam(input: {
   name: string;
   tag?: string;
+  /** The browser's own IANA zone — the only reliable read on where the
+      creator actually plays. Validated here like any other input. */
+  timezone?: string;
 }): Promise<ActionResult<{ teamId: string; token: string }>> {
   const userId = await requireUserId();
   if (!userId) return { ok: false, error: "You need to be signed in." };
@@ -151,8 +155,11 @@ export async function createTeam(input: {
   const now = new Date();
   const teamId = crypto.randomUUID();
   const token = generateInviteToken();
-  // The creator's verified school affiliates the team; nothing to ask for.
+  // The creator's verified school affiliates the team and names its region;
+  // the browser supplies the timezone. Both are prefills, editable after.
   const reg = await getRegistrationState(userId);
+  const region = await getCollegeRegion(reg?.collegeId);
+  const timezone = cleanTimezone(input.timezone ?? "");
 
   await db.batch([
     db.insert(teams).values({
@@ -162,6 +169,10 @@ export async function createTeam(input: {
       collegeId: reg?.collegeId ?? null,
       name,
       tag: cleanTag(input.tag ?? ""),
+      region,
+      // `undefined` means the browser sent something unusable — store nothing
+      // rather than failing the creation over a cosmetic field.
+      timezone: timezone ?? null,
       createdByUserId: userId,
       createdAt: now,
       updatedAt: now,

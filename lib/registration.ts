@@ -7,6 +7,7 @@ import {
   colleges,
   programMemberships,
   collegiateRegistrations,
+  schools,
   teamMembers,
   teams,
 } from "@/db/schema";
@@ -148,6 +149,19 @@ export function schoolEmailMatches(email: string, candidates: string[]): boolean
 // ---------------------------------------------------------------------------
 // Read helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Countries the school directory actually covers, for the country selects
+ * that gate a school search (registration) or label a team's region. Read
+ * from D1 rather than a hardcoded list so it can never drift from the seed.
+ */
+export async function listSchoolCountries(): Promise<string[]> {
+  const rows = await getDb()
+    .selectDistinct({ country: schools.country })
+    .from(schools)
+    .orderBy(schools.country);
+  return rows.map((r) => r.country);
+}
 
 /** Slim cross-program person row (country / age range / dm pref), or null. */
 export async function getProfile(userId: string) {

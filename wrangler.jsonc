@@ -2,49 +2,66 @@
 // (@opennextjs/cloudflare). `opennextjs-cloudflare build` emits the worker
 // entry + prerendered assets into .open-next/.
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  // Must stay "commons": the "website" Worker is the separate marketing-site
-  // repo (fault.foundation). Deploying this repo under that name would
-  // overwrite the static site.
-  "name": "commons",
-  "main": ".open-next/worker.js",
-  "compatibility_date": "2026-07-15",
-  "compatibility_flags": ["nodejs_compat"],
-  "assets": {
-    "directory": ".open-next/assets",
-    "binding": "ASSETS"
-  },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "website-sql",
-      "database_id": "5268b495-2952-4570-bd37-295e9d452753",
-      "migrations_dir": "drizzle"
-    }
-  ],
-  // Non-secret runtime config. Secrets (BETTER_AUTH_SECRET, DISCORD_CLIENT_*,
-  // BATTLENET_CLIENT_*, SUPPORT_EMAIL_APP_PASSWORD) are set with
-  // `wrangler secret put` in production and .dev.vars locally.
-  "vars": {
-    // The origin the Commons is actually served from. Flip to
-    // https://commons.fault.foundation once that DNS record is live —
-    // lib/auth.ts already trusts both, so no code change is needed.
-    "BETTER_AUTH_URL": "https://commons.oscarlabit9729.workers.dev",
-    // The mailbox verification codes are sent from — also the SMTP account
-    // we authenticate as (its app password is the SUPPORT_EMAIL_APP_PASSWORD
-    // secret). Sender and account match, so Gmail leaves the From header be.
-    "SUPPORT_EMAIL": "support@fault.foundation",
-    "EMAIL_FROM": "The Fault Foundation <support@fault.foundation>",
-    // The Fault Foundation Discord server. Public identifier, not a secret —
-    // gates the "are they actually in the server?" lookup on the account page.
-    // Fill in with the server's snowflake (Discord → right-click server →
-    // Copy Server ID, with Developer Mode on); left empty the check is skipped.
-    "DISCORD_GUILD_ID": "1431492264668037153"
-  },
-  "dev": {
-    "port": 3999
-  },
-  "observability": {
-    "enabled": true
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	// Must stay "commons": the "website" Worker is the separate marketing-site
+	// repo (fault.foundation). Deploying this repo under that name would
+	// overwrite the static site.
+	"name": "commons",
+	"main": ".open-next/worker.js",
+	"compatibility_date": "2026-07-15",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "website-sql",
+			"database_id": "5268b495-2952-4570-bd37-295e9d452753",
+			"migrations_dir": "drizzle"
+		}
+	],
+	// Profile pictures and team logos. Objects are content-addressed and served
+	// through /api/avatars/*, so the bucket stays private — no public access or
+	// custom domain to configure. Wrangler simulates it locally under
+	// .wrangler/state, but the real bucket must exist before `npm run deploy`:
+	//   npx wrangler r2 bucket create commons-avatars
+	"r2_buckets": [
+		{
+			"binding": "AVATARS",
+			"bucket_name": "commons-avatars"
+		},
+		{
+			"bucket_name": "commons-avatars",
+			"binding": "commons_avatars"
+		}
+	],
+	// Non-secret runtime config. Secrets (BETTER_AUTH_SECRET, DISCORD_CLIENT_*,
+	// BATTLENET_CLIENT_*, SUPPORT_EMAIL_APP_PASSWORD) are set with
+	// `wrangler secret put` in production and .dev.vars locally.
+	"vars": {
+		// The origin the Commons is actually served from. Flip to
+		// https://commons.fault.foundation once that DNS record is live —
+		// lib/auth.ts already trusts both, so no code change is needed.
+		"BETTER_AUTH_URL": "https://commons.oscarlabit9729.workers.dev",
+		// The mailbox verification codes are sent from — also the SMTP account
+		// we authenticate as (its app password is the SUPPORT_EMAIL_APP_PASSWORD
+		// secret). Sender and account match, so Gmail leaves the From header be.
+		"SUPPORT_EMAIL": "support@fault.foundation",
+		"EMAIL_FROM": "The Fault Foundation <support@fault.foundation>",
+		// The Fault Foundation Discord server. Public identifier, not a secret —
+		// gates the "are they actually in the server?" lookup on the account page.
+		// Fill in with the server's snowflake (Discord → right-click server →
+		// Copy Server ID, with Developer Mode on); left empty the check is skipped.
+		"DISCORD_GUILD_ID": "1431492264668037153"
+	},
+	"dev": {
+		"port": 3999
+	},
+	"observability": {
+		"enabled": true
+	}
 }

@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 
-import { updateTeamSettings } from "@/app/teams/actions";
+import { removeTeamLogo, setTeamLogo, updateTeamSettings } from "@/app/teams/actions";
+import { AvatarUploadRow } from "@/components/dashboard/accounts/AvatarUploadRow";
 import { InlineEditRow } from "@/components/dashboard/accounts/InlineEditRow";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { RegionRow } from "@/components/dashboard/teams/RegionRow";
@@ -29,6 +30,7 @@ export function TeamSettingsRows({
   region,
   timezone,
   discordInviteUrl,
+  logoUrl,
   countries,
   editable,
 }: {
@@ -40,6 +42,7 @@ export function TeamSettingsRows({
   region: string | null;
   timezone: string | null;
   discordInviteUrl: string | null;
+  logoUrl: string | null;
   /** Directory countries for the region picker; empty for read-only viewers. */
   countries: string[];
   editable: boolean;
@@ -59,6 +62,31 @@ export function TeamSettingsRows({
 
   return (
     <>
+      {/* Read-only viewers see the logo on the bubble's header instead — a row
+          whose only purpose is an upload button is noise without the button. */}
+      {editable ? (
+        <AvatarUploadRow
+          label="Team logo"
+          name={name}
+          currentUrl={logoUrl}
+          shape="team"
+          onSave={async (file) => {
+            const body = new FormData();
+            body.set("file", file);
+            const result = await setTeamLogo(teamId, body);
+            if (!result.ok) return result.error;
+            router.refresh();
+            return null;
+          }}
+          onRemove={async () => {
+            const result = await removeTeamLogo(teamId);
+            if (!result.ok) return result.error;
+            router.refresh();
+            return null;
+          }}
+        />
+      ) : null}
+
       {editable ? (
         <>
           <InlineEditRow

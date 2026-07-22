@@ -325,6 +325,7 @@ export type MyTeam = {
   id: string;
   name: string;
   tag: string | null;
+  logoUrl: string | null;
   collegeName: string | null;
   role: TeamRole;
   memberCount: number;
@@ -349,6 +350,7 @@ export async function listMyTeams(userId: string): Promise<MyTeam[]> {
       id: teams.id,
       name: teams.name,
       tag: teams.tag,
+      logoUrl: teams.logoUrl,
       collegeName: colleges.name,
       role: teamMembers.role,
     })
@@ -419,6 +421,7 @@ export async function listMyTeams(userId: string): Promise<MyTeam[]> {
       id: team.id,
       name: team.name,
       tag: team.tag,
+      logoUrl: team.logoUrl,
       collegeName: team.collegeName,
       role,
       memberCount: counts.find((c) => c.teamId === team.id)?.count ?? 0,
@@ -437,6 +440,8 @@ export type RosterMember = {
   membershipId: string;
   userId: string;
   name: string;
+  /** Profile picture, or null for the initials placeholder. */
+  image: string | null;
   role: TeamRole;
   position: string | null;
   discordHandle: string | null;
@@ -484,6 +489,7 @@ export type TeamDetail = {
   region: string | null;
   timezone: string | null;
   discordInviteUrl: string | null;
+  logoUrl: string | null;
   collegeName: string | null;
   programId: string;
   gameId: string | null;
@@ -510,6 +516,7 @@ export async function getTeamDetail(teamId: string): Promise<TeamDetail | null> 
       region: teams.region,
       timezone: teams.timezone,
       discordInviteUrl: teams.discordInviteUrl,
+      logoUrl: teams.logoUrl,
       programId: teams.programId,
       gameId: teams.gameId,
       collegeName: colleges.name,
@@ -528,6 +535,7 @@ export async function getTeamDetail(teamId: string): Promise<TeamDetail | null> 
           membershipId: teamMembers.id,
           userId: teamMembers.userId,
           name: user.name,
+          image: user.image,
           role: teamMembers.role,
           position: teamMembers.position,
           joinedAt: teamMembers.joinedAt,
@@ -609,6 +617,7 @@ export async function getTeamDetail(teamId: string): Promise<TeamDetail | null> 
       membershipId: r.membershipId,
       userId: r.userId,
       name: r.name,
+      image: r.image,
       role: asTeamRole(r.role),
       position: r.position,
       discordHandle: r.discordHandle,

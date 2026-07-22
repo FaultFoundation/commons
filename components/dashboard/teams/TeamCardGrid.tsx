@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type DragEvent } from "react";
 
 import { reorderMyTeams } from "@/app/teams/actions";
+import { Avatar } from "@/components/dashboard/Avatar";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { CopyInviteButton } from "@/components/dashboard/teams/CopyInviteButton";
@@ -93,6 +94,14 @@ export function TeamCardGrid({ teams: initial }: { teams: MyTeam[] }) {
               span={index === 0 ? "full" : undefined}
               className={classes.join(" ")}
               title={team.tag ? `${team.name} [${team.tag}]` : team.name}
+              media={
+                <Avatar
+                  src={team.logoUrl}
+                  name={team.name}
+                  shape="team"
+                  size="md"
+                />
+              }
               draggable
               onDragStart={() => setDragging(team.id)}
               onDragEnd={() => {

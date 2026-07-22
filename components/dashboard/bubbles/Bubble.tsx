@@ -12,6 +12,7 @@ export function Bubble({
   variant = "default",
   span,
   className,
+  media,
   actions,
   children,
   ...rest
@@ -28,6 +29,9 @@ export function Bubble({
   /** Extra classes on the card itself, for per-page state (drag, drop target).
       Never for spacing — that comes from the density tokens. */
   className?: string;
+  /** Leading visual beside the title — a team logo or avatar. Identity, not
+      decoration: it belongs next to the name, not out in the action slot. */
+  media?: ReactNode;
   /** Right side of the header: a badge, count, or small button. */
   actions?: ReactNode;
   children?: ReactNode;
@@ -41,7 +45,10 @@ export function Bubble({
   return (
     <section id={id} className={classes.join(" ")} {...rest}>
       <header className="ff-bubble__head">
-        <h2 className="ff-bubble__title">{title}</h2>
+        <div className="ff-bubble__heading">
+          {media}
+          <h2 className="ff-bubble__title">{title}</h2>
+        </div>
         {actions ? <div className="ff-bubble__actions">{actions}</div> : null}
       </header>
       <div className="ff-bubble__body">{children}</div>

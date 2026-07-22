@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { getAuth } from "@/lib/auth";
+import { deleteAvatarByUrl, putAvatar } from "@/lib/avatars";
 import { getDb } from "@/lib/db";
 import {
   teamDeleteRequests,
@@ -259,6 +260,76 @@ export async function updateTeamSettings(
     .update(teams)
     .set({ ...fields, updatedAt: new Date() })
     .where(eq(teams.id, teamId));
+
+  revalidateTeams(teamId);
+  return { ok: true };
+}
+
+/**
+ * Team logo upload. Same capability gate as every other team setting, so a
+ * coach or player can see the logo but never change it.
+ */
+export async function setTeamLogo(
+  teamId: string,
+  form: FormData,
+): Promise<ActionResult> {
+  const userId = await requireUserId();
+  if (!userId) return { ok: false, error: "You need to be signed in." };
+
+  const check = await requireTeamCapability(userId, teamId, "editSettings");
+  if (!check.ok) return check;
+
+  const file = form.get("file");
+  if (!(file instanceof File)) {
+    return { ok: false, error: "Choose an image to upload." };
+  }
+
+  const db = getDb();
+  const [current] = await db
+    .select({ logoUrl: teams.logoUrl })
+    .from(teams)
+    .where(eq(teams.id, teamId))
+    .limit(1);
+
+  const stored = await putAvatar("team", teamId, await file.arrayBuffer());
+  if (!stored.ok) return stored;
+
+  await db
+    .update(teams)
+    .set({ logoUrl: stored.url, updatedAt: new Date() })
+    .where(eq(teams.id, teamId));
+
+  // Keys are content-addressed, so re-uploading an identical crop lands on the
+  // key we just wrote. Deleting "the old one" would then delete the live object
+  // and leave the row pointing at a 404.
+  if (current?.logoUrl && current.logoUrl !== stored.url) {
+    await deleteAvatarByUrl(current.logoUrl);
+  }
+
+  revalidateTeams(teamId);
+  return { ok: true };
+}
+
+export async function removeTeamLogo(teamId: string): Promise<ActionResult> {
+  const userId = await requireUserId();
+  if (!userId) return { ok: false, error: "You need to be signed in." };
+
+  const check = await requireTeamCapability(userId, teamId, "editSettings");
+  if (!check.ok) return check;
+
+  const db = getDb();
+  const [current] = await db
+    .select({ logoUrl: teams.logoUrl })
+    .from(teams)
+    .where(eq(teams.id, teamId))
+    .limit(1);
+
+  await db
+    .update(teams)
+    .set({ logoUrl: null, updatedAt: new Date() })
+    .where(eq(teams.id, teamId));
+
+  await deleteAvatarByUrl(current?.logoUrl);
 
   revalidateTeams(teamId);
   return { ok: true };

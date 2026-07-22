@@ -8,6 +8,7 @@ import { DeleteAccount } from "@/components/dashboard/accounts/DeleteAccount";
 import { DensityRow } from "@/components/dashboard/accounts/DensityRow";
 import { IntegrationCard } from "@/components/dashboard/accounts/IntegrationCard";
 import {
+  AvatarRow,
   EmailRow,
   NameRow,
   PasswordRow,
@@ -66,6 +67,10 @@ export default async function AccountPage() {
       <h1 className="screen-reader-text">Account</h1>
       <div className="ff-bubble-grid">
         <Bubble title="Profile" span="full">
+          <AvatarRow
+            name={session.user.name}
+            initialImage={session.user.image ?? null}
+          />
           <NameRow initialName={session.user.name} />
           <EmailRow initialEmail={session.user.email} />
           {hasPassword ? (

@@ -382,6 +382,10 @@ export const teams = sqliteTable(
     timezone: text("timezone"), // IANA zone
     // Where "connect with this team" points (LFM).
     discordInviteUrl: text("discord_invite_url"),
+    // Team logo, as the /api/avatars/... path it is served from (lib/avatars.ts).
+    // A path, not an absolute URL, so it survives the workers.dev -> custom
+    // domain cutover. The user-side equivalent is Better Auth's `user.image`.
+    logoUrl: text("logo_url"),
     createdByUserId: text("created_by_user_id").references(() => user.id, {
       onDelete: "set null",
     }),

@@ -1140,8 +1140,16 @@ a.ff-dash__link:hover {
   gap: 12px;
   margin: 0 0 var(--ff-bubble-head-gap);
 }
+/* Logo/avatar + title travel together on the left; actions stay right. */
+.ff-bubble__heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
 .ff-bubble__title {
   margin: 0;
+  min-width: 0;
   font-size: var(--ff-dash-text-lg);
   font-weight: 800;
   letter-spacing: -0.2px;
@@ -1254,6 +1262,49 @@ a.ff-dash__link:hover {
   padding-top: 12px;
 }
 
+/* ---------- Avatars (member pictures + team logos) ----------
+   People are circles, teams are rounded squares — the same distinction the
+   cropper frames, so the upload preview matches every place it lands.
+   Sizes are fixed, not density-scaled: an avatar is content, not spacing. */
+.ff-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  color: #dfe9f4;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  user-select: none;
+}
+.ff-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ff-avatar--team {
+  border-radius: var(--ff-radius-md);
+}
+.ff-avatar--sm {
+  width: 28px;
+  height: 28px;
+  font-size: 0.6875rem;
+}
+.ff-avatar--md {
+  width: 40px;
+  height: 40px;
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-avatar--lg {
+  width: 56px;
+  height: 56px;
+  font-size: var(--ff-dash-text-md);
+}
+
 /* Label / value / action rows inside bubbles */
 .ff-row {
   display: grid;
@@ -1263,6 +1314,20 @@ a.ff-dash__link:hover {
   padding: var(--ff-row-pad-y) var(--ff-row-pad-x);
   border: 1px solid var(--ff-border);
   border-radius: var(--ff-radius-md);
+}
+/* A row with a leading avatar/icon needs a third track. Scoped with :has() so
+   the ordinary two-column row is untouched — and so adding `media` to any row
+   is purely a JSX change. */
+.ff-row:has(> .ff-row__media) {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+.ff-row:has(> .ff-row__media) .ff-row__action {
+  grid-column: 3;
+}
+.ff-row__media {
+  display: flex;
+  align-items: center;
+  grid-row: 1;
 }
 .ff-row__main {
   display: grid;
@@ -1662,6 +1727,34 @@ a.ff-dash__link:hover {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 18px;
+}
+
+/* Crop popup (react-avatar-editor inside the ConfirmDialog shell). */
+.ff-cropper {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+}
+/* The editor renders a fixed 320px canvas (256 crop + 32 border each side).
+   Letting it shrink on a narrow phone only scales what's *displayed* —
+   getImageScaledToCanvas still exports the full 256px square. */
+.ff-cropper canvas {
+  max-width: 100%;
+  height: auto;
+  touch-action: none;
+  cursor: grab;
+}
+.ff-cropper canvas:active {
+  cursor: grabbing;
+}
+.ff-cropper__zoom {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+}
+.ff-cropper__zoom input {
+  width: 100%;
+  accent-color: var(--ff-blue);
 }
 
 @media (max-width: 781.98px) {

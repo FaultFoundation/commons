@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
+import { Avatar } from "@/components/dashboard/Avatar";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { DangerZonePanel } from "@/components/dashboard/teams/DangerZonePanel";
@@ -72,6 +73,11 @@ export default async function TeamPage({
       <div className="ff-bubble-grid ff-bubble-grid--single">
         <Bubble
           title={team.tag ? `${team.name} [${team.tag}]` : team.name}
+          /* Everyone sees the logo; only members who may edit settings also
+             get the upload row below. */
+          media={
+            <Avatar src={team.logoUrl} name={team.name} shape="team" size="md" />
+          }
           actions={
             <span className={`ff-badge ff-badge--${role}`}>
               {TEAM_ROLE_LABELS[role]}
@@ -104,6 +110,7 @@ export default async function TeamPage({
             region={team.region}
             timezone={team.timezone}
             discordInviteUrl={team.discordInviteUrl}
+            logoUrl={team.logoUrl}
             countries={countries}
             editable={editsSettings}
           />

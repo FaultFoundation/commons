@@ -12,11 +12,14 @@ export function BubbleRow({
   locked,
   lockTitle,
   note,
+  media,
   action,
   children,
 }: {
   label: string;
   value?: ReactNode;
+  /** Leading visual — an avatar or icon, left of the label/value stack. */
+  media?: ReactNode;
   /** Read-only row: lock icon + muted background + default note. */
   locked?: boolean;
   /** Hover text on the lock icon; defaults to the note. */
@@ -32,6 +35,7 @@ export function BubbleRow({
 
   return (
     <div className={locked ? "ff-row ff-row--locked" : "ff-row"}>
+      {media ? <div className="ff-row__media">{media}</div> : null}
       <div className="ff-row__main">
         <span className="ff-row__label">
           {label}

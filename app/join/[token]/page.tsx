@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, eq, isNull } from "drizzle-orm";
 
+import { Avatar } from "@/components/dashboard/Avatar";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
@@ -122,6 +123,7 @@ export default async function JoinPage({
       tag: teams.tag,
       description: teams.description,
       region: teams.region,
+      logoUrl: teams.logoUrl,
       collegeName: colleges.name,
     })
     .from(teams)
@@ -177,6 +179,11 @@ export default async function JoinPage({
   );
 
   const title = team.tag ? `${team.name} [${team.tag}]` : team.name;
+  // The logo leads: an invite should look like the team it's for before it
+  // asks the visitor for anything.
+  const logo = (
+    <Avatar src={team.logoUrl} name={team.name} shape="team" size="md" />
+  );
   const badge = (
     <span className={`ff-badge ff-badge--${role}`}>{TEAM_ROLE_LABELS[role]}</span>
   );
@@ -185,7 +192,7 @@ export default async function JoinPage({
   if (!session) {
     return (
       <Shell signedIn={false}>
-        <Bubble title={title} actions={badge}>
+        <Bubble title={title} media={logo} actions={badge}>
           <p className="ff-auth__hint">
             You&rsquo;ve been invited to join this team on The Commons.
           </p>
@@ -203,7 +210,7 @@ export default async function JoinPage({
   if (!verified) {
     return (
       <Shell signedIn>
-        <Bubble title={title} actions={badge}>
+        <Bubble title={title} media={logo} actions={badge}>
           <p className="ff-auth__hint">
             Teams are for verified members. Verify your academic email and this
             link will work — it stays valid while you do.
@@ -221,7 +228,7 @@ export default async function JoinPage({
 
   return (
     <Shell signedIn>
-      <Bubble title={title} actions={badge}>
+      <Bubble title={title} media={logo} actions={badge}>
         {details}
         {conflicts.length ? (
           <>

@@ -131,6 +131,8 @@ import { Bubble } from "@/components/dashboard/bubbles/Bubble";
   (dimmed title; pair with a `.ff-bubble__wip` placeholder body).
 - `span="full"` — spans the whole grid row. **Required on every page's first
   bubble** (see the rule above); also used for Danger Zone-style footers.
+- `media` — leading visual beside the title, for identity (a team logo). It
+  belongs next to the name, not out in `actions` with the badges.
 - `actions` — optional right side of the header (a badge or small button).
 
 ### `BubbleRow` — label / value / action rows
@@ -152,6 +154,9 @@ import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 - `locked` — lock icon, muted background, and a default note
   ("Locked — contact support to change").
 - `note` — fine print under the value.
+- `media` — leading visual (an `Avatar`, an icon) left of the label/value
+  stack. The row grows a third grid column via `:has()`, so adding one is a
+  pure JSX change.
 - `action` — right-aligned control. Use `ff-btn--sm` inside rows.
 - `children` — an expanded editor area rendered full-width under the row
   (see `InlineEditRow`).
@@ -176,6 +181,39 @@ confirms, Esc/Cancel closes. Use `danger` for red confirm buttons. See
 `components/dashboard/bubbles/Disclosure.tsx`. Same shell as `BubbleRow`,
 but the body expands on click. Native `<details>`, so no client directive
 and it works without JS. Used for the team options in setup step 3.
+
+### `Avatar` + `AvatarUploadRow` — pictures and logos
+
+`components/dashboard/Avatar.tsx` renders a member's picture or a team's logo,
+falling back to initials. **People are circles, teams are rounded squares**
+(`shape="team"`) — the same distinction the cropper frames, so the upload
+preview matches every place the image lands. Sizes are `sm` (roster rows),
+`md` (cards, headers), `lg` (the upload row).
+
+`AvatarUploadRow` is the picture row plus the crop popup, shared by the Account
+tab and a team's settings. Cropping is `react-avatar-editor` (MIT, zero deps)
+inside the existing `ConfirmDialog`, so Esc/focus-trapping come free; the
+export is one `getImageScaledToCanvas().toBlob(…, "image/webp")` call, with no
+hand-written crop math.
+
+**Storage** is the `AVATARS` R2 bucket via `lib/avatars.ts`. Three rules matter:
+
+- **Keys are content-addressed** — `user|team/<ownerId>/<sha256-16>.webp`. That
+  is what lets `/api/avatars/*` serve `immutable`, but it also means a
+  re-uploaded *identical* crop returns the key you already have. **Never delete
+  the previous object without checking it differs from the new one**, or you
+  delete the live image out from under the row. Both call sites guard this.
+- **Bytes are sniffed, never trusted.** `sniffImageType` allows only PNG, JPEG
+  and WebP magic numbers. **SVG is rejected outright** — these are served from
+  our own origin, so an inline-script SVG would be stored XSS.
+- **`user.image` is written by the *client*** (`authClient.updateUser`), not by
+  the server action. Better Auth only invalidates its cached session on a
+  client `/update-user` call, so a server-side write leaves the header avatar
+  stale until the next full page load. The action does the R2 write and returns
+  the URL; `AvatarRow` moves the pointer and only then discards the old object.
+
+Team logos have no such constraint — `setTeamLogo` owns the object and the row
+together, gated on `editSettings` like every other team setting.
 
 ### `SetupBanner` — the amber "action required" bar
 
@@ -345,6 +383,12 @@ matches, so re-reporting a corrected score replaces rather than accumulates.
   re-checks the session (see `EmailRow`).
 - Unlink and password-less delete need a fresh (<24h) session — map 403s
   to a friendly "sign out and back in" message.
+- Images live in the `AVATARS` R2 bucket, not D1 — see the `Avatar` section
+  above. The bucket is private and served through `/api/avatars/*`, which puts
+  `caches.default` in front of R2 so repeat hits cost no Class B operations.
+  That API only exists in workerd, so `npm run preview` is the run that
+  actually exercises it. Create the bucket before the first deploy:
+  `npx wrangler r2 bucket create commons-avatars`.
 - Schema changes: edit `db/schema.ts`, then `npm run db:generate`,
   `npm run db:migrate:local`, and at deploy time
   `npm run db:migrate:remote` **before** `npm run deploy`.

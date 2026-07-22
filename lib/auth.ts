@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { deleteAvatarByUrl } from "@/lib/avatars";
 import { getDb } from "@/lib/db";
 import {
   fetchBattleTag,
@@ -54,6 +55,13 @@ export function getAuth() {
       // keep the anti-abuse record after deletion).
       deleteUser: {
         enabled: true,
+        // R2 has no foreign keys to cascade through, so the profile picture is
+        // the one artifact that would outlive the account. Deleting an
+        // already-gone object is a no-op, and deleteAvatarByUrl never throws —
+        // an orphaned 20 KB blob must not block someone's deletion request.
+        beforeDelete: async (user) => {
+          await deleteAvatarByUrl(user.image);
+        },
       },
     },
     account: {

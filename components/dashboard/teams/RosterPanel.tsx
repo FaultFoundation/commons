@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { changeMemberRole, removeMember } from "@/app/teams/actions";
+import { Avatar } from "@/components/dashboard/Avatar";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { ConfirmDialog } from "@/components/dashboard/bubbles/ConfirmDialog";
 import {
@@ -19,6 +20,7 @@ export type RosterEntry = {
   membershipId: string;
   userId: string;
   name: string;
+  image: string | null;
   role: TeamRole;
   position: string | null;
   discordHandle: string | null;
@@ -90,6 +92,7 @@ export function RosterPanel({
           <BubbleRow
             key={entry.membershipId}
             label={entry.name}
+            media={<Avatar src={entry.image} name={entry.name} size="sm" />}
             value={
               <span className={`ff-badge ff-badge--${entry.role}`}>
                 {TEAM_ROLE_LABELS[entry.role]}

@@ -1521,15 +1521,26 @@ a.ff-dash__link:hover {
   position: relative;
   min-width: 0;
 }
-.ff-row__field .ff-auth__input {
-  /* Room for the status glyph; the same inset the select chevrons use. */
+/* Room for the trailing glyphs. One is the same inset the select chevrons use;
+   a locked field that also has a status (a verified school email) carries two,
+   so the padding has to grow with them or the text runs underneath. */
+.ff-row__field:has(.ff-row__status) .ff-auth__input {
   padding-right: 2.6em;
 }
+.ff-row__field:has(.ff-row__status + .ff-row__status) .ff-auth__input {
+  padding-right: 4.1em;
+}
+/* A locked field keeps the ordinary field background — matching the editable
+   rows is the point; the lock glyph and the dimmed text carry "read-only", and
+   a second background shade only made the card look patchy. */
 .ff-row__field .ff-auth__input:disabled {
-  background: rgba(255, 255, 255, 0.03);
   color: var(--ff-text-dim);
   cursor: not-allowed;
 }
+/* Right-aligned stack: the first glyph in source order sits outermost, so the
+   lock is rendered first and keeps the same column whether or not the field
+   also carries a status — School and School email have to line up. Hoverable
+   on purpose: each glyph's <title> is where its explanation lives. */
 .ff-row__status {
   position: absolute;
   top: 50%;
@@ -1537,7 +1548,10 @@ a.ff-dash__link:hover {
   width: 14px;
   height: 14px;
   transform: translateY(-50%);
-  pointer-events: none;
+  cursor: help;
+}
+.ff-row__status + .ff-row__status {
+  right: 2.4em;
 }
 .ff-row__status--verified {
   color: var(--ff-ok);
@@ -1545,10 +1559,25 @@ a.ff-dash__link:hover {
 .ff-row__status--warning {
   color: var(--ff-warn);
 }
+.ff-row__status--locked {
+  color: var(--ff-text-dim);
+}
 .ff-row__saved {
   margin: 0;
   color: var(--ff-ok);
   font-size: var(--ff-dash-text-xs);
+}
+/* Inline follow-up action under a field ("Resend verification email"). Reads
+   as fine print rather than a second control competing with Save Changes. */
+.ff-row__hint {
+  margin: 0;
+  font-size: var(--ff-dash-text-xs);
+}
+.ff-row__hint .ff-link-btn {
+  color: var(--ff-text-dim);
+}
+.ff-row__hint .ff-link-btn:hover {
+  color: #fff;
 }
 .ff-row__action {
   grid-column: 2;

@@ -123,11 +123,12 @@ export default async function AccountPage({
           />
           {hasSchool ? (
             <>
+              {/* No `note` on either: the reason lives on the lock glyph's
+                  hover, so the two rows don't each spend a line repeating it. */}
               <FieldRow
                 label="School"
                 value={reg?.schoolName ?? ""}
                 locked
-                note={SCHOOL_LOCK_NOTE}
                 lockTitle={SCHOOL_LOCK_NOTE}
               />
               <FieldRow
@@ -137,7 +138,6 @@ export default async function AccountPage({
                 locked
                 status="verified"
                 statusLabel="Verified"
-                note={SCHOOL_LOCK_NOTE}
                 lockTitle={SCHOOL_LOCK_NOTE}
               />
             </>

@@ -128,6 +128,22 @@ the names, labels, and `asDensity()` normalizer, shared by both sides.
 - Deliberately not on `<html>`: the root layout is shared with the public
   marketing pages, and reading `cookies()` there would make them all dynamic.
 
+## Button colour means one thing
+
+**Blue commits a change. Outline doesn't.** This is a site-wide rule, not a
+per-page choice:
+
+| Look | Class | Use for |
+| --- | --- | --- |
+| Blue (filled) | `ff-btn` | The click that actually writes something — Save Changes once a field differs, Save in an editor, Turn On |
+| White outline | `ff-btn ff-btn--outline` | Everything else: opening an editor (Change, Edit, Add), a secondary or cancelling action, and any commit button with nothing yet to commit |
+| Red | `ff-btn ff-btn--danger` | Destructive confirmation |
+
+A control that *becomes* live swaps class rather than only toggling
+`disabled` — `FieldRow`'s Save Changes is outline-and-disabled until the value
+differs, then turns blue. A page of live inputs has to read as settled at a
+glance, and greying out a blue button doesn't achieve that.
+
 ## The template components
 
 All in `components/dashboard/bubbles/`. `Bubble` and `BubbleRow` are
@@ -177,7 +193,8 @@ import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 - `media` — leading visual (an `Avatar`, an icon) left of the label/value
   stack. The row grows a third grid column via `:has()`, so adding one is a
   pure JSX change.
-- `action` — right-aligned control. Use `ff-btn--sm` inside rows.
+- `action` — right-aligned control. Use `ff-btn--sm` inside rows, and follow
+  the button convention below.
 - `children` — an expanded editor area rendered full-width under the row.
   **Pass `undefined`, not an always-truthy fragment**, when there is nothing
   to show: the editor draws a top margin and a dashed rule for any truthy
@@ -208,7 +225,17 @@ Changes button that stays disabled until the value actually differs.
   Use `?? ""` with a `placeholder`, and `required={false}` if it may be blank.
 - `status` / `statusLabel` — a check or warning glyph inside the field's right
   edge. The label is the accessible text; the colour is never the only signal.
-- `locked` — disabled input plus the lock affordance, for support-only values.
+- `locked` / `lockTitle` — disabled input plus a lock glyph beside any
+  `status`, for support-only values. The row keeps the **ordinary** field
+  background, and the reason lives on the lock's hover rather than in a note
+  under the field: several locked rows each repeating "contact support" was
+  most of the card's height and none of its meaning.
+- **Never pass `autoComplete` unless the field really is a credential.** It
+  defaults to `"off"`, and the input also carries the password managers'
+  opt-out attributes (`data-1p-ignore`, `data-lpignore`, `data-bwignore`,
+  `data-form-type`). An `autoComplete="email"` here is enough to make a manager
+  read the row as a sign-in form and offer to fill a login — on a page the
+  member is already signed in to.
 - `savedNote` — shown after a successful save until the field is edited again,
   for saves whose result isn't visible in the field (an email change lands in
   an inbox, not in the row).

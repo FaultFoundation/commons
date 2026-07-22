@@ -49,6 +49,8 @@ export function FieldRow({
   /** Accessible name for the input; defaults to `label`. */
   inputLabel?: string;
   inputType?: string;
+  /** Defaults to "off". Only set this when the field really is a credential —
+      anything else invites a password manager to offer a login. */
   autoComplete?: string;
   minLength?: number;
   maxLength?: number;
@@ -56,12 +58,15 @@ export function FieldRow({
   /** Set false for fields that may be cleared (a team's tag, say). */
   required?: boolean;
   note?: string;
-  /** Trailing indicator inside the field: confirmed vs needs attention. */
+  /** Trailing glyph inside the field: confirmed vs needs attention. */
   status?: "verified" | "warning";
-  /** What the indicator means, e.g. "Verified". Required with `status`. */
+  /** What the glyph means, e.g. "Verified". Required with `status`. */
   statusLabel?: string;
-  /** Read-only: disabled input, lock icon, muted row. */
+  /** Read-only: disabled input plus a lock glyph beside any `status`. The row
+      keeps the ordinary background — the glyph carries the meaning. */
   locked?: boolean;
+  /** Why it's locked. Surfaces on hover over the lock, and as its accessible
+      name, so a locked row needs no explanatory note of its own. */
   lockTitle?: string;
   saveLabel?: string;
   /** Shown after a successful save, until the field is edited again. Use it
@@ -116,10 +121,10 @@ export function FieldRow({
     <BubbleRow
       label={label}
       note={note}
-      locked={locked}
-      lockTitle={lockTitle}
       field={
-        <form id={formId} onSubmit={onSubmit}>
+        // autoComplete="off" on the form as well as the input: password
+        // managers read the form, not just the field.
+        <form id={formId} onSubmit={onSubmit} autoComplete="off">
           <label className="screen-reader-text" htmlFor={`${formId}-input`}>
             {inputLabel ?? label}
           </label>
@@ -133,13 +138,36 @@ export function FieldRow({
               setSaved(false);
               setError(null);
             }}
-            autoComplete={autoComplete}
+            // Defaults to "off". A settings field is never a credential:
+            // advertising `email`/`username` here is what makes browsers and
+            // password managers offer to fill a *login*, which on the Account
+            // tab is a sign-in prompt over a page you're already signed in to.
+            autoComplete={autoComplete ?? "off"}
+            // autocomplete alone doesn't stop the extensions — each honours its
+            // own opt-out attribute, and Chrome ignores "off" on fields it has
+            // decided look like a login.
+            data-1p-ignore
+            data-lpignore="true"
+            data-bwignore
+            data-form-type="other"
             minLength={minLength}
             maxLength={maxLength}
             placeholder={placeholder}
             required={required}
             disabled={locked || pending}
           />
+          {/* Trailing glyphs, in the field's right edge. A locked field can
+              also carry a status (a verified school email is both), so this is
+              a stack rather than one slot. The lock goes first because the CSS
+              puts the first glyph outermost — that keeps it in the same column
+              on a locked row with a status and one without, which is what makes
+              School and School email line up. */}
+          {locked ? (
+            <StatusIcon
+              kind="locked"
+              label={lockTitle ?? "Locked — contact support to change"}
+            />
+          ) : null}
           {status ? (
             <StatusIcon kind={status} label={statusLabel ?? status} />
           ) : null}
@@ -148,7 +176,12 @@ export function FieldRow({
       action={
         onSave ? (
           <button
-            className="ff-btn ff-btn--sm"
+            // Outline while there is nothing to save, blue once there is: the
+            // colour is the affordance, so a page of live fields still reads
+            // as settled. See docs/dashboard-guide.md.
+            className={
+              dirty ? "ff-btn ff-btn--sm" : "ff-btn ff-btn--outline ff-btn--sm"
+            }
             type="submit"
             form={formId}
             disabled={!dirty || pending}
@@ -177,15 +210,26 @@ export function FieldRow({
   );
 }
 
-/** Sits inside the field's right edge. The label is the accessible text —
-    the shape alone must not be the only thing carrying the meaning. */
-function StatusIcon({
-  kind,
-  label,
-}: {
-  kind: "verified" | "warning";
-  label: string;
-}) {
+const ICONS: Record<FieldIcon, string> = {
+  verified: "M6.2 11.9 2.6 8.3l1.2-1.2 2.4 2.4 6-6 1.2 1.2z",
+  warning:
+    "M7.1 1.9a1 1 0 0 1 1.8 0l6 11.2a1 1 0 0 1-.9 1.5H2a1 1 0 0 1-.9-1.5zM8 5.5a.9.9 0 0 0-.9 1l.3 3a.6.6 0 0 0 1.2 0l.3-3a.9.9 0 0 0-.9-1M8 11a.9.9 0 1 0 0 1.8A.9.9 0 0 0 8 11",
+  locked:
+    "M8 1a3.5 3.5 0 0 0-3.5 3.5V7H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-.5V4.5A3.5 3.5 0 0 0 8 1Zm2 6V4.5a2 2 0 1 0-4 0V7h4Z",
+};
+
+type FieldIcon = "verified" | "warning" | "locked";
+
+/**
+ * Sits inside the field's right edge.
+ *
+ * `<title>` is doing real work here: it is both the pointer-hover tooltip and,
+ * with `aria-label`, the accessible name. For a locked field that tooltip is
+ * the *only* place the reason lives — the explanatory note under the field was
+ * removed, because five rows each repeating "contact support" was most of the
+ * card's height and none of its meaning.
+ */
+function StatusIcon({ kind, label }: { kind: FieldIcon; label: string }) {
   return (
     <svg
       className={`ff-row__status ff-row__status--${kind}`}
@@ -195,14 +239,7 @@ function StatusIcon({
       aria-label={label}
     >
       <title>{label}</title>
-      {kind === "verified" ? (
-        <path d="M6.2 11.9 2.6 8.3l1.2-1.2 2.4 2.4 6-6 1.2 1.2z" />
-      ) : (
-        <path
-          fillRule="evenodd"
-          d="M7.1 1.9a1 1 0 0 1 1.8 0l6 11.2a1 1 0 0 1-.9 1.5H2a1 1 0 0 1-.9-1.5zM8 5.5a.9.9 0 0 0-.9 1l.3 3a.6.6 0 0 0 1.2 0l.3-3a.9.9 0 0 0-.9-1M8 11a.9.9 0 1 0 0 1.8A.9.9 0 0 0 8 11"
-        />
-      )}
+      <path fillRule="evenodd" d={ICONS[kind]} />
     </svg>
   );
 }

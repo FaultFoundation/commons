@@ -86,7 +86,6 @@ export function NameRow({ initialName }: { initialName: string }) {
       value={initialName}
       inputLabel="Username"
       placeholder="Your display name"
-      autoComplete="name"
       maxLength={80}
       onSave={async (name) => {
         if (!name) return "Enter a username.";
@@ -141,7 +140,9 @@ export function EmailRow({
       value={initialEmail}
       inputLabel="Email"
       inputType="email"
-      autoComplete="email"
+      // No autoComplete: FieldRow defaults it to "off". `email` here made
+      // password managers treat this settings row as a sign-in form and offer
+      // to fill credentials on a page you are already signed in to.
       placeholder="you@example.com"
       status={verified ? "verified" : "warning"}
       statusLabel={verified ? "Verified" : "Not verified yet"}
@@ -169,16 +170,16 @@ export function EmailRow({
       }}
     >
       {verified ? null : (
-        <div className="ff-row__buttons">
+        <p className="ff-row__hint">
           <button
-            className="ff-btn ff-btn--outline ff-btn--sm"
+            className="ff-link-btn"
             type="button"
             onClick={resend}
             disabled={resending}
           >
-            {resending ? "Sending…" : "Resend verification"}
+            {resending ? "Sending…" : "Resend verification email"}
           </button>
-        </div>
+        </p>
       )}
       {resent ? (
         <p className="ff-row__saved" role="status">

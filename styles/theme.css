@@ -1508,7 +1508,12 @@ a.ff-dash__link:hover {
   grid-column: 2;
   grid-row: 2;
 }
-.ff-row--field .ff-row__note {
+/* The note and the follow-up sub-row share row 3, directly under the field:
+   they're mutually exclusive in practice (a note explains, a sub-row acts), and
+   sharing the row keeps the follow-up flush under the field with no empty gap
+   the way a dedicated fourth row would leave. */
+.ff-row--field .ff-row__note,
+.ff-row--field .ff-row__subrow {
   grid-column: 1 / -1;
   grid-row: 3;
 }
@@ -1566,6 +1571,13 @@ a.ff-dash__link:hover {
   margin: 0;
   color: var(--ff-ok);
   font-size: var(--ff-dash-text-xs);
+}
+/* Follow-up directly under the field (the resend link, then its confirmation).
+   Grid so a shown confirmation clears the link rather than butting against it;
+   with a single child there's nothing to space. */
+.ff-row__subrow {
+  display: grid;
+  gap: 4px;
 }
 /* Inline follow-up action under a field ("Resend verification email"). Reads
    as fine print rather than a second control competing with Save Changes. */
@@ -1999,7 +2011,9 @@ a.ff-dash__link:hover {
     grid-column: 1 / -1;
     grid-row: 3;
   }
-  .ff-row--field .ff-row__note {
+  /* The button now occupies row 3, so the note / follow-up drop below it. */
+  .ff-row--field .ff-row__note,
+  .ff-row--field .ff-row__subrow {
     grid-row: 4;
   }
   .ff-row--field .ff-row__editor {

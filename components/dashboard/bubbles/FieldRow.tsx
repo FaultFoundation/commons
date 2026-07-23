@@ -39,6 +39,7 @@ export function FieldRow({
   lockTitle,
   saveLabel = "Save Changes",
   savedNote,
+  belowField,
   onSave,
   children,
 }: {
@@ -72,10 +73,16 @@ export function FieldRow({
   /** Shown after a successful save, until the field is edited again. Use it
       when success isn't visible in the field itself — "check your inbox". */
   savedNote?: string;
+  /** A follow-up control that sits directly under the field, in the note's
+      place — no dashed separator. For something that belongs *with* the field,
+      like "Resend verification email". Transient save feedback (`children`,
+      errors, `savedNote`) still renders in the editor area below. */
+  belowField?: ReactNode;
   /** Resolves to an error message to display, or null on success. Omit on
       locked rows. */
   onSave?: (value: string) => Promise<string | null>;
-  /** Extra controls under the field (a Resend button, say). */
+  /** Extra controls in the editor area under the field, behind a dashed
+      separator (transient feedback). */
   children?: ReactNode;
 }) {
   const formId = useId();
@@ -121,6 +128,7 @@ export function FieldRow({
     <BubbleRow
       label={label}
       note={note}
+      belowField={belowField}
       field={
         // autoComplete="off" on the form as well as the input: password
         // managers read the form, not just the field.

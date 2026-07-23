@@ -152,6 +152,30 @@ export function EmailRow({
       savedNote={
         sent ? `Check ${sent} for a link to confirm the change.` : undefined
       }
+      // The resend action sits directly under the field, in the note's place —
+      // it's about *this* address, not about the pending save, so it doesn't
+      // belong down in the dashed editor with the save feedback.
+      belowField={
+        verified ? undefined : (
+          <>
+            <p className="ff-row__hint">
+              <button
+                className="ff-link-btn"
+                type="button"
+                onClick={resend}
+                disabled={resending}
+              >
+                {resending ? "Sending…" : "Resend verification email"}
+              </button>
+            </p>
+            {resent ? (
+              <p className="ff-row__saved" role="status">
+                {resent}
+              </p>
+            ) : null}
+          </>
+        )
+      }
       onSave={async (email) => {
         if (email.toLowerCase() === initialEmail.toLowerCase()) {
           return "That's already your email.";
@@ -166,25 +190,7 @@ export function EmailRow({
         // yet, and refreshing would reset the field and hide the message.
         return null;
       }}
-    >
-      {verified ? null : (
-        <p className="ff-row__hint">
-          <button
-            className="ff-link-btn"
-            type="button"
-            onClick={resend}
-            disabled={resending}
-          >
-            {resending ? "Sending…" : "Resend verification email"}
-          </button>
-        </p>
-      )}
-      {resent ? (
-        <p className="ff-row__saved" role="status">
-          {resent}
-        </p>
-      ) : null}
-    </FieldRow>
+    />
   );
 }
 

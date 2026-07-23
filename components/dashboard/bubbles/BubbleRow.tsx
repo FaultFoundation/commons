@@ -10,6 +10,7 @@ export function BubbleRow({
   label,
   value,
   field,
+  belowField,
   locked,
   lockTitle,
   note,
@@ -23,6 +24,10 @@ export function BubbleRow({
       A block container rather than the value's `<span>`, because what goes in
       here is a `<form>` — which may not live inside phrasing content. */
   field?: ReactNode;
+  /** Follow-up content sitting directly under the field, where a note would go
+      — no dashed separator (that's `children`). For a control that belongs with
+      the field, like a "Resend verification email" link. Field rows only. */
+  belowField?: ReactNode;
   /** Leading visual — an avatar or icon, left of the label/value stack. */
   media?: ReactNode;
   /** Read-only row: lock icon + muted background + default note. */
@@ -60,6 +65,7 @@ export function BubbleRow({
         {noteText ? <span className="ff-row__note">{noteText}</span> : null}
       </div>
       {action ? <div className="ff-row__action">{action}</div> : null}
+      {belowField ? <div className="ff-row__subrow">{belowField}</div> : null}
       {children ? <div className="ff-row__editor">{children}</div> : null}
     </div>
   );

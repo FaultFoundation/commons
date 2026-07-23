@@ -6,12 +6,15 @@ import { getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import {
   fetchDiscordUsername,
+  fetchGuildMemberRoles,
   fetchIsInGuild,
   getPlatformIdentity,
   hasScope,
   markIdentityRefreshed,
   pushRoleConnection,
 } from "@/lib/platform-identities";
+import { syncManagedStaffRoles } from "@/lib/staff";
+import { isStaffRole, type StaffRole } from "@/lib/staff-shared";
 
 // ---------------------------------------------------------------------------
 // Session-aware integration reads. Imports lib/auth.ts (for token access), so
@@ -170,5 +173,76 @@ export async function syncRoleConnection(
     await pushRoleConnection(accessToken, env.DISCORD_CLIENT_ID, userId);
   } catch (error) {
     console.error("role connection sync failed:", error);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Staff role linking — read the member's guild roles and reconcile the ones
+// this app maps to staff tiers into staff_roles. The DB stays authoritative
+// (every gate re-reads it); Discord just drives the granted_via = "discord"
+// rows. Manual grants are never affected.
+// ---------------------------------------------------------------------------
+
+/**
+ * DISCORD_STAFF_ROLE_MAP is a JSON object of Discord role snowflake -> staff
+ * tier, e.g. {"1234...":"admin","5678...":"moderator"}. Unknown tiers and a
+ * malformed value are dropped rather than thrown — bad config disables the
+ * sync, it never breaks a page load.
+ */
+function parseStaffRoleMap(raw: string | undefined): Map<string, StaffRole> {
+  const map = new Map<string, StaffRole>();
+  if (!raw) return map;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    for (const [roleId, tier] of Object.entries(parsed)) {
+      if (roleId && isStaffRole(tier)) map.set(roleId, tier);
+    }
+  } catch {
+    // Leave the map empty; syncStaffRolesFromDiscord no-ops on an empty map.
+  }
+  return map;
+}
+
+/**
+ * Reconcile the member's Discord-linked staff roles. Best-effort and never
+ * throws: called from the admin area on load, it degrades to whatever
+ * staff_roles already holds (so manual grants keep working) on any failure.
+ *
+ * Crucially, an *unknown* role lookup (revoked auth, 404, network) is left
+ * alone — only a definitive role list from Discord, including an empty one,
+ * revokes a previously-synced grant.
+ */
+export async function syncStaffRolesFromDiscord(
+  userId: string,
+  requestHeaders: Headers,
+): Promise<void> {
+  try {
+    const { env } = getCloudflareContext();
+    const guildId = env.DISCORD_GUILD_ID || null;
+    const roleMap = parseStaffRoleMap(env.DISCORD_STAFF_ROLE_MAP);
+    if (!guildId || roleMap.size === 0) return;
+
+    const discordAccount = await getDiscordAccount(userId);
+    if (!discordAccount) return;
+    if (!hasScope(discordAccount.scope, "guilds.members.read")) return;
+
+    const accessToken = await getDiscordAccessToken(
+      userId,
+      discordAccount.accountId,
+      requestHeaders,
+    );
+    if (!accessToken) return;
+
+    const memberRoleIds = await fetchGuildMemberRoles(accessToken, guildId);
+    if (memberRoleIds === null) return; // unknown — do not revoke on a guess
+
+    const desired = new Set<StaffRole>();
+    for (const roleId of memberRoleIds) {
+      const tier = roleMap.get(roleId);
+      if (tier) desired.add(tier);
+    }
+    await syncManagedStaffRoles(userId, [...desired]);
+  } catch (error) {
+    console.error("staff role sync failed:", error);
   }
 }

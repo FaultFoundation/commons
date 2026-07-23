@@ -57,6 +57,20 @@
       "when": 1784703401827,
       "tag": "0007_past_talkback",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1784790332945,
+      "tag": "0008_chubby_magik",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1784791269769,
+      "tag": "0009_sleepy_maddog",
+      "breakpoints": true
     }
   ]
 }

@@ -26,6 +26,14 @@ BETTER_AUTH_URL=http://localhost:3999
 # reads it from wrangler.jsonc "vars" instead; it isn't a secret.
 # DISCORD_GUILD_ID=
 
+# Optional — JSON map of Discord role snowflake -> staff tier
+# (owner|admin|moderator|tournament_admin). Members holding a mapped role are
+# auto-granted that tier (granted_via="discord") when they open the admin area,
+# and lose it when the Discord role is removed. Manual grants made in the
+# dashboard are never touched. Bootstrap the first owner with
+# `node scripts/seed-staff-owner.mjs`. Not a secret.
+# DISCORD_STAFF_ROLE_MAP={"111111111111111111":"admin","222222222222222222":"moderator"}
+
 # Optional — enables the Blizzard "Connect" button locally. Create a client at
 # https://develop.battle.net/access/clients and add
 # http://localhost:3999/api/auth/oauth2/callback/battlenet as a redirect URI
@@ -49,3 +57,13 @@ BETTER_AUTH_URL=http://localhost:3999
 # EMAIL_FROM=
 # SMTP_HOST=
 # SMTP_PORT=
+
+# Optional — support-ticket bridge to the Discord bot. Leave unset and the
+# ticket dashboard still works (D1 is the source of truth); replies/closes just
+# aren't reflected in Discord until the bot is reachable.
+#   BOT_BRIDGE_URL   base URL of the bot's HTTP server (site -> bot calls)
+#   BOT_BRIDGE_SECRET  shared secret the bot verifies on site -> bot calls
+#   BOT_API_SECRET   shared secret app/api/bot/* verifies on bot -> site calls
+# BOT_BRIDGE_URL=http://localhost:8787
+# BOT_BRIDGE_SECRET=replace-with-a-long-random-string
+# BOT_API_SECRET=replace-with-a-long-random-string

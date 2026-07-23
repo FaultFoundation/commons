@@ -901,9 +901,29 @@ html:not([data-auth="in"]) .ff-auth-when-in {
   top: calc(var(--ff-header-h) + 20px);
   padding: 16px;
 }
-.ff-dash__nav nav {
+/* Two-panel rail: the viewport clips, the track slides one panel width to
+   reveal a group's sub-tabs, and each panel keeps the bubble row rhythm.
+   Only one panel is ever interactive (the other carries `inert`), so the
+   off-screen links stay out of the tab order and the a11y tree. */
+.ff-dash__nav-viewport {
+  overflow: hidden;
+}
+.ff-dash__nav-track {
+  display: flex;
+  width: 200%;
+  /* Guarded by the reduced-motion rule in §8, which blanks .ff-main
+     transitions — so this jumps instead of sliding when asked to. */
+  transition: transform var(--ff-transition);
+}
+.ff-dash__nav-track[data-open="sub"] {
+  transform: translateX(-50%);
+}
+.ff-dash__nav-panel {
+  flex: 0 0 50%;
+  width: 50%;
   display: grid;
   gap: 4px;
+  align-content: start;
 }
 .ff-dash__link {
   display: block;
@@ -916,7 +936,34 @@ html:not([data-auth="in"]) .ff-auth-when-in {
     background var(--ff-transition),
     color var(--ff-transition);
 }
-a.ff-dash__link:hover {
+/* Group + back controls are buttons, not links: reset the UA styling and
+   lay the label out against its chevron. */
+.ff-dash__link--group,
+.ff-dash__back {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.ff-dash__link--group {
+  justify-content: space-between;
+}
+.ff-dash__back {
+  color: var(--ff-text-dim);
+  margin-bottom: 2px;
+}
+.ff-dash__chevron {
+  flex-shrink: 0;
+  color: var(--ff-text-dim);
+}
+a.ff-dash__link:hover,
+button.ff-dash__link:hover {
   background: rgba(255, 255, 255, 0.09);
   color: #fff;
 }
@@ -937,8 +984,9 @@ a.ff-dash__link:hover {
 .ff-dash__foot .ff-btn {
   width: 100%;
 }
-/* Tablet: rail collapses to a horizontal pill row above the content
-   (same breakpoint as the policy TOC). */
+/* Tablet: rail collapses to a horizontal pill row above the content (same
+   breakpoint as the policy TOC). The slide is dropped here — the active panel
+   simply shows as pills and the inert one is removed from the flow. */
 @media (max-width: 1023.98px) {
   .ff-dash {
     grid-template-columns: 1fr;
@@ -950,14 +998,32 @@ a.ff-dash__link:hover {
     gap: 6px;
     overflow-x: auto;
   }
-  .ff-dash__nav nav {
+  .ff-dash__nav-viewport {
+    flex: 1;
+    min-width: 0;
+    overflow: visible;
+  }
+  .ff-dash__nav-track {
+    display: block;
+    width: auto;
+    transform: none !important;
+  }
+  .ff-dash__nav-panel[inert] {
+    display: none;
+  }
+  .ff-dash__nav-panel {
     display: flex;
     gap: 6px;
+    overflow-x: auto;
   }
   .ff-dash__link {
     padding: 8px 14px;
     border-radius: var(--ff-radius-pill);
     white-space: nowrap;
+  }
+  .ff-dash__link--group,
+  .ff-dash__back {
+    width: auto;
   }
   .ff-dash__foot {
     margin: 0 0 0 auto;
@@ -969,6 +1035,16 @@ a.ff-dash__link:hover {
     width: auto;
     white-space: nowrap;
   }
+}
+/* Admin surface — "less bubble, more technical". A separate axis from density
+   (which never touches radius/shadow): tighter corners and a flatter shadow,
+   scoped to the admin tab via data-surface. Density still controls spacing. */
+.ff-dash[data-surface="technical"] {
+  --ff-radius-md: 8px;
+  --ff-radius-lg: 10px;
+  --ff-radius-xl: 12px;
+  --ff-shadow-card:
+    0 1px 0 rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.22);
 }
 
 /* ---------- 11. Registration flow + setup checklist ---------- */
@@ -2058,4 +2134,241 @@ a.ff-dash__link:hover {
     grid-row: auto;
     margin-top: 10px;
   }
+}
+
+/* ---------- 14. Admin — support tickets ---------- */
+
+.ff-ticket-muted {
+  color: var(--ff-text-dim);
+}
+.ff-ticket-empty {
+  color: var(--ff-text-dim);
+  padding: 12px 0;
+}
+
+/* Queue filters */
+.ff-ticket-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.ff-ticket-view {
+  padding: 5px 12px;
+  border-radius: var(--ff-radius-pill);
+  border: 1px solid var(--ff-border);
+  color: #dfe9f4;
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background var(--ff-transition),
+    color var(--ff-transition);
+}
+.ff-ticket-view:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.ff-ticket-view[aria-current="page"] {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
+  border-color: transparent;
+}
+
+/* Queue table */
+.ff-ticket-table-wrap {
+  overflow-x: auto;
+}
+.ff-ticket-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-ticket-table th {
+  text-align: left;
+  color: var(--ff-text-dim);
+  font-weight: 700;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--ff-border);
+  white-space: nowrap;
+}
+.ff-ticket-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ff-border);
+  vertical-align: middle;
+}
+.ff-ticket-table tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+.ff-ticket-num a {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--ff-accent);
+  text-decoration: none;
+}
+.ff-ticket-subject {
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+.ff-ticket-subject:hover {
+  text-decoration: underline;
+}
+.ff-ticket-tag {
+  margin-left: 8px;
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-xs);
+}
+
+/* Status + priority chips */
+.ff-ticket-status {
+  text-transform: capitalize;
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--ff-radius-pill);
+}
+.ff-ticket-status--open {
+  background: rgba(76, 175, 80, 0.18);
+  color: #7ddc81;
+}
+.ff-ticket-status--closed {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ff-text-dim);
+}
+.ff-ticket-prio {
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+}
+.ff-ticket-prio--low {
+  color: #7fa8d8;
+}
+.ff-ticket-prio--normal {
+  color: #dfe9f4;
+}
+.ff-ticket-prio--high {
+  color: #ffb74d;
+}
+.ff-ticket-prio--urgent {
+  color: #ff7043;
+}
+
+/* Detail header */
+.ff-ticket-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px 20px;
+  margin: 0 0 14px;
+}
+.ff-ticket-meta dt {
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ff-ticket-meta dd {
+  margin: 2px 0 0;
+  font-size: var(--ff-dash-text-sm);
+}
+
+/* Toolbar */
+.ff-ticket-toolbar__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ff-ticket-select select {
+  padding: 5px 8px;
+  font-size: var(--ff-dash-text-sm);
+}
+
+/* Conversation log */
+.ff-ticket-log {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.ff-ticket-msg {
+  padding: 10px 12px;
+  border-radius: var(--ff-radius-md);
+  border: 1px solid var(--ff-border);
+  border-left: 3px solid var(--ff-border);
+}
+.ff-ticket-msg--staff {
+  border-left-color: var(--ff-accent);
+  background: rgba(255, 238, 88, 0.04);
+}
+.ff-ticket-msg--user {
+  border-left-color: #4c8bf5;
+}
+.ff-ticket-msg--system {
+  border-left-color: var(--ff-text-dim);
+  opacity: 0.85;
+}
+.ff-ticket-msg__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.ff-ticket-msg__author {
+  font-weight: 700;
+  color: #fff;
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-ticket-msg__badge {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ff-text-dim);
+  font-size: 10px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-pill);
+  padding: 0 6px;
+}
+.ff-ticket-msg__body {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--ff-dash-text-md);
+}
+.ff-ticket-msg__files {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: var(--ff-dash-text-sm);
+}
+
+/* Composers (reply + note) */
+.ff-ticket-compose {
+  display: grid;
+  gap: 8px;
+}
+.ff-ticket-textarea {
+  resize: vertical;
+  min-height: 60px;
+  font-family: inherit;
+}
+.ff-ticket-compose__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Notes */
+.ff-ticket-notes {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.ff-ticket-notes li {
+  padding: 8px 10px;
+  border-radius: var(--ff-radius-md);
+  background: rgba(255, 255, 255, 0.03);
 }

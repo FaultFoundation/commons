@@ -277,6 +277,13 @@ export const staffRoles = sqliteTable(
     grantedBy: text("granted_by").references(() => user.id, {
       onDelete: "set null",
     }),
+    // How the grant was created: "discord" rows are reconciled automatically
+    // against the linked Discord role (lib/staff.ts syncManagedStaffRoles) and
+    // removed when the role is lost; "manual" (or NULL/legacy) rows are managed
+    // by owners/admins in the dashboard and never touched by the sync. Kept
+    // separate from granted_by because that column is a FK to user.id — it can't
+    // hold a sentinel, and it goes NULL when the granting account is deleted.
+    grantedVia: text("granted_via"), // discord | manual (NULL = legacy/manual)
     grantedAt: integer("granted_at", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -940,4 +947,125 @@ export const lfgConnections = sqliteTable(
     // One approach per player per listing (re-approaching updates the row).
     uniqueIndex("lfg_connections_listing_user_unique").on(t.listingId, t.userId),
   ],
+);
+
+// ===========================================================================
+// LAYER 10 — Support tickets (website is source of truth; Discord mirrors)
+//
+// Ported from the Discord bot's Google "Tickets" sheet, which stored only 13
+// columns of metadata and left the conversation in the channel. Here D1 owns
+// both: support_ticket_messages is a full two-way mirror (Discord messages
+// stream in; staff replies from the dashboard stream out via the bot bridge).
+// ===========================================================================
+
+export const supportTickets = sqliteTable(
+  "support_tickets",
+  {
+    id: text("id").primaryKey(),
+    // Human-facing 4-digit number (bot parity: ticket-oscar-0007). Monotonic
+    // and unique; the id above is the real key.
+    ticketNumber: integer("ticket_number").notNull(),
+    // The opener. userId is null when they have no site account yet; the
+    // Discord id/name are always captured so the ticket survives either way.
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    discordUserId: text("discord_user_id"),
+    discordUsername: text("discord_username"),
+    // The mirrored Discord channel. Nullable until the bot reports it; unique so
+    // one channel maps to exactly one ticket.
+    discordChannelId: text("discord_channel_id"),
+    discordChannelName: text("discord_channel_name"),
+    // Verification | Other | Internal | … (bot inquiry types, kept as text).
+    category: text("category"),
+    subject: text("subject"),
+    // open | closed
+    status: text("status").notNull().default("open"),
+    // low | normal | high | urgent (staff-set; NULL = unset)
+    priority: text("priority"),
+    assignedToUserId: text("assigned_to_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    // manual | inactivity | discord (who/what closed it), plus the staff closer.
+    closeReason: text("close_reason"),
+    closedByUserId: text("closed_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    // Inactivity bookkeeping, mirrored from the bot's InactivityMonitor.
+    warningSent: integer("warning_sent", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    lastActivityAt: integer("last_activity_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    closedAt: integer("closed_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [
+    uniqueIndex("support_tickets_number_unique").on(t.ticketNumber),
+    uniqueIndex("support_tickets_channel_unique").on(t.discordChannelId),
+    index("support_tickets_status_idx").on(t.status),
+    index("support_tickets_assigned_idx").on(t.assignedToUserId),
+    index("support_tickets_discord_user_idx").on(t.discordUserId),
+  ],
+);
+
+export const supportTicketMessages = sqliteTable(
+  "support_ticket_messages",
+  {
+    id: text("id").primaryKey(),
+    ticketId: text("ticket_id")
+      .notNull()
+      .references(() => supportTickets.id, { onDelete: "cascade" }),
+    // user | staff | system
+    authorType: text("author_type").notNull(),
+    // Set when we can attribute the author to a site account (a staff reply, or
+    // a Discord author whose account is linked); the Discord id/name are the
+    // fallback for everyone else.
+    authorUserId: text("author_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    authorDiscordId: text("author_discord_id"),
+    authorName: text("author_name").notNull(),
+    content: text("content").notNull().default(""),
+    // JSON array of { url, name } — attachments carried on the Discord message.
+    attachments: text("attachments"),
+    // discord | website — which side authored it. Also stops the bridge from
+    // re-mirroring a website reply the bot just posted into the channel.
+    source: text("source").notNull(),
+    // The Discord message id, when one exists. Unique so mirroring is
+    // idempotent — replaying an event never duplicates a row.
+    discordMessageId: text("discord_message_id"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [
+    index("support_ticket_messages_ticket_idx").on(t.ticketId, t.createdAt),
+    uniqueIndex("support_ticket_messages_discord_msg_unique").on(
+      t.discordMessageId,
+    ),
+  ],
+);
+
+// Staff-only notes, never shown to the ticket opener or mirrored to Discord.
+export const supportTicketNotes = sqliteTable(
+  "support_ticket_notes",
+  {
+    id: text("id").primaryKey(),
+    ticketId: text("ticket_id")
+      .notNull()
+      .references(() => supportTickets.id, { onDelete: "cascade" }),
+    authorUserId: text("author_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    body: text("body").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [index("support_ticket_notes_ticket_idx").on(t.ticketId)],
 );

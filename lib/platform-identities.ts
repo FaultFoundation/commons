@@ -132,6 +132,36 @@ export async function fetchIsInGuild(
   }
 }
 
+/**
+ * The member's Discord role IDs in our guild, via the same endpoint as
+ * fetchIsInGuild (which discards them). Needs the guilds.members.read scope.
+ *
+ * Returns the role-ID array (possibly empty — a member with no roles), or null
+ * when the answer is unknown: missing scope, not a member (404), revoked
+ * authorization, or network trouble. Null and [] are deliberately different —
+ * the staff-role sync must not revoke access on an unknown answer, only on a
+ * confirmed empty/changed set. This is the only place roles are read; they are
+ * used transiently to reconcile staff_roles and never stored.
+ */
+export async function fetchGuildMemberRoles(
+  accessToken: string | null | undefined,
+  guildId: string | null | undefined,
+): Promise<string[] | null> {
+  if (!accessToken || !guildId) return null;
+  try {
+    const res = await fetch(`${DISCORD_API}/users/@me/guilds/${guildId}/member`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const member = (await res.json()) as { roles?: unknown };
+    if (!Array.isArray(member.roles)) return null;
+    return member.roles.filter((role): role is string => typeof role === "string");
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Linked Roles (Discord) — write-only push of verification state.
 //

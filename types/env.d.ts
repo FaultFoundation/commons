@@ -9,6 +9,13 @@ interface CloudflareEnv {
   // Snowflake of the Fault Foundation server. Not a secret (it lives in
   // wrangler.jsonc vars); gates the guilds.members.read lookup.
   DISCORD_GUILD_ID?: string;
+  // JSON map of Discord role snowflake -> staff tier
+  // (owner|admin|moderator|tournament_admin), e.g.
+  //   {"123...":"admin","456...":"moderator"}
+  // Drives the granted_via="discord" rows in staff_roles (lib/integrations.ts
+  // syncStaffRolesFromDiscord). Not a secret — the role IDs aren't sensitive —
+  // but bootstrap the very first owner with scripts/seed-staff-owner.mjs.
+  DISCORD_STAFF_ROLE_MAP?: string;
   // Battle.net OAuth client (https://develop.battle.net/access/clients).
   // Link-only: Blizzard returns no email, so it can never create a user.
   BATTLENET_CLIENT_ID?: string;
@@ -26,4 +33,13 @@ interface CloudflareEnv {
   // Default to Gmail submission; override to point at another provider.
   SMTP_HOST?: string;
   SMTP_PORT?: string;
+  // Support-ticket bridge to the Discord bot (both directions HMAC-signed).
+  // BOT_BRIDGE_URL: base URL of the bot's in-process HTTP server; the site
+  // calls it to post staff replies, close channels, and DM transcripts.
+  BOT_BRIDGE_URL?: string;
+  // Shared secret for site -> bot calls (bot verifies the X-Signature HMAC).
+  BOT_BRIDGE_SECRET?: string;
+  // Shared secret for bot -> site calls (app/api/bot/* verifies it). Kept
+  // distinct from BOT_BRIDGE_SECRET so the two directions rotate independently.
+  BOT_API_SECRET?: string;
 }

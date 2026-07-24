@@ -29,14 +29,19 @@ export function TicketReply({
     if (pending || !value.trim()) return;
     setPending(true);
     setError(null);
-    const result = await replyToTicket(ticketId, value);
-    setPending(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    try {
+      const result = await replyToTicket(ticketId, value);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setValue("");
+      router.refresh();
+    } catch {
+      setError("Something went wrong sending that. Please try again.");
+    } finally {
+      setPending(false);
     }
-    setValue("");
-    router.refresh();
   }
 
   return (

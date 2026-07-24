@@ -22,15 +22,21 @@ export async function enqueueBotJob(
   ticketId?: string | null,
 ): Promise<void> {
   const now = new Date();
-  await getDb().insert(botOutbox).values({
-    id: crypto.randomUUID(),
-    kind,
-    ticketId: ticketId ?? null,
-    payload: JSON.stringify(payload),
-    status: "pending",
-    createdAt: now,
-    updatedAt: now,
-  });
+  // Never throw: a queue failure must not fail (or hang) the dashboard action
+  // that triggered it — the D1 write it accompanies has already happened.
+  try {
+    await getDb().insert(botOutbox).values({
+      id: crypto.randomUUID(),
+      kind,
+      ticketId: ticketId ?? null,
+      payload: JSON.stringify(payload),
+      status: "pending",
+      createdAt: now,
+      updatedAt: now,
+    });
+  } catch (error) {
+    console.error(`enqueueBotJob(${kind}) failed:`, error);
+  }
 }
 
 export type OutboxJob = { id: string; kind: string; payload: unknown };

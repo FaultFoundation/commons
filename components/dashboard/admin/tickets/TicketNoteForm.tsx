@@ -18,14 +18,19 @@ export function TicketNoteForm({ ticketId }: { ticketId: string }) {
     if (pending || !value.trim()) return;
     setPending(true);
     setError(null);
-    const result = await addNote(ticketId, value);
-    setPending(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    try {
+      const result = await addNote(ticketId, value);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setValue("");
+      router.refresh();
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setPending(false);
     }
-    setValue("");
-    router.refresh();
   }
 
   return (

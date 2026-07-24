@@ -38,13 +38,18 @@ export function TicketToolbar({
     if (pending) return;
     setPending(true);
     setError(null);
-    const result = await action();
-    setPending(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    try {
+      const result = await action();
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setPending(false);
     }
-    router.refresh();
   }
 
   return (

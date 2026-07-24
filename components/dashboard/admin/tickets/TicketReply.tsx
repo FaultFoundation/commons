@@ -11,9 +11,13 @@ import { TICKET_REPLY_MAX } from "@/lib/tickets-shared";
 export function TicketReply({
   ticketId,
   closed,
+  onSent,
 }: {
   ticketId: string;
   closed: boolean;
+  /** Called after a successful send — the thread re-fetches instead of a full
+      server re-render. Falls back to router.refresh when absent. */
+  onSent?: () => void;
 }) {
   const router = useRouter();
   const [value, setValue] = useState("");
@@ -36,7 +40,8 @@ export function TicketReply({
         return;
       }
       setValue("");
-      router.refresh();
+      if (onSent) onSent();
+      else router.refresh();
     } catch {
       setError("Something went wrong sending that. Please try again.");
     } finally {

@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 
+import { LiveRefresh } from "@/components/dashboard/admin/tickets/LiveRefresh";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { getAuth } from "@/lib/auth";
 import { listTickets, type TicketListFilter } from "@/lib/tickets";
@@ -61,7 +62,9 @@ export async function TicketQueue({ view }: { view?: string }) {
   const tickets = await listTickets(filter);
 
   return (
-    <div className="ff-bubble-grid">
+    <>
+      <LiveRefresh />
+      <div className="ff-bubble-grid">
       <Bubble title="Support Tickets" span="full">
         <nav className="ff-ticket-views" aria-label="Ticket filters">
           {VIEWS.map((v) => (
@@ -145,6 +148,7 @@ export async function TicketQueue({ view }: { view?: string }) {
           </div>
         )}
       </Bubble>
-    </div>
+      </div>
+    </>
   );
 }

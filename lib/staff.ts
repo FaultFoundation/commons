@@ -1,6 +1,6 @@
 import { eq, inArray } from "drizzle-orm";
 
-import { staffRoles } from "@/db/schema";
+import { staffRoles, user } from "@/db/schema";
 import { getDb } from "@/lib/db";
 import {
   asStaffRole,
@@ -40,6 +40,18 @@ export async function getStaffRoles(userId: string): Promise<StaffRole[]> {
 /** Whether the user has any staff access at all (drives tab visibility). */
 export async function isStaff(userId: string): Promise<boolean> {
   return (await getStaffRoles(userId)).length > 0;
+}
+
+/** Everyone who holds any staff role — the ticket assignee picker. One row per
+    person, even if they hold several roles. */
+export async function listStaffMembers(): Promise<
+  { userId: string; name: string }[]
+> {
+  return getDb()
+    .selectDistinct({ userId: staffRoles.userId, name: user.name })
+    .from(staffRoles)
+    .innerJoin(user, eq(user.id, staffRoles.userId))
+    .orderBy(user.name);
 }
 
 export type StaffCheck =

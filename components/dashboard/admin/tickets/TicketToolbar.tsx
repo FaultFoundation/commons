@@ -4,12 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
-  claimTicket,
+  assignTicket,
   closeTicket,
-  exportTranscript,
   reopenTicket,
   setTicketPriority,
-  unassignTicket,
 } from "@/app/admin/tickets/actions";
 import {
   TICKET_PRIORITIES,
@@ -23,36 +21,30 @@ export function TicketToolbar({
   status,
   priority,
   assignedToUserId,
-  currentUserId,
-  canTranscript,
+  staffMembers,
 }: {
   ticketId: string;
   status: string;
   priority: string | null;
   assignedToUserId: string | null;
-  currentUserId: string;
-  canTranscript: boolean;
+  staffMembers: { userId: string; name: string }[];
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
-  const mine = assignedToUserId === currentUserId;
   const closed = status === "closed";
 
-  async function run(action: () => Promise<Result>, successNote?: string) {
+  async function run(action: () => Promise<Result>) {
     if (pending) return;
     setPending(true);
     setError(null);
-    setNotice(null);
     const result = await action();
     setPending(false);
     if (!result.ok) {
       setError(result.error);
       return;
     }
-    if (successNote) setNotice(successNote);
     router.refresh();
   }
 
@@ -63,32 +55,26 @@ export function TicketToolbar({
           <p>{error}</p>
         </div>
       ) : null}
-      {notice ? (
-        <p className="ff-row__saved" role="status">
-          {notice}
-        </p>
-      ) : null}
 
       <div className="ff-ticket-toolbar__row">
-        {mine ? (
-          <button
-            className="ff-btn ff-btn--outline ff-btn--sm"
-            type="button"
+        <label className="ff-ticket-select">
+          <span className="screen-reader-text">Assign</span>
+          <select
+            className="ff-auth__input"
+            value={assignedToUserId ?? ""}
             disabled={pending}
-            onClick={() => run(() => unassignTicket(ticketId))}
+            onChange={(event) =>
+              run(() => assignTicket(ticketId, event.target.value))
+            }
           >
-            Unassign me
-          </button>
-        ) : (
-          <button
-            className="ff-btn ff-btn--sm"
-            type="button"
-            disabled={pending}
-            onClick={() => run(() => claimTicket(ticketId))}
-          >
-            {assignedToUserId ? "Assign to me" : "Claim"}
-          </button>
-        )}
+            <option value="">Assign…</option>
+            {staffMembers.map((member) => (
+              <option key={member.userId} value={member.userId}>
+                {member.name}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <label className="ff-ticket-select">
           <span className="screen-reader-text">Priority</span>
@@ -128,25 +114,6 @@ export function TicketToolbar({
             Close ticket
           </button>
         )}
-
-        <button
-          className="ff-btn ff-btn--outline ff-btn--sm"
-          type="button"
-          disabled={pending || !canTranscript}
-          title={
-            canTranscript
-              ? undefined
-              : "No linked Discord user to DM the transcript to."
-          }
-          onClick={() =>
-            run(
-              () => exportTranscript(ticketId),
-              "Transcript queued — the bot will DM it shortly.",
-            )
-          }
-        >
-          Send transcript
-        </button>
       </div>
     </div>
   );

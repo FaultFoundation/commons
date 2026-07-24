@@ -1,11 +1,11 @@
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
+import { LiveRefresh } from "@/components/dashboard/admin/tickets/LiveRefresh";
 import { TicketNoteForm } from "@/components/dashboard/admin/tickets/TicketNoteForm";
 import { TicketReply } from "@/components/dashboard/admin/tickets/TicketReply";
 import { TicketToolbar } from "@/components/dashboard/admin/tickets/TicketToolbar";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
-import { getAuth } from "@/lib/auth";
+import { listStaffMembers } from "@/lib/staff";
 import {
   getTicket,
   getTicketMessages,
@@ -26,21 +26,24 @@ function parseAttachments(raw: string | null): { url: string; name: string }[] {
 /** The full ticket view. Rendered inside AdminGate, so only verified staff
     reach it — the session lookup here just resolves "is this assigned to me". */
 export async function TicketDetail({ ticketId }: { ticketId: string }) {
-  const session = await getAuth().api.getSession({ headers: await headers() });
-  const currentUserId = session?.user.id ?? "";
-
   const ticket = await getTicket(ticketId);
   if (!ticket) notFound();
 
-  const [messages, notes] = await Promise.all([
+  const [messages, notes, staffMembers] = await Promise.all([
     getTicketMessages(ticketId),
     getTicketNotes(ticketId),
+    listStaffMembers(),
   ]);
 
   const closed = ticket.status === "closed";
 
   return (
-    <div className="ff-bubble-grid">
+    <>
+      <LiveRefresh />
+      <a className="ff-ticket-back" href="/admin/tickets/">
+        <span aria-hidden="true">←</span> Back to tickets
+      </a>
+      <div className="ff-bubble-grid">
       <Bubble
         title={`${formatTicketNumber(ticket.ticketNumber)}${
           ticket.subject ? ` — ${ticket.subject}` : ""
@@ -87,8 +90,7 @@ export async function TicketDetail({ ticketId }: { ticketId: string }) {
           status={ticket.status}
           priority={ticket.priority}
           assignedToUserId={ticket.assignedToUserId}
-          currentUserId={currentUserId}
-          canTranscript={Boolean(ticket.discordUserId)}
+          staffMembers={staffMembers}
         />
       </Bubble>
 
@@ -159,6 +161,7 @@ export async function TicketDetail({ ticketId }: { ticketId: string }) {
           </ul>
         )}
       </Bubble>
-    </div>
+      </div>
+    </>
   );
 }

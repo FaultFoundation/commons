@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdminUnlock } from "@/lib/admin-unlock";
 import { getAuth } from "@/lib/auth";
 import { enqueueBotJob } from "@/lib/bot-outbox";
-import { requireStaffCapability } from "@/lib/staff";
+import { isStaff, requireStaffCapability } from "@/lib/staff";
 import {
   addTicketNote,
   appendMessage,
@@ -62,18 +62,19 @@ function revalidateTicket(ticketId: string) {
 // Assignment
 // ---------------------------------------------------------------------------
 
-export async function claimTicket(ticketId: string): Promise<ActionResult> {
+/** Assign to a staff member, or unassign with an empty string. */
+export async function assignTicket(
+  ticketId: string,
+  assigneeUserId: string,
+): Promise<ActionResult> {
   const gate = await requireActor();
   if (!gate.ok) return gate;
-  await updateTicket(ticketId, { assignedToUserId: gate.actor.userId });
-  revalidateTicket(ticketId);
-  return { ok: true };
-}
 
-export async function unassignTicket(ticketId: string): Promise<ActionResult> {
-  const gate = await requireActor();
-  if (!gate.ok) return gate;
-  await updateTicket(ticketId, { assignedToUserId: null });
+  const target = assigneeUserId.trim();
+  if (target && !(await isStaff(target))) {
+    return { ok: false, error: "That person isn't staff." };
+  }
+  await updateTicket(ticketId, { assignedToUserId: target || null });
   revalidateTicket(ticketId);
   return { ok: true };
 }
@@ -200,6 +201,21 @@ export async function closeTicket(ticketId: string): Promise<ActionResult> {
     closedByUserId: gate.actor.userId,
     closeReason: "manual",
   });
+
+  // Closing automatically DMs the member their transcript (built from D1) and
+  // closes the Discord channel.
+  if (ticket.discordUserId) {
+    const messages = await getTicketMessages(ticketId);
+    await enqueueBotJob(
+      "send_transcript",
+      {
+        discordUserId: ticket.discordUserId,
+        filename: `ticket-${String(ticket.ticketNumber).padStart(4, "0")}.txt`,
+        content: buildTranscript({ ...ticket, status: "closed" }, messages),
+      },
+      ticketId,
+    );
+  }
   if (ticket.discordChannelId) {
     await enqueueBotJob(
       "close_channel",
@@ -216,35 +232,6 @@ export async function reopenTicket(ticketId: string): Promise<ActionResult> {
   if (!gate.ok) return gate;
   await reopenTicketRow(ticketId);
   revalidateTicket(ticketId);
-  return { ok: true };
-}
-
-export async function exportTranscript(
-  ticketId: string,
-): Promise<ActionResult> {
-  const gate = await requireActor();
-  if (!gate.ok) return gate;
-
-  const ticket = await getTicket(ticketId);
-  if (!ticket) return { ok: false, error: "That ticket no longer exists." };
-  if (!ticket.discordUserId) {
-    return {
-      ok: false,
-      error: "This ticket has no Discord user to DM the transcript to.",
-    };
-  }
-
-  const messages = await getTicketMessages(ticketId);
-  const transcript = buildTranscript(ticket, messages);
-  await enqueueBotJob(
-    "send_transcript",
-    {
-      discordUserId: ticket.discordUserId,
-      filename: `ticket-${String(ticket.ticketNumber).padStart(4, "0")}.txt`,
-      content: transcript,
-    },
-    ticketId,
-  );
   return { ok: true };
 }
 

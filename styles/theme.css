@@ -2272,6 +2272,21 @@ button.ff-dash__link:hover {
   font-size: var(--ff-dash-text-sm);
 }
 
+/* Back link above the ticket header */
+.ff-ticket-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+  text-decoration: none;
+}
+.ff-ticket-back:hover {
+  color: #fff;
+}
+
 /* Toolbar */
 .ff-ticket-toolbar__row {
   display: flex;
@@ -2279,8 +2294,11 @@ button.ff-dash__link:hover {
   align-items: center;
   gap: 8px;
 }
+/* Right padding leaves room for the native dropdown arrow so it sits to the
+   right of the label instead of overlapping it. */
 .ff-ticket-select select {
-  padding: 5px 8px;
+  padding: 5px 30px 5px 8px;
+  min-width: 132px;
   font-size: var(--ff-dash-text-sm);
 }
 
@@ -2298,11 +2316,13 @@ button.ff-dash__link:hover {
   border: 1px solid var(--ff-border);
   border-left: 3px solid var(--ff-border);
 }
-.ff-ticket-msg--staff {
+/* The member's messages carry the highlight (that's what staff are here to
+   read); staff replies sit in a neutral blue. */
+.ff-ticket-msg--user {
   border-left-color: var(--ff-accent);
   background: rgba(255, 238, 88, 0.04);
 }
-.ff-ticket-msg--user {
+.ff-ticket-msg--staff {
   border-left-color: #4c8bf5;
 }
 .ff-ticket-msg--system {

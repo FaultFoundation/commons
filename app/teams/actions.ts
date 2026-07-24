@@ -22,6 +22,10 @@ import { getRegistrationState } from "@/lib/registration";
 import { reportMatchScore, type GameScoreInput } from "@/lib/scoring";
 import {
   INVITE_PROBLEM_MESSAGES,
+  cleanName,
+  cleanTag,
+  cleanTimezone,
+  cleanUrl,
   entryConflicts,
   generateInviteToken,
   getCollegeRegion,
@@ -31,12 +35,11 @@ import {
   inviteProblem,
   isVerifiedMember,
   joinConflicts,
+  nameTaken,
   requireTeamCapability,
 } from "@/lib/teams";
 import {
   TEAM_DESCRIPTION_MAX,
-  TEAM_NAME_MAX,
-  TEAM_TAG_MAX,
   asTeamRole,
   assignableRoles,
   outranks,
@@ -73,61 +76,10 @@ function revalidateTeams(teamId?: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Field validation
-// ---------------------------------------------------------------------------
-
-function cleanName(input: string): string {
-  return input.trim().replace(/\s+/g, " ").slice(0, TEAM_NAME_MAX);
-}
-
-function cleanTag(input: string): string | null {
-  const tag = input.trim().toUpperCase().replace(/\s+/g, "").slice(0, TEAM_TAG_MAX);
-  return tag || null;
-}
-
-/** True when another live team in the program already uses this name. */
-async function nameTaken(name: string, excludeTeamId?: string): Promise<boolean> {
-  const rows = await getDb()
-    .select({ id: teams.id })
-    .from(teams)
-    .where(
-      and(
-        eq(teams.programId, PROGRAM_COLLEGIATE_ID),
-        isNull(teams.disbandedAt),
-        // Disbanding frees a name, so there's no unique index to lean on.
-        sql`lower(${teams.name}) = ${name.toLowerCase()}`,
-      ),
-    );
-  return rows.some((row) => row.id !== excludeTeamId);
-}
-
-/** Accepts only https URLs, so a pasted handle can't become a broken link. */
-function cleanUrl(input: string): string | null | undefined {
-  const raw = input.trim();
-  if (!raw) return null;
-  try {
-    const url = new URL(raw);
-    if (url.protocol !== "https:") return undefined;
-    return url.toString().slice(0, 300);
-  } catch {
-    return undefined;
-  }
-}
-
-/** Validates against the runtime's own zone database rather than a hardcoded list. */
-function cleanTimezone(input: string): string | null | undefined {
-  const raw = input.trim();
-  if (!raw) return null;
-  try {
-    new Intl.DateTimeFormat(undefined, { timeZone: raw });
-    return raw.slice(0, 60);
-  } catch {
-    return undefined;
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Create / settings
+//
+// Field validators (cleanName, cleanTag, nameTaken, cleanUrl, cleanTimezone)
+// now live in lib/teams.ts so the admin actions share them.
 // ---------------------------------------------------------------------------
 
 export async function createTeam(input: {

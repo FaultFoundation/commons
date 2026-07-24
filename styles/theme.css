@@ -1838,6 +1838,58 @@ button.ff-dash__link:hover {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
 }
+/* Staff-role badges (admin Staff panel). Owner/admin get a highlight; the
+   lower tiers fall back to the neutral base pill. */
+.ff-badge--owner {
+  border-color: var(--ff-accent);
+  background: rgba(255, 238, 88, 0.12);
+  color: var(--ff-accent);
+}
+.ff-badge--admin {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+/* Role chips sitting together in a row's value slot (a staff member's roles). */
+.ff-staff__roles {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* Per-member remove buttons wrap on narrow rows rather than overflow. */
+.ff-staff__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Admin teams list: search toolbar + pager above/below the table. */
+.ff-team-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.ff-team-search .ff-auth__input {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.ff-team-search__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+  white-space: nowrap;
+}
+.ff-team-pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  font-size: var(--ff-dash-text-sm);
+}
 
 /* Tab-level action row (Teams: start / find / recruit). Buttons first, and
    at most one panel expanded beneath them. */

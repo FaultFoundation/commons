@@ -6,6 +6,7 @@ import {
   colleges,
   matchGames,
   matches,
+  programs,
   teamDeleteRequests,
   teamDeleteVotes,
   teamInvites,
@@ -16,9 +17,12 @@ import {
   user,
   platformIdentities,
 } from "@/db/schema";
+import { PROGRAM_COLLEGIATE_ID } from "@/lib/programs";
 import { getRegistrationState } from "@/lib/registration";
 import {
+  TEAM_NAME_MAX,
   TEAM_ROLES,
+  TEAM_TAG_MAX,
   asTeamRole,
   can,
   type TeamCapability,
@@ -116,6 +120,73 @@ export async function getInviteByToken(token: string) {
     .where(eq(teamInvites.token, token))
     .limit(1);
   return rows[0] ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Field validation
+//
+// Shared by the member-facing team actions (app/teams/actions.ts) and the
+// staff-facing admin actions (app/admin/teams/actions.ts), so a name edited
+// from either surface is cleaned and uniqueness-checked the same way.
+// ---------------------------------------------------------------------------
+
+export function cleanName(input: string): string {
+  return input.trim().replace(/\s+/g, " ").slice(0, TEAM_NAME_MAX);
+}
+
+export function cleanTag(input: string): string | null {
+  const tag = input
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .slice(0, TEAM_TAG_MAX);
+  return tag || null;
+}
+
+/** True when another live team in the program already uses this name. */
+export async function nameTaken(
+  name: string,
+  excludeTeamId?: string,
+): Promise<boolean> {
+  const rows = await getDb()
+    .select({ id: teams.id })
+    .from(teams)
+    .where(
+      and(
+        eq(teams.programId, PROGRAM_COLLEGIATE_ID),
+        isNull(teams.disbandedAt),
+        // Disbanding frees a name, so there's no unique index to lean on.
+        sql`lower(${teams.name}) = ${name.toLowerCase()}`,
+      ),
+    );
+  return rows.some((row) => row.id !== excludeTeamId);
+}
+
+/** Accepts only https URLs, so a pasted handle can't become a broken link.
+    Returns null to clear the field, undefined when the input is unusable. */
+export function cleanUrl(input: string): string | null | undefined {
+  const raw = input.trim();
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:") return undefined;
+    return url.toString().slice(0, 300);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Validates against the runtime's own zone database rather than a hardcoded
+    list. Returns null to clear, undefined when the zone isn't recognized. */
+export function cleanTimezone(input: string): string | null | undefined {
+  const raw = input.trim();
+  if (!raw) return null;
+  try {
+    new Intl.DateTimeFormat(undefined, { timeZone: raw });
+    return raw.slice(0, 60);
+  } catch {
+    return undefined;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -436,6 +507,111 @@ export async function listMyTeams(userId: string): Promise<MyTeam[]> {
   });
 }
 
+export type AdminTeamRow = {
+  id: string;
+  name: string;
+  tag: string | null;
+  logoUrl: string | null;
+  collegeName: string | null;
+  programName: string | null;
+  memberCount: number;
+  /** null = live; a timestamp = disbanded (soft-deleted). */
+  disbandedAt: number | null;
+  createdAt: number;
+};
+
+export type AdminTeamsPage = {
+  teams: AdminTeamRow[];
+  page: number;
+  pageCount: number;
+  total: number;
+};
+
+const ADMIN_TEAMS_PAGE_SIZE = 25;
+
+/**
+ * Every team, for the staff admin panel — the counterpart to `listMyTeams`
+ * without the caller-membership filter. Paginated and optionally name/tag
+ * searched; includes disbanded teams (a soft delete) so staff can review and
+ * restore them.
+ */
+export async function listAllTeams(options?: {
+  query?: string;
+  includeDisbanded?: boolean;
+  page?: number;
+}): Promise<AdminTeamsPage> {
+  const db = getDb();
+  const q = (options?.query ?? "").trim().toLowerCase();
+
+  const filters = [];
+  if (!options?.includeDisbanded) filters.push(isNull(teams.disbandedAt));
+  if (q) {
+    const like = `%${q}%`;
+    filters.push(
+      sql`(lower(${teams.name}) like ${like} or lower(${teams.tag}) like ${like})`,
+    );
+  }
+  const where = filters.length ? and(...filters) : undefined;
+
+  const totalRows = await db
+    .select({ count: sql<number>`count(*)`.as("count") })
+    .from(teams)
+    .where(where);
+  const total = totalRows[0]?.count ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / ADMIN_TEAMS_PAGE_SIZE));
+  const page = Math.min(Math.max(1, Math.trunc(options?.page ?? 1)), pageCount);
+
+  const rows = await db
+    .select({
+      id: teams.id,
+      name: teams.name,
+      tag: teams.tag,
+      logoUrl: teams.logoUrl,
+      disbandedAt: teams.disbandedAt,
+      createdAt: teams.createdAt,
+      collegeName: colleges.name,
+      programName: programs.name,
+    })
+    .from(teams)
+    .leftJoin(colleges, eq(colleges.id, teams.collegeId))
+    .leftJoin(programs, eq(programs.id, teams.programId))
+    .where(where)
+    .orderBy(teams.name)
+    .limit(ADMIN_TEAMS_PAGE_SIZE)
+    .offset((page - 1) * ADMIN_TEAMS_PAGE_SIZE);
+
+  const ids = rows.map((r) => r.id);
+  const counts = ids.length
+    ? await db
+        .select({
+          teamId: teamMembers.teamId,
+          count: sql<number>`count(*)`.as("count"),
+        })
+        .from(teamMembers)
+        .where(
+          and(inArray(teamMembers.teamId, ids), eq(teamMembers.status, "active")),
+        )
+        .groupBy(teamMembers.teamId)
+    : [];
+
+  return {
+    teams: rows.map((team) => ({
+      id: team.id,
+      name: team.name,
+      tag: team.tag,
+      logoUrl: team.logoUrl,
+      collegeName: team.collegeName,
+      programName: team.programName,
+      memberCount: counts.find((c) => c.teamId === team.id)?.count ?? 0,
+      disbandedAt: team.disbandedAt?.getTime() ?? null,
+      createdAt: team.createdAt.getTime(),
+    })),
+    page,
+    pageCount,
+    total,
+  };
+}
+
 export type RosterMember = {
   membershipId: string;
   userId: string;
@@ -493,6 +669,9 @@ export type TeamDetail = {
   collegeName: string | null;
   programId: string;
   gameId: string | null;
+  /** null for a live team; a timestamp for a disbanded one (only reachable
+      with `includeDisbanded`, which the admin panel passes). */
+  disbandedAt: number | null;
   roster: RosterMember[];
   invites: TeamInviteView[];
   inviteLinkToken: string | null;
@@ -502,10 +681,15 @@ export type TeamDetail = {
 };
 
 /**
- * Everything the team management page renders, in one call. Returns null for
- * a missing or disbanded team; the page 404s on that and on non-membership.
+ * Everything the team management page renders, in one call. Returns null for a
+ * missing team, and for a disbanded one unless `includeDisbanded` is set — the
+ * member page 404s on both, while the admin panel passes `includeDisbanded` so
+ * staff can view (and restore) a disbanded team.
  */
-export async function getTeamDetail(teamId: string): Promise<TeamDetail | null> {
+export async function getTeamDetail(
+  teamId: string,
+  options?: { includeDisbanded?: boolean },
+): Promise<TeamDetail | null> {
   const db = getDb();
   const teamRows = await db
     .select({
@@ -519,11 +703,16 @@ export async function getTeamDetail(teamId: string): Promise<TeamDetail | null> 
       logoUrl: teams.logoUrl,
       programId: teams.programId,
       gameId: teams.gameId,
+      disbandedAt: teams.disbandedAt,
       collegeName: colleges.name,
     })
     .from(teams)
     .leftJoin(colleges, eq(colleges.id, teams.collegeId))
-    .where(and(eq(teams.id, teamId), isNull(teams.disbandedAt)))
+    .where(
+      options?.includeDisbanded
+        ? eq(teams.id, teamId)
+        : and(eq(teams.id, teamId), isNull(teams.disbandedAt)),
+    )
     .limit(1);
   const team = teamRows[0];
   if (!team) return null;
@@ -668,6 +857,7 @@ export async function getTeamDetail(teamId: string): Promise<TeamDetail | null> 
 
   return {
     ...team,
+    disbandedAt: team.disbandedAt?.getTime() ?? null,
     roster,
     invites: usableInvites.map((i) => ({
       id: i.id,

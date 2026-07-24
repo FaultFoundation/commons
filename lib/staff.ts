@@ -1,9 +1,10 @@
 import { cache } from "react";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 
 import { staffRoles, user } from "@/db/schema";
 import { getDb } from "@/lib/db";
 import {
+  STAFF_ROLES,
   asStaffRole,
   canAny,
   isStaffRole,
@@ -56,6 +57,82 @@ export async function listStaffMembers(): Promise<
     .from(staffRoles)
     .innerJoin(user, eq(user.id, staffRoles.userId))
     .orderBy(user.name);
+}
+
+/** One grant a staff member holds — the role plus how it got there. */
+export type StaffGrant = {
+  role: StaffRole;
+  /** "discord" rows are Discord-synced and can't be removed by hand; "manual"
+      (or NULL/legacy) rows are dashboard-owned. */
+  grantedVia: string | null;
+  grantedAt: number;
+};
+
+export type StaffMemberEntry = {
+  userId: string;
+  name: string;
+  email: string;
+  roles: StaffGrant[];
+};
+
+/**
+ * Every staff member with the full set of roles they hold — the staff-
+ * management panel's payload. One row per person (unlike the flat table),
+ * roles ordered most- to least-privileged so their badges read consistently.
+ */
+export async function listAllStaffWithRoles(): Promise<StaffMemberEntry[]> {
+  const rows = await getDb()
+    .select({
+      userId: staffRoles.userId,
+      name: user.name,
+      email: user.email,
+      role: staffRoles.role,
+      grantedVia: staffRoles.grantedVia,
+      grantedAt: staffRoles.grantedAt,
+    })
+    .from(staffRoles)
+    .innerJoin(user, eq(user.id, staffRoles.userId))
+    .orderBy(user.name);
+
+  const byUser = new Map<string, StaffMemberEntry>();
+  for (const row of rows) {
+    const role = asStaffRole(row.role);
+    if (!role) continue; // drop unknown/legacy roles, exactly like getStaffRoles
+    let entry = byUser.get(row.userId);
+    if (!entry) {
+      entry = { userId: row.userId, name: row.name, email: row.email, roles: [] };
+      byUser.set(row.userId, entry);
+    }
+    entry.roles.push({
+      role,
+      grantedVia: row.grantedVia,
+      grantedAt: row.grantedAt.getTime(),
+    });
+  }
+  for (const entry of byUser.values()) {
+    entry.roles.sort(
+      (a, b) => STAFF_ROLES.indexOf(a.role) - STAFF_ROLES.indexOf(b.role),
+    );
+  }
+  return [...byUser.values()];
+}
+
+/**
+ * Resolve an email to the account it belongs to, for granting staff access.
+ * Case-insensitive: Better Auth stores emails lowercased, but a hand-typed one
+ * may not be.
+ */
+export async function getUserByEmail(
+  email: string,
+): Promise<{ id: string; name: string; email: string } | null> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+  const rows = await getDb()
+    .select({ id: user.id, name: user.name, email: user.email })
+    .from(user)
+    .where(sql`lower(${user.email}) = ${normalized}`)
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 export type StaffCheck =

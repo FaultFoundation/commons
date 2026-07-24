@@ -36,6 +36,7 @@ export const STAFF_ROLE_HINTS: Record<StaffRole, string> = {
 export type StaffCapability =
   | "viewAdmin"
   | "manageTickets"
+  | "viewTeams"
   | "manageTeams"
   | "manageTournaments"
   | "manageStaff"
@@ -55,6 +56,7 @@ export const STAFF_CAPABILITIES: Record<StaffRole, readonly StaffCapability[]> =
     owner: [
       "viewAdmin",
       "manageTickets",
+      "viewTeams",
       "manageTeams",
       "manageTournaments",
       "manageStaff",
@@ -63,12 +65,16 @@ export const STAFF_CAPABILITIES: Record<StaffRole, readonly StaffCapability[]> =
     admin: [
       "viewAdmin",
       "manageTickets",
+      "viewTeams",
       "manageTeams",
       "manageTournaments",
       "manageStaff",
       "moderate",
     ],
-    moderator: ["viewAdmin", "manageTickets", "moderate"],
+    // `viewTeams` (read the admin teams panel) without `manageTeams` (edit it):
+    // a moderator browses every team read-only, but only owner/admin can change
+    // one from here.
+    moderator: ["viewAdmin", "manageTickets", "viewTeams", "moderate"],
     tournament_admin: ["viewAdmin", "manageTournaments"],
   };
 

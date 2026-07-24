@@ -2,13 +2,22 @@ import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 
 import { SignOutButton } from "@/components/auth/SignOutButton";
-import { DashboardNav, type NavItem } from "@/components/dashboard/DashboardNav";
+import {
+  DashboardNav,
+  type NavChild,
+  type NavItem,
+} from "@/components/dashboard/DashboardNav";
 import { DensityCookie } from "@/components/dashboard/accounts/DensityCookie";
 import { SetupBanner } from "@/components/dashboard/SetupBanner";
 import { DENSITY_COOKIE, asDensity, type Density } from "@/lib/density";
 import { getProfile } from "@/lib/registration";
 import { getSessionCached } from "@/lib/session";
-import { isStaff } from "@/lib/staff";
+import { getStaffRoles } from "@/lib/staff";
+import {
+  canAny,
+  type StaffCapability,
+  type StaffRole,
+} from "@/lib/staff-shared";
 
 export type DashboardNavKey =
   | "home"
@@ -27,16 +36,32 @@ const NAV_ITEMS: NavItem[] = [
   { key: "account", label: "Account", href: "/account/" },
 ];
 
-/** The Admin group, appended only for staff. Its children are the sub-tabs. */
-const ADMIN_ITEM: NavItem = {
-  key: "admin",
-  label: "Admin",
-  children: [
-    { key: "tickets", label: "Support", href: "/admin/tickets/" },
-    { key: "teams", label: "Teams", href: "/admin/teams/" },
-    { key: "tournaments", label: "Tournaments", href: "/admin/tournaments/" },
-  ],
-};
+/**
+ * The Admin group's sub-tabs and the capability each one needs. A staff member
+ * only sees the children their roles unlock: a moderator gets Support + Teams
+ * (read-only), an owner/admin also gets Staff, a tournament admin only
+ * Tournaments. The page-level gate is still the real boundary — this just keeps
+ * the rail from offering tabs that would immediately redirect.
+ */
+const ADMIN_CHILDREN: (NavChild & { capability: StaffCapability })[] = [
+  { key: "tickets", label: "Support", href: "/admin/tickets/", capability: "manageTickets" },
+  { key: "teams", label: "Teams", href: "/admin/teams/", capability: "viewTeams" },
+  {
+    key: "tournaments",
+    label: "Tournaments",
+    href: "/admin/tournaments/",
+    capability: "manageTournaments",
+  },
+  { key: "staff", label: "Staff", href: "/admin/staff/", capability: "manageStaff" },
+];
+
+/** The Admin group for a viewer's roles, or null when they can see nothing. */
+function adminItem(roles: StaffRole[]): NavItem | null {
+  const children = ADMIN_CHILDREN.filter((child) =>
+    canAny(roles, child.capability),
+  ).map(({ key, label, href }) => ({ key, label, href }));
+  return children.length ? { key: "admin", label: "Admin", children } : null;
+}
 
 /**
  * The member's bubble-density preference, cookie first.
@@ -81,12 +106,13 @@ export async function DashboardShell({
   const userId = session?.user.id ?? null;
 
   // Lands on .ff-dash, which is where the density tokens are defined.
-  const [density, showAdmin] = await Promise.all([
+  const [density, staffRoles] = await Promise.all([
     resolveDensity(userId),
-    userId ? isStaff(userId) : Promise.resolve(false),
+    userId ? getStaffRoles(userId) : Promise.resolve<StaffRole[]>([]),
   ]);
 
-  const items = showAdmin ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS;
+  const admin = adminItem(staffRoles);
+  const items = admin ? [...NAV_ITEMS, admin] : NAV_ITEMS;
 
   return (
     <main id="wp--skip-link--target" className="ff-main ff-main--fill">

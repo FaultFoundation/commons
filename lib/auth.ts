@@ -102,6 +102,16 @@ export function getAuth() {
     database: drizzleAdapter(getDb(), { provider: "sqlite" }),
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
+    // Cloudflare terminates TLS and puts the real client IP in CF-Connecting-IP.
+    // Without this, Better Auth can't resolve an IP and rate-limits every client
+    // into one shared per-path bucket — weakening brute-force protection on
+    // sign-in and 2FA. Trust only this header; our own edge sets it and the
+    // client can't forge it.
+    advanced: {
+      ipAddress: {
+        ipAddressHeaders: ["cf-connecting-ip"],
+      },
+    },
     // `next dev` serves on :3000 while BETTER_AUTH_URL points at :3999
     // (the wrangler preview port) — trust both origins in development.
     // In production the baseURL origin is always trusted; listing both the

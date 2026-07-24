@@ -21,11 +21,7 @@ export function TicketReply({
   const [error, setError] = useState<string | null>(null);
 
   if (closed) {
-    return (
-      <p className="ff-ticket-muted">
-        This ticket is closed. Reopen it to reply.
-      </p>
-    );
+    return <p className="ff-ticket-muted">This ticket is closed.</p>;
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {

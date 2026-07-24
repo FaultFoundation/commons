@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import {
   assignTicket,
   closeTicket,
-  reopenTicket,
   setTicketPriority,
 } from "@/app/admin/tickets/actions";
 import {
@@ -96,14 +95,7 @@ export function TicketToolbar({
         </label>
 
         {closed ? (
-          <button
-            className="ff-btn ff-btn--sm"
-            type="button"
-            disabled={pending}
-            onClick={() => run(() => reopenTicket(ticketId))}
-          >
-            Reopen
-          </button>
+          <span className="ff-ticket-muted">Closed</span>
         ) : (
           <button
             className="ff-btn ff-btn--danger ff-btn--sm"

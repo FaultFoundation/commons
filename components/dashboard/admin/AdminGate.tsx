@@ -30,9 +30,16 @@ export async function AdminGate({ children }: { children: ReactNode }) {
   if (!session) redirect("/login/");
   const userId = session.user.id;
 
-  await syncStaffRolesFromDiscord(userId, requestHeaders);
-
-  const staff = await requireStaffCapability(userId, "viewAdmin");
+  // Discord-linked role detection is kept OFF the common render path: the live
+  // refresh re-runs this every few seconds, and syncing hits the Discord API
+  // (token refresh + a fetch) which blows the Worker's CPU budget. Only a
+  // not-yet-staff visitor pays for it (once — they're then staff or redirected);
+  // for existing staff the sync runs at unlock instead (app/admin/actions.ts).
+  let staff = await requireStaffCapability(userId, "viewAdmin");
+  if (!staff.ok) {
+    await syncStaffRolesFromDiscord(userId, requestHeaders);
+    staff = await requireStaffCapability(userId, "viewAdmin");
+  }
   if (!staff.ok) redirect("/home/");
 
   // Read the 2FA state from D1, not the session: the session can be served from

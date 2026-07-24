@@ -7,6 +7,7 @@ import { user } from "@/db/schema";
 import { clearAdminUnlock, setAdminUnlock } from "@/lib/admin-unlock";
 import { getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { syncStaffRolesFromDiscord } from "@/lib/integrations";
 import { requireStaffCapability } from "@/lib/staff";
 
 // ---------------------------------------------------------------------------
@@ -73,6 +74,9 @@ export async function unlockAdmin(input: {
   }
 
   await setAdminUnlock(userId);
+  // Reconcile Discord-linked roles here (best-effort) rather than on every
+  // render — this runs about once per 15-minute unlock window.
+  await syncStaffRolesFromDiscord(userId, requestHeaders);
   return { ok: true };
 }
 

@@ -13,7 +13,6 @@ import {
   closeTicket as closeTicketRow,
   getTicket,
   getTicketMessages,
-  reopenTicket as reopenTicketRow,
   updateTicket,
 } from "@/lib/tickets";
 import {
@@ -223,14 +222,6 @@ export async function closeTicket(ticketId: string): Promise<ActionResult> {
       ticketId,
     );
   }
-  revalidateTicket(ticketId);
-  return { ok: true };
-}
-
-export async function reopenTicket(ticketId: string): Promise<ActionResult> {
-  const gate = await requireActor();
-  if (!gate.ok) return gate;
-  await reopenTicketRow(ticketId);
   revalidateTicket(ticketId);
   return { ok: true };
 }

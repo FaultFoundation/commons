@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { eq, inArray } from "drizzle-orm";
 
 import { staffRoles, user } from "@/db/schema";
@@ -26,16 +27,19 @@ export const DISCORD_GRANT = "discord";
 // can layer on later without changing callers.
 // ---------------------------------------------------------------------------
 
-/** Every staff role the user holds, unknown/legacy values dropped. */
-export async function getStaffRoles(userId: string): Promise<StaffRole[]> {
-  const rows = await getDb()
-    .select({ role: staffRoles.role })
-    .from(staffRoles)
-    .where(eq(staffRoles.userId, userId));
-  return rows
-    .map((row) => asStaffRole(row.role))
-    .filter((role): role is StaffRole => role !== null);
-}
+/** Every staff role the user holds, unknown/legacy values dropped. Memoized per
+    request: isStaff (shell) and requireStaffCapability (gate) both call it. */
+export const getStaffRoles = cache(
+  async (userId: string): Promise<StaffRole[]> => {
+    const rows = await getDb()
+      .select({ role: staffRoles.role })
+      .from(staffRoles)
+      .where(eq(staffRoles.userId, userId));
+    return rows
+      .map((row) => asStaffRole(row.role))
+      .filter((role): role is StaffRole => role !== null);
+  },
+);
 
 /** Whether the user has any staff access at all (drives tab visibility). */
 export async function isStaff(userId: string): Promise<boolean> {

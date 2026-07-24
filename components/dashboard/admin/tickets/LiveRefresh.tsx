@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
  * new mirrored messages and queue changes appear without a manual refresh.
  * Pauses while the tab is hidden so a backgrounded tab isn't polling D1.
  */
-export function LiveRefresh({ seconds = 5 }: { seconds?: number }) {
+export function LiveRefresh({ seconds = 8 }: { seconds?: number }) {
   const router = useRouter();
   useEffect(() => {
     const tick = () => {

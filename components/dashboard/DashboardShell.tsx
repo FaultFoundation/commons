@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { DashboardNav, type NavItem } from "@/components/dashboard/DashboardNav";
 import { DensityCookie } from "@/components/dashboard/accounts/DensityCookie";
 import { SetupBanner } from "@/components/dashboard/SetupBanner";
-import { getAuth } from "@/lib/auth";
 import { DENSITY_COOKIE, asDensity, type Density } from "@/lib/density";
 import { getProfile } from "@/lib/registration";
+import { getSessionCached } from "@/lib/session";
 import { isStaff } from "@/lib/staff";
 
 export type DashboardNavKey =
@@ -77,7 +77,7 @@ export async function DashboardShell({
   surface?: "technical";
   children: ReactNode;
 }) {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  const session = await getSessionCached();
   const userId = session?.user.id ?? null;
 
   // Lands on .ff-dash, which is where the density tokens are defined.

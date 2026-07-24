@@ -7,9 +7,9 @@ import { AdminUnlock } from "@/components/dashboard/admin/AdminUnlock";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { twoFactor, user } from "@/db/schema";
 import { isAdminUnlocked } from "@/lib/admin-unlock";
-import { getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { syncStaffRolesFromDiscord } from "@/lib/integrations";
+import { getSessionCached } from "@/lib/session";
 import { requireStaffCapability } from "@/lib/staff";
 
 /**
@@ -26,7 +26,7 @@ import { requireStaffCapability } from "@/lib/staff";
  */
 export async function AdminGate({ children }: { children: ReactNode }) {
   const requestHeaders = await headers();
-  const session = await getAuth().api.getSession({ headers: requestHeaders });
+  const session = await getSessionCached();
   if (!session) redirect("/login/");
   const userId = session.user.id;
 
@@ -42,21 +42,25 @@ export async function AdminGate({ children }: { children: ReactNode }) {
   }
   if (!staff.ok) redirect("/home/");
 
-  // Read the 2FA state from D1, not the session: the session can be served from
-  // Better Auth's cookie cache, so enrolling in another tab would otherwise
-  // leave this gate thinking 2FA is still off. One row gives both flags —
-  // `enabled` (is a second factor required) and `verified` (was an authenticator
-  // ever proven, i.e. is TOTP an option or only email).
+  // Common path first, and cheap: a valid unlock cookie needs no DB read, so a
+  // page under the live-refresh doesn't pay for the 2FA lookup every few
+  // seconds. The 2FA state is only needed to render the prompts below.
+  if (await isAdminUnlocked(userId)) {
+    return <>{children}</>;
+  }
+
+  // Not unlocked — read the 2FA state from D1 (not the session, which can be
+  // cookie-cached and stale after enrolling in another tab). One row gives both
+  // `enabled` (is a second factor required) and `verified` (is TOTP an option
+  // or only email).
   const rows = await getDb()
     .select({ enabled: user.twoFactorEnabled, totpVerified: twoFactor.verified })
     .from(user)
     .leftJoin(twoFactor, eq(twoFactor.userId, user.id))
     .where(eq(user.id, userId))
     .limit(1);
-  const twoFactorEnabled = rows[0]?.enabled ?? false;
-  const hasTotp = Boolean(rows[0]?.totpVerified);
 
-  if (!twoFactorEnabled) {
+  if (!rows[0]?.enabled) {
     return (
       <div className="ff-bubble-grid">
         <Bubble title="Two-Factor Required" span="full">
@@ -74,20 +78,16 @@ export async function AdminGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!(await isAdminUnlocked(userId))) {
-    const methods = hasTotp ? ["totp", "otp"] : ["otp"];
-    return (
-      <div className="ff-bubble-grid">
-        <Bubble title="Verify to Continue" span="full">
-          <p>
-            Confirm it&rsquo;s you before making changes. This keeps admin
-            access unlocked for a short while.
-          </p>
-          <AdminUnlock methods={methods} email={session.user.email} />
-        </Bubble>
-      </div>
-    );
-  }
-
-  return <>{children}</>;
+  const methods = rows[0]?.totpVerified ? ["totp", "otp"] : ["otp"];
+  return (
+    <div className="ff-bubble-grid">
+      <Bubble title="Verify to Continue" span="full">
+        <p>
+          Confirm it&rsquo;s you before making changes. This keeps admin access
+          unlocked for a short while.
+        </p>
+        <AdminUnlock methods={methods} email={session.user.email} />
+      </Bubble>
+    </div>
+  );
 }

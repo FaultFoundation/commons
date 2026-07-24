@@ -9,6 +9,11 @@ export const dynamic = "force-dynamic";
 type CreateBody = {
   discordUserId?: string;
   discordUsername?: string;
+  // Set at creation (the bot already made the channel), so a ticket is never
+  // left without its channel link — that link is how a Discord-side close finds
+  // and closes the row.
+  discordChannelId?: string;
+  discordChannelName?: string;
   category?: string;
   subject?: string;
   /** The opener's modal text — stored as the first (user) message. */
@@ -32,6 +37,8 @@ export async function POST(request: Request) {
     userId,
     discordUserId: body.discordUserId,
     discordUsername: body.discordUsername ?? null,
+    discordChannelId: body.discordChannelId ?? null,
+    discordChannelName: body.discordChannelName ?? null,
     category: body.category ?? null,
     subject: body.subject ?? null,
     firstMessage: body.description

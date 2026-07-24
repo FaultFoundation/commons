@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAdminUnlock } from "@/lib/admin-unlock";
 import { getAuth } from "@/lib/auth";
+import { enqueueBotJob } from "@/lib/bot-outbox";
 import { requireStaffCapability } from "@/lib/staff";
 import {
   addTicketNote,
@@ -12,15 +13,9 @@ import {
   closeTicket as closeTicketRow,
   getTicket,
   getTicketMessages,
-  linkMessageToDiscord,
   reopenTicket as reopenTicketRow,
   updateTicket,
 } from "@/lib/tickets";
-import {
-  bridgeCloseChannel,
-  bridgePostMessage,
-  bridgeSendTranscript,
-} from "@/lib/ticket-bridge";
 import {
   TICKET_NOTE_MAX,
   TICKET_REPLY_MAX,
@@ -146,7 +141,7 @@ export async function addNote(
 export async function replyToTicket(
   ticketId: string,
   content: string,
-): Promise<ActionResult<{ delivered: boolean }>> {
+): Promise<ActionResult> {
   const gate = await requireActor();
   if (!gate.ok) return gate;
 
@@ -162,7 +157,8 @@ export async function replyToTicket(
   const ticket = await getTicket(ticketId);
   if (!ticket) return { ok: false, error: "That ticket no longer exists." };
 
-  // Store first, so the reply is never lost even if Discord is unreachable.
+  // Store first, so the reply is never lost. It shows in the log immediately;
+  // the bot picks the job off the outbox and posts it into Discord shortly.
   const messageId = await appendMessage({
     ticketId,
     authorType: "staff",
@@ -172,23 +168,21 @@ export async function replyToTicket(
     source: "website",
   });
 
-  let delivered = false;
   if (messageId && ticket.discordChannelId) {
-    const result = await bridgePostMessage({
+    await enqueueBotJob(
+      "post_message",
+      {
+        messageId,
+        discordChannelId: ticket.discordChannelId,
+        authorName: gate.actor.userName,
+        content: value,
+      },
       ticketId,
-      discordChannelId: ticket.discordChannelId,
-      authorName: gate.actor.userName,
-      content: value,
-    });
-    delivered = result.delivered;
-    // Tie our row to the Discord message so the bot's own mirror is deduped.
-    if (result.discordMessageId) {
-      await linkMessageToDiscord(messageId, result.discordMessageId);
-    }
+    );
   }
 
   revalidateTicket(ticketId);
-  return { ok: true, delivered };
+  return { ok: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -207,11 +201,11 @@ export async function closeTicket(ticketId: string): Promise<ActionResult> {
     closeReason: "manual",
   });
   if (ticket.discordChannelId) {
-    await bridgeCloseChannel({
+    await enqueueBotJob(
+      "close_channel",
+      { discordChannelId: ticket.discordChannelId },
       ticketId,
-      discordChannelId: ticket.discordChannelId,
-      closedByName: gate.actor.userName,
-    });
+    );
   }
   revalidateTicket(ticketId);
   return { ok: true };
@@ -227,7 +221,7 @@ export async function reopenTicket(ticketId: string): Promise<ActionResult> {
 
 export async function exportTranscript(
   ticketId: string,
-): Promise<ActionResult<{ delivered: boolean }>> {
+): Promise<ActionResult> {
   const gate = await requireActor();
   if (!gate.ok) return gate;
 
@@ -242,19 +236,16 @@ export async function exportTranscript(
 
   const messages = await getTicketMessages(ticketId);
   const transcript = buildTranscript(ticket, messages);
-  const result = await bridgeSendTranscript({
+  await enqueueBotJob(
+    "send_transcript",
+    {
+      discordUserId: ticket.discordUserId,
+      filename: `ticket-${String(ticket.ticketNumber).padStart(4, "0")}.txt`,
+      content: transcript,
+    },
     ticketId,
-    discordUserId: ticket.discordUserId,
-    filename: `ticket-${String(ticket.ticketNumber).padStart(4, "0")}.txt`,
-    content: transcript,
-  });
-  if (!result.delivered) {
-    return {
-      ok: false,
-      error: "Couldn't reach the Discord bot to deliver the transcript.",
-    };
-  }
-  return { ok: true, delivered: true };
+  );
+  return { ok: true };
 }
 
 /** Plain-text transcript, generated from D1 (we hold the whole conversation). */

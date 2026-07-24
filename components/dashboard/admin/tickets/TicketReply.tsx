@@ -19,7 +19,6 @@ export function TicketReply({
   const [value, setValue] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   if (closed) {
     return (
@@ -34,7 +33,6 @@ export function TicketReply({
     if (pending || !value.trim()) return;
     setPending(true);
     setError(null);
-    setNotice(null);
     const result = await replyToTicket(ticketId, value);
     setPending(false);
     if (!result.ok) {
@@ -42,9 +40,6 @@ export function TicketReply({
       return;
     }
     setValue("");
-    if (!result.delivered) {
-      setNotice("Saved. Not yet delivered to Discord — the bot may be offline.");
-    }
     router.refresh();
   }
 
@@ -54,11 +49,6 @@ export function TicketReply({
         <div className="ff-auth__error" role="alert">
           <p>{error}</p>
         </div>
-      ) : null}
-      {notice ? (
-        <p className="ff-row__saved" role="status">
-          {notice}
-        </p>
       ) : null}
       <textarea
         className="ff-auth__input ff-ticket-textarea"

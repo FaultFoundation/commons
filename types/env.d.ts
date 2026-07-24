@@ -33,13 +33,8 @@ interface CloudflareEnv {
   // Default to Gmail submission; override to point at another provider.
   SMTP_HOST?: string;
   SMTP_PORT?: string;
-  // Support-ticket bridge to the Discord bot (both directions HMAC-signed).
-  // BOT_BRIDGE_URL: base URL of the bot's in-process HTTP server; the site
-  // calls it to post staff replies, close channels, and DM transcripts.
-  BOT_BRIDGE_URL?: string;
-  // Shared secret for site -> bot calls (bot verifies the X-Signature HMAC).
-  BOT_BRIDGE_SECRET?: string;
-  // Shared secret for bot -> site calls (app/api/bot/* verifies it). Kept
-  // distinct from BOT_BRIDGE_SECRET so the two directions rotate independently.
+  // Shared secret for the Discord bot's calls to the site: the bot HMAC-signs
+  // POST bodies (app/api/bot/*) and bears it as a token on the outbox poll GET.
+  // The bot only ever calls the site (outbound), so there is no reverse secret.
   BOT_API_SECRET?: string;
 }

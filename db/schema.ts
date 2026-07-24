@@ -1051,6 +1051,37 @@ export const supportTicketMessages = sqliteTable(
   ],
 );
 
+// Outbound work queue for the Discord bot. The bot can only make outbound
+// calls (managed hosting), so instead of the site pushing to it, the bot polls
+// this table and carries out each job: post a staff reply, close a channel, DM
+// a transcript. Enqueued by the dashboard actions; drained via /api/bot/outbox.
+export const botOutbox = sqliteTable(
+  "bot_outbox",
+  {
+    id: text("id").primaryKey(),
+    // post_message | close_channel | send_transcript
+    kind: text("kind").notNull(),
+    ticketId: text("ticket_id").references(() => supportTickets.id, {
+      onDelete: "cascade",
+    }),
+    // JSON args for the job (channel id, content, transcript, …).
+    payload: text("payload").notNull(),
+    // pending | claimed | done | failed
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    // Set when a poll hands the job out; a stale claim (crash mid-run) is
+    // re-offered after a visibility timeout.
+    claimedAt: integer("claimed_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [index("bot_outbox_status_idx").on(t.status, t.createdAt)],
+);
+
 // Staff-only notes, never shown to the ticket opener or mirrored to Discord.
 export const supportTicketNotes = sqliteTable(
   "support_ticket_notes",

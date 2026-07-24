@@ -2,10 +2,10 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 import { hmacHex, safeEqualHex } from "@/lib/hmac";
 
-// Verifies bot -> website calls (app/api/bot/*). The bot signs the raw request
-// body with BOT_API_SECRET (HMAC-SHA256 hex) in the X-Signature header; we
-// recompute and compare in constant time. Kept separate from BOT_BRIDGE_SECRET
-// (the other direction) so the two rotate independently.
+// Verifies the bot's calls to the site (app/api/bot/*). The bot signs POST
+// bodies with BOT_API_SECRET (HMAC-SHA256 hex) in the X-Signature header; we
+// recompute and compare in constant time. The outbox poll GET has no body, so
+// it bears the same secret as a token (authorizeBotBearer).
 
 export type BotBodyResult<T> =
   | { ok: true; data: T }
@@ -42,4 +42,30 @@ export async function readSignedBotBody<T>(
   } catch {
     return { ok: false, status: 400, error: "invalid JSON" };
   }
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+/**
+ * Authorize a bot GET (the outbox poll — no body to sign) with a bearer token
+ * equal to BOT_API_SECRET, compared in constant time. Over HTTPS this is the
+ * same trust as the HMAC used on the POST routes.
+ */
+export function authorizeBotBearer(
+  request: Request,
+): { ok: true } | { ok: false; status: number } {
+  const { env } = getCloudflareContext();
+  const secret = env.BOT_API_SECRET;
+  if (!secret) return { ok: false, status: 503 };
+  const header = request.headers.get("Authorization") ?? "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+  if (!token || !timingSafeEqual(token, secret)) {
+    return { ok: false, status: 401 };
+  }
+  return { ok: true };
 }

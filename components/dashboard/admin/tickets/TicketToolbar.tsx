@@ -141,7 +141,7 @@ export function TicketToolbar({
           onClick={() =>
             run(
               () => exportTranscript(ticketId),
-              "Transcript sent to the member.",
+              "Transcript queued — the bot will DM it shortly.",
             )
           }
         >

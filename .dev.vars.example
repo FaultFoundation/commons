@@ -58,12 +58,9 @@ BETTER_AUTH_URL=http://localhost:3999
 # SMTP_HOST=
 # SMTP_PORT=
 
-# Optional — support-ticket bridge to the Discord bot. Leave unset and the
-# ticket dashboard still works (D1 is the source of truth); replies/closes just
-# aren't reflected in Discord until the bot is reachable.
-#   BOT_BRIDGE_URL   base URL of the bot's HTTP server (site -> bot calls)
-#   BOT_BRIDGE_SECRET  shared secret the bot verifies on site -> bot calls
-#   BOT_API_SECRET   shared secret app/api/bot/* verifies on bot -> site calls
-# BOT_BRIDGE_URL=http://localhost:8787
-# BOT_BRIDGE_SECRET=replace-with-a-long-random-string
+# Optional — shared secret for the Discord bot's calls to this site. The bot
+# only ever calls outbound (opening tickets, mirroring messages, and polling
+# /api/bot/outbox for staff replies / closes / transcripts to carry out), so
+# nothing on the bot needs to be publicly reachable. Leave unset and the ticket
+# dashboard still works (D1 is the source of truth); Discord just isn't wired up.
 # BOT_API_SECRET=replace-with-a-long-random-string

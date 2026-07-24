@@ -9,6 +9,7 @@ import {
   user,
 } from "@/db/schema";
 import { getDb } from "@/lib/db";
+import { formatTicketNumber } from "@/lib/tickets-shared";
 import type {
   TicketAuthorType,
   TicketMessageSource,
@@ -398,6 +399,32 @@ export async function getTicketByChannel(
     .where(eq(supportTickets.discordChannelId, discordChannelId))
     .limit(1);
   return rows[0] ?? null;
+}
+
+/** Plain-text transcript, generated from D1 (we hold the whole conversation).
+    Shared by the dashboard close and the Discord-close mirror. */
+export function buildTranscript(
+  ticket: Pick<
+    TicketDetail,
+    "ticketNumber" | "category" | "openerName" | "createdAt" | "status"
+  >,
+  messages: TicketMessage[],
+): string {
+  const header = [
+    `Support Ticket ${formatTicketNumber(ticket.ticketNumber)}${
+      ticket.category ? ` — ${ticket.category}` : ""
+    }`,
+    `Opened by ${ticket.openerName} on ${ticket.createdAt.toISOString()}`,
+    `Status: ${ticket.status}`,
+    "",
+    "----------------------------------------",
+    "",
+  ];
+  const body = messages.map(
+    (message) =>
+      `[${message.createdAt.toISOString()}] ${message.authorName} (${message.authorType}):\n${message.content}\n`,
+  );
+  return [...header, ...body].join("\n");
 }
 
 /** Resolve a Discord snowflake to a linked site account, or null. Lets a ticket

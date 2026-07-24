@@ -10,6 +10,7 @@ import { isStaff, requireStaffCapability } from "@/lib/staff";
 import {
   addTicketNote,
   appendMessage,
+  buildTranscript,
   closeTicket as closeTicketRow,
   getTicket,
   getTicketMessages,
@@ -18,7 +19,6 @@ import {
 import {
   TICKET_NOTE_MAX,
   TICKET_REPLY_MAX,
-  formatTicketNumber,
   isTicketPriority,
 } from "@/lib/tickets-shared";
 
@@ -224,26 +224,4 @@ export async function closeTicket(ticketId: string): Promise<ActionResult> {
   }
   revalidateTicket(ticketId);
   return { ok: true };
-}
-
-/** Plain-text transcript, generated from D1 (we hold the whole conversation). */
-function buildTranscript(
-  ticket: Awaited<ReturnType<typeof getTicket>> & object,
-  messages: Awaited<ReturnType<typeof getTicketMessages>>,
-): string {
-  const header = [
-    `Support Ticket ${formatTicketNumber(ticket.ticketNumber)}${
-      ticket.category ? ` — ${ticket.category}` : ""
-    }`,
-    `Opened by ${ticket.openerName} on ${ticket.createdAt.toISOString()}`,
-    `Status: ${ticket.status}`,
-    "",
-    "----------------------------------------",
-    "",
-  ];
-  const body = messages.map((message) => {
-    const stamp = message.createdAt.toISOString();
-    return `[${stamp}] ${message.authorName} (${message.authorType}):\n${message.content}\n`;
-  });
-  return [...header, ...body].join("\n");
 }

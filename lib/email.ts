@@ -136,6 +136,44 @@ export async function sendEmailVerificationLink({
 }
 
 /**
+ * Parental/guardian consent request for a minor (13–17) registrant. Link-based:
+ * the parent opens it to confirm, so it lands them straight on the consent page
+ * — no code for a non-account-holder to type.
+ */
+export async function sendParentalConsentEmail({
+  to,
+  memberName,
+  url,
+}: {
+  to: string;
+  /** The teen's account name, so the parent knows what they're approving. */
+  memberName: string;
+  url: string;
+}): Promise<{ ok: boolean }> {
+  return sendMail({
+    to,
+    devLabel: "parental consent link",
+    subject: "Approve a Fault Foundation account",
+    text: [
+      "Hi,",
+      "",
+      `${memberName} listed you as their parent or guardian while signing up`,
+      "for the Fault Foundation, a collegiate/community Overwatch organization.",
+      "Because they're under 18, we need your OK before their account is active.",
+      "",
+      "If that's fine with you, confirm by opening the link below:",
+      "",
+      url,
+      "",
+      "The link expires in 7 days. If you didn't expect this or don't approve,",
+      "you can ignore this email — the account stays inactive until it's opened.",
+      "",
+      ...SIGNATURE,
+    ].join("\n"),
+  });
+}
+
+/**
  * Second-factor code, sent at sign-in and when enrolling in email 2FA.
  *
  * Deliberately terse and urgent: unlike the other two, receiving this without

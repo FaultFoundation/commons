@@ -40,6 +40,7 @@ export type StaffCapability =
   | "manageTeams"
   | "manageTournaments"
   | "manageStaff"
+  | "verifyMembers"
   | "moderate";
 
 /**
@@ -60,6 +61,7 @@ export const STAFF_CAPABILITIES: Record<StaffRole, readonly StaffCapability[]> =
       "manageTeams",
       "manageTournaments",
       "manageStaff",
+      "verifyMembers",
       "moderate",
     ],
     admin: [
@@ -69,12 +71,20 @@ export const STAFF_CAPABILITIES: Record<StaffRole, readonly StaffCapability[]> =
       "manageTeams",
       "manageTournaments",
       "manageStaff",
+      "verifyMembers",
       "moderate",
     ],
     // `viewTeams` (read the admin teams panel) without `manageTeams` (edit it):
     // a moderator browses every team read-only, but only owner/admin can change
-    // one from here.
-    moderator: ["viewAdmin", "manageTickets", "viewTeams", "moderate"],
+    // one from here. `verifyMembers` lets them clear the registration review
+    // queue (alumni without a school email).
+    moderator: [
+      "viewAdmin",
+      "manageTickets",
+      "viewTeams",
+      "verifyMembers",
+      "moderate",
+    ],
     tournament_admin: ["viewAdmin", "manageTournaments"],
   };
 

@@ -10,6 +10,7 @@ import { CopyInviteButton } from "@/components/dashboard/teams/CopyInviteButton"
 import { CreateTeamForm } from "@/components/dashboard/teams/CreateTeamForm";
 import { JoinByLinkForm } from "@/components/dashboard/teams/JoinByLinkForm";
 import { getAuth } from "@/lib/auth";
+import { getRegistrationState } from "@/lib/registration";
 import { isVerifiedMember, listMyTeams } from "@/lib/teams";
 
 // Session-gated: always rendered per request.
@@ -26,10 +27,12 @@ export default async function TeamSetupPage() {
     redirect("/login/");
   }
 
-  const [myTeams, verified] = await Promise.all([
+  const [myTeams, verified, reg] = await Promise.all([
     listMyTeams(session.user.id),
     isVerifiedMember(session.user.id),
+    getRegistrationState(session.user.id),
   ]);
+  const status = reg?.status ?? null;
 
   return (
     <SetupShell step={3}>
@@ -79,6 +82,23 @@ export default async function TeamSetupPage() {
                 <div className="ff-bubble__wip">Work in progress</div>
               </Disclosure>
             </>
+          ) : status === "MANUAL_REVIEW" ? (
+            <BubbleRow
+              label="Membership"
+              value="Under review"
+              note="Your registration needs a manual check. We've opened a ticket in Discord — we'll follow up with you there."
+            />
+          ) : status === "CONSENT_PENDING" ? (
+            <BubbleRow
+              label="Membership"
+              value="Awaiting consent"
+              note="Waiting for your parent or guardian to confirm by email. Teams open up once they do."
+              action={
+                <a className="ff-btn ff-btn--sm" href="/account/setup/">
+                  Resend
+                </a>
+              }
+            />
           ) : (
             <BubbleRow
               label="Membership"

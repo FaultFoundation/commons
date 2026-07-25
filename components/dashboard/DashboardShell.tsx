@@ -45,6 +45,12 @@ const NAV_ITEMS: NavItem[] = [
  */
 const ADMIN_CHILDREN: (NavChild & { capability: StaffCapability })[] = [
   { key: "tickets", label: "Support", href: "/admin/tickets/", capability: "manageTickets" },
+  {
+    key: "verification",
+    label: "Verification",
+    href: "/admin/verification/",
+    capability: "verifyMembers",
+  },
   { key: "teams", label: "Teams", href: "/admin/teams/", capability: "viewTeams" },
   {
     key: "tournaments",

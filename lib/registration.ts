@@ -10,6 +10,7 @@ import {
   schools,
   teamMembers,
   teams,
+  user,
 } from "@/db/schema";
 import { PROGRAM_COLLEGIATE_ID } from "@/lib/programs";
 import { CODE_LENGTH } from "@/lib/registration-shared";
@@ -258,6 +259,75 @@ export async function getRegistrationState(
     circumstances: row?.circumstances ?? null,
     collegeId: row?.collegeId ?? null,
   };
+}
+
+/** A registration waiting on a staff decision — the verification queue's row. */
+export type ReviewMember = {
+  userId: string;
+  membershipId: string;
+  name: string;
+  email: string;
+  userType: string | null;
+  ageRange: string | null;
+  schoolName: string | null;
+  schoolEmail: string | null;
+  graduationDate: string | null;
+  referrer: string | null;
+  circumstances: string | null;
+  createdAt: number;
+};
+
+/**
+ * Everyone parked in MANUAL_REVIEW — chiefly alumni without a school email.
+ * The staff verification panel lists these and flips them to VERIFIED or
+ * INELIGIBLE. Oldest first (longest-waiting on top).
+ */
+export async function listManualReviewMembers(): Promise<ReviewMember[]> {
+  const rows = await getDb()
+    .select({
+      userId: programMemberships.userId,
+      membershipId: programMemberships.id,
+      name: user.name,
+      email: user.email,
+      userType: collegiateRegistrations.userType,
+      schoolEmail: collegiateRegistrations.schoolEmail,
+      graduationDate: collegiateRegistrations.graduationDate,
+      referrer: collegiateRegistrations.referrer,
+      circumstances: collegiateRegistrations.circumstances,
+      collegeName: colleges.name,
+      ageRange: profiles.ageRange,
+      createdAt: programMemberships.createdAt,
+    })
+    .from(programMemberships)
+    .innerJoin(user, eq(user.id, programMemberships.userId))
+    .leftJoin(
+      collegiateRegistrations,
+      eq(collegiateRegistrations.membershipId, programMemberships.id),
+    )
+    .leftJoin(colleges, eq(colleges.id, collegiateRegistrations.collegeId))
+    .leftJoin(profiles, eq(profiles.userId, programMemberships.userId))
+    .where(
+      and(
+        eq(programMemberships.programId, PROGRAM_COLLEGIATE_ID),
+        eq(programMemberships.status, "MANUAL_REVIEW"),
+      ),
+    )
+    .orderBy(programMemberships.createdAt);
+
+  return rows.map((r) => ({
+    userId: r.userId,
+    membershipId: r.membershipId,
+    name: r.name,
+    email: r.email,
+    userType: r.userType,
+    ageRange: r.ageRange,
+    schoolName: r.collegeName ?? null,
+    schoolEmail: r.schoolEmail,
+    graduationDate: r.graduationDate,
+    referrer: r.referrer,
+    circumstances: r.circumstances,
+    createdAt: r.createdAt.getTime(),
+  }));
 }
 
 /** Which setup steps are actually finished, in step-rail order. */

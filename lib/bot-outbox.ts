@@ -12,7 +12,11 @@ import { linkMessageToDiscord } from "@/lib/tickets";
 // visibility timeout, so nothing is lost.
 // ---------------------------------------------------------------------------
 
-export type OutboxKind = "post_message" | "close_channel" | "send_transcript";
+export type OutboxKind =
+  | "post_message"
+  | "close_channel"
+  | "send_transcript"
+  | "create_ticket";
 
 const VISIBILITY_TIMEOUT_MS = 60_000;
 

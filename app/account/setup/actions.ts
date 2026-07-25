@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import { sendVerificationCodeEmail } from "@/lib/email";
 import { syncRoleConnection } from "@/lib/integrations";
+import { getPendingConsent, issueParentalConsent } from "@/lib/parental-consent";
 import {
   AGE_RANGES,
   CODE_TTL_MS,
@@ -30,10 +31,13 @@ import {
   hashCode,
   hashesEqual,
   hostnameOf,
+  isFreeEmailDomain,
   normalizeCodeInput,
   schoolEmailMatches,
   upsertCollegiateRegistration,
 } from "@/lib/registration";
+import { isMinor, isUnder13 } from "@/lib/registration-shared";
+import { ensureVerificationTicket } from "@/lib/verification-ticket";
 
 // ---------------------------------------------------------------------------
 // Server actions for the registration flow. Every action re-checks the
@@ -56,10 +60,14 @@ export type SubmitInput = {
   graduationDate?: string;
   referrer?: string;
   circumstances?: string;
+  /** Minors (13–17) only: the parent/guardian address that must consent. */
+  parentEmail?: string;
 };
 
 export type SubmitResult =
   | { ok: true; outcome: "EMAIL_SENT"; email: string }
+  | { ok: true; outcome: "CONSENT_PENDING"; parentEmail: string }
+  | { ok: true; outcome: "VERIFIED" }
   | { ok: true; outcome: "MANUAL_REVIEW" }
   | { ok: false; error: string };
 
@@ -79,7 +87,12 @@ async function requireUserId(): Promise<string | null> {
 // Statuses the member can still act on; anything else (VERIFIED, INELIGIBLE,
 // legacy KICKED/…) is read-only from the site.
 function isOpenStatus(status: string | null): boolean {
-  return status === null || status === "EMAIL_SENT" || status === "MANUAL_REVIEW";
+  return (
+    status === null ||
+    status === "EMAIL_SENT" ||
+    status === "CONSENT_PENDING" ||
+    status === "MANUAL_REVIEW"
+  );
 }
 
 /**
@@ -171,8 +184,10 @@ async function issueCode(userId: string, email: string): Promise<SubmitResult> {
 }
 
 export async function submitRegistration(input: SubmitInput): Promise<SubmitResult> {
-  const userId = await requireUserId();
-  if (!userId) return { ok: false, error: "You need to be signed in." };
+  const session = await getAuth().api.getSession({ headers: await headers() });
+  if (!session) return { ok: false, error: "You need to be signed in." };
+  const userId = session.user.id;
+  const memberName = session.user.name;
 
   const state = await getRegistrationState(userId);
   if (state && !isOpenStatus(state.status)) {
@@ -184,6 +199,12 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
   const country = (input.country ?? "").trim();
   if (!userType) return { ok: false, error: "Pick a membership type." };
   if (!ageRange) return { ok: false, error: "Pick an age range." };
+
+  // COPPA: never knowingly take a registration from an under-13. Nothing is
+  // persisted — they're turned away before any data is stored.
+  if (isUnder13(ageRange)) {
+    return { ok: false, error: "You need to be at least 13 to register." };
+  }
 
   const db = getDb();
   const memberCountry = country.slice(0, 100) || null;
@@ -208,32 +229,71 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
   };
 
   /** Commit the outcome once everything that can fail already has. */
-  const setStatus = async (status: "EMAIL_SENT" | "MANUAL_REVIEW") => {
-    await ensureCollegiateMembership(userId, { status });
+  const setStatus = async (
+    status: "EMAIL_SENT" | "CONSENT_PENDING" | "MANUAL_REVIEW" | "VERIFIED",
+    opts?: { verifiedAt?: Date },
+  ) => {
+    await ensureCollegiateMembership(userId, {
+      status,
+      verifiedAt: opts?.verifiedAt ?? null,
+    });
     revalidatePath("/home/", "layout");
     revalidatePath("/account/", "layout");
   };
 
-  // --- "None of the above": straight to manual review, no school/email. ---
+  // --- Minors (13–17): parental consent, whatever the membership type. The
+  //     parent opening the emailed link is the verification — no student code,
+  //     no documents. Under-13 was already turned away above. ---
+  if (isMinor(ageRange)) {
+    // High-schoolers may self-attest a school; nobody types a student email.
+    const schoolName = (input.schoolName ?? "").trim().slice(0, 200);
+    const schoolWebsite = (input.schoolWebsite ?? "").trim().slice(0, 300);
+    let collegeId: string | null = null;
+    if (userType === "High school student" && schoolName) {
+      collegeId = await getOrCreateCollege({
+        name: schoolName,
+        country: memberCountry,
+        webPages: schoolWebsite ? [schoolWebsite] : [],
+      });
+    }
+    await save({
+      collegeId,
+      schoolEmail: null,
+      graduationDate: null,
+      referrer: null,
+      circumstances: null,
+      domainMatched: null,
+    });
+    const consent = await issueParentalConsent(
+      userId,
+      input.parentEmail ?? "",
+      memberName,
+    );
+    if (!consent.ok) return { ok: false, error: consent.error };
+    await setStatus("CONSENT_PENDING");
+    return { ok: true, outcome: "CONSENT_PENDING", parentEmail: consent.parentEmail };
+  }
+
+  // --- Guests (adult "None of the above"): instant, no email, full access.
+  //     `user_type` records that they're a guest for future gating. ---
   if (userType === "None of the above") {
     const referrer = (input.referrer ?? "").trim().slice(0, 200);
     const circumstances = (input.circumstances ?? "").trim().slice(0, 2000);
-    if (!circumstances) {
-      return { ok: false, error: "Tell us a bit about your circumstances." };
-    }
     await save({
       collegeId: null,
       referrer: referrer || null,
-      circumstances,
+      circumstances: circumstances || null,
       schoolEmail: null,
       graduationDate: null,
       domainMatched: null,
     });
-    await setStatus("MANUAL_REVIEW");
-    return { ok: true, outcome: "MANUAL_REVIEW" };
+    await setStatus("VERIFIED", { verifiedAt: new Date() });
+    // Push the guest member_type to Discord (best-effort).
+    await syncRoleConnection(userId, await headers());
+    return { ok: true, outcome: "VERIFIED" };
   }
 
-  // --- School paths (university student / alumnus / high school). ---
+  // --- Adult school paths (university student / alumnus / high school). ---
   const schoolEmail = (input.schoolEmail ?? "").trim().toLowerCase().slice(0, 254);
   const domain = emailDomain(schoolEmail);
   if (!domain || schoolEmail.length < 6 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(schoolEmail)) {
@@ -331,6 +391,13 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
     )
     .limit(1);
 
+  // Alumni are held to the same bar as students: the proof of past enrolment is
+  // a school-domain email. An alumnus whose email doesn't match (or is a free
+  // mailbox) can't self-serve — route them to staff review rather than issuing
+  // a code. Students keep today's lenient behaviour (a code either way).
+  const alumnusNeedsReview =
+    userType === "University alumnus" && (!matched || isFreeEmailDomain(domain));
+
   const collegeId = await getOrCreateCollege(collegeInput);
   const detail = {
     collegeId,
@@ -338,16 +405,22 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
     graduationDate: graduationDate || null,
     referrer: null,
     circumstances: null,
-    // Recorded, not enforced: a mismatch still gets a code today. The admin
-    // layer sweeps `false` rows once it exists.
     domainMatched: matched,
   };
 
   // Everything the member typed lands in D1 first — see `save` above.
   await save(detail);
 
-  if (dupe[0]) {
+  if (dupe[0] || alumnusNeedsReview) {
     await setStatus("MANUAL_REVIEW");
+    // Open a Discord ticket now if their Discord is already linked (a returning
+    // member re-registering); otherwise the Discord-link hook opens it later.
+    await ensureVerificationTicket(
+      userId,
+      dupe[0]
+        ? "Registration needs manual verification (school email already verified by another account)."
+        : "Registration needs manual verification (no matching school email).",
+    );
     return { ok: true, outcome: "MANUAL_REVIEW" };
   }
 
@@ -375,6 +448,36 @@ export async function resendCode(): Promise<ResendResult> {
       ok: false,
       error: result.error,
       cooldownSeconds: m ? Number(m[1]) : undefined,
+    };
+  }
+  return { ok: true };
+}
+
+/** Re-send the parental-consent link to the same parent/guardian address. */
+export async function resendParentalConsent(): Promise<ResendResult> {
+  const session = await getAuth().api.getSession({ headers: await headers() });
+  if (!session) return { ok: false, error: "You need to be signed in." };
+  const userId = session.user.id;
+
+  const state = await getRegistrationState(userId);
+  if (state?.status !== "CONSENT_PENDING") {
+    return { ok: false, error: "Nothing to resend — submit the form first." };
+  }
+  const consent = await getPendingConsent(userId);
+  if (!consent) {
+    return { ok: false, error: "Nothing to resend — submit the form first." };
+  }
+
+  const result = await issueParentalConsent(
+    userId,
+    consent.parentEmail,
+    session.user.name,
+  );
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: result.error,
+      cooldownSeconds: result.cooldownSeconds,
     };
   }
   return { ok: true };

@@ -13,6 +13,7 @@ import {
   mirrorPlatformIdentity,
   pushRoleConnection,
 } from "@/lib/platform-identities";
+import { ensureVerificationTicket } from "@/lib/verification-ticket";
 
 // Server-side Better Auth instance. Built per-request because the D1 binding
 // and secrets only exist on the request's Cloudflare context.
@@ -205,6 +206,12 @@ export function getAuth() {
                   account.userId,
                 );
               }
+              // Now that we know their Discord, open a support ticket if their
+              // registration is stuck in manual review — self-gates on status.
+              await ensureVerificationTicket(
+                account.userId,
+                "Registration needs manual verification (no matching school email).",
+              );
             } else if (account.providerId === "battlenet") {
               const battleTag = await fetchBattleTag(account.accessToken);
               await mirrorPlatformIdentity(

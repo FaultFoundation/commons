@@ -121,7 +121,7 @@ export default async function AccountPage({
             initialEmail={session.user.email}
             verified={session.user.emailVerified}
           />
-          {hasSchool ? (
+          {status === "VERIFIED" && hasSchool ? (
             <>
               {/* No `note` on either: the reason lives on the lock glyph's
                   hover, so the two rows don't each spend a line repeating it. */}
@@ -141,11 +141,29 @@ export default async function AccountPage({
                 lockTitle={SCHOOL_LOCK_NOTE}
               />
             </>
+          ) : status === "VERIFIED" ? (
+            // Verified with no school on file — a guest.
+            <BubbleRow
+              label="Membership"
+              value="Guest"
+              note="You're in with community access."
+            />
+          ) : status === "CONSENT_PENDING" ? (
+            <BubbleRow
+              label="Membership"
+              value="Awaiting consent"
+              note="Waiting for your parent or guardian to confirm by email."
+              action={
+                <a className="ff-btn ff-btn--sm" href="/account/setup/">
+                  Resend
+                </a>
+              }
+            />
           ) : status === "MANUAL_REVIEW" ? (
             <BubbleRow
               label="School"
               value="In Review"
-              note="Staff are reviewing your registration."
+              note="Your registration needs a manual check — we've opened a ticket in Discord and will follow up there."
             />
           ) : (
             <BubbleRow

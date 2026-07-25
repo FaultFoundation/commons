@@ -3,11 +3,19 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
-import { submitRegistration } from "@/app/account/setup/actions";
+import {
+  resendParentalConsent,
+  submitRegistration,
+} from "@/app/account/setup/actions";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { SETUP_DRAFT_KEY } from "@/components/dashboard/setup/draft";
 import { SchoolTypeahead, type SchoolHit } from "@/components/dashboard/SchoolTypeahead";
-import { AGE_RANGES, USER_TYPES } from "@/lib/registration-shared";
+import {
+  AGE_RANGES,
+  USER_TYPES,
+  isMinor,
+  isUnder13,
+} from "@/lib/registration-shared";
 
 export type AcademicInitialState = {
   status: string | null;
@@ -23,22 +31,28 @@ export type AcademicInitialState = {
 
 const TYPE_HINTS: Record<string, string> = {
   "University student": "Verify with your university email.",
-  "University alumnus": "Verify with your old school email, or we review by hand.",
-  "High school student": "Verify with your school email.",
-  "None of the above": "Tell us who referred you and we'll review by hand.",
+  "University alumnus": "Verify with your school email, or staff review it.",
+  "High school student": "A parent confirms by email if you're under 18.",
+  "None of the above": "Join instantly with limited access.",
 };
 
 /**
- * Step 1 of setup: everything the old four-screen register flow asked for,
- * on one page as two stacked bubbles. Submitting mails a code and moves to
- * /account/setup/code/ — except the "None of the above" path, which has no
- * address to verify and parks in manual review.
+ * Step 1 of setup, on one page as stacked bubbles. What happens on submit
+ * depends on age and type: under-13 is turned away; a minor (13–17) has a
+ * parent/guardian confirm by email; an adult guest joins instantly; a student,
+ * alumnus, or 18+ high-schooler gets an emailed code (an alumnus without a
+ * school email is parked in staff review).
  */
 export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [review, setReview] = useState(initial.status === "MANUAL_REVIEW");
+  const [consentSent, setConsentSent] = useState(
+    initial.status === "CONSENT_PENDING",
+  );
+  const [consentEmail, setConsentEmail] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
+  const [resendOk, setResendOk] = useState(false);
 
   const [userType, setUserType] = useState(initial.userType ?? "");
   const [ageRange, setAgeRange] = useState(initial.ageRange ?? "");
@@ -51,6 +65,7 @@ export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
   const [manualSchool, setManualSchool] = useState(false);
   const [referrer, setReferrer] = useState("");
   const [circumstances, setCircumstances] = useState("");
+  const [parentEmail, setParentEmail] = useState("");
 
   // Draft persistence. Coming back from the code page ("change email") or via
   // the browser's Back button must not wipe what was typed — the server only
@@ -73,6 +88,7 @@ export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
         if (str(d.graduationDate)) setGraduationDate(d.graduationDate as string);
         if (str(d.referrer)) setReferrer(d.referrer as string);
         if (str(d.circumstances)) setCircumstances(d.circumstances as string);
+        if (str(d.parentEmail)) setParentEmail(d.parentEmail as string);
         if (typeof d.schoolId === "number") setSchoolId(d.schoolId);
         if (typeof d.manualSchool === "boolean") setManualSchool(d.manualSchool);
       }
@@ -101,6 +117,7 @@ export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
           manualSchool,
           referrer,
           circumstances,
+          parentEmail,
         }),
       );
     } catch {
@@ -119,6 +136,7 @@ export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
     manualSchool,
     referrer,
     circumstances,
+    parentEmail,
   ]);
 
   const isNone = userType === "None of the above";
@@ -128,66 +146,134 @@ export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
   const needsGradDate = userType === "University student" || isHighSchool;
   const useManualEntry = isHighSchool || manualSchool;
 
-  const canSubmit = isNone
-    ? Boolean(userType && ageRange && circumstances.trim())
-    : Boolean(
-        userType &&
-          ageRange &&
-          country &&
-          schoolName.trim() &&
-          schoolEmail.trim() &&
-          (!needsGradDate || graduationDate),
-      );
+  const under13 = isUnder13(ageRange);
+  // A minor is 13–17; under-13 is handled separately as a hard block.
+  const minor = isMinor(ageRange) && !under13;
+
+  const canSubmit = under13
+    ? false
+    : minor
+      ? Boolean(userType && ageRange && parentEmail.trim())
+      : isNone
+        ? Boolean(userType && ageRange)
+        : Boolean(
+            userType &&
+              ageRange &&
+              country &&
+              schoolName.trim() &&
+              schoolEmail.trim() &&
+              (!needsGradDate || graduationDate),
+          );
 
   function submit() {
     setError(null);
     startTransition(async () => {
-      const result = await submitRegistration(
-        isNone
+      const input = minor
+        ? {
+            userType,
+            ageRange,
+            country,
+            parentEmail,
+            schoolName: isHighSchool ? schoolName : undefined,
+            schoolWebsite: isHighSchool ? schoolWebsite : undefined,
+          }
+        : isNone
           ? { userType, ageRange, country, referrer, circumstances }
           : {
               userType,
               ageRange,
               country,
-              schoolId: !useManualEntry && schoolId != null ? schoolId : undefined,
+              schoolId:
+                !useManualEntry && schoolId != null ? schoolId : undefined,
               schoolName,
               schoolWebsite,
               schoolEmail,
               graduationDate,
-            },
-      );
+            };
+      const result = await submitRegistration(input);
       if (!result.ok) {
         setError(result.error);
         return;
       }
       if (result.outcome === "MANUAL_REVIEW") {
-        setReview(true);
+        // Don't dead-end here. Let them keep setting up — linking Discord opens
+        // a support ticket, and the "under review" status surfaces once they
+        // finish or leave setup (team step + account page).
+        router.push("/account/setup/integrations/");
+        return;
+      }
+      if (result.outcome === "CONSENT_PENDING") {
+        setConsentEmail(result.parentEmail);
+        setResendOk(false);
+        setResendError(null);
+        setConsentSent(true);
+        return;
+      }
+      if (result.outcome === "VERIFIED") {
+        router.push("/account/setup/integrations/");
         return;
       }
       router.push("/account/setup/code/");
     });
   }
 
-  if (review) {
+  function onResend() {
+    setResendError(null);
+    setResendOk(false);
+    startTransition(async () => {
+      const result = await resendParentalConsent();
+      if (!result.ok) {
+        setResendError(result.error);
+        return;
+      }
+      setResendOk(true);
+    });
+  }
+
+  if (consentSent) {
     return (
       <div className="ff-card ff-reg">
-        <h2 className="ff-reg__title">We&rsquo;re On It</h2>
+        <h2 className="ff-reg__title">Check with Your Parent</h2>
         <p>
-          Your registration is with our staff for a manual look. You&rsquo;ll
-          hear from us on Discord.
+          We emailed{" "}
+          {consentEmail ? (
+            <strong>{consentEmail}</strong>
+          ) : (
+            "your parent or guardian"
+          )}{" "}
+          a link to approve your account. The moment they open it you&rsquo;re
+          verified — you can move on and finish the rest of setup meanwhile.
         </p>
+        {resendError ? (
+          <div className="ff-auth__error" role="alert">
+            <p>{resendError}</p>
+          </div>
+        ) : null}
+        {resendOk ? (
+          <p className="ff-row__saved" role="status">
+            Sent again.
+          </p>
+        ) : null}
         <div className="ff-reg__nav">
           <button
             className="ff-btn ff-btn--outline"
             type="button"
-            onClick={() => setReview(false)}
+            disabled={pending}
+            onClick={onResend}
           >
-            Edit and resubmit
+            {pending ? "Sending…" : "Resend link"}
           </button>
           <a className="ff-btn" href="/account/setup/integrations/">
             Next
           </a>
         </div>
+        <button
+          className="ff-reg__alt"
+          type="button"
+          onClick={() => setConsentSent(false)}
+        >
+          Use a different email
+        </button>
       </div>
     );
   }
@@ -237,11 +323,63 @@ export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
         </label>
       </Bubble>
 
-      {isNone ? (
-        <Bubble title="A Bit of Context" span="full">
+      {/* Age decides the rest of the flow. Nothing shows until a type is
+          picked, to keep the page from opening on a wall of fields. */}
+      {!userType ? null : under13 ? (
+        <Bubble title="One Moment" span="full">
           <p className="ff-auth__hint">
-            Non-students are welcome by referral. A staff member reviews these
-            by hand, so the more context the better.
+            You need to be at least 13 to register for the Fault Foundation.
+            Thanks for your interest — come back when you&rsquo;re a little
+            older.
+          </p>
+        </Bubble>
+      ) : minor ? (
+        <Bubble title="Parent or Guardian Consent" span="full">
+          <p className="ff-auth__hint">
+            Because you&rsquo;re under 18, a parent or guardian confirms your
+            account by email. Enter their address and we&rsquo;ll send them a
+            link — no documents, nothing else needed.
+          </p>
+          {isHighSchool ? (
+            <label className="ff-auth__field">
+              <span className="ff-auth__label">School name (optional)</span>
+              <input
+                className="ff-auth__input"
+                type="text"
+                value={schoolName}
+                maxLength={200}
+                onChange={(e) => setSchoolName(e.target.value)}
+              />
+            </label>
+          ) : null}
+          <label className="ff-auth__field">
+            <span className="ff-auth__label">Parent or guardian email</span>
+            <input
+              className="ff-auth__input"
+              type="email"
+              value={parentEmail}
+              maxLength={254}
+              placeholder="parent@example.com"
+              onChange={(e) => setParentEmail(e.target.value)}
+            />
+          </label>
+          <div className="ff-reg__nav">
+            <span />
+            <button
+              className="ff-btn"
+              type="button"
+              disabled={pending || !canSubmit}
+              onClick={submit}
+            >
+              {pending ? "Sending…" : "Email my parent/guardian"}
+            </button>
+          </div>
+        </Bubble>
+      ) : isNone ? (
+        <Bubble title="Join as a Guest" span="full">
+          <p className="ff-auth__hint">
+            Guests get in right away with community access. You can tell us who
+            sent you if you like — it&rsquo;s optional.
           </p>
           <label className="ff-auth__field">
             <span className="ff-auth__label">
@@ -256,13 +394,13 @@ export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
             />
           </label>
           <label className="ff-auth__field">
-            <span className="ff-auth__label">Your circumstances</span>
+            <span className="ff-auth__label">Anything to add? (optional)</span>
             <textarea
               className="ff-auth__input ff-reg__textarea"
               value={circumstances}
               maxLength={2000}
-              rows={5}
-              placeholder="How did you find us, and why would you like to join?"
+              rows={4}
+              placeholder="How did you find us?"
               onChange={(e) => setCircumstances(e.target.value)}
             />
           </label>
@@ -274,7 +412,7 @@ export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
               disabled={pending || !canSubmit}
               onClick={submit}
             >
-              {pending ? "Submitting…" : "Submit for review"}
+              {pending ? "Joining…" : "Join as guest"}
             </button>
           </div>
         </Bubble>

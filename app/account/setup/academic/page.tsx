@@ -53,7 +53,12 @@ export default async function AcademicSetupPage() {
     );
   }
 
-  if (status !== null && status !== "MANUAL_REVIEW" && status !== "EMAIL_SENT") {
+  if (
+    status !== null &&
+    status !== "MANUAL_REVIEW" &&
+    status !== "EMAIL_SENT" &&
+    status !== "CONSENT_PENDING"
+  ) {
     return (
       <SetupShell step={1}>
         <div className="ff-card ff-reg">

@@ -34,18 +34,39 @@ export const MEMBER_TYPE_IDS: Record<UserType, number> = {
   "None of the above": 4, // shown to admins as "Guest"
 };
 
+// Unambiguous bands: the boundaries at 13 (COPPA block) and 18 (parental
+// consent) have to be exact, so no bucket may straddle them. `isUnder13` /
+// `isMinor` also tolerate the legacy bucket strings so old rows read correctly.
 export const AGE_RANGES = [
-  "12 years and under",
-  "13-18 years old",
-  "18-25 years old",
-  "26 years and older",
+  "Under 13",
+  "13-17",
+  "18-24",
+  "25 or older",
 ] as const;
+export type AgeRange = (typeof AGE_RANGES)[number];
+
+/** Under-13 registrants are turned away (we never knowingly collect their data
+    — COPPA). Tolerates the legacy "12 years and under" bucket. */
+export function isUnder13(ageRange: string | null | undefined): boolean {
+  return ageRange === "Under 13" || ageRange === "12 years and under";
+}
+
+/** Minors (under 18) need a parent/guardian's consent before they're verified.
+    Tolerates the legacy "13-18 years old" bucket (treated as a minor). */
+export function isMinor(ageRange: string | null | undefined): boolean {
+  return (
+    isUnder13(ageRange) ||
+    ageRange === "13-17" ||
+    ageRange === "13-18 years old"
+  );
+}
 
 // program_memberships.status values the site writes. The vocabulary matches
 // the legacy sheet so the Discord bot can consume D1 rows later without
 // translation.
 export type RegistrationStatus =
   | "EMAIL_SENT"
+  | "CONSENT_PENDING" // minor: waiting on a parent/guardian to confirm
   | "MANUAL_REVIEW"
   | "VERIFIED"
   | "INELIGIBLE"; // staff-set only

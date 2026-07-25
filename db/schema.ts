@@ -810,6 +810,43 @@ export const schoolEmailVerifications = sqliteTable(
 );
 
 // ===========================================================================
+// Parental consent (registration, minors 13–17). One active request per user.
+// The raw token lives only in the emailed link; we store sha256(token) and look
+// the row up by that on click. Same throttle shape as the code table above.
+// ===========================================================================
+
+export const parentalConsents = sqliteTable(
+  "parental_consents",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .unique()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // Parent/guardian address the consent link was sent to.
+    parentEmail: text("parent_email").notNull(),
+    // sha256(token); the raw token is only ever in the emailed URL.
+    tokenHash: text("token_hash").notNull(),
+    status: text("status").notNull().default("pending"), // pending | consented | expired
+    // Filled in when the parent confirms, for an audit trail.
+    consentedAt: integer("consented_at", { mode: "timestamp_ms" }),
+    consentIp: text("consent_ip"),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    // Sends within the current window (anchored at firstSentAt).
+    sendCount: integer("send_count").notNull().default(1),
+    lastSentAt: integer("last_sent_at", { mode: "timestamp_ms" }).notNull(),
+    firstSentAt: integer("first_sent_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [index("parental_consents_token_hash_idx").on(t.tokenHash)],
+);
+
+// ===========================================================================
 // LAYER 9 — Matchmaking (LFG / LFT / LFM)
 //
 // Two sides of one market: `lfg_profiles` is a player advertising themselves,

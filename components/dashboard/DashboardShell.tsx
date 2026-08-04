@@ -9,6 +9,7 @@ import {
 } from "@/components/dashboard/DashboardNav";
 import { DensityCookie } from "@/components/dashboard/accounts/DensityCookie";
 import { SetupBanner } from "@/components/dashboard/SetupBanner";
+import { isAdminUnlocked } from "@/lib/admin-unlock";
 import { DENSITY_COOKIE, asDensity, type Density } from "@/lib/density";
 import { getProfile } from "@/lib/registration";
 import { getSessionCached } from "@/lib/session";
@@ -120,6 +121,13 @@ export async function DashboardShell({
   const admin = adminItem(staffRoles);
   const items = admin ? [...NAV_ITEMS, admin] : NAV_ITEMS;
 
+  // Cookie read, no D1: cheap enough to do on every portal render, which is
+  // what lets the rail prompt for two-factor before it expands the Admin
+  // group. The dialog fetches the heavier 2FA details only once it opens.
+  const adminLocked = admin != null && userId != null
+    ? !(await isAdminUnlocked(userId))
+    : false;
+
   return (
     <main id="wp--skip-link--target" className="ff-main ff-main--fill">
       <DensityCookie value={density} />
@@ -132,6 +140,7 @@ export async function DashboardShell({
             items={items}
             active={active}
             activeChild={activeChild}
+            adminLocked={adminLocked}
           />
           <div className="ff-dash__foot">
             <SignOutButton />

@@ -1,12 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+
+import { AdminUnlockDialog } from "@/components/dashboard/admin/AdminUnlockDialog";
+import { sanitizeNextPath } from "@/lib/next-path";
 
 // The sidebar rail, extracted from DashboardShell as a client island because it
 // now holds interactive state: a tab with sub-tabs (currently only Admin)
 // slides the rail across to a second panel with a Back button. DashboardShell
 // stays a server component and hands this a fully-resolved, serializable model
 // — including whether the Admin group is present at all.
+//
+// It also owns the admin two-factor step-up, because both ways of reaching it
+// land here: clicking the Admin group (which prompts *before* sliding the rail
+// across, rather than letting someone browse a menu they can't use yet), and
+// arriving at /home/?unlock=1&next=… after AdminGate bounced a direct hit on an
+// admin URL. `adminLocked` is UX only — the real boundary is AdminGate and the
+// requireAdminUnlock check inside every privileged server action.
 
 export type NavChild = { key: string; label: string; href: string };
 export type NavItem = {
@@ -63,11 +74,17 @@ export function DashboardNav({
   items,
   active,
   activeChild,
+  adminLocked,
 }: {
   items: NavItem[];
   active?: string;
   activeChild?: string;
+  /** Staff, but without a current two-factor unlock: prompt before expanding. */
+  adminLocked?: boolean;
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   // Land already inside a group's sub-tabs when the active tab is that group,
   // so navigating between sub-pages never bounces back to the top level.
   const activeGroup = items.find(
@@ -76,6 +93,61 @@ export function DashboardNav({
   const [openKey, setOpenKey] = useState<string | null>(
     activeGroup ? activeGroup.key : null,
   );
+  const [unlockOpen, setUnlockOpen] = useState(false);
+  // The group to slide across to once the unlock succeeds, and the admin URL
+  // the member was originally after (only set when AdminGate bounced them).
+  const pendingGroup = useRef<string | null>(null);
+  const resumeTo = useRef<string | null>(null);
+
+  // AdminGate redirects a locked staff member to /home/?unlock=1&next=<url>.
+  // Capture both, open the dialog, then scrub the query: a bookmarked or
+  // shared URL shouldn't reopen this, and `next` has no business lingering in
+  // the address bar. Sanitized with the same helper the login redirect uses,
+  // so a crafted link can't bounce anyone off-site after unlocking.
+  const handledDeepLink = useRef(false);
+  useEffect(() => {
+    if (handledDeepLink.current) return;
+    if (searchParams.get("unlock") !== "1") return;
+    handledDeepLink.current = true;
+
+    resumeTo.current = sanitizeNextPath(searchParams.get("next"));
+    pendingGroup.current = "admin";
+    setUnlockOpen(true);
+
+    const rest = new URLSearchParams(searchParams);
+    rest.delete("unlock");
+    rest.delete("next");
+    const query = rest.toString();
+    router.replace(window.location.pathname + (query ? `?${query}` : ""), {
+      scroll: false,
+    });
+  }, [searchParams, router]);
+
+  function handleUnlocked() {
+    setUnlockOpen(false);
+    // Resume the admin page they asked for. A full navigation rather than a
+    // client one: the unlock cookie was just set in a server action, and this
+    // guarantees the whole tree is re-rendered with it.
+    if (resumeTo.current) {
+      window.location.assign(resumeTo.current);
+      return;
+    }
+    // Opened from the rail — slide across to the group they clicked and let
+    // the server tree re-render with adminLocked now false.
+    if (pendingGroup.current) setOpenKey(pendingGroup.current);
+    pendingGroup.current = null;
+    router.refresh();
+  }
+
+  function openGroup(item: NavItem) {
+    if (item.key === "admin" && adminLocked) {
+      pendingGroup.current = item.key;
+      setUnlockOpen(true);
+      return;
+    }
+    setOpenKey(item.key);
+  }
+
   const openItem =
     openKey != null ? (items.find((item) => item.key === openKey) ?? null) : null;
   const showingSub = openItem != null;
@@ -97,7 +169,7 @@ export function DashboardNav({
                   className="ff-dash__link ff-dash__link--group"
                   aria-current={item.key === active ? "page" : undefined}
                   aria-expanded={openKey === item.key}
-                  onClick={() => setOpenKey(item.key)}
+                  onClick={() => openGroup(item)}
                 >
                   <span>{item.label}</span>
                   <ChevronRight />
@@ -152,6 +224,16 @@ export function DashboardNav({
           ))}
         </nav>
       </div>
+
+      <AdminUnlockDialog
+        open={unlockOpen}
+        onClose={() => {
+          setUnlockOpen(false);
+          pendingGroup.current = null;
+          resumeTo.current = null;
+        }}
+        onUnlocked={handleUnlocked}
+      />
     </div>
   );
 }

@@ -254,6 +254,16 @@ The parent owns all state, including any input passed as children; Enter
 confirms, Esc/Cancel closes. Use `danger` for red confirm buttons. See
 `DeleteAccount.tsx` for the full pattern.
 
+`AdminUnlockDialog` is the other modal in the portal. It is built on the same
+native `<dialog>` shell but deliberately **not** on `ConfirmDialog`: there is no
+Cancel/Confirm pair, the body is a form that owns its own submit and its own
+"email me a code instead" links. When a modal's body needs to drive the action
+row, copy the `<dialog>` shell rather than bending `ConfirmDialog` around it.
+
+Note that a modal in the top layer still inherits CSS custom properties from its
+DOM ancestors, so `--ff-dash-*` tokens resolve normally inside a dialog rendered
+within `.ff-dash`. Top layer changes painting and stacking, not inheritance.
+
 ### `Disclosure` — collapsible row
 
 `components/dashboard/bubbles/Disclosure.tsx`. Same shell as `BubbleRow`,

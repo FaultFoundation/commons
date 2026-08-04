@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 
 import { unlockAdmin } from "@/app/admin/actions";
 import { authClient } from "@/lib/auth-client";
@@ -10,9 +9,11 @@ import { twoFactorError } from "@/lib/two-factor";
 type Mode = "totp" | "otp";
 
 /**
- * The step-up gate shown in place of admin content until the staff member
- * re-verifies with two-factor. On success the server sets the short-lived
- * unlock cookie (app/admin/actions.ts) and we refresh into the real content.
+ * The two-factor step-up form. Rendered inside AdminUnlockDialog — it is the
+ * body of the modal, not a page of its own. On success the server sets the
+ * short-lived unlock cookie (app/admin/actions.ts) and `onUnlocked` decides
+ * where the member goes: back to the admin URL they asked for, or just into
+ * the newly-expanded Admin menu.
  *
  * Mirrors the sign-in TwoFactorChallenge, minus backup codes and trust-device:
  * this is a periodic re-proof by someone already signed in, not account
@@ -22,11 +23,15 @@ type Mode = "totp" | "otp";
 export function AdminUnlock({
   methods,
   email,
+  onUnlocked,
+  onCancel,
 }: {
   methods: string[];
   email: string;
+  onUnlocked: () => void;
+  /** Rendered beside Unlock so the dialog has one action row, not two. */
+  onCancel: () => void;
 }) {
-  const router = useRouter();
   const hasTotp = methods.includes("totp");
   const hasOtp = methods.includes("otp");
 
@@ -76,8 +81,10 @@ export function AdminUnlock({
       setError(result.error);
       return;
     }
-    // The unlock cookie is set; re-render the server tree into admin content.
-    router.refresh();
+    // The unlock cookie is set. Leave `pending` true: the caller navigates or
+    // refreshes from here, and re-enabling the button first only invites a
+    // second submit against an already-spent code.
+    onUnlocked();
   }
 
   return (
@@ -109,10 +116,6 @@ export function AdminUnlock({
           required
         />
       </label>
-
-      <button className="ff-btn ff-auth__submit" type="submit" disabled={pending}>
-        {pending ? "Verifying…" : "Unlock admin"}
-      </button>
 
       <p className="ff-auth__hint ff-auth__alts">
         {hasOtp && mode !== "otp" ? (
@@ -148,6 +151,20 @@ export function AdminUnlock({
           </button>
         ) : null}
       </p>
+
+      <div className="ff-dialog__actions">
+        <button
+          type="button"
+          className="ff-btn ff-btn--outline"
+          onClick={onCancel}
+          disabled={pending}
+        >
+          Cancel
+        </button>
+        <button className="ff-btn" type="submit" disabled={pending}>
+          {pending ? "Verifying…" : "Unlock admin"}
+        </button>
+      </div>
     </form>
   );
 }

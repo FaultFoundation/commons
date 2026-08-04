@@ -2096,6 +2096,17 @@ button.ff-dash__link:hover {
   gap: 10px;
   margin-top: 18px;
 }
+/* The admin two-factor step-up. Wider than a confirm prompt because it carries
+   a labelled field plus the "email me a code instead" alternates, and those
+   read badly wrapped into 420px. */
+.ff-dialog--unlock {
+  width: min(460px, calc(100% - 32px));
+}
+/* The form supplies the dialog's action row, so it must not add another
+   bottom margin under the alternates above it. */
+.ff-dialog--unlock .ff-auth__alts {
+  margin-bottom: 0;
+}
 
 /* Crop popup (react-avatar-editor inside the ConfirmDialog shell). */
 .ff-cropper {

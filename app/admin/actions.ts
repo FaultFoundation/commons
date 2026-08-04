@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
 
-import { user } from "@/db/schema";
+import { twoFactor, user } from "@/db/schema";
 import { clearAdminUnlock, setAdminUnlock } from "@/lib/admin-unlock";
 import { getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
@@ -83,4 +83,51 @@ export async function unlockAdmin(input: {
 export async function lockAdmin(): Promise<ActionResult> {
   await clearAdminUnlock();
   return { ok: true };
+}
+
+export type UnlockPrompt = {
+  /** False = no second factor enrolled; the dialog offers enrollment instead. */
+  twoFactorEnabled: boolean;
+  /** "totp" only appears once an authenticator code has actually verified. */
+  methods: UnlockMethod[];
+  email: string;
+};
+
+/**
+ * What the unlock dialog needs to render itself.
+ *
+ * Fetched on open rather than passed down from DashboardShell on purpose: the
+ * shell renders on every portal page, and this costs a D1 read. Staff who are
+ * already unlocked — the common case — never pay for it, which is the same
+ * reasoning that keeps the 2FA lookup off AdminGate's fast path.
+ *
+ * Returns only the caller's own 2FA shape, and only to staff. Nothing here is
+ * authorization: the unlock still requires a verified code in `unlockAdmin`.
+ */
+export async function getUnlockPrompt(): Promise<ActionResult<UnlockPrompt>> {
+  const requestHeaders = await headers();
+  const session = await getAuth().api.getSession({ headers: requestHeaders });
+  if (!session) return { ok: false, error: "Your session expired. Sign in again." };
+  const userId = session.user.id;
+
+  const staff = await requireStaffCapability(userId, "viewAdmin");
+  if (!staff.ok) return { ok: false, error: staff.error };
+
+  // Read from D1, not the session: the session cookie can be stale right after
+  // enrolling in another tab. One row carries both flags — `enabled` (is a
+  // second factor required at all) and `verified` (is TOTP an option, or has
+  // this account only ever used email codes).
+  const rows = await getDb()
+    .select({ enabled: user.twoFactorEnabled, totpVerified: twoFactor.verified })
+    .from(user)
+    .leftJoin(twoFactor, eq(twoFactor.userId, user.id))
+    .where(eq(user.id, userId))
+    .limit(1);
+
+  return {
+    ok: true,
+    twoFactorEnabled: Boolean(rows[0]?.enabled),
+    methods: rows[0]?.totpVerified ? ["totp", "otp"] : ["otp"],
+    email: session.user.email,
+  };
 }

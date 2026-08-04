@@ -156,6 +156,26 @@ re-checks all three; admin JSON endpoints under `app/api/admin/*` use
 Discord staff roles are synced into `staff_roles` (`granted_via = "discord"`) on
 entry/unlock, mapped by the `DISCORD_STAFF_ROLE_MAP` env var.
 
+**Every failure redirects; the gate never renders a page in place.** Not signed
+in → `/login/`. Not staff → `/home/`, with no prompt at all, because offering to
+verify would confirm there is an admin area to unlock. Staff without a current
+unlock → `/home/?unlock=1&next=<the admin URL>`, where
+[DashboardNav](components/dashboard/DashboardNav.tsx) opens the 2FA step-up as a
+modal ([AdminUnlockDialog](components/dashboard/admin/AdminUnlockDialog.tsx)),
+scrubs the query, and on success resumes `next` (re-sanitized with
+`sanitizeNextPath`). The rail opens the same dialog when the Admin group is
+clicked, *before* sliding across — `DashboardShell` passes `adminLocked`, which
+is a cookie read with no D1 cost. That flag is UX only; the boundary is still
+AdminGate plus `requireAdminUnlock` inside every privileged action.
+
+Two things are load-bearing in that flow. `AdminGate` learns its own URL from
+the `x-ff-pathname` request header set in [middleware.ts](middleware.ts) —
+server components can't see their URL, and threading a prop through every admin
+page is something the next new admin page would forget. And the dialog fetches
+its 2FA details (`getUnlockPrompt`) only when it *opens*, never from the shell:
+`DashboardShell` renders on every portal page, and the 2FA row read there would
+be a per-page D1 query for staff who are already unlocked.
+
 ### Styling
 
 **No CSS framework.** `styles/theme.css` is the design system (every selector

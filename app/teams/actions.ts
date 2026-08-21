@@ -19,7 +19,11 @@ import {
 } from "@/db/schema";
 import { GAME_OVERWATCH_ID, PROGRAM_COLLEGIATE_ID } from "@/lib/programs";
 import { getRegistrationState } from "@/lib/registration";
-import { reportMatchScore, type GameScoreInput } from "@/lib/scoring";
+import {
+  addChallongeParticipant,
+  removeChallongeParticipant,
+} from "@/lib/challonge";
+import { getPlatformIdentity } from "@/lib/platform-identities";
 import {
   INVITE_PROBLEM_MESSAGES,
   cleanName,
@@ -672,11 +676,12 @@ export async function enterTournament(
 
   const db = getDb();
   const teamRows = await db
-    .select({ programId: teams.programId })
+    .select({ programId: teams.programId, name: teams.name, tag: teams.tag })
     .from(teams)
     .where(and(eq(teams.id, teamId), isNull(teams.disbandedAt)))
     .limit(1);
-  if (!teamRows[0]) return { ok: false, error: "That team no longer exists." };
+  const teamRow = teamRows[0];
+  if (!teamRow) return { ok: false, error: "That team no longer exists." };
 
   const tournamentRows = await db
     .select({
@@ -684,12 +689,13 @@ export async function enterTournament(
       name: tournaments.name,
       status: tournaments.status,
       programId: tournaments.programId,
+      externalId: tournaments.externalId,
     })
     .from(tournaments)
     .where(eq(tournaments.id, tournamentId))
     .limit(1);
   const tournament = tournamentRows[0];
-  if (!tournament || tournament.programId !== teamRows[0].programId) {
+  if (!tournament || tournament.programId !== teamRow.programId) {
     return { ok: false, error: "That tournament isn't open to this team." };
   }
   if (tournament.status !== "registration") {
@@ -705,6 +711,21 @@ export async function enterTournament(
     };
   }
 
+  // Add the team as a Challonge participant first: if that fails there is no
+  // half-entered state. The Challonge entry carries the team's display name;
+  // if the registering captain has connected Challonge, we pass their handle so
+  // the tournament also lands in their Challonge history.
+  if (!tournament.externalId) {
+    return { ok: false, error: "That tournament isn't linked to Challonge yet." };
+  }
+  const challongeIdentity = await getPlatformIdentity(userId, "challonge");
+  const entryName = teamRow.tag ? `${teamRow.name} [${teamRow.tag}]` : teamRow.name;
+  const added = await addChallongeParticipant(tournament.externalId, {
+    name: entryName,
+    username: challongeIdentity?.handle ?? null,
+  });
+  if (!added.ok) return { ok: false, error: added.error };
+
   const existing = (
     await db
       .select({ id: tournamentParticipants.id })
@@ -719,10 +740,15 @@ export async function enterTournament(
   )[0];
 
   if (existing) {
-    // Re-entering after a withdrawal reuses the row, keeping its standings.
+    // Re-entering after a withdrawal reuses the row and points it at the new
+    // Challonge participant.
     await db
       .update(tournamentParticipants)
-      .set({ withdrawnAt: null, updatedAt: new Date() })
+      .set({
+        withdrawnAt: null,
+        challongeParticipantId: added.data.id,
+        updatedAt: new Date(),
+      })
       .where(eq(tournamentParticipants.id, existing.id));
   } else {
     await db.insert(tournamentParticipants).values({
@@ -730,6 +756,7 @@ export async function enterTournament(
       tournamentId,
       teamId,
       registeredByUserId: userId,
+      challongeParticipantId: added.data.id,
     });
   }
 
@@ -748,15 +775,42 @@ export async function withdrawFromTournament(
   const check = await requireTeamCapability(userId, teamId, "enterTournaments");
   if (!check.ok) return check;
 
-  await getDb()
+  const db = getDb();
+  const entry = (
+    await db
+      .select({
+        id: tournamentParticipants.id,
+        challongeParticipantId: tournamentParticipants.challongeParticipantId,
+        externalId: tournaments.externalId,
+      })
+      .from(tournamentParticipants)
+      .innerJoin(tournaments, eq(tournaments.id, tournamentParticipants.tournamentId))
+      .where(
+        and(
+          eq(tournamentParticipants.teamId, teamId),
+          eq(tournamentParticipants.tournamentId, tournamentId),
+          isNull(tournamentParticipants.withdrawnAt),
+        ),
+      )
+      .limit(1)
+  )[0];
+  if (!entry) return { ok: true }; // already out — nothing to do
+
+  // Remove the Challonge participant (best-effort: a bracket that has already
+  // started refuses removal, in which case the team stays in on Challonge and
+  // staff manage it there — we still withdraw on our side).
+  if (entry.challongeParticipantId && entry.externalId) {
+    await removeChallongeParticipant(entry.externalId, entry.challongeParticipantId);
+  }
+
+  await db
     .update(tournamentParticipants)
-    .set({ withdrawnAt: new Date(), updatedAt: new Date() })
-    .where(
-      and(
-        eq(tournamentParticipants.teamId, teamId),
-        eq(tournamentParticipants.tournamentId, tournamentId),
-      ),
-    );
+    .set({
+      withdrawnAt: new Date(),
+      challongeParticipantId: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(tournamentParticipants.id, entry.id));
 
   revalidateTeams(teamId);
   revalidatePath("/tournaments/", "layout");
@@ -1014,28 +1068,7 @@ export async function cancelTeamDelete(
   return { ok: true };
 }
 
-// ---------------------------------------------------------------------------
-// Score reporting
-// ---------------------------------------------------------------------------
-
-export async function reportScore(input: {
-  teamId: string;
-  matchId: string;
-  games: GameScoreInput[];
-}): Promise<ActionResult> {
-  const userId = await requireUserId();
-  if (!userId) return { ok: false, error: "You need to be signed in." };
-
-  // Authorization is re-derived from the match's own participants inside
-  // reportMatchScore — teamId here only steers revalidation.
-  const result = await reportMatchScore({
-    matchId: input.matchId,
-    userId,
-    games: input.games,
-  });
-  if (!result.ok) return result;
-
-  revalidateTeams(input.teamId);
-  revalidatePath("/tournaments/", "layout");
-  return { ok: true };
-}
+// Score reporting used to live here (self-hosted engine). Challonge owns scoring
+// now — results are entered staff-side in the admin tournament view
+// (app/admin/tournaments/actions.ts reportResult), which pushes to Challonge and
+// rebuilds the public snapshot.

@@ -1,11 +1,9 @@
-import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { getDb } from "@/lib/db";
 import {
   colleges,
-  matchGames,
-  matches,
   programs,
   teamDeleteRequests,
   teamDeleteVotes,
@@ -640,10 +638,6 @@ export type TeamTournamentEntry = {
   tournamentId: string;
   tournamentName: string;
   status: string;
-  wins: number;
-  losses: number;
-  mapDiff: number;
-  points: number;
 };
 
 export type DeleteRequestView = {
@@ -757,10 +751,6 @@ export async function getTeamDetail(
           tournamentId: tournaments.id,
           tournamentName: tournaments.name,
           status: tournaments.status,
-          wins: tournamentParticipants.wins,
-          losses: tournamentParticipants.losses,
-          mapDiff: tournamentParticipants.mapDiff,
-          points: tournamentParticipants.points,
         })
         .from(tournamentParticipants)
         .innerJoin(
@@ -877,120 +867,8 @@ export async function getTeamDetail(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Matches a team can report on
-// ---------------------------------------------------------------------------
-
-export type ReportableGame = {
-  gameNumber: number;
-  mapName: string | null;
-  aScore: number;
-  bScore: number;
-  replayCode: string | null;
-};
-
-export type ReportableMatch = {
-  id: string;
-  tournamentId: string;
-  tournamentName: string;
-  round: number | null;
-  bestOf: number;
-  status: string;
-  /** Always this team's side of the match, so the form can label the inputs. */
-  ourParticipantId: string;
-  opponentName: string;
-  /** True when this team is participant A (score column order). */
-  weAreA: boolean;
-  games: ReportableGame[];
-};
-
-/**
- * Every match this team is in, with any scores already on record. The score
- * reporter is a client component that switches tournament → match without a
- * round trip, so it gets the whole (small) set up front.
- */
-export async function listReportableMatches(
-  teamId: string,
-): Promise<ReportableMatch[]> {
-  const db = getDb();
-  const ourEntries = await db
-    .select({ id: tournamentParticipants.id })
-    .from(tournamentParticipants)
-    .where(
-      and(
-        eq(tournamentParticipants.teamId, teamId),
-        isNull(tournamentParticipants.withdrawnAt),
-      ),
-    );
-  if (!ourEntries.length) return [];
-  const ourIds = ourEntries.map((e) => e.id);
-
-  const pa = alias(tournamentParticipants, "pa");
-  const pb = alias(tournamentParticipants, "pb");
-  const ta = alias(teams, "ta");
-  const tb = alias(teams, "tb");
-
-  const rows = await db
-    .select({
-      id: matches.id,
-      tournamentId: matches.tournamentId,
-      tournamentName: tournaments.name,
-      round: matches.round,
-      bestOf: matches.bestOf,
-      status: matches.status,
-      participantAId: matches.participantAId,
-      participantBId: matches.participantBId,
-      aName: ta.name,
-      bName: tb.name,
-    })
-    .from(matches)
-    .innerJoin(tournaments, eq(tournaments.id, matches.tournamentId))
-    .leftJoin(pa, eq(pa.id, matches.participantAId))
-    .leftJoin(pb, eq(pb.id, matches.participantBId))
-    .leftJoin(ta, eq(ta.id, pa.teamId))
-    .leftJoin(tb, eq(tb.id, pb.teamId))
-    .where(
-      or(
-        inArray(matches.participantAId, ourIds),
-        inArray(matches.participantBId, ourIds),
-      ),
-    )
-    .orderBy(matches.round);
-
-  if (!rows.length) return [];
-
-  const gameRows = await db
-    .select()
-    .from(matchGames)
-    .where(
-      inArray(
-        matchGames.matchId,
-        rows.map((r) => r.id),
-      ),
-    )
-    .orderBy(matchGames.gameNumber);
-
-  return rows.map((row) => {
-    const weAreA = row.participantAId != null && ourIds.includes(row.participantAId);
-    return {
-      id: row.id,
-      tournamentId: row.tournamentId,
-      tournamentName: row.tournamentName,
-      round: row.round,
-      bestOf: row.bestOf,
-      status: row.status,
-      ourParticipantId: (weAreA ? row.participantAId : row.participantBId) ?? "",
-      opponentName: (weAreA ? row.bName : row.aName) ?? "TBD",
-      weAreA,
-      games: gameRows
-        .filter((g) => g.matchId === row.id)
-        .map((g) => ({
-          gameNumber: g.gameNumber,
-          mapName: g.mapName,
-          aScore: g.participantAScore,
-          bScore: g.participantBScore,
-          replayCode: g.replayCode,
-        })),
-    };
-  });
-}
+// Score reporting and the team's match schedule used to live here, reading the
+// self-hosted `matches` / `match_games` tables. Those are gone — Challonge owns
+// matches and scoring now — so there is no listReportableMatches: the bracket
+// and results are read from the Challonge snapshot (lib/tournaments.ts) on the
+// public page, and results are entered staff-side in the admin tournament view.

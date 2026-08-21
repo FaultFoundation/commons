@@ -5,7 +5,6 @@ import {
   index,
   uniqueIndex,
   check,
-  type AnySQLiteColumn,
 } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
@@ -585,37 +584,78 @@ export const teamDeleteVotes = sqliteTable(
 );
 
 // ===========================================================================
-// LAYER 8 — Brackets / tournaments (self-hosted; scores + replay codes)
+// LAYER 8 — Tournaments (Challonge-backed)
+//
+// Challonge is the bracket engine and the system of record for seeds, matches,
+// and standings; the Commons is a branded front-end over it. So there is no
+// self-hosted match/score model here — the old `stages` / `matches` /
+// `match_games` tables were removed when we moved to Challonge. What we keep in
+// D1 is only what Challonge doesn't own: the tournament's *identity and
+// lifecycle* on our side (`tournaments`), *who signed up through our site*
+// mapped to their Challonge participant (`tournament_participants`), and a
+// cached render of the live bracket (`tournament_brackets`). The bracket state
+// itself is pulled from Challonge (lib/challonge.ts) and materialized into the
+// cache with a TTL — Workers has no cron, so it refreshes lazily on read.
 // ===========================================================================
 
 export const tournaments = sqliteTable(
   "tournaments",
   {
+    // A random 6-digit number ("482910"), not a UUID: it is the *public*
+    // identifier as well as the key, appearing in /admin/tournaments/<id>/ and
+    // /t/<id>/<name>/. There is deliberately no slug column — the name segment
+    // of a public URL is derived from `name` at render time
+    // (lib/tournaments-shared.ts `tournamentPath`), so a rename can never
+    // orphan a link.
     id: text("id").primaryKey(),
     programId: text("program_id")
       .notNull()
       .references(() => programs.id),
     gameId: text("game_id").references(() => games.id),
-    // Provenance. "internal" tournaments are run on this platform and owned by
-    // the bracket engine; anything else is mirrored from a member's connected
-    // account (or a future scraper), so the engine leaves it alone. external_id
-    // is the provider's tournament id (null for internal); external_url deep-
-    // links back to it. UNIQUE(source, external_id) lets a sync upsert without
-    // duplicating a shared event across members.
-    source: text("source").notNull().default("internal"),
+    // Provenance. "challonge" is the only source today: the tournament lives in
+    // the org's Challonge account. `externalId` is the Challonge tournament id
+    // (what every v2.1 API call keys on); `externalUrl` deep-links to the
+    // Challonge bracket. UNIQUE(source, external_id) keeps a Challonge event
+    // mapped to exactly one row. `source` is kept general so a future provider
+    // (or the pending external-calendar mirror) can reuse the shape.
+    source: text("source").notNull().default("challonge"),
     externalId: text("external_id"),
     externalUrl: text("external_url"),
     name: text("name").notNull(),
-    slug: text("slug").notNull().unique(),
-    // round_robin | single_elim | double_elim | swiss
-    format: text("format").notNull().default("round_robin"),
-    // draft | registration | active | completed
+    // single_elim | double_elim | round_robin | swiss (maps to Challonge's
+    // tournament_type — see lib/tournaments-shared.ts CHALLONGE_TYPE).
+    format: text("format").notNull().default("single_elim"),
+    // draft | registration | seeding | active | completed | cancelled.
+    // Our lifecycle is richer than Challonge's pending/underway/complete; the
+    // mapping to Challonge start/finalize/reset lives in the admin actions.
     status: text("status").notNull().default("draft"),
-    bestOf: integer("best_of").notNull().default(3),
-    customGameCode: text("custom_game_code"),
+    // Organizer-set field cap; the app clamps to MAX_PARTICIPANTS.
+    maxParticipants: integer("max_participants"),
     startsAt: integer("starts_at", { mode: "timestamp_ms" }),
     endsAt: integer("ends_at", { mode: "timestamp_ms" }),
+    registrationOpensAt: integer("registration_opens_at", {
+      mode: "timestamp_ms",
+    }),
+    registrationClosesAt: integer("registration_closes_at", {
+      mode: "timestamp_ms",
+    }),
+    // After this timestamp, roster mutations on entered teams are blocked
+    // (lib/tournaments.ts `rosterLockedFor`).
+    rosterLockAt: integer("roster_lock_at", { mode: "timestamp_ms" }),
+    bestOf: integer("best_of").notNull().default(3),
+    // Format-specific (Challonge settings): Swiss round count (null = derive)
+    // and whether single-elim holds a third-place match.
+    swissRounds: integer("swiss_rounds"),
+    thirdPlaceMatch: integer("third_place_match", { mode: "boolean" })
+      .notNull()
+      .default(false),
     rulesUrl: text("rules_url"),
+    // Bumped on every mutating action; readers compare to detect stale state.
+    version: integer("version").notNull().default(0),
+    // Set when the bracket is started on Challonge (status -> active).
+    bracketGeneratedAt: integer("bracket_generated_at", {
+      mode: "timestamp_ms",
+    }),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -625,25 +665,10 @@ export const tournaments = sqliteTable(
   },
   (t) => [
     index("tournaments_program_id_idx").on(t.programId),
-    // A given external tournament maps to one row; internal rows have a null
+    // A given Challonge tournament maps to one row; draft rows have a null
     // external_id and don't collide (SQLite treats NULLs as distinct).
     uniqueIndex("tournaments_source_external_unique").on(t.source, t.externalId),
   ],
-);
-
-export const stages = sqliteTable(
-  "stages",
-  {
-    id: text("id").primaryKey(),
-    tournamentId: text("tournament_id")
-      .notNull()
-      .references(() => tournaments.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    // round_robin | single_elim | double_elim | swiss | groups
-    type: text("type").notNull().default("round_robin"),
-    ordinal: integer("ordinal").notNull().default(0),
-  },
-  (t) => [index("stages_tournament_id_idx").on(t.tournamentId)],
 );
 
 export const tournamentParticipants = sqliteTable(
@@ -653,25 +678,24 @@ export const tournamentParticipants = sqliteTable(
     tournamentId: text("tournament_id")
       .notNull()
       .references(() => tournaments.id, { onDelete: "cascade" }),
-    // Exactly one of teamId / userId (team tournaments vs solo).
+    // Exactly one of teamId / userId. Teams-only today; the XOR keeps solo
+    // entrants a schema-ready future (a new game mode, no migration).
     teamId: text("team_id").references(() => teams.id, { onDelete: "set null" }),
     userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
     registeredByUserId: text("registered_by_user_id").references(
       () => user.id,
       { onDelete: "set null" },
     ),
+    // The matching Challonge participant id. Null only in the brief window
+    // between the D1 row and a successful Challonge add (or if Challonge was
+    // unconfigured at entry time); the sync reconciles by name.
+    challongeParticipantId: text("challonge_participant_id"),
     seed: integer("seed"),
     checkedInAt: integer("checked_in_at", { mode: "timestamp_ms" }),
-    // Withdrawing keeps the row (and its standings history) but drops it out
-    // of every "who is entered" query — including the one-team-per-tournament
-    // conflict check in lib/teams.ts.
+    // Withdrawing keeps the row but drops it out of every "who is entered"
+    // query — including the one-team-per-tournament conflict check in
+    // lib/teams.ts. Standings live on Challonge, not here.
     withdrawnAt: integer("withdrawn_at", { mode: "timestamp_ms" }),
-    // Standings, updated on match confirmation.
-    wins: integer("wins").notNull().default(0),
-    losses: integer("losses").notNull().default(0),
-    mapDiff: integer("map_diff").notNull().default(0),
-    points: integer("points").notNull().default(0),
-    finalStanding: integer("final_standing"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -685,101 +709,45 @@ export const tournamentParticipants = sqliteTable(
       "tournament_participants_team_xor_user",
       sql`(${t.teamId} IS NOT NULL) <> (${t.userId} IS NOT NULL)`,
     ),
+    // SQLite permits multiple NULLs in a unique index, so these hold correctly
+    // for the team-XOR-user split and close the read-then-write race in
+    // enterTournament (a withdrawn row is reused, never duplicated).
+    uniqueIndex("tournament_participants_tournament_team_unique").on(
+      t.tournamentId,
+      t.teamId,
+    ),
+    uniqueIndex("tournament_participants_tournament_user_unique").on(
+      t.tournamentId,
+      t.userId,
+    ),
   ],
 );
 
-export const matches = sqliteTable(
-  "matches",
-  {
-    id: text("id").primaryKey(),
-    tournamentId: text("tournament_id")
-      .notNull()
-      .references(() => tournaments.id, { onDelete: "cascade" }),
-    stageId: text("stage_id").references(() => stages.id, {
-      onDelete: "set null",
-    }),
-    round: integer("round"),
-    bracket: text("bracket"), // W | L | group | null
-    participantAId: text("participant_a_id").references(
-      () => tournamentParticipants.id,
-      { onDelete: "set null" },
-    ),
-    participantBId: text("participant_b_id").references(
-      () => tournamentParticipants.id,
-      { onDelete: "set null" },
-    ),
-    winnerParticipantId: text("winner_participant_id").references(
-      () => tournamentParticipants.id,
-      { onDelete: "set null" },
-    ),
-    bestOf: integer("best_of").notNull().default(3),
-    // pending | live | reported | confirmed | disputed
-    status: text("status").notNull().default("pending"),
-    scheduledAt: integer("scheduled_at", { mode: "timestamp_ms" }),
-    playedAt: integer("played_at", { mode: "timestamp_ms" }),
-    // Who filed the score that stands. Reports apply instantly (no opponent
-    // confirmation step), so this is the audit trail staff correct against.
-    reportedByUserId: text("reported_by_user_id").references(() => user.id, {
-      onDelete: "set null",
-    }),
-    reportedAt: integer("reported_at", { mode: "timestamp_ms" }),
-    // Winner routing for elimination brackets.
-    nextMatchId: text("next_match_id").references(
-      (): AnySQLiteColumn => matches.id,
-      { onDelete: "set null" },
-    ),
-    nextMatchSlot: text("next_match_slot"), // a | b
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .$defaultFn(() => new Date()),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .notNull()
-      .$defaultFn(() => new Date()),
-  },
-  (t) => [index("matches_tournament_id_idx").on(t.tournamentId)],
-);
-
-// The maps inside a Bo3/Bo5 — where scores + replay codes live.
-export const matchGames = sqliteTable(
-  "match_games",
-  {
-    id: text("id").primaryKey(),
-    matchId: text("match_id")
-      .notNull()
-      .references(() => matches.id, { onDelete: "cascade" }),
-    gameNumber: integer("game_number").notNull(),
-    mapName: text("map_name"),
-    mode: text("mode"),
-    participantAScore: integer("participant_a_score").notNull().default(0),
-    participantBScore: integer("participant_b_score").notNull().default(0),
-    winnerParticipantId: text("winner_participant_id").references(
-      () => tournamentParticipants.id,
-      { onDelete: "set null" },
-    ),
-    replayCode: text("replay_code"),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .$defaultFn(() => new Date()),
-    // Re-reporting a match overwrites these rows rather than adding to them.
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .notNull()
-      .$defaultFn(() => new Date()),
-  },
-  (t) => [
-    index("match_games_match_id_idx").on(t.matchId),
-    uniqueIndex("match_games_match_game_unique").on(t.matchId, t.gameNumber),
-  ],
-);
+// Cached render of a tournament's live bracket, pulled from Challonge and
+// materialized as one JSON blob (the SnapshotPayload shape lib/challonge.ts
+// builds and components/tournaments/BracketView.tsx consumes). One row per
+// tournament: the public poll route reads a single row rather than assembling
+// the bracket per request, and `version`/`fetchedAt` drive the lazy TTL
+// refresh (no cron on Workers) and the poll route's ETag.
+export const tournamentBrackets = sqliteTable("tournament_brackets", {
+  tournamentId: text("tournament_id")
+    .primaryKey()
+    .references(() => tournaments.id, { onDelete: "cascade" }),
+  payload: text("payload").notNull(),
+  version: integer("version").notNull().default(0),
+  fetchedAt: integer("fetched_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
 
 // A member's individual matches on a connected external platform (FACEIT /
-// start.gg / Challonge). Deliberately NOT the internal `matches` table above:
-// that one is the bracket engine's (internal participant FKs, next-match
-// routing, the report lifecycle). External matches are flat, per-user schedule
-// rows the calendar reads — no engine, no participants. Populated by the
-// schedule sync (or a future scraper); idempotent on (user_id, provider,
-// external_id). The member's *entry* in an external tournament is a
-// tournament_participants row (user_id) pointing at a source!="internal"
-// tournaments row — this table is only the match-level schedule beneath it.
+// start.gg / Challonge), for the pending personal calendar. These are flat,
+// per-user schedule rows the calendar reads — populated by the schedule sync
+// (or a future scraper); idempotent on (user_id, provider, external_id). The
+// member's *entry* in an external tournament is a tournament_participants row
+// (user_id) pointing at a source!="challonge" tournaments row — this table is
+// only the match-level schedule beneath it. (Our own Challonge-run tournaments
+// keep their live bracket in `tournament_brackets`, not here.)
 export const externalMatches = sqliteTable(
   "external_matches",
   {

@@ -25,11 +25,10 @@ DROP TABLE IF EXISTS lfg_connections;
 DROP TABLE IF EXISTS team_listings;
 DROP TABLE IF EXISTS lfg_profiles;
 
--- Layer 8 — brackets
-DROP TABLE IF EXISTS match_games;
-DROP TABLE IF EXISTS matches;
+-- Layer 8 — tournaments (Challonge-backed) + the personal-calendar mirror
+DROP TABLE IF EXISTS external_matches;
+DROP TABLE IF EXISTS tournament_brackets;
 DROP TABLE IF EXISTS tournament_participants;
-DROP TABLE IF EXISTS stages;
 DROP TABLE IF EXISTS tournaments;
 
 -- Layer 7 — teams & rosters

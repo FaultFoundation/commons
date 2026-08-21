@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
+import { TournamentList } from "@/components/dashboard/tournaments/TournamentList";
 import { getAuth } from "@/lib/auth";
+import { listTournaments } from "@/lib/tournaments";
 
 // Session-gated: always rendered per request.
 export const dynamic = "force-dynamic";
@@ -20,16 +22,24 @@ export default async function TournamentsPage() {
     redirect("/login/");
   }
 
+  const tournaments = await listTournaments({ excludeDraft: true });
+
   return (
     <DashboardShell active="tournaments" setupUserId={session.user.id}>
       <h1 className="screen-reader-text">Tournaments</h1>
       <div className="ff-bubble-grid">
-        {/* Setup step 3 deep-links here (/tournaments/#overfault), so the
-            id has to stay stable. */}
-        <Bubble id="overfault" title="Overfault" variant="wip" span="full">
-          <div className="ff-bubble__wip">
-            Registration, brackets, and standings land here.
-          </div>
+        <Bubble title="Tournaments" span="full">
+          <TournamentList
+            tournaments={tournaments.map((t) => ({
+              id: t.id,
+              name: t.name,
+              format: t.format,
+              status: t.status,
+              entrantCount: t.entrantCount,
+              maxParticipants: t.maxParticipants,
+              startsAt: t.startsAt ? t.startsAt.getTime() : null,
+            }))}
+          />
         </Bubble>
       </div>
     </DashboardShell>

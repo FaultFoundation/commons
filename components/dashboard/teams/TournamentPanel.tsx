@@ -6,22 +6,20 @@ import { useState, useTransition } from "react";
 import { enterTournament, withdrawFromTournament } from "@/app/teams/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { can, type TeamRole } from "@/lib/teams-shared";
+import { TOURNAMENT_STATUS_LABELS } from "@/lib/tournaments-shared";
 
 export type TeamEntry = {
   tournamentId: string;
   tournamentName: string;
   status: string;
-  wins: number;
-  losses: number;
-  mapDiff: number;
-  points: number;
 };
 
 /**
- * Entering and leaving tournaments. The one-team-per-tournament rule is
- * enforced server-side (lib/teams.ts `entryConflicts`); when it bites, the
- * error names the players who are already entered elsewhere, so the manager
- * knows exactly what to fix.
+ * Entering and leaving tournaments. Entering adds the team as a participant on
+ * Challonge (and links the captain's Challonge account, if connected); the
+ * one-team-per-tournament rule is enforced server-side (lib/teams.ts
+ * `entryConflicts`). Standings and results live on the public bracket, not
+ * here — this panel is just the entry control.
  */
 export function TournamentPanel({
   teamId,
@@ -64,10 +62,11 @@ export function TournamentPanel({
         <BubbleRow
           key={entry.tournamentId}
           label={entry.tournamentName}
-          value={`${entry.wins}W – ${entry.losses}L`}
-          note={`${entry.points} ${entry.points === 1 ? "point" : "points"} · map diff ${
-            entry.mapDiff > 0 ? `+${entry.mapDiff}` : entry.mapDiff
-          }`}
+          value={
+            TOURNAMENT_STATUS_LABELS[
+              entry.status as keyof typeof TOURNAMENT_STATUS_LABELS
+            ] ?? entry.status
+          }
           action={
             manages ? (
               <button

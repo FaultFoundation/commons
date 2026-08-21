@@ -61,11 +61,19 @@ BETTER_AUTH_URL=http://localhost:3999
 # STARTGG_CLIENT_ID=
 # STARTGG_CLIENT_SECRET=
 
-# Challonge (OAuth 2.0) — register at connect.challonge.com. Note the new free
-# tier caps API calls (500/month, 429s from 2026-07-01), which the schedule
-# sync will have to respect.
+# Challonge member connect (OAuth 2.0) — register at connect.challonge.com.
+# Used only to read a member's Challonge handle so their tournament entry can be
+# linked to their account. Note the free tier caps API calls (500/month, 429s
+# from 2026-07-01), which the snapshot sync respects via conservative TTLs.
 # CHALLONGE_CLIENT_ID=
 # CHALLONGE_CLIENT_SECRET=
+# Challonge tournament backend — the org account's personal API key from
+# challonge.com/settings/developer (the "create an API v1 key" button; no OAuth
+# redirect URL needed). lib/challonge.ts sends it as Authorization-Type: v1 to
+# the v2.1 API, so tournaments we create live in the org's Challonge history.
+# Leave it unset and tournament admin actions report "not configured" and public
+# bracket pages render empty rather than erroring.
+# CHALLONGE_API_V1_KEY=
 
 # Optional — the 16-char Google app password for support@fault.foundation.
 # Set it and real mail goes out (academic-email codes, account-email

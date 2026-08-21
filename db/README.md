@@ -6,8 +6,9 @@ A single relational database behind the Next.js site: accounts and two-factor
 enrollment, collegiate membership & school-email verification, parental consent
 for minors, connected platform identities (Discord / Battle.net / Steam), staff
 access & moderation, teams with invites and multi-manager deletion, matchmaking
-(LFG/LFM), a **self-hosted tournament/bracket backend** (scores + replay codes),
-and the **support-ticket system mirrored two-way with the Discord bot**. It is
+(LFG/LFM), a **Challonge-backed tournament system** (Challonge runs the bracket;
+D1 holds identity, sign-ups and a cached render), and the **support-ticket
+system mirrored two-way with the Discord bot**. It is
 built on a **stable identity core** with **per-program satellite tables** —
 adding a new program is a new table, never a change to `user`.
 
@@ -68,7 +69,7 @@ npm run db:seed:generate    # regenerate db/seed/schools.sql from the upstream d
 npm run db:seed:local       # load the ~10k-row university directory
 npm run db:seed:remote
 
-# registry rows the app references by stable id (games/programs/example tournament):
+# registry rows the app references by stable id (games/programs):
 wrangler d1 execute website-sql --local  --file=db/seed/bootstrap.sql
 wrangler d1 execute website-sql --remote --file=db/seed/bootstrap.sql
 
@@ -133,12 +134,19 @@ and deduped by `primary_domain` — while `schools` stays a wholesale-reseeded
 lookup that nothing references. Teams carry **no owner column**: permission
 lives entirely on `team_members.role`, deleting a team with several managers
 goes through a `team_delete_requests` / `team_delete_votes` vote, and disbanding
-is a **soft delete** (`teams.disbanded_at`) so standings and match history
-survive. The bracket backend is fully self-hosted: `tournaments → stages →
-matches → match_games` (per-map scores + `replay_code`), with
-`tournament_participants` that are a team **or** a solo user (a `CHECK` enforces
-the exclusive-or) and single/double-elimination routing through
-`matches.next_match_id`. Tournaments a member plays on a **connected external platform** (FACEIT / start.gg / Challonge) reuse this shape — a `source != "internal"` `tournaments` row plus a `tournament_participants` entry — while their match-level schedule lands in a separate lightweight `external_matches` table kept out of the bracket engine. Support tickets are the one surface shared with another
+is a **soft delete** (`teams.disbanded_at`) so team history survives. The
+tournament backend is **Challonge** (`lib/challonge.ts`, API v2.1): Challonge
+owns bracket generation, seeding, match progression and standings, so there is
+no self-hosted match/score model here. D1 keeps only what Challonge doesn't —
+the tournament's identity and lifecycle (`tournaments`, with `source =
+"challonge"` and `external_id` = the Challonge tournament id), who signed up
+through our site mapped to their Challonge participant (`tournament_participants`
+with `challonge_participant_id`, a team **or** a solo user — a `CHECK` enforces
+the exclusive-or), and a cached JSON render of the live bracket pulled from
+Challonge (`tournament_brackets`, refreshed lazily on read). A member's matches
+on a **connected external platform** (FACEIT / start.gg / Challonge) for the
+pending personal calendar land in the separate lightweight `external_matches`
+table. Support tickets are the one surface shared with another
 system: D1 is the source of truth and the Discord bot mirrors both ways, pushing
 Discord activity into `support_tickets` / `support_ticket_messages` and pulling
 site-initiated work out of `bot_outbox`.
@@ -156,7 +164,7 @@ site-initiated work out of `bot_outbox`.
 | 5 — program membership + detail | `program_memberships`, `collegiate_registrations` |
 | 6 — durable schools | `colleges` |
 | 7 — teams & rosters | `teams`, `team_members`, `team_invites`, `team_delete_requests`, `team_delete_votes` |
-| 8 — brackets | `tournaments`, `stages`, `tournament_participants`, `matches`, `match_games`, `external_matches` |
+| 8 — tournaments (Challonge-backed) | `tournaments`, `tournament_participants`, `tournament_brackets`, `external_matches` |
 | 9 — matchmaking | `lfg_profiles`, `team_listings`, `lfg_connections` |
 | 10 — support tickets | `support_tickets`, `support_ticket_messages`, `support_ticket_notes`, `bot_outbox` |
 | registration support | `schools`, `school_email_verifications`, `parental_consents` |
@@ -205,16 +213,19 @@ site-initiated work out of `bot_outbox`.
 | Join links | `team_invites` | one reusable `kind = 'link'` per team (its newest non-revoked row is *the* link; rotating revokes and re-inserts) plus single-use `kind = 'targeted'` invites carrying a role; `token` unique, `max_uses` NULL = unlimited |
 | Multi-manager deletion | `team_delete_requests` + `team_delete_votes` | a sole manager disbands outright; with several, every *current* manager must approve and one decline cancels — so promoting someone mid-vote correctly re-blocks it. `UNIQUE(request_id, user_id)` = one vote each |
 
-### Brackets, scoring & matchmaking (self-hosted)
+### Tournaments (Challonge-backed) & matchmaking
+
+Challonge runs the bracket (`lib/challonge.ts`, v2.1). These tables are the D1
+side of that: identity/lifecycle, our sign-ups mapped to Challonge participants,
+and a cached render. Seeds, matches, scores and standings are **not** modeled
+here — they live on Challonge and are pulled into `tournament_brackets`.
 
 | App concept | Table | Key mappings |
 |---|---|---|
-| Bracket | `tournaments` | `format` ∈ `round_robin` \| `single_elim` \| `double_elim` \| `swiss`; `status` ∈ `draft` \| `registration` \| `active` \| `completed`; `best_of`, `custom_game_code` (the in-game lobby code); `source` ∈ `internal` \| `faceit` \| `startgg` \| `challonge` (non-internal = mirrored from a connected account, left untouched by the bracket engine) with `external_id` / `external_url` and `UNIQUE(source, external_id)` |
-| Group / playoff phase | `stages` | `type`, `ordinal` (round-robin = one stage) |
-| Competitor + standings | `tournament_participants` | team **XOR** solo user (`CHECK`); `seed`, `wins`/`losses`/`map_diff`/`points`/`final_standing` recomputed on report. `withdrawn_at` keeps the row and its history but drops it out of every "who is entered" query, including the one-team-per-tournament conflict check |
-| Match | `matches` | `status` ∈ `pending` \| `live` \| `reported` \| `confirmed` \| `disputed`; `next_match_id` + `next_match_slot` route the winner onward; `reported_by_user_id` / `reported_at` are the audit trail, since reports apply instantly with no opponent confirmation step |
-| Per-map result | `match_games` | `game_number`, `map_name`, `participant_a_score`/`_b_score`, `winner_participant_id`, **`replay_code`**; `UNIQUE(match_id, game_number)` — re-reporting overwrites these rows rather than accumulating |
-| External match (connected platform) | `external_matches` | a member's FACEIT / start.gg / Challonge matches — flat per-user schedule rows, **not** the engine's `matches`: `provider`, `external_id`, `opponent_name`, `round`, `status` ∈ `scheduled` \| `live` \| `finished` \| `cancelled`, `scheduled_at`, optional `tournament_id`. `UNIQUE(user_id, provider, external_id)` (idempotent sync); indexed `(user_id, scheduled_at)` for the calendar |
+| Tournament | `tournaments` | 6-digit `id` (public identifier; no slug — the URL name segment is derived from `name`); `format` ∈ `single_elim` \| `double_elim` \| `round_robin` \| `swiss` (maps to Challonge `tournament_type`); `status` ∈ `draft` \| `registration` \| `seeding` \| `active` \| `completed` \| `cancelled` (our lifecycle, mapped to Challonge start/finalize/reset in the admin actions); `source = "challonge"` with `external_id` = the Challonge tournament id and `external_url` the deep link, `UNIQUE(source, external_id)`; `max_participants`, `best_of`, `swiss_rounds`, `third_place_match`, registration/roster-lock timestamps, `version` (bumped on every mutation → forces a snapshot rebuild), `bracket_generated_at` (set on Start) |
+| Competitor | `tournament_participants` | team **XOR** solo user (`CHECK`); `challonge_participant_id` maps our row to the Challonge participant; `seed`; `withdrawn_at` keeps the row but drops it out of every "who is entered" query, including the one-team-per-tournament conflict check. Two `UNIQUE(tournament_id, team_id)` / `(tournament_id, user_id)` indexes close the enter race. No standings columns — Challonge is the scorer |
+| Cached bracket | `tournament_brackets` | one row per tournament (`tournament_id` PK): `payload` (the JSON `SnapshotPayload` `lib/challonge.ts` builds and `BracketView` renders), `version` (the tournament version it was built at) and `fetched_at`. Rebuilt from Challonge lazily on read past a status TTL, or immediately when `version` moves (an admin mutation). Workers has no cron — this is the "refresh on read" cache |
+| External match (connected platform) | `external_matches` | a member's FACEIT / start.gg / Challonge matches for the pending personal calendar — flat per-user schedule rows: `provider`, `external_id`, `opponent_name`, `round`, `status` ∈ `scheduled` \| `live` \| `finished` \| `cancelled`, `scheduled_at`, optional `tournament_id`. `UNIQUE(user_id, provider, external_id)` (idempotent sync); indexed `(user_id, scheduled_at)` |
 | Player advertising themselves | `lfg_profiles` | `status` ∈ `open` \| `paused` \| `placed`; `skill_rating`/`peak_rating` matched against a listing's range; `positions`/`availability` are JSON whose shape is owned by `lib/lfg-shared.ts` — parse through those helpers, never ad hoc. `UNIQUE(user_id, program_id, game_id)` |
 | Team advertising open slots | `team_listings` | the mirror shape of the above, plus `skill_min`/`skill_max`, `slots_open`, and a `contact_url` that overrides `teams.discord_invite_url` for this listing only |
 | The handshake | `lfg_connections` | `direction` ∈ `player_to_team` \| `team_to_player`; both `listing_id` and `profile_id` are nullable because either side can approach the other cold. `UNIQUE(listing_id, user_id)` — re-approaching updates the row |
@@ -287,23 +298,19 @@ TEAM_DELETE_REQUESTS( *id, team_id→TEAMS, requested_by_user_id→USER?, reason
 TEAM_DELETE_VOTES( *id, request_id→TEAM_DELETE_REQUESTS, user_id→USER, decision,
                  UNIQUE(request_id, user_id) )
 
--- Self-hosted brackets (scores + replay codes)
-TOURNAMENTS(     *id, program_id→PROGRAMS, game_id→GAMES?, name, slug UNIQUE, format, status,
-                 best_of, custom_game_code?, starts_at?, ends_at?, rules_url? )
-STAGES(          *id, tournament_id→TOURNAMENTS, name, type, ordinal )
+-- Tournaments (Challonge-backed; Challonge owns bracket/matches/standings)
+TOURNAMENTS(     *id, program_id→PROGRAMS, game_id→GAMES?, source, external_id?, external_url?,
+                 name, format, status, max_participants?, best_of, swiss_rounds?,
+                 third_place_match, starts_at?, ends_at?, registration_opens_at?,
+                 registration_closes_at?, roster_lock_at?, rules_url?, version,
+                 bracket_generated_at?,
+                 UNIQUE(source, external_id) )
 TOURNAMENT_PARTICIPANTS( *id, tournament_id→TOURNAMENTS, team_id→TEAMS?, user_id→USER?,
-                 registered_by_user_id→USER?, seed?, checked_in_at?, withdrawn_at?,
-                 wins, losses, map_diff, points, final_standing?,
-                 CHECK( team_id XOR user_id ) )
-MATCHES(         *id, tournament_id→TOURNAMENTS, stage_id→STAGES?, round?, bracket?,
-                 participant_a_id→TOURNAMENT_PARTICIPANTS?, participant_b_id→TOURNAMENT_PARTICIPANTS?,
-                 winner_participant_id→TOURNAMENT_PARTICIPANTS?, best_of, status,
-                 scheduled_at?, played_at?, reported_by_user_id→USER?, reported_at?,
-                 next_match_id→MATCHES?, next_match_slot? )
-MATCH_GAMES(     *id, match_id→MATCHES, game_number, map_name?, mode?,
-                 participant_a_score, participant_b_score,
-                 winner_participant_id→TOURNAMENT_PARTICIPANTS?, replay_code?,
-                 UNIQUE(match_id, game_number) )
+                 registered_by_user_id→USER?, challonge_participant_id?, seed?,
+                 checked_in_at?, withdrawn_at?,
+                 CHECK( team_id XOR user_id ),
+                 UNIQUE(tournament_id, team_id), UNIQUE(tournament_id, user_id) )
+TOURNAMENT_BRACKETS( *tournament_id→TOURNAMENTS, payload, version, fetched_at )
 
 -- Matchmaking (LFG / LFT / LFM)
 LFG_PROFILES(    *id, user_id→USER, program_id→PROGRAMS, game_id→GAMES?, status,
@@ -344,8 +351,8 @@ Functional dependencies (identity + natural / unique keys):
 id                                            → all attributes of its relation   (every table)
 user.email                                    → user.id           (UNIQUE)
 session.token                                 → session.id        (UNIQUE)
-programs.slug / games.slug / tournaments.slug → that relation's id (UNIQUE)
-(tournaments.source, external_id)             → tournaments.id    (UNIQUE; internal rows null)
+programs.slug / games.slug                    → that relation's id (UNIQUE)
+(tournaments.source, external_id)             → tournaments.id    (UNIQUE; draft rows null external_id)
 profiles.user_id                              → profiles.id       (1:1 with user)
 (platform_identities.user_id, provider)       → platform_identities.id
 (platform_identities.provider, external_id)   → platform_identities.id
@@ -359,7 +366,8 @@ team_invites.token                            → team_invites.id
 (team_delete_votes.request_id, user_id)       → team_delete_votes.id
 (lfg_profiles.user_id, program_id, game_id)   → lfg_profiles.id
 (lfg_connections.listing_id, user_id)         → lfg_connections.id
-(match_games.match_id, game_number)           → match_games.id
+(tournament_participants.tournament_id, team_id) → tournament_participants.id
+(tournament_participants.tournament_id, user_id) → tournament_participants.id
 (external_matches.user_id, provider, external_id) → external_matches.id
 support_tickets.ticket_number                 → support_tickets.id
 support_tickets.discord_channel_id            → support_tickets.id   (the mirror's alignment key)
@@ -380,13 +388,10 @@ detail     : PROGRAM_MEMBERSHIPS ↔ COLLEGIATE_REGISTRATIONS (1:1 — the progr
 college    : COLLEGIATE_REGISTRATIONS / TEAMS ⇀ COLLEGES
 team       : TEAM_MEMBERS / TEAM_INVITES / TEAM_DELETE_REQUESTS / TEAM_LISTINGS → TEAMS
 vote       : TEAM_DELETE_VOTES → TEAM_DELETE_REQUESTS × USER  (unanimity judged vs the CURRENT managers)
-tournament : STAGES / TOURNAMENT_PARTICIPANTS / MATCHES → TOURNAMENTS
-stage      : MATCHES ⇀ STAGES
-match      : MATCH_GAMES → MATCHES
-sides      : MATCHES ⇀ TOURNAMENT_PARTICIPANTS × TOURNAMENT_PARTICIPANTS   (a, b, winner)
+tournament : TOURNAMENT_PARTICIPANTS / TOURNAMENT_BRACKETS → TOURNAMENTS
 competitor : TOURNAMENT_PARTICIPANTS → TEAMS ⊕ USER                        (exactly one; CHECK)
+bracket    : TOURNAMENT_BRACKETS ⇀ TOURNAMENTS  (1:1 cached Challonge render)
 roster     ⊆ TEAMS × USER                                                  (many-to-many via TEAM_MEMBERS)
-advance    : MATCHES ⇀ MATCHES                                             (winner routing via next_match_id)
 market     : LFG_CONNECTIONS → TEAMS × USER, ⇀ TEAM_LISTINGS, ⇀ LFG_PROFILES
 ticket     : SUPPORT_TICKET_MESSAGES / SUPPORT_TICKET_NOTES → SUPPORT_TICKETS
              (BOT_OUTBOX ⇀ SUPPORT_TICKETS)
@@ -430,12 +435,8 @@ erDiagram
     TEAMS                   |o--o{ TOURNAMENT_PARTICIPANTS : "team_id"
     TEAM_LISTINGS           |o--o{ LFG_CONNECTIONS         : "listing_id"
     LFG_PROFILES            |o--o{ LFG_CONNECTIONS         : "profile_id"
-    TOURNAMENTS             ||--o{ STAGES                  : "tournament_id"
     TOURNAMENTS             ||--o{ TOURNAMENT_PARTICIPANTS : "tournament_id"
-    TOURNAMENTS             ||--o{ MATCHES                 : "tournament_id"
-    STAGES                  |o--o{ MATCHES                 : "stage_id"
-    TOURNAMENT_PARTICIPANTS ||--o{ MATCHES                 : "sides"
-    MATCHES                 ||--o{ MATCH_GAMES             : "match_id"
+    TOURNAMENTS             ||--|| TOURNAMENT_BRACKETS      : "tournament_id"
     SUPPORT_TICKETS         ||--o{ SUPPORT_TICKET_MESSAGES : "ticket_id"
     SUPPORT_TICKETS         ||--o{ SUPPORT_TICKET_NOTES    : "ticket_id"
     SUPPORT_TICKETS         |o--o{ BOT_OUTBOX              : "ticket_id"
@@ -476,17 +477,15 @@ erDiagram
         text tournament_id FK
         text team_id FK
         text user_id FK
-        int  points
-        int  final_standing
+        text challonge_participant_id
+        int  seed
         int  withdrawn_at
     }
-    MATCH_GAMES {
-        text id PK
-        text match_id FK
-        int  game_number
-        int  participant_a_score
-        int  participant_b_score
-        text replay_code
+    TOURNAMENT_BRACKETS {
+        text tournament_id PK
+        text payload
+        int  version
+        int  fetched_at
     }
     SUPPORT_TICKETS {
         text id PK
@@ -523,16 +522,15 @@ flowchart LR
         REG -. "minor 13-17" .-> PC[(parental_consents)]
         PC -. parent confirms .-> PM
     end
-    subgraph brk["Teams, brackets & scoring"]
+    subgraph brk["Teams & tournaments (Challonge-backed)"]
         PROG[(programs)] --> T[(tournaments)]
         GM[(games)] --> T
-        T --> ST[(stages)]
-        T --> M[(matches)]
-        ST --> M
-        M --> MG[("match_games — replay_code")]
+        T -. "challonge v2.1" .-> CH{{Challonge}}
+        CH -. snapshot .-> TB[("tournament_brackets — cached bracket")]
+        T --> TB
         TM[(teams)] --> TP[(tournament_participants)]
         U --> TP
-        TP --> M
+        TP -. "challonge_participant_id" .-> CH
         T --> EM[("external_matches — connected sites")]
         U --> EM
         TM --> RM[(team_members)]
@@ -572,16 +570,14 @@ User  (Better Auth: + session, account, verification, two_factor)
 └─ Moderation Action   note / warn / kick / ban                            0..n
 ```
 
-A tournament — the self-hosted bracket tree:
+A tournament — a Challonge-backed shell in D1 (the bracket itself is on Challonge):
 
 ```
 Program  (+ Game)
-└─ Tournament   format, status, best_of, custom_game_code
-   ├─ Stage     round_robin / single_elim / double_elim / swiss
-   │  └─ Match  round, status, next_match ──▶ advance winner
-   │     └─ Match Game   map, scores, replay_code
-   └─ Participant   team XOR solo user; seed, wins/losses, standing
-      └─ Team ─→ Roster  (Team Members ─→ Users)
+└─ Tournament   format, status, best_of; source="challonge", external_id
+   ├─ Participant   team XOR solo user; seed, challonge_participant_id
+   │  └─ Team ─→ Roster  (Team Members ─→ Users)
+   └─ Cached bracket   tournament_brackets.payload  ◀── pulled from Challonge (v2.1)
 ```
 
 A support ticket — one thread, two front ends:
@@ -608,9 +604,8 @@ Support Ticket   number, status, priority, assignee, discord_channel_id
 | Staff access | `staff_roles` | **Live** — admin dashboard grants/revokes, plus the Discord-role sync |
 | Moderation | `moderation_actions` | Schema-ready — **no code writes it yet** |
 | Teams & rosters | `teams`, `team_members`, `team_invites`, `team_delete_requests`, `team_delete_votes` | **Live** — create, invite links, roster management, multi-manager delete vote, soft disband, staff team editing |
-| Score reporting | `matches`, `match_games`, `tournament_participants` | **Live** — a manager/captain's report applies instantly; `recomputeStandings` rebuilds standings from confirmed matches |
-| Bracket generation | `tournaments`, `stages` | Schema-ready — **no generation code**: nothing writes `stages`, and seeding / round / bracket / `next_match_id` routing is unbuilt. Tournaments exist only as seeded rows (`db/seed/bootstrap.sql`) |
-| Cross-site schedule & calendar | `tournaments` (`source`), `external_matches`, `tournament_participants` | Schema-ready — the connect OAuth (FACEIT / start.gg / Challonge) is live and the columns + `external_matches` table exist, but the sync that populates them and the calendar view are **not built yet** (next phase) |
+| Tournaments (Challonge) | `tournaments`, `tournament_participants`, `tournament_brackets` | **Live** — staff create/configure/seed/start/finalize/reset/delete against Challonge v2.1 (`lib/challonge.ts`); teams self-register (adds a Challonge participant, linking the captain's connected Challonge account); the branded public bracket at `/t/<id>/<name>/` renders the cached snapshot. Needs `CHALLONGE_API_V1_KEY`; degrades cleanly without it. Staff enter results; captain self-reporting is deferred |
+| Cross-site schedule & calendar | `external_matches`, `tournament_participants` | Schema-ready — the connect OAuth (FACEIT / start.gg / Challonge) is live and `external_matches` exists, but the sync that populates it and the calendar view are **not built yet** (next phase) |
 | Matchmaking (LFG/LFM) | `lfg_profiles`, `team_listings`, `lfg_connections` | Schema-ready — `team_listings` is written by the team actions; `lfg_profiles` / `lfg_connections` have no code yet and the browse/apply UI is WIP |
 | Support tickets | `support_tickets`, `support_ticket_messages`, `support_ticket_notes`, `bot_outbox` | **Live** — staff queue, two-way Discord mirror, outbox bridge |
 | Reference data | `games`, `programs` | Seeded via `db/seed/bootstrap.sql` (`overwatch`, `collegiate-overwatch`) |

@@ -18,15 +18,7 @@ ON CONFLICT(id) DO UPDATE SET
   game_id = excluded.game_id,
   active = excluded.active;
 
--- Example self-hosted tournament (Overfault): round-robin, Bo3, custom lobby
--- code. created_at/updated_at have no SQL default (set app-side by Drizzle),
--- so raw inserts must supply them.
-INSERT INTO tournaments
-  (id, program_id, game_id, name, slug, format, status, best_of,
-   custom_game_code, created_at, updated_at)
-VALUES
-  ('overfault-2026', 'collegiate-overwatch', 'overwatch', 'Overfault',
-   'overfault-2026', 'round_robin', 'draft', 3, 'Y2TXE',
-   CAST(strftime('%s','now') AS INTEGER) * 1000,
-   CAST(strftime('%s','now') AS INTEGER) * 1000)
-ON CONFLICT(id) DO NOTHING;
+-- No example tournament is seeded: tournaments are created through the admin UI,
+-- which also creates the matching Challonge tournament and stores its id. A
+-- seeded row with no Challonge backing would have an empty bracket and can't be
+-- managed, so the registry stops at games + programs.

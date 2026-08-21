@@ -32,9 +32,19 @@ interface CloudflareEnv {
   // GraphQL API; connect-only.
   STARTGG_CLIENT_ID?: string;
   STARTGG_CLIENT_SECRET?: string;
-  // Challonge OAuth client (connect.challonge.com). OAuth 2.0; connect-only.
+  // Challonge OAuth client (connect.challonge.com). OAuth 2.0; connect-only —
+  // this is the *member* "Connect Challonge" flow, used only to read a member's
+  // Challonge handle so their tournament entry can be linked to their account.
   CHALLONGE_CLIENT_ID?: string;
   CHALLONGE_CLIENT_SECRET?: string;
+  // Challonge personal API key (challonge.com/settings/developer, the "create an
+  // API v1 key" button) for the org's own account. This is the *tournament
+  // backend* credential: lib/challonge.ts sends it as `Authorization-Type: v1`
+  // against the current v2.1 API, so every tournament we create lives in the
+  // org's Challonge history. Optional so the repo stays open-source-clean and
+  // degrades gracefully — with it unset, admin tournament actions return a clear
+  // "not configured" error and public bracket pages render empty rather than 500.
+  CHALLONGE_API_V1_KEY?: string;
   // Verification-code emails, sent over SMTP (see lib/email.ts). The Google
   // app password for SUPPORT_EMAIL — without it the code is logged to the
   // console instead (dev mode).

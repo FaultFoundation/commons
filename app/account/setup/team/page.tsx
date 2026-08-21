@@ -115,12 +115,12 @@ export default async function TeamSetupPage() {
 
         <Bubble title="Your Tournaments" span="full">
           <BubbleRow
-            label="Overfault"
-            value="Open for registration"
-            note="Collegiate Overwatch — our flagship tournament. Enter from your team's page."
+            label="Tournaments"
+            value="Browse what's open"
+            note="Collegiate Overwatch events run here. Enter an open tournament from your team's page."
             action={
-              <a className="ff-btn ff-btn--sm" href="/tournaments/#overfault">
-                Join
+              <a className="ff-btn ff-btn--sm" href="/tournaments/">
+                View
               </a>
             }
           />

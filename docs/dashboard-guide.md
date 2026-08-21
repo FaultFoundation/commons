@@ -12,9 +12,11 @@ now 308s via `middleware.ts`). `/` stays the public Commons landing page.
 | ------------------------------ | ----------- | ---------------------------- |
 | `/home/`                       | Home        | Condensed widget views       |
 | `/schedule/`                   | Schedule    | WIP                          |
-| `/tournaments/`                | Tournaments | WIP (`#overfault` anchor)    |
+| `/tournaments/`                | Tournaments | List of open/live/finished tournaments |
+| `/t/<id>/<name>/`              | —           | Public branded bracket (signed-out-safe) |
+| `/admin/tournaments/`          | Admin       | Create + manage (Challonge-backed) |
 | `/teams/`                      | Teams       | Your teams + create          |
-| `/teams/<teamId>/`             | Teams       | One team: roster, invites, settings, scores |
+| `/teams/<teamId>/`             | Teams       | One team: roster, invites, settings, tournaments |
 | `/join/<token>/`               | —           | Invite landing (join a team) |
 | `/account/`                    | Account     | Profile / integrations       |
 | `/account/setup/`              | —           | Resolver → current step      |
@@ -386,7 +388,6 @@ player` — and `lib/teams-shared.ts` owns the whole model:
 | Capability         | manager | captain | coach | player |
 | ------------------ | :-----: | :-----: | :---: | :----: |
 | `viewStats`        |    ✅    |    ✅    |   ✅   |   ✅    |
-| `reportScores`     |    ✅    |    ✅    |       |        |
 | `editSettings`     |    ✅    |    ✅    |       |        |
 | `manageRoster`     |    ✅    |    ✅    |       |        |
 | `manageInvites`    |    ✅    |    ✅    |       |        |
@@ -430,19 +431,35 @@ container inside a plain `ff-dash` wrapper (`.ff-join`).
 Team layout: `/teams/` is an action row (`TeamsActions`) over the member's team
 cards; `/teams/<id>/` is a **single-column** `ff-bubble-grid--single` in
 priority order — header (identity + settings + the Invite Players disclosure),
-Roster, Report a Score, Tournaments, Danger Zone. There is no separate Team
-Settings bubble; `TeamSettingsRows` is the header's row set, and a team's
-region/timezone are prefilled at creation from the creator's verified college
-(`getCollegeRegion`) and their browser zone, then edited through dropdowns
-(`RegionRow` uses the same `schools` country list the registration form does).
+Roster, Tournaments, Danger Zone. There is no separate Team Settings bubble;
+`TeamSettingsRows` is the header's row set, and a team's region/timezone are
+prefilled at creation from the creator's verified college (`getCollegeRegion`)
+and their browser zone, then edited through dropdowns (`RegionRow` uses the same
+`schools` country list the registration form does). The Tournaments bubble is
+the entry control — a manager/captain enters or withdraws the team, which
+adds/removes it as a Challonge participant.
 
-## Score reporting
+## Tournaments (Challonge-backed)
 
-`lib/scoring.ts`. Either team's manager or captain reports, and the report
-applies immediately — there is no opponent confirmation. `matches.status`
-goes straight to `confirmed`, and `recomputeStandings` rebuilds
-`wins/losses/map_diff/points` for the whole tournament from its confirmed
-matches, so re-reporting a corrected score replaces rather than accumulates.
+The tournament backend is Challonge (API v2.1); the Commons renders a branded
+front-end over it. See the CLAUDE.md "Tournaments run on Challonge" section for
+the architecture (the `lib/challonge.ts` boundary, the snapshot cache seam, the
+lazy TTL). Portal conventions specific to this surface:
+
+- **Admin** (`/admin/tournaments/`, gated on `manageTournaments` + admin unlock):
+  a create form (name/format/max entrants — also creates the Challonge
+  tournament) and a per-tournament detail page. The detail page groups the same
+  bubble vocabulary as the rest of the portal — Lifecycle (status transitions),
+  Settings (only Challonge-honored fields: format, best-of, swiss rounds,
+  third-place match, schedule), Seeding (a reorder list pushed to Challonge on
+  Start), Bracket (Start button, then a per-match result-entry row), Danger Zone
+  (reset/delete, both hitting Challonge). "Blue commits, outline doesn't" holds;
+  reset/delete are `ff-btn--danger` behind a `ConfirmDialog`.
+- **Public bracket** (`/t/<id>/<name>/`): signed-out-safe, its own `ff-bracket`
+  layout (rounds as columns, matches as cards, a standings table), polling
+  `/api/tournaments/[id]/bracket` on the interval the server dictates
+  (`nextPollMs`) and pausing on a hidden tab — the same request-budget
+  discipline the ticket queue uses.
 
 ## Backend notes
 

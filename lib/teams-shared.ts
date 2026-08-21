@@ -27,7 +27,6 @@ export const TEAM_ROLE_HINTS: Record<TeamRole, string> = {
 
 export type TeamCapability =
   | "viewStats"
-  | "reportScores"
   | "editSettings"
   | "manageRoster"
   | "manageInvites"
@@ -46,7 +45,6 @@ export type TeamCapability =
 export const TEAM_CAPABILITIES: Record<TeamRole, readonly TeamCapability[]> = {
   manager: [
     "viewStats",
-    "reportScores",
     "editSettings",
     "manageRoster",
     "manageInvites",
@@ -55,7 +53,6 @@ export const TEAM_CAPABILITIES: Record<TeamRole, readonly TeamCapability[]> = {
   ],
   captain: [
     "viewStats",
-    "reportScores",
     "editSettings",
     "manageRoster",
     "manageInvites",

@@ -2500,3 +2500,109 @@ button.ff-dash__link:hover {
   border-radius: var(--ff-radius-md);
   background: rgba(255, 255, 255, 0.03);
 }
+
+/* ===========================================================================
+   Tournaments — the public bracket at /t/<id>/<name>/ and the branded bracket
+   view (components/tournaments/BracketView.tsx). Rendered from a Challonge-fed
+   snapshot; rounds are columns, matches are cards. Uses the dashboard type
+   scale and the shared surface/border tokens so it reads as one system.
+   =========================================================================== */
+
+.ff-bracket-page {
+  max-width: var(--ff-container);
+  margin: 0 auto;
+  padding: calc(var(--ff-header-offset, 0px) + 32px) var(--ff-gutter) 64px;
+}
+.ff-bracket-page__head {
+  margin-bottom: 24px;
+}
+.ff-bracket-page__title {
+  font-size: var(--ff-dash-text-xl);
+  font-weight: 800;
+  margin: 0 0 4px;
+}
+.ff-bracket-page__sub {
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+  margin: 0 0 12px;
+}
+
+.ff-bracket {
+  display: grid;
+  gap: var(--ff-space-section, 28px);
+}
+.ff-bracket__source {
+  margin: 0;
+}
+.ff-bracket__section-title {
+  font-size: var(--ff-dash-text-lg);
+  font-weight: 700;
+  margin: 0 0 12px;
+}
+
+/* Rounds scroll horizontally inside their own container so the page body never
+   does — a deep bracket is wider than the viewport by design. */
+.ff-bracket__rounds {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+.ff-bracket__round {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 220px;
+  justify-content: space-around;
+}
+.ff-bracket__round-label {
+  font-size: var(--ff-dash-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ff-text-dim);
+}
+
+.ff-bracket__match {
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-surface-2);
+  overflow: hidden;
+}
+.ff-bracket__match[data-state="open"] {
+  border-color: var(--ff-blue);
+}
+.ff-bracket__slot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-bracket__slot + .ff-bracket__slot {
+  border-top: 1px solid var(--ff-border);
+}
+.ff-bracket__slot-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ff-bracket__slot-score {
+  font-variant-numeric: tabular-nums;
+  color: var(--ff-text-dim);
+}
+.ff-bracket__slot--winner {
+  font-weight: 700;
+}
+.ff-bracket__slot--winner .ff-bracket__slot-name {
+  color: var(--ff-accent);
+}
+.ff-bracket__slot--winner .ff-bracket__slot-score {
+  color: inherit;
+}
+.ff-bracket__match-state {
+  padding: 4px 12px;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+  border-top: 1px solid var(--ff-border);
+}

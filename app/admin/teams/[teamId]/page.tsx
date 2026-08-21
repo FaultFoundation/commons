@@ -116,8 +116,7 @@ async function TeamContent({ teamId }: { teamId: string }) {
             <BubbleRow
               key={entry.participantId}
               label={entry.tournamentName}
-              value={`${entry.wins}–${entry.losses}`}
-              note={entry.status}
+              value={entry.status}
             />
           ))}
         </Bubble>

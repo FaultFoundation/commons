@@ -8,16 +8,11 @@ import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { DangerZonePanel } from "@/components/dashboard/teams/DangerZonePanel";
 import { InvitePanel } from "@/components/dashboard/teams/InvitePanel";
 import { RosterPanel } from "@/components/dashboard/teams/RosterPanel";
-import { ScoreReporter } from "@/components/dashboard/teams/ScoreReporter";
 import { TeamSettingsRows } from "@/components/dashboard/teams/TeamSettingsRows";
 import { TournamentPanel } from "@/components/dashboard/teams/TournamentPanel";
 import { getAuth } from "@/lib/auth";
 import { listSchoolCountries } from "@/lib/registration";
-import {
-  getTeamDetail,
-  getTeamMembership,
-  listReportableMatches,
-} from "@/lib/teams";
+import { getTeamDetail, getTeamMembership } from "@/lib/teams";
 import { TEAM_ROLE_LABELS, can } from "@/lib/teams-shared";
 
 // Session-gated: always rendered per request.
@@ -60,11 +55,10 @@ export default async function TeamPage({
 
   const role = membership.role;
   const editsSettings = can(role, "editSettings");
-  const [matches, countries] = await Promise.all([
-    can(role, "reportScores") ? listReportableMatches(teamId) : [],
-    // Only the region picker needs the directory — don't pay for it otherwise.
-    editsSettings ? listSchoolCountries() : [],
-  ]);
+  // Only the region picker needs the school directory — don't pay for it
+  // otherwise. Scores are entered staff-side now (Challonge), so there's no
+  // per-team reporting fetch here anymore.
+  const countries = editsSettings ? await listSchoolCountries() : [];
   const managerCount = team.roster.filter((m) => m.role === "manager").length;
 
   return (
@@ -136,12 +130,6 @@ export default async function TeamPage({
             viewerUserId={session.user.id}
           />
         </Bubble>
-
-        {can(role, "reportScores") ? (
-          <Bubble title="Report a Score">
-            <ScoreReporter teamId={team.id} matches={matches} />
-          </Bubble>
-        ) : null}
 
         <Bubble title="Tournaments">
           <TournamentPanel

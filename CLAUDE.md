@@ -177,6 +177,49 @@ its 2FA details (`getUnlockPrompt`) only when it *opens*, never from the shell:
 `DashboardShell` renders on every portal page, and the 2FA row read there would
 be a per-page D1 query for staff who are already unlocked.
 
+### Tournaments run on Challonge
+
+The tournament backend is **Challonge (API v2.1)**, not a self-hosted bracket
+engine — Challonge owns bracket generation, seeding, match progression and
+standings, and the Commons is a **branded front-end** over it. (An earlier
+self-hosted engine — `lib/brackets*.ts`, `lib/scoring.ts`, `stages`/`matches`/
+`match_games` — was removed when we moved to Challonge; don't reintroduce that
+shape.)
+
+- **[lib/challonge.ts](lib/challonge.ts) is the only module that talks to
+  Challonge.** It authenticates with the org account's **personal API key**
+  (`CHALLONGE_API_V1_KEY`), sent as `Authorization-Type: v1` against the v2.1
+  base URL — the key is a *credential type*, not the deprecated v1 API. v2.1
+  speaks JSON:API, so the client wraps/unwraps the `{ data: { type, attributes } }`
+  envelope. Server-only. **Degrades**: unset key → admin actions return "not
+  configured" and public pages render an empty bracket, never a 500. This is
+  distinct from the member `CHALLONGE_CLIENT_*` OAuth (a profile read used only
+  to link a member's entry to their Challonge account).
+- **The snapshot seam.** [lib/tournaments.ts](lib/tournaments.ts) pulls Challonge
+  participants+matches into a `SnapshotPayload` (defined in
+  [lib/tournaments-shared.ts](lib/tournaments-shared.ts)), cached as one JSON row
+  in `tournament_brackets`. `BracketView` and the poll route
+  (`app/api/tournaments/[id]/bracket`) consume that shape and never touch
+  Challonge — the cache decouples viewer count from Challonge's metered API. It
+  refreshes **lazily on read** past a status TTL (Workers has no cron) and
+  **immediately** after any admin mutation (which bumps `tournaments.version`;
+  `getOrRefreshSnapshot` rebuilds when the cache is behind that version).
+- **Admin lifecycle → Challonge.** Our status
+  (`draft→registration→seeding→active→completed`) is richer than Challonge's;
+  the mapping lives in [app/admin/tournaments/actions.ts](app/admin/tournaments/actions.ts):
+  Start = `change_state("start")`, Complete = `finalize`, reset = `reset`. Every
+  action re-derives the `manageTournaments` staff capability + admin unlock, same
+  three-layer gate as every other admin surface.
+- **Registration is teams-only** today (the schema keeps solo a migration-free
+  future). Entering adds a Challonge participant named for the team, passing the
+  registering captain's connected Challonge handle when present so the event also
+  lands in their Challonge history. Results are entered staff-side; captain
+  self-reporting is deferred.
+
+The public bracket is at `/t/<id>/<name>/` (not `/tournaments/[…]` — `robots.ts`
+disallows that prefix); the id is the whole lookup and the name segment is
+cosmetic, re-derived from `name` so a rename never orphans a link.
+
 ### Styling
 
 **No CSS framework.** `styles/theme.css` is the design system (every selector

@@ -85,6 +85,13 @@
       "when": 1784966604887,
       "tag": "0011_eager_tyger_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1786117785683,
+      "tag": "0012_vengeful_franklin_richards",
+      "breakpoints": true
     }
   ]
 }

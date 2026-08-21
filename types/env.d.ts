@@ -20,6 +20,21 @@ interface CloudflareEnv {
   // Link-only: Blizzard returns no email, so it can never create a user.
   BATTLENET_CLIENT_ID?: string;
   BATTLENET_CLIENT_SECRET?: string;
+  // FACEIT "FACEIT Connect" OAuth client (developers.faceit.com). OpenID
+  // Connect; connect-only (attaches to a session, never signs up).
+  FACEIT_CLIENT_ID?: string;
+  FACEIT_CLIENT_SECRET?: string;
+  // FACEIT server-side Data API key (open.faceit.com/data/v4). Separate from
+  // the OAuth client above: identity is OAuth, but match history / ELO /
+  // upcoming matches come from the API-key Data API (used by the schedule sync).
+  FACEIT_API_KEY?: string;
+  // start.gg OAuth client (start.gg/admin/profile/developer). OAuth 2.0 over a
+  // GraphQL API; connect-only.
+  STARTGG_CLIENT_ID?: string;
+  STARTGG_CLIENT_SECRET?: string;
+  // Challonge OAuth client (connect.challonge.com). OAuth 2.0; connect-only.
+  CHALLONGE_CLIENT_ID?: string;
+  CHALLONGE_CLIENT_SECRET?: string;
   // Verification-code emails, sent over SMTP (see lib/email.ts). The Google
   // app password for SUPPORT_EMAIL — without it the code is logged to the
   // console instead (dev mode).

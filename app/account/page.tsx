@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { ComingSoonIntegration } from "@/components/dashboard/accounts/ComingSoonIntegration";
 import { DeleteAccount } from "@/components/dashboard/accounts/DeleteAccount";
 import { DensityRow } from "@/components/dashboard/accounts/DensityRow";
 import { IntegrationCard } from "@/components/dashboard/accounts/IntegrationCard";
@@ -22,7 +23,11 @@ import { account, twoFactor, user } from "@/db/schema";
 import { battlenetAuthEnabled, discordAuthEnabled, getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { DENSITY_COOKIE, asDensity } from "@/lib/density";
-import { discordServerNote, loadDiscordIntegration } from "@/lib/integrations";
+import {
+  discordServerNote,
+  loadConnectIntegrations,
+  loadDiscordIntegration,
+} from "@/lib/integrations";
 import { getPlatformIdentity } from "@/lib/platform-identities";
 import { getProfile, getRegistrationState } from "@/lib/registration";
 
@@ -61,12 +66,21 @@ export default async function AccountPage({
   const densityCookie = (await cookies()).get(DENSITY_COOKIE)?.value;
 
   const db = getDb();
-  const [reg, discord, battlenetIdentity, accountRows, twoFactorRows, profile, params] =
-    await Promise.all([
+  const [
+    reg,
+    discord,
+    battlenetIdentity,
+    connectIntegrations,
+    accountRows,
+    twoFactorRows,
+    profile,
+    params,
+  ] = await Promise.all([
       getRegistrationState(session.user.id),
       // Also refreshes the stored Discord handle when it has gone stale.
       loadDiscordIntegration(session.user.id, await headers()),
       getPlatformIdentity(session.user.id, "battlenet"),
+      loadConnectIntegrations(session.user.id),
       db
         .select({ providerId: account.providerId })
         .from(account)
@@ -213,6 +227,23 @@ export default async function AccountPage({
               enabled={battlenetAuthEnabled()}
               linkLabel="Link Blizzard"
               callbackURL="/account/"
+            />
+            {connectIntegrations.map((c) => (
+              <IntegrationCard
+                key={c.id}
+                provider={c.id}
+                label={c.label}
+                linked={c.linked}
+                handle={c.handle}
+                enabled={c.enabled}
+                linkLabel={c.linkLabel}
+                callbackURL="/account/"
+              />
+            ))}
+            <ComingSoonIntegration
+              label="LeagueSpot"
+              mark="LS"
+              note="No public sign-in to connect yet — we'll add it when LeagueSpot opens one up."
             />
           </div>
         </Bubble>

@@ -3,13 +3,18 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 
+import { ComingSoonIntegration } from "@/components/dashboard/accounts/ComingSoonIntegration";
 import { IntegrationCard } from "@/components/dashboard/accounts/IntegrationCard";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { SetupShell } from "@/components/dashboard/setup/SetupShell";
 import { account } from "@/db/schema";
 import { battlenetAuthEnabled, discordAuthEnabled, getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { discordServerNote, loadDiscordIntegration } from "@/lib/integrations";
+import {
+  discordServerNote,
+  loadConnectIntegrations,
+  loadDiscordIntegration,
+} from "@/lib/integrations";
 import { getPlatformIdentity } from "@/lib/platform-identities";
 
 // Session-gated: always rendered per request.
@@ -26,7 +31,8 @@ export default async function IntegrationsSetupPage() {
     redirect("/login/");
   }
 
-  const [discord, battlenetIdentity, battlenetRows] = await Promise.all([
+  const [discord, battlenetIdentity, battlenetRows, connectIntegrations] =
+    await Promise.all([
     // Also refreshes the stored Discord handle when it has gone stale.
     loadDiscordIntegration(session.user.id, await headers()),
     getPlatformIdentity(session.user.id, "battlenet"),
@@ -40,6 +46,7 @@ export default async function IntegrationsSetupPage() {
         ),
       )
       .limit(1),
+    loadConnectIntegrations(session.user.id),
   ]);
 
   return (
@@ -77,8 +84,26 @@ export default async function IntegrationsSetupPage() {
           </div>
         </Bubble>
 
-        <Bubble title="Your Optional Integrations" span="full" variant="wip">
-          <div className="ff-bubble__wip">Work in progress</div>
+        <Bubble title="Your Optional Integrations" span="full">
+          <div className="ff-integrations">
+            {connectIntegrations.map((c) => (
+              <IntegrationCard
+                key={c.id}
+                provider={c.id}
+                label={c.label}
+                linked={c.linked}
+                handle={c.handle}
+                enabled={c.enabled}
+                linkLabel={c.linkLabel}
+                callbackURL="/account/setup/integrations/"
+              />
+            ))}
+            <ComingSoonIntegration
+              label="LeagueSpot"
+              mark="LS"
+              note="No public sign-in to connect yet — we'll add it when LeagueSpot opens one up."
+            />
+          </div>
         </Bubble>
       </div>
     </SetupShell>

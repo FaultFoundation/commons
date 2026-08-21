@@ -125,7 +125,8 @@ row, not by column. Layer comments in the file mark the tiers.
 ### The `*-shared.ts` convention
 
 `lib/teams-shared.ts`, `staff-shared.ts`, `tickets-shared.ts`,
-`registration-shared.ts`, `lfg-shared.ts` are importable from **client**
+`registration-shared.ts`, `lfg-shared.ts`, `integrations-shared.ts` are
+importable from **client**
 components: they must stay free of server-only imports (db, cloudflare context).
 Constants, enums, labels, and pure validators live there; the server-only
 counterpart (`teams.ts`, `staff.ts`, `tickets.ts`) does the D1 work.

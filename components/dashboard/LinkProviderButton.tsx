@@ -3,9 +3,7 @@
 import { useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
-
-/** Providers a member can attach to an existing account. */
-export type LinkableProvider = "discord" | "battlenet";
+import type { LinkableProvider } from "@/lib/integrations-shared";
 
 /**
  * Starts a provider's OAuth link flow (full-page redirect, like AuthForm).

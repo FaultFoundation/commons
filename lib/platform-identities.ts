@@ -20,7 +20,29 @@ import { MEMBER_TYPE_IDS, type UserType } from "@/lib/registration-shared";
 
 const DISCORD_API = "https://discord.com/api/v10";
 const BATTLENET_USERINFO = "https://oauth.battle.net/userinfo";
+// FACEIT OpenID Connect userinfo (the authorize/token hosts come from FACEIT's
+// OIDC discovery doc — see the discoveryUrl in lib/auth.ts).
+const FACEIT_USERINFO = "https://api.faceit.com/auth/v1/resources/userinfo";
+// start.gg is GraphQL-only; identity is the `currentUser` query.
+const STARTGG_GQL = "https://api.start.gg/gql/alpha";
+// Challonge API v2 "me" (the `me` scope). Exact response shape is parsed
+// defensively — confirm the fields against a live token when wiring the app.
+const CHALLONGE_ME = "https://api.challonge.com/v2/me.json";
 const PROVIDER_TIMEOUT_MS = 3000;
+
+/**
+ * The identity fields we read from an esports provider at link time. Shared by
+ * lib/auth.ts (to shape the Better Auth user for the OAuth callback) and the
+ * account-created hook (to mirror the handle into platform_identities), so each
+ * provider is fetched through one code path. `externalId` is the provider's
+ * stable user id; `handle` is the display name; the rest is best-effort.
+ */
+export type ProviderProfile = {
+  externalId: string;
+  handle: string | null;
+  email?: string | null;
+  emailVerified?: boolean;
+};
 
 /** Platform name shown on the member's Discord connection card. */
 const PLATFORM_NAME = "The Fault Foundation";
@@ -98,6 +120,126 @@ export async function fetchBattleTag(
     if (!res.ok) return null;
     const me = (await res.json()) as { battletag?: string };
     return me.battletag || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Best-effort FACEIT profile via the OIDC userinfo endpoint. `guid` is the
+ * stable player id, `nickname` the handle. Returns a real email (with the
+ * `email` scope), so — unlike Battle.net — no synthetic address is needed.
+ */
+export async function fetchFaceitProfile(
+  accessToken: string | null | undefined,
+): Promise<ProviderProfile | null> {
+  if (!accessToken) return null;
+  try {
+    const res = await fetch(FACEIT_USERINFO, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const me = (await res.json()) as {
+      guid?: string;
+      sub?: string;
+      nickname?: string;
+      email?: string;
+      email_verified?: boolean;
+    };
+    const externalId = me.guid ?? me.sub;
+    if (!externalId) return null;
+    return {
+      externalId,
+      handle: me.nickname ?? null,
+      email: me.email ?? null,
+      emailVerified: me.email_verified ?? false,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Best-effort start.gg profile via the GraphQL `currentUser` query. The
+ * gamerTag is the competitor-facing handle; `slug` is the fallback. `email`
+ * needs the user.email scope.
+ */
+export async function fetchStartggProfile(
+  accessToken: string | null | undefined,
+): Promise<ProviderProfile | null> {
+  if (!accessToken) return null;
+  try {
+    const res = await fetch(STARTGG_GQL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        query: "query{currentUser{id slug email player{gamerTag}}}",
+      }),
+      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as {
+      data?: {
+        currentUser?: {
+          id?: number;
+          slug?: string;
+          email?: string;
+          player?: { gamerTag?: string };
+        };
+      };
+    };
+    const u = body.data?.currentUser;
+    if (!u?.id) return null;
+    return {
+      externalId: String(u.id),
+      handle: u.player?.gamerTag ?? u.slug ?? null,
+      email: u.email ?? null,
+      emailVerified: false,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Best-effort Challonge profile via the v2 `me` endpoint. Challonge accounts
+ * are thin (username + email, no avatar/region). The response shape isn't fully
+ * documented, so this parses both a JSON:API `data.attributes` envelope and a
+ * flat body, and gives up to id-only rather than throwing.
+ */
+export async function fetchChallongeProfile(
+  accessToken: string | null | undefined,
+): Promise<ProviderProfile | null> {
+  if (!accessToken) return null;
+  try {
+    const res = await fetch(CHALLONGE_ME, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as {
+      data?: { id?: string | number; attributes?: Record<string, unknown> };
+      id?: string | number;
+      username?: string;
+      email?: string;
+    };
+    const attr = (body.data?.attributes ?? body) as {
+      username?: string;
+      name?: string;
+      email?: string;
+    };
+    const rawId = body.data?.id ?? body.id ?? attr.username;
+    if (rawId == null) return null;
+    return {
+      externalId: String(rawId),
+      handle: attr.username ?? attr.name ?? null,
+      email: attr.email ?? null,
+      emailVerified: false,
+    };
   } catch {
     return null;
   }

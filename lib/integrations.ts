@@ -1,9 +1,18 @@
 import { and, eq } from "drizzle-orm";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
-import { account } from "@/db/schema";
-import { getAuth } from "@/lib/auth";
+import { account, platformIdentities } from "@/db/schema";
+import {
+  challongeAuthEnabled,
+  faceitAuthEnabled,
+  getAuth,
+  startggAuthEnabled,
+} from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import {
+  CONNECT_PROVIDERS,
+  type ConnectProviderId,
+} from "@/lib/integrations-shared";
 import {
   fetchDiscordUsername,
   fetchGuildMemberRoles,
@@ -245,4 +254,61 @@ export async function syncStaffRolesFromDiscord(
   } catch (error) {
     console.error("staff role sync failed:", error);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Esports connects — the FACEIT / start.gg / Challonge cards under Integrations.
+// Unlike Discord these need no per-render provider call: the link is a Better
+// Auth account row and the handle is mirrored at link time, so this is pure D1.
+// ---------------------------------------------------------------------------
+
+export type ConnectIntegration = {
+  id: ConnectProviderId;
+  label: string;
+  linkLabel: string;
+  /** A Better Auth account row exists for this provider. */
+  linked: boolean;
+  /** Display handle captured at link time, or null. */
+  handle: string | null;
+  /** This provider's OAuth secrets are configured. */
+  enabled: boolean;
+};
+
+const CONNECT_ENABLED: Record<ConnectProviderId, () => boolean> = {
+  faceit: faceitAuthEnabled,
+  startgg: startggAuthEnabled,
+  challonge: challongeAuthEnabled,
+};
+
+/**
+ * State for every esports-connect card in one shot — one identities read plus
+ * one account read, shared by the account page and the setup step. Never throws
+ * on a per-provider basis: a provider with no secrets simply comes back
+ * disabled.
+ */
+export async function loadConnectIntegrations(
+  userId: string,
+): Promise<ConnectIntegration[]> {
+  const db = getDb();
+  const [identities, linkedRows] = await Promise.all([
+    db
+      .select({
+        provider: platformIdentities.provider,
+        handle: platformIdentities.handle,
+      })
+      .from(platformIdentities)
+      .where(eq(platformIdentities.userId, userId)),
+    db
+      .select({ providerId: account.providerId })
+      .from(account)
+      .where(eq(account.userId, userId)),
+  ]);
+  const linked = new Set(linkedRows.map((r) => r.providerId));
+  const handleByProvider = new Map(identities.map((i) => [i.provider, i.handle]));
+  return CONNECT_PROVIDERS.map((p) => ({
+    ...p,
+    linked: linked.has(p.id),
+    handle: handleByProvider.get(p.id) ?? null,
+    enabled: CONNECT_ENABLED[p.id](),
+  }));
 }

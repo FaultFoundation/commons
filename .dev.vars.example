@@ -43,6 +43,30 @@ BETTER_AUTH_URL=http://localhost:3999
 # BATTLENET_CLIENT_ID=
 # BATTLENET_CLIENT_SECRET=
 
+# Optional — esports "Connect" cards under Integrations. Each is connect-only
+# (attaches to a signed-in account, never a sign-up) and stays hidden/disabled
+# until its secrets are set. All use the generic-OAuth callback path
+# http://localhost:3999/api/auth/oauth2/callback/<provider> (note /oauth2/) —
+# add that as the redirect URI when registering each app.
+
+# FACEIT "FACEIT Connect" (OpenID Connect) — register at developers.faceit.com.
+# FACEIT_CLIENT_ID=
+# FACEIT_CLIENT_SECRET=
+# FACEIT server-side Data API key (open.faceit.com/data/v4) — separate from the
+# OAuth app above. Only needed for match history / ELO / the schedule sync.
+# FACEIT_API_KEY=
+
+# start.gg (OAuth 2.0 over GraphQL) — register at start.gg/admin/profile/developer.
+# callback provider segment is "startgg".
+# STARTGG_CLIENT_ID=
+# STARTGG_CLIENT_SECRET=
+
+# Challonge (OAuth 2.0) — register at connect.challonge.com. Note the new free
+# tier caps API calls (500/month, 429s from 2026-07-01), which the schedule
+# sync will have to respect.
+# CHALLONGE_CLIENT_ID=
+# CHALLONGE_CLIENT_SECRET=
+
 # Optional — the 16-char Google app password for support@fault.foundation.
 # Set it and real mail goes out (academic-email codes, account-email
 # confirmation links, two-factor sign-in codes); leave it unset and the message

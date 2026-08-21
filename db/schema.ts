@@ -229,6 +229,11 @@ export const platformIdentities = sqliteTable(
     provider: text("provider").notNull(),
     externalId: text("external_id"),
     handle: text("handle"),
+    // Optional per-provider profile extras as one JSON blob (avatar url,
+    // country, rank/elo, …). Kept as a blob so a new field is never a schema
+    // change — this layer's "extend by row, not column" rule applied within a
+    // row. Written by the integration profile fetchers; null where absent.
+    metadata: text("metadata"),
     verified: integer("verified", { mode: "boolean" }).notNull().default(false),
     connectedAt: integer("connected_at", { mode: "timestamp_ms" }),
     // Last time the provider profile was successfully re-read (or the attempt
@@ -591,6 +596,15 @@ export const tournaments = sqliteTable(
       .notNull()
       .references(() => programs.id),
     gameId: text("game_id").references(() => games.id),
+    // Provenance. "internal" tournaments are run on this platform and owned by
+    // the bracket engine; anything else is mirrored from a member's connected
+    // account (or a future scraper), so the engine leaves it alone. external_id
+    // is the provider's tournament id (null for internal); external_url deep-
+    // links back to it. UNIQUE(source, external_id) lets a sync upsert without
+    // duplicating a shared event across members.
+    source: text("source").notNull().default("internal"),
+    externalId: text("external_id"),
+    externalUrl: text("external_url"),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
     // round_robin | single_elim | double_elim | swiss
@@ -609,7 +623,12 @@ export const tournaments = sqliteTable(
       .notNull()
       .$defaultFn(() => new Date()),
   },
-  (t) => [index("tournaments_program_id_idx").on(t.programId)],
+  (t) => [
+    index("tournaments_program_id_idx").on(t.programId),
+    // A given external tournament maps to one row; internal rows have a null
+    // external_id and don't collide (SQLite treats NULLs as distinct).
+    uniqueIndex("tournaments_source_external_unique").on(t.source, t.externalId),
+  ],
 );
 
 export const stages = sqliteTable(
@@ -749,6 +768,54 @@ export const matchGames = sqliteTable(
   (t) => [
     index("match_games_match_id_idx").on(t.matchId),
     uniqueIndex("match_games_match_game_unique").on(t.matchId, t.gameNumber),
+  ],
+);
+
+// A member's individual matches on a connected external platform (FACEIT /
+// start.gg / Challonge). Deliberately NOT the internal `matches` table above:
+// that one is the bracket engine's (internal participant FKs, next-match
+// routing, the report lifecycle). External matches are flat, per-user schedule
+// rows the calendar reads — no engine, no participants. Populated by the
+// schedule sync (or a future scraper); idempotent on (user_id, provider,
+// external_id). The member's *entry* in an external tournament is a
+// tournament_participants row (user_id) pointing at a source!="internal"
+// tournaments row — this table is only the match-level schedule beneath it.
+export const externalMatches = sqliteTable(
+  "external_matches",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // The external tournament this match sits under, when known. Nullable: some
+    // matches (e.g. FACEIT matchmaking) aren't tied to a tournament row.
+    tournamentId: text("tournament_id").references(() => tournaments.id, {
+      onDelete: "set null",
+    }),
+    provider: text("provider").notNull(),
+    externalId: text("external_id").notNull(),
+    opponentName: text("opponent_name"),
+    round: text("round"),
+    // scheduled | live | finished | cancelled — provider-normalized.
+    status: text("status").notNull().default("scheduled"),
+    scheduledAt: integer("scheduled_at", { mode: "timestamp_ms" }),
+    url: text("url"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [
+    // The calendar reads a member's matches in time order.
+    index("external_matches_user_scheduled_idx").on(t.userId, t.scheduledAt),
+    // One row per external match per user — idempotent sync.
+    uniqueIndex("external_matches_user_provider_external_unique").on(
+      t.userId,
+      t.provider,
+      t.externalId,
+    ),
   ],
 );
 

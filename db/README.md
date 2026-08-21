@@ -138,7 +138,7 @@ survive. The bracket backend is fully self-hosted: `tournaments → stages →
 matches → match_games` (per-map scores + `replay_code`), with
 `tournament_participants` that are a team **or** a solo user (a `CHECK` enforces
 the exclusive-or) and single/double-elimination routing through
-`matches.next_match_id`. Support tickets are the one surface shared with another
+`matches.next_match_id`. Tournaments a member plays on a **connected external platform** (FACEIT / start.gg / Challonge) reuse this shape — a `source != "internal"` `tournaments` row plus a `tournament_participants` entry — while their match-level schedule lands in a separate lightweight `external_matches` table kept out of the bracket engine. Support tickets are the one surface shared with another
 system: D1 is the source of truth and the Discord bot mirrors both ways, pushing
 Discord activity into `support_tickets` / `support_ticket_messages` and pulling
 site-initiated work out of `bot_outbox`.
@@ -156,7 +156,7 @@ site-initiated work out of `bot_outbox`.
 | 5 — program membership + detail | `program_memberships`, `collegiate_registrations` |
 | 6 — durable schools | `colleges` |
 | 7 — teams & rosters | `teams`, `team_members`, `team_invites`, `team_delete_requests`, `team_delete_votes` |
-| 8 — brackets | `tournaments`, `stages`, `tournament_participants`, `matches`, `match_games` |
+| 8 — brackets | `tournaments`, `stages`, `tournament_participants`, `matches`, `match_games`, `external_matches` |
 | 9 — matchmaking | `lfg_profiles`, `team_listings`, `lfg_connections` |
 | 10 — support tickets | `support_tickets`, `support_ticket_messages`, `support_ticket_notes`, `bot_outbox` |
 | registration support | `schools`, `school_email_verifications`, `parental_consents` |
@@ -176,7 +176,7 @@ site-initiated work out of `bot_outbox`.
 | App concept | Table | Key mappings |
 |---|---|---|
 | Cross-program person record | `profiles` | 1:1 with `user`; `country`, `age_range`, `dm_preference`, and `density` (`compact` \| `cozy` \| `comfortable` — the dashboard spacing preset; source of truth, cached in the `ff-density` cookie) |
-| Connected accounts | `platform_identities` | one row per `provider`, mirrored from the Better-Auth account-created hook via `mirrorPlatformIdentity`: `discord` → `external_id` = Discord id + `handle` = display name; `battlenet` → `external_id` = Blizzard account id + `handle` = BattleTag; `steam` → `handle` = friend code. `refreshed_at` records the last provider re-read (see `loadDiscordIntegration`) — Blizzard is never re-read, since it issues no refresh token. `UNIQUE(user_id, provider)` and `UNIQUE(provider, external_id)`. **This is the join key to the Discord bot**: `getUserIdByDiscordId` resolves a Discord id to a site account here |
+| Connected accounts | `platform_identities` | one row per `provider`, mirrored from the Better-Auth account-created hook via `mirrorPlatformIdentity`: `discord` → `external_id` = Discord id + `handle` = display name; `battlenet` → `external_id` = Blizzard account id + `handle` = BattleTag; `steam` → `handle` = friend code; the esports connects (`faceit` / `startgg` / `challonge`) → `external_id` = provider user id + `handle` = gamertag, connect-only generic-OAuth links whose optional profile extras (avatar, country, rank) ride the JSON `metadata` column. `refreshed_at` records the last provider re-read (see `loadDiscordIntegration`) — Blizzard is never re-read, since it issues no refresh token. `UNIQUE(user_id, provider)` and `UNIQUE(provider, external_id)`. **This is the join key to the Discord bot**: `getUserIdByDiscordId` resolves a Discord id to a site account here |
 
 ### Collegiate registration, verification & minors
 
@@ -209,11 +209,12 @@ site-initiated work out of `bot_outbox`.
 
 | App concept | Table | Key mappings |
 |---|---|---|
-| Bracket | `tournaments` | `format` ∈ `round_robin` \| `single_elim` \| `double_elim` \| `swiss`; `status` ∈ `draft` \| `registration` \| `active` \| `completed`; `best_of`, `custom_game_code` (the in-game lobby code) |
+| Bracket | `tournaments` | `format` ∈ `round_robin` \| `single_elim` \| `double_elim` \| `swiss`; `status` ∈ `draft` \| `registration` \| `active` \| `completed`; `best_of`, `custom_game_code` (the in-game lobby code); `source` ∈ `internal` \| `faceit` \| `startgg` \| `challonge` (non-internal = mirrored from a connected account, left untouched by the bracket engine) with `external_id` / `external_url` and `UNIQUE(source, external_id)` |
 | Group / playoff phase | `stages` | `type`, `ordinal` (round-robin = one stage) |
 | Competitor + standings | `tournament_participants` | team **XOR** solo user (`CHECK`); `seed`, `wins`/`losses`/`map_diff`/`points`/`final_standing` recomputed on report. `withdrawn_at` keeps the row and its history but drops it out of every "who is entered" query, including the one-team-per-tournament conflict check |
 | Match | `matches` | `status` ∈ `pending` \| `live` \| `reported` \| `confirmed` \| `disputed`; `next_match_id` + `next_match_slot` route the winner onward; `reported_by_user_id` / `reported_at` are the audit trail, since reports apply instantly with no opponent confirmation step |
 | Per-map result | `match_games` | `game_number`, `map_name`, `participant_a_score`/`_b_score`, `winner_participant_id`, **`replay_code`**; `UNIQUE(match_id, game_number)` — re-reporting overwrites these rows rather than accumulating |
+| External match (connected platform) | `external_matches` | a member's FACEIT / start.gg / Challonge matches — flat per-user schedule rows, **not** the engine's `matches`: `provider`, `external_id`, `opponent_name`, `round`, `status` ∈ `scheduled` \| `live` \| `finished` \| `cancelled`, `scheduled_at`, optional `tournament_id`. `UNIQUE(user_id, provider, external_id)` (idempotent sync); indexed `(user_id, scheduled_at)` for the calendar |
 | Player advertising themselves | `lfg_profiles` | `status` ∈ `open` \| `paused` \| `placed`; `skill_rating`/`peak_rating` matched against a listing's range; `positions`/`availability` are JSON whose shape is owned by `lib/lfg-shared.ts` — parse through those helpers, never ad hoc. `UNIQUE(user_id, program_id, game_id)` |
 | Team advertising open slots | `team_listings` | the mirror shape of the above, plus `skill_min`/`skill_max`, `slots_open`, and a `contact_url` that overrides `teams.discord_invite_url` for this listing only |
 | The handshake | `lfg_connections` | `direction` ∈ `player_to_team` \| `team_to_player`; both `listing_id` and `profile_id` are nullable because either side can approach the other cold. `UNIQUE(listing_id, user_id)` — re-approaching updates the row |
@@ -344,6 +345,7 @@ id                                            → all attributes of its relation
 user.email                                    → user.id           (UNIQUE)
 session.token                                 → session.id        (UNIQUE)
 programs.slug / games.slug / tournaments.slug → that relation's id (UNIQUE)
+(tournaments.source, external_id)             → tournaments.id    (UNIQUE; internal rows null)
 profiles.user_id                              → profiles.id       (1:1 with user)
 (platform_identities.user_id, provider)       → platform_identities.id
 (platform_identities.provider, external_id)   → platform_identities.id
@@ -358,6 +360,7 @@ team_invites.token                            → team_invites.id
 (lfg_profiles.user_id, program_id, game_id)   → lfg_profiles.id
 (lfg_connections.listing_id, user_id)         → lfg_connections.id
 (match_games.match_id, game_number)           → match_games.id
+(external_matches.user_id, provider, external_id) → external_matches.id
 support_tickets.ticket_number                 → support_tickets.id
 support_tickets.discord_channel_id            → support_tickets.id   (the mirror's alignment key)
 support_ticket_messages.discord_message_id    → support_ticket_messages.id (mirror idempotency)
@@ -530,6 +533,8 @@ flowchart LR
         TM[(teams)] --> TP[(tournament_participants)]
         U --> TP
         TP --> M
+        T --> EM[("external_matches — connected sites")]
+        U --> EM
         TM --> RM[(team_members)]
         U --> RM
         TM --> TI[(team_invites)]
@@ -556,7 +561,7 @@ A member's record — everything fans out from one `user` row:
 ```
 User  (Better Auth: + session, account, verification, two_factor)
 ├─ Profile             country, age range, dm pref, density                1:1
-├─ Platform Identity   discord / battlenet / steam                         0..n
+├─ Platform Identity   discord / battlenet / faceit / startgg / challonge / steam  0..n
 ├─ Staff Role          owner / admin / moderator / tournament_admin        0..n
 ├─ Program Membership  status (per program)                                0..n
 │  └─ Collegiate Registration  school email, grad date ─→ College          1:1 detail
@@ -597,7 +602,7 @@ Support Ticket   number, status, priority, assignee, discord_channel_id
 |---|---|---|
 | Accounts & auth | `user`, `session`, `account`, `verification` | **Live** — email/password + Discord OAuth; Battle.net is link-only (Blizzard returns no email) |
 | Two-factor | `two_factor` | **Live** — TOTP + email codes, backup codes, account lockout |
-| Profile & identities | `profiles`, `platform_identities` | **Live** — Discord and Battle.net mirrored; Steam schema-ready |
+| Profile & identities | `profiles`, `platform_identities` | **Live** — Discord and Battle.net mirrored; FACEIT / start.gg / Challonge connect-only (OAuth + schema wired, cards under Integrations); Steam schema-ready |
 | Collegiate registration | `program_memberships`, `collegiate_registrations`, `colleges`, `schools`, `school_email_verifications` | **Live** — school-email verification; the manual path routes to the staff queue |
 | Parental consent | `parental_consents` | **Live** — under-13 refused, 13–17 double-opt-in by email |
 | Staff access | `staff_roles` | **Live** — admin dashboard grants/revokes, plus the Discord-role sync |
@@ -605,6 +610,7 @@ Support Ticket   number, status, priority, assignee, discord_channel_id
 | Teams & rosters | `teams`, `team_members`, `team_invites`, `team_delete_requests`, `team_delete_votes` | **Live** — create, invite links, roster management, multi-manager delete vote, soft disband, staff team editing |
 | Score reporting | `matches`, `match_games`, `tournament_participants` | **Live** — a manager/captain's report applies instantly; `recomputeStandings` rebuilds standings from confirmed matches |
 | Bracket generation | `tournaments`, `stages` | Schema-ready — **no generation code**: nothing writes `stages`, and seeding / round / bracket / `next_match_id` routing is unbuilt. Tournaments exist only as seeded rows (`db/seed/bootstrap.sql`) |
+| Cross-site schedule & calendar | `tournaments` (`source`), `external_matches`, `tournament_participants` | Schema-ready — the connect OAuth (FACEIT / start.gg / Challonge) is live and the columns + `external_matches` table exist, but the sync that populates them and the calendar view are **not built yet** (next phase) |
 | Matchmaking (LFG/LFM) | `lfg_profiles`, `team_listings`, `lfg_connections` | Schema-ready — `team_listings` is written by the team actions; `lfg_profiles` / `lfg_connections` have no code yet and the browse/apply UI is WIP |
 | Support tickets | `support_tickets`, `support_ticket_messages`, `support_ticket_notes`, `bot_outbox` | **Live** — staff queue, two-way Discord mirror, outbox bridge |
 | Reference data | `games`, `programs` | Seeded via `db/seed/bootstrap.sql` (`overwatch`, `collegiate-overwatch`) |

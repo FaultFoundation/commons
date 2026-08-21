@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 
 import { TwoFactorChallenge } from "./TwoFactorChallenge";
+import { OAuthButton } from "./OAuthButton";
 import { authClient } from "@/lib/auth-client";
 import { setAuthHint } from "@/lib/auth-hint";
 import { withNext } from "@/lib/next-path";
@@ -188,14 +189,13 @@ export function AuthForm({ mode, discordEnabled, next }: Props) {
           <div className="ff-auth__divider" aria-hidden="true">
             or
           </div>
-          <button
-            className="ff-btn ff-btn--outline ff-auth__submit"
-            type="button"
+          <OAuthButton
+            provider="discord"
+            label="Continue with Discord"
             onClick={onDiscord}
             disabled={pending}
-          >
-            Continue with Discord
-          </button>
+            className="ff-auth__submit"
+          />
         </>
       ) : null}
     </form>

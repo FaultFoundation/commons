@@ -1,6 +1,9 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { genericOAuth } from "better-auth/plugins/generic-oauth";
+import {
+  genericOAuth,
+  type GenericOAuthConfig,
+} from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { deleteAvatarByUrl } from "@/lib/avatars";
@@ -8,12 +11,20 @@ import { getDb } from "@/lib/db";
 import { sendEmailVerificationLink, sendTwoFactorCodeEmail } from "@/lib/email";
 import {
   fetchBattleTag,
+  fetchChallongeProfile,
   fetchDiscordUsername,
+  fetchFaceitProfile,
+  fetchStartggProfile,
   hasScope,
   mirrorPlatformIdentity,
   pushRoleConnection,
 } from "@/lib/platform-identities";
 import { ensureVerificationTicket } from "@/lib/verification-ticket";
+
+// The tokens object passed to a generic-OAuth getUserInfo. Derived from the
+// plugin's own config type so the callbacks below (which live in a separate
+// array literal, where contextual typing doesn't reach them) stay typed.
+type OAuthTokens = Parameters<NonNullable<GenericOAuthConfig["getUserInfo"]>>[0];
 
 // Server-side Better Auth instance. Built per-request because the D1 binding
 // and secrets only exist on the request's Cloudflare context.
@@ -21,10 +32,139 @@ export function getAuth() {
   const { env } = getCloudflareContext();
   const isDev = process.env.NODE_ENV === "development";
 
+  // Generic-OAuth providers — platforms with no built-in better-auth provider.
+  // Each config is added only when its secrets are set; all are connect-only
+  // (disableSignUp: true), so they attach to an authenticated session and never
+  // create an account. One plugin instance carries every config, built here so
+  // the `plugins` literal below stays a literal (see the inference note there).
+  const genericConfig: GenericOAuthConfig[] = [
+    // Blizzard rides generic-OAuth; unset secrets leave it dark.
+    ...(env.BATTLENET_CLIENT_ID && env.BATTLENET_CLIENT_SECRET
+      ? [
+          {
+            providerId: "battlenet",
+            clientId: env.BATTLENET_CLIENT_ID,
+            clientSecret: env.BATTLENET_CLIENT_SECRET,
+            // Region-neutral hosts, per oauth.battle.net's OIDC discovery
+            // document. The old us./eu./kr. hosts are legacy.
+            authorizationUrl: "https://oauth.battle.net/authorize",
+            tokenUrl: "https://oauth.battle.net/token",
+            userInfoUrl: "https://oauth.battle.net/userinfo",
+            // BattleTag and account id come back without any extra scope; the
+            // game-profile scopes (wow./sc2./d3.) would buy us nothing —
+            // Blizzard publishes no Overwatch API at all.
+            scopes: ["openid"],
+            pkce: true,
+            // Required, not optional: Blizzard returns no email address and
+            // user.email is NOT NULL, so an implicit sign-up would try to
+            // create a user with an empty email. Battle.net may only ever
+            // attach to an already-authenticated session.
+            disableSignUp: true,
+            getUserInfo: async (tokens: OAuthTokens) => {
+              const profile = await fetchBattleNetProfile(tokens.accessToken);
+              if (!profile) return null;
+              return {
+                id: profile.id,
+                // Must be non-empty or the callback bails with
+                // "name_is_missing". Only validated here — the link path
+                // writes an account row, never the user's name.
+                name: profile.battletag || `Battle.net ${profile.id}`,
+                // Blizzard returns no email, but the generic-OAuth callback
+                // rejects a blank one *before* it branches on link vs sign-up,
+                // so disableSignUp alone wouldn't get us through. .invalid is
+                // reserved by RFC 2606 and can never resolve, so this is inert:
+                // with allowDifferentEmails the link path never compares it,
+                // and disableSignUp means it is never written to a user row.
+                email: `${profile.id}@battlenet.invalid`,
+                emailVerified: false,
+              };
+            },
+          },
+        ]
+      : []),
+    // FACEIT ("FACEIT Connect") — OpenID Connect. Endpoints come from FACEIT's
+    // OIDC discovery doc, which sidesteps the authorize-host ambiguity in their
+    // written docs. Returns a real email, so no synthetic address is needed.
+    ...(env.FACEIT_CLIENT_ID && env.FACEIT_CLIENT_SECRET
+      ? [
+          {
+            providerId: "faceit",
+            clientId: env.FACEIT_CLIENT_ID,
+            clientSecret: env.FACEIT_CLIENT_SECRET,
+            discoveryUrl: "https://api.faceit.com/auth/v1/openid_configuration",
+            scopes: ["openid", "email", "profile"],
+            pkce: true,
+            disableSignUp: true,
+            getUserInfo: async (tokens: OAuthTokens) => {
+              const p = await fetchFaceitProfile(tokens.accessToken);
+              if (!p) return null;
+              return {
+                id: p.externalId,
+                name: p.handle || `FACEIT ${p.externalId}`,
+                email: p.email || `${p.externalId}@faceit.invalid`,
+                emailVerified: p.emailVerified ?? false,
+              };
+            },
+          },
+        ]
+      : []),
+    // start.gg — OAuth 2.0 over a GraphQL API. Identity is the currentUser
+    // query (see fetchStartggProfile).
+    ...(env.STARTGG_CLIENT_ID && env.STARTGG_CLIENT_SECRET
+      ? [
+          {
+            providerId: "startgg",
+            clientId: env.STARTGG_CLIENT_ID,
+            clientSecret: env.STARTGG_CLIENT_SECRET,
+            authorizationUrl: "https://start.gg/oauth/authorize",
+            tokenUrl: "https://api.start.gg/oauth/access_token",
+            scopes: ["user.identity", "user.email"],
+            disableSignUp: true,
+            getUserInfo: async (tokens: OAuthTokens) => {
+              const p = await fetchStartggProfile(tokens.accessToken);
+              if (!p) return null;
+              return {
+                id: p.externalId,
+                name: p.handle || `start.gg ${p.externalId}`,
+                email: p.email || `${p.externalId}@startgg.invalid`,
+                emailVerified: p.emailVerified ?? false,
+              };
+            },
+          },
+        ]
+      : []),
+    // Challonge — OAuth 2.0. The `me` scope is a thin profile (username +
+    // email); the tournament read scopes are added when the schedule sync lands.
+    ...(env.CHALLONGE_CLIENT_ID && env.CHALLONGE_CLIENT_SECRET
+      ? [
+          {
+            providerId: "challonge",
+            clientId: env.CHALLONGE_CLIENT_ID,
+            clientSecret: env.CHALLONGE_CLIENT_SECRET,
+            authorizationUrl: "https://api.challonge.com/oauth/authorize",
+            tokenUrl: "https://api.challonge.com/oauth/token",
+            scopes: ["me"],
+            disableSignUp: true,
+            getUserInfo: async (tokens: OAuthTokens) => {
+              const p = await fetchChallongeProfile(tokens.accessToken);
+              if (!p) return null;
+              return {
+                id: p.externalId,
+                name: p.handle || `Challonge ${p.externalId}`,
+                email: p.email || `${p.externalId}@challonge.invalid`,
+                emailVerified: p.emailVerified ?? false,
+              };
+            },
+          },
+        ]
+      : []),
+  ];
+
   // Deliberately *not* annotated `BetterAuthPlugin[]`: the widened type erases
   // each plugin's own inference, and with it `session.user.twoFactorEnabled`.
-  // Battle.net is spread in rather than pushed for the same reason — a `push`
-  // onto an inferred array would need the annotation back.
+  // The generic-OAuth plugin is spread into the literal rather than pushed for
+  // the same reason — a `push` onto an inferred array would need the annotation
+  // back.
   const plugins = [
     twoFactor({
       // What authenticator apps display beside the code.
@@ -46,56 +186,10 @@ export function getAuth() {
       // the password, and the account lockout stays on (10 consecutive failed
       // verifications → 15 minutes).
     }),
-    // Blizzard has no built-in better-auth provider, so it rides the
-    // generic-OAuth plugin. Unset secrets leave the integration dark rather
-    // than breaking getAuth().
-    ...(env.BATTLENET_CLIENT_ID && env.BATTLENET_CLIENT_SECRET
-      ? [
-          genericOAuth({
-            config: [
-              {
-                providerId: "battlenet",
-                clientId: env.BATTLENET_CLIENT_ID,
-                clientSecret: env.BATTLENET_CLIENT_SECRET,
-                // Region-neutral hosts, per oauth.battle.net's OIDC discovery
-                // document. The old us./eu./kr. hosts are legacy.
-                authorizationUrl: "https://oauth.battle.net/authorize",
-                tokenUrl: "https://oauth.battle.net/token",
-                userInfoUrl: "https://oauth.battle.net/userinfo",
-                // BattleTag and account id come back without any extra scope;
-                // the game-profile scopes (wow./sc2./d3.) would buy us nothing
-                // — Blizzard publishes no Overwatch API at all.
-                scopes: ["openid"],
-                pkce: true,
-                // Required, not optional: Blizzard returns no email address and
-                // user.email is NOT NULL, so an implicit sign-up would try to
-                // create a user with an empty email. Battle.net may only ever
-                // attach to an already-authenticated session.
-                disableSignUp: true,
-                getUserInfo: async (tokens) => {
-                  const profile = await fetchBattleNetProfile(tokens.accessToken);
-                  if (!profile) return null;
-                  return {
-                    id: profile.id,
-                    // Must be non-empty or the callback bails with
-                    // "name_is_missing". Only validated here — the link path
-                    // writes an account row, never the user's name.
-                    name: profile.battletag || `Battle.net ${profile.id}`,
-                    // Blizzard returns no email, but the generic-OAuth callback
-                    // rejects a blank one *before* it branches on link vs
-                    // sign-up, so disableSignUp alone wouldn't get us through.
-                    // .invalid is reserved by RFC 2606 and can never resolve,
-                    // so this is inert: with allowDifferentEmails the link path
-                    // never compares it, and disableSignUp means it is never
-                    // written to a user row.
-                    email: `${profile.id}@battlenet.invalid`,
-                    emailVerified: false,
-                  };
-                },
-              },
-            ],
-          }),
-        ]
+    // The generic-OAuth providers assembled above (Battle.net + the esports
+    // connects), as a single plugin. Spread, not pushed — see the note above.
+    ...(genericConfig.length
+      ? [genericOAuth({ config: genericConfig })]
       : []),
   ];
 
@@ -169,7 +263,13 @@ export function getAuth() {
     },
     account: {
       accountLinking: {
-        trustedProviders: ["discord", "battlenet"],
+        trustedProviders: [
+          "discord",
+          "battlenet",
+          "faceit",
+          "startgg",
+          "challonge",
+        ],
         // Members' Discord emails rarely match their site email; linking is
         // only reachable with an authenticated session, so the different-
         // email check adds no real protection here.
@@ -219,6 +319,30 @@ export function getAuth() {
                 "battlenet",
                 account.accountId,
                 battleTag,
+              );
+            } else if (account.providerId === "faceit") {
+              const p = await fetchFaceitProfile(account.accessToken);
+              await mirrorPlatformIdentity(
+                account.userId,
+                "faceit",
+                account.accountId,
+                p?.handle,
+              );
+            } else if (account.providerId === "startgg") {
+              const p = await fetchStartggProfile(account.accessToken);
+              await mirrorPlatformIdentity(
+                account.userId,
+                "startgg",
+                account.accountId,
+                p?.handle,
+              );
+            } else if (account.providerId === "challonge") {
+              const p = await fetchChallongeProfile(account.accessToken);
+              await mirrorPlatformIdentity(
+                account.userId,
+                "challonge",
+                account.accountId,
+                p?.handle,
               );
             }
           },
@@ -284,4 +408,21 @@ export function discordAuthEnabled(): boolean {
 export function battlenetAuthEnabled(): boolean {
   const { env } = getCloudflareContext();
   return Boolean(env.BATTLENET_CLIENT_ID && env.BATTLENET_CLIENT_SECRET);
+}
+
+// The esports-connect providers, each gated on its own OAuth secrets. Same
+// degrade-don't-break rule: unset secrets leave the card disabled.
+export function faceitAuthEnabled(): boolean {
+  const { env } = getCloudflareContext();
+  return Boolean(env.FACEIT_CLIENT_ID && env.FACEIT_CLIENT_SECRET);
+}
+
+export function startggAuthEnabled(): boolean {
+  const { env } = getCloudflareContext();
+  return Boolean(env.STARTGG_CLIENT_ID && env.STARTGG_CLIENT_SECRET);
+}
+
+export function challongeAuthEnabled(): boolean {
+  const { env } = getCloudflareContext();
+  return Boolean(env.CHALLONGE_CLIENT_ID && env.CHALLONGE_CLIENT_SECRET);
 }

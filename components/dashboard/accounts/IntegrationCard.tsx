@@ -3,12 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import {
-  LinkProviderButton,
-  type LinkableProvider,
-} from "@/components/dashboard/LinkProviderButton";
+import { LinkProviderButton } from "@/components/dashboard/LinkProviderButton";
 import { ProviderLogo } from "@/components/dashboard/accounts/ProviderLogo";
 import { authClient } from "@/lib/auth-client";
+import type { LinkableProvider } from "@/lib/integrations-shared";
 
 /**
  * One connected-account card: link when disconnected, unlink when connected.

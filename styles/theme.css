@@ -172,6 +172,35 @@ html.ff-no-scroll givebutter-widget {
   box-shadow: inset 0 0 0 1.5px #fff;
 }
 
+/* ---------- 4a. Branded OAuth buttons ---------- */
+/* Each provider's own "standard" sign-in / connect treatment, layered on
+   .ff-btn so it keeps the pill shape, padding and font. The mark inherits the
+   button's text colour, so a single brand colour drives both glyph and label —
+   and each provider overrides the .ff-btn:hover accent swap with its own hover. */
+.ff-oauth {
+  gap: 0.6em;
+}
+.ff-oauth__mark {
+  display: inline-flex;
+  flex: none;
+}
+.ff-oauth__mark svg {
+  display: block;
+  width: 1.25em;
+  height: 1.25em;
+}
+/* Discord: blurple with the white mark, per Discord's brand guidelines (the
+   blurple button is the dark-surface standard; the white one is for light). */
+.ff-oauth--discord {
+  background: #5865f2;
+  color: #fff;
+}
+.ff-oauth--discord:hover {
+  background: #4752c4;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
 /* ---------- 5. Cards ---------- */
 
 .ff-card {
@@ -1451,6 +1480,22 @@ button.ff-dash__link:hover {
    variant, so it keeps its own blue. */
 .ff-integration__logo--discord {
   color: #fff;
+}
+/* Esports-connect brand tints. FACEIT ships a real single-path mark; start.gg
+   and Challonge fall back to lettermarks (see ProviderMark) until official art
+   is on hand, so their colours are placeholders to confirm alongside the art. */
+.ff-integration__logo--faceit {
+  color: #ff5500;
+}
+.ff-integration__logo--challonge {
+  color: #ff7146;
+}
+.ff-integration__logo--startgg {
+  color: #fff;
+}
+/* A platform we can't connect yet (LeagueSpot): shown, but visibly inert. */
+.ff-integration--soon {
+  opacity: 0.55;
 }
 .ff-integration__name {
   color: #fff;

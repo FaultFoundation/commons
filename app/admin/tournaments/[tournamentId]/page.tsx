@@ -81,7 +81,7 @@ async function TournamentContent({ tournamentId }: { tournamentId: string }) {
           </a>
           {tournament.status !== "draft" ? (
             <a
-              className="ff-btn ff-btn--sm"
+              className="ff-btn ff-btn--outline ff-btn--sm"
               href={publicUrl}
               target="_blank"
               rel="noreferrer noopener"

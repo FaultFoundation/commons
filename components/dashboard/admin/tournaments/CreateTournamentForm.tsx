@@ -105,7 +105,11 @@ export function CreateTournamentForm() {
       />
 
       <div className="ff-row__buttons">
-        <button className="ff-btn" type="submit" disabled={pending || !name.trim()}>
+        <button
+          className="ff-btn ff-btn--outline"
+          type="submit"
+          disabled={pending || !name.trim()}
+        >
           {pending ? "Creating…" : "Create Tournament"}
         </button>
       </div>

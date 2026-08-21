@@ -86,11 +86,7 @@ export function TournamentLifecycle({
           {options.map((to) => (
             <button
               key={to}
-              className={
-                to === "cancelled"
-                  ? "ff-btn ff-btn--outline ff-btn--sm"
-                  : "ff-btn ff-btn--sm"
-              }
+              className="ff-btn ff-btn--outline ff-btn--sm"
               type="button"
               disabled={pending || (to === "seeding" && entrantCount < 2)}
               title={EXPLAIN[to]}

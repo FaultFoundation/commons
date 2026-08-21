@@ -54,7 +54,14 @@ type JsonApiResource = {
 
 type JsonApiBody = {
   data?: JsonApiResource | JsonApiResource[];
-  errors?: Array<{ title?: string; detail?: string; code?: string }>;
+  errors?: Array<{
+    title?: string;
+    detail?: string;
+    code?: string;
+    // JSON:API points at the offending field here — the difference between a
+    // useful "name is missing" and a baffling "is missing".
+    source?: { pointer?: string; parameter?: string };
+  }>;
 };
 
 async function request(
@@ -101,14 +108,19 @@ async function request(
   }
 
   if (!res.ok) {
-    const first = parsed.errors?.[0];
-    const detail = first?.detail || first?.title;
-    return {
-      ok: false,
-      error: detail
-        ? `Challonge: ${detail}`
-        : `Challonge request failed (${res.status}).`,
-    };
+    // Name the field(s) Challonge is complaining about — its errors carry the
+    // reason ("is missing", "is invalid") in `detail`/`title` and the field in
+    // `source.pointer` (".../data/attributes/name"), which we stitch together.
+    const errs = parsed.errors ?? [];
+    const parts = errs.map((e) => {
+      const field =
+        e.source?.pointer?.split("/").filter(Boolean).pop() ??
+        e.source?.parameter;
+      const reason = e.detail || e.title || "was rejected";
+      return field ? `${field} ${reason}` : reason;
+    });
+    const msg = parts.length ? parts.join("; ") : `request failed (${res.status})`;
+    return { ok: false, error: `Challonge: ${msg}` };
   }
 
   return { ok: true, data: parsed };
@@ -148,8 +160,6 @@ export type CreateTournamentInput = {
   gameName?: string;
   description?: string;
   startsAt?: Date | null;
-  openSignup?: boolean;
-  signupCap?: number | null;
   holdThirdPlaceMatch?: boolean;
   swissRounds?: number | null;
 };
@@ -190,12 +200,9 @@ export async function createChallongeTournament(
   if (input.swissRounds != null) {
     attributes.swiss_options = { rounds: input.swissRounds };
   }
-  const registration: Record<string, unknown> = {};
-  if (input.openSignup != null) registration.open_signup = input.openSignup;
-  if (input.signupCap != null) registration.signup_cap = input.signupCap;
-  if (Object.keys(registration).length) {
-    attributes.registration_options = registration;
-  }
+  // Deliberately no registration_options: we don't use Challonge's own signup
+  // page (entrants are added through the API), and sending a partial
+  // registration_options object is what Challonge rejects with "is missing".
 
   const res = await request("POST", "/tournaments.json", {
     type: "tournament",

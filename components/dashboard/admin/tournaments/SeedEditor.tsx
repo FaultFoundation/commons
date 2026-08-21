@@ -98,7 +98,12 @@ export function SeedEditor({
 
       {editable ? (
         <div className="ff-row__buttons">
-          <button className="ff-btn ff-btn--sm" type="button" disabled={pending} onClick={save}>
+          <button
+            className="ff-btn ff-btn--outline ff-btn--sm"
+            type="button"
+            disabled={pending}
+            onClick={save}
+          >
             {pending ? "Saving…" : "Save seeds"}
           </button>
         </div>

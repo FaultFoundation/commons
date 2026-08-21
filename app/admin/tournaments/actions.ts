@@ -117,8 +117,6 @@ export async function createTournament(input: {
     format: input.format,
     urlSlug: `ff${id}`,
     gameName: "Overwatch",
-    openSignup: false,
-    signupCap: maxParticipants,
   });
   if (!created.ok) return created;
 
@@ -194,9 +192,10 @@ export async function updateTournamentSettings(
   }
 
   if (patch.maxParticipants !== undefined) {
-    const cap = clampMaxParticipants(patch.maxParticipants);
-    fields.maxParticipants = cap;
-    challongeAttrs.registration_options = { signup_cap: cap };
+    // Our own cap (checkRegistrationOpen enforces it); not pushed to Challonge —
+    // we don't use Challonge's signup page, and a partial registration_options
+    // object is rejected.
+    fields.maxParticipants = clampMaxParticipants(patch.maxParticipants);
   }
   if (patch.bestOf !== undefined) fields.bestOf = clampBestOf(patch.bestOf);
   if (patch.swissRounds !== undefined) {

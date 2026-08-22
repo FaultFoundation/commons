@@ -270,7 +270,35 @@ within `.ff-dash`. Top layer changes painting and stacking, not inheritance.
 
 `components/dashboard/bubbles/Disclosure.tsx`. Same shell as `BubbleRow`,
 but the body expands on click. Native `<details>`, so no client directive
-and it works without JS. Used for the team options in setup step 3.
+and it works without JS. The **progressive-disclosure** tool: keep a bubble to
+the common case and tuck detailed knobs behind it (e.g. the tournament Game
+Info bubble shows Format + a verification `Switch`, with best-of / swiss / third-
+place inside an "Advanced" `Disclosure`). Prefer this and popups over a long
+flat list of rows.
+
+### `Switch` — on/off toggle (client)
+
+`components/dashboard/bubbles/Switch.tsx`. A `role="switch"` toggle for booleans,
+dropped into a `BubbleRow`'s `action` slot — the standard replacement for a
+"Turn on / Turn off" button. The row carries the visible label; pass it as the
+Switch's `label` for the accessible name. Accent when on.
+
+```tsx
+<BubbleRow label="Third-Place Match" note="Adds a 3rd/4th-place match."
+  action={<Switch checked={on} onChange={(v) => apply({ thirdPlaceMatch: v })}
+    label="Third-place match" />} />
+```
+
+### `useReorderableGrid` + `DragGrip` — draggable tiles
+
+`components/dashboard/bubbles/useReorderableGrid.ts` + `DragGrip.tsx`, plus the
+`Bubble` `dragHandle` slot. The reusable "drag a tile to reorder" template for
+any `.ff-bubble-grid`: spread `bubbleProps(i)` onto each `Bubble` and pass
+`<DragGrip {...handleProps(i)} />` as its `dragHandle`. A drag starts **only**
+from the grip (bottom-right), so links/buttons on the card still work; keyboard
+users reorder with the section's own up/down buttons. Adopt it per section (plus
+a server reorder action); dropping the `dragHandle` hides the affordance.
+Currently used by the Teams grid (`TeamCardGrid`).
 
 ### `Avatar` + `AvatarUploadRow` — pictures and logos
 

@@ -5,7 +5,9 @@ import { useState, useTransition, type ReactNode } from "react";
 
 import { updateTournamentSettings } from "@/app/admin/tournaments/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
+import { Disclosure } from "@/components/dashboard/bubbles/Disclosure";
 import { FieldRow } from "@/components/dashboard/bubbles/FieldRow";
+import { Switch } from "@/components/dashboard/bubbles/Switch";
 import {
   MAX_PARTICIPANTS,
   RULES_URL_MAX,
@@ -167,44 +169,6 @@ export function TournamentGameInfo({
         />
       )}
 
-      {format === "swiss" ? (
-        <FieldRow
-          label="Swiss Rounds"
-          value={swissRounds ? String(swissRounds) : ""}
-          inputLabel="Number of rounds"
-          inputType="number"
-          required={false}
-          note={`${SWISS_ROUNDS_MIN}–${SWISS_ROUNDS_MAX}, or blank to derive from the field size.`}
-          onSave={saveNumber("swissRounds")}
-        />
-      ) : null}
-
-      {format === "single_elim" ? (
-        <BubbleRow
-          label="Third-Place Match"
-          value={thirdPlaceMatch ? "On" : "Off"}
-          action={
-            <button
-              className="ff-btn ff-btn--soft ff-btn--sm"
-              type="button"
-              disabled={pending || formatLocked}
-              onClick={() => apply({ thirdPlaceMatch: !thirdPlaceMatch })}
-            >
-              {thirdPlaceMatch ? "Turn off" : "Turn on"}
-            </button>
-          }
-        />
-      ) : null}
-
-      <FieldRow
-        label="Best Of"
-        value={String(bestOf)}
-        inputLabel="Games per series"
-        inputType="number"
-        note="Odd, 1–9. Shown on the bracket; scores are entered as sets."
-        onSave={saveNumber("bestOf")}
-      />
-
       <FieldRow
         label="Max Entrants"
         value={maxParticipants ? String(maxParticipants) : ""}
@@ -217,25 +181,59 @@ export function TournamentGameInfo({
 
       <BubbleRow
         label="Academic Verification"
-        value={academicVerificationRequired ? "Required" : "Not required"}
         note={
           academicVerificationRequired
-            ? "Every team member must be academically verified to enter."
+            ? "Every team member must be verified to enter."
             : "Any team can enter, verified or not."
         }
         action={
-          <button
-            className="ff-btn ff-btn--soft ff-btn--sm"
-            type="button"
+          <Switch
+            checked={academicVerificationRequired}
             disabled={pending}
-            onClick={() =>
-              apply({ academicVerificationRequired: !academicVerificationRequired })
-            }
-          >
-            {academicVerificationRequired ? "Make optional" : "Require"}
-          </button>
+            label="Academic verification required"
+            onChange={(next) => apply({ academicVerificationRequired: next })}
+          />
         }
       />
+
+      {/* Less-used knobs, tucked away so the common case stays a two-line form. */}
+      <Disclosure label="Advanced" note="Series length and format extras">
+        <FieldRow
+          label="Best Of"
+          value={String(bestOf)}
+          inputLabel="Games per series"
+          inputType="number"
+          note="Odd, 1–9. Shown on the bracket; scores are entered as sets."
+          onSave={saveNumber("bestOf")}
+        />
+
+        {format === "swiss" ? (
+          <FieldRow
+            label="Swiss Rounds"
+            value={swissRounds ? String(swissRounds) : ""}
+            inputLabel="Number of rounds"
+            inputType="number"
+            required={false}
+            note={`${SWISS_ROUNDS_MIN}–${SWISS_ROUNDS_MAX}, or blank to derive from the field size.`}
+            onSave={saveNumber("swissRounds")}
+          />
+        ) : null}
+
+        {format === "single_elim" ? (
+          <BubbleRow
+            label="Third-Place Match"
+            note="Adds a match for 3rd/4th place."
+            action={
+              <Switch
+                checked={thirdPlaceMatch}
+                disabled={pending || formatLocked}
+                label="Third-place match"
+                onChange={(next) => apply({ thirdPlaceMatch: next })}
+              />
+            }
+          />
+        ) : null}
+      </Disclosure>
     </>
   );
 }

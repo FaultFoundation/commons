@@ -5,6 +5,7 @@ import { useState, useTransition, type FormEvent } from "react";
 
 import { createTournament } from "@/app/admin/tournaments/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
+import { Switch } from "@/components/dashboard/bubbles/Switch";
 import {
   MAX_PARTICIPANTS,
   TOURNAMENT_FORMATS,
@@ -113,15 +114,12 @@ export function CreateTournamentForm() {
             ? "Every team member must be academically verified to enter."
             : "Any team can enter, verified or not."
         }
-        value={verificationRequired ? "Required" : "Not required"}
         action={
-          <button
-            className="ff-btn ff-btn--soft ff-btn--sm"
-            type="button"
-            onClick={() => setVerificationRequired((v) => !v)}
-          >
-            {verificationRequired ? "Make optional" : "Require"}
-          </button>
+          <Switch
+            checked={verificationRequired}
+            label="Academic verification required"
+            onChange={setVerificationRequired}
+          />
         }
       />
 

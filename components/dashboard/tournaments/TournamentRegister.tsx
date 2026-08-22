@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 
 import { enterTournament, withdrawFromTournament } from "@/app/teams/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
+import { ConfirmDialog } from "@/components/dashboard/bubbles/ConfirmDialog";
 
 export type RegisterTeam = {
   id: string;
@@ -16,11 +17,11 @@ export type RegisterTeam = {
 };
 
 /**
- * The team-registration control on a tournament page. Lists the teams the
- * viewer manages in this program; each can Enter (or Withdraw). When academic
- * verification is required, a team with unverified members can't enter and the
- * row says how many need verifying — the same rule the server re-checks in
- * enterTournament, surfaced up front so the button isn't a dead end.
+ * The team-registration control on a tournament page. Entered teams (with a
+ * Withdraw) sit inline; registering opens a popup to pick a team, so the bubble
+ * stays a short status list until you act. When academic verification is
+ * required, a team with unverified members can't enter and its row says how many
+ * need verifying — the same rule the server re-checks in enterTournament.
  */
 export function TournamentRegister({
   tournamentId,
@@ -36,12 +37,21 @@ export function TournamentRegister({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<string>(teams[0]?.id ?? "");
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  function run(action: () => Promise<{ ok: boolean; error?: string }>) {
+  const label = (t: RegisterTeam) => (t.tag ? `${t.name} [${t.tag}]` : t.name);
+
+  const enteredTeams = teams.filter((t) => t.entered);
+  const available = teams.filter((t) => !t.entered);
+  const selectable = available.filter(
+    (t) => !academicVerificationRequired || t.unverifiedCount === 0,
+  );
+  const [selected, setSelected] = useState<string>(selectable[0]?.id ?? "");
+
+  function withdraw(teamId: string) {
     setError(null);
     startTransition(async () => {
-      const result = await action();
+      const result = await withdrawFromTournament(teamId, tournamentId);
       if (!result.ok) {
         setError(result.error ?? "Something went wrong.");
         return;
@@ -50,7 +60,18 @@ export function TournamentRegister({
     });
   }
 
-  const label = (t: RegisterTeam) => (t.tag ? `${t.name} [${t.tag}]` : t.name);
+  function register() {
+    setError(null);
+    startTransition(async () => {
+      const result = await enterTournament(selected, tournamentId);
+      if (!result.ok) {
+        setError(result.error ?? "Something went wrong.");
+        return;
+      }
+      setDialogOpen(false);
+      router.refresh();
+    });
+  }
 
   if (teams.length === 0) {
     return (
@@ -61,21 +82,14 @@ export function TournamentRegister({
     );
   }
 
-  const enteredTeams = teams.filter((t) => t.entered);
-  const available = teams.filter((t) => !t.entered);
-  const selectable = available.filter(
-    (t) => !academicVerificationRequired || t.unverifiedCount === 0,
-  );
-
   return (
     <>
-      {error ? (
+      {error && !dialogOpen ? (
         <div className="ff-auth__error" role="alert">
           <p>{error}</p>
         </div>
       ) : null}
 
-      {/* Teams already in. */}
       {enteredTeams.map((t) => (
         <BubbleRow
           key={t.id}
@@ -86,7 +100,7 @@ export function TournamentRegister({
               className="ff-btn ff-btn--soft ff-btn--sm"
               type="button"
               disabled={pending}
-              onClick={() => run(() => withdrawFromTournament(t.id, tournamentId))}
+              onClick={() => withdraw(t.id)}
             >
               Withdraw
             </button>
@@ -94,7 +108,6 @@ export function TournamentRegister({
         />
       ))}
 
-      {/* Teams blocked by unverified members. */}
       {academicVerificationRequired
         ? available
             .filter((t) => t.unverifiedCount > 0)
@@ -108,46 +121,62 @@ export function TournamentRegister({
             ))
         : null}
 
-      {/* The register control. */}
       {!registrationOpen ? (
         <p className="ff-auth__hint">Registration isn&apos;t open right now.</p>
-      ) : selectable.length === 0 ? (
-        available.length ? null : (
-          <p className="ff-auth__hint">
-            All your teams are entered. Nothing more to register.
-          </p>
-        )
-      ) : (
-        <BubbleRow
-          label="Register a team"
-          field={
-            <select
-              className="ff-auth__input"
-              value={selected}
-              disabled={pending}
-              onChange={(e) => setSelected(e.target.value)}
-            >
-              {selectable.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {label(t)}
-                </option>
-              ))}
-            </select>
-          }
-          action={
-            <button
-              className="ff-btn ff-btn--soft ff-btn--sm"
-              type="button"
-              disabled={pending || !selected}
-              onClick={() =>
-                run(() => enterTournament(selected, tournamentId))
-              }
-            >
-              {pending ? "Registering…" : "Register"}
-            </button>
-          }
-        />
+      ) : selectable.length ? (
+        <div className="ff-row__buttons">
+          <button
+            className="ff-btn ff-btn--soft ff-btn--sm"
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              setError(null);
+              setSelected((s) => s || selectable[0]?.id || "");
+              setDialogOpen(true);
+            }}
+          >
+            Register a team
+          </button>
+        </div>
+      ) : available.length ? null : (
+        <p className="ff-auth__hint">
+          All your teams are entered. Nothing more to register.
+        </p>
       )}
+
+      <ConfirmDialog
+        open={dialogOpen}
+        title="Register a Team"
+        description={
+          academicVerificationRequired
+            ? "Only teams whose members are all academically verified appear here."
+            : "Pick the team to enter this tournament."
+        }
+        confirmLabel={pending ? "Registering…" : "Register"}
+        busy={pending}
+        error={dialogOpen ? error : null}
+        onConfirm={register}
+        onClose={() => {
+          if (!pending) setDialogOpen(false);
+        }}
+      >
+        <label className="screen-reader-text" htmlFor="ff-register-team">
+          Team
+        </label>
+        <select
+          id="ff-register-team"
+          className="ff-auth__input"
+          value={selected}
+          disabled={pending}
+          onChange={(e) => setSelected(e.target.value)}
+        >
+          {selectable.map((t) => (
+            <option key={t.id} value={t.id}>
+              {label(t)}
+            </option>
+          ))}
+        </select>
+      </ConfirmDialog>
     </>
   );
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { BracketView } from "@/components/tournaments/BracketView";
@@ -41,16 +42,33 @@ export async function generateMetadata({
 
   const format = TOURNAMENT_FORMAT_LABELS[tournament.format] ?? tournament.format;
   const canonical = `${ORIGIN}${tournamentPath(tournament.id)}`;
+  const description = `${format} bracket, standings and results for ${tournament.name}.`;
+
+  // The link preview (Open Graph / Twitter card) shows the tournament's banner
+  // and name. The banner is an /api/avatars/… path, so make it absolute against
+  // the host the crawler fetched (workers.dev today, the live domain later).
+  const host = (await headers()).get("host");
+  const origin = host ? `https://${host}` : ORIGIN;
+  const images = tournament.bannerUrl
+    ? [{ url: `${origin}${tournament.bannerUrl}`, alt: tournament.name }]
+    : undefined;
 
   return {
     title: `${tournament.name} · The Commons`,
-    description: `${format} bracket, standings and results for ${tournament.name}.`,
+    description,
     alternates: { canonical },
     openGraph: {
       title: tournament.name,
-      description: `${format} bracket and live results.`,
+      description,
       url: canonical,
       type: "website",
+      images,
+    },
+    twitter: {
+      card: images ? "summary_large_image" : "summary",
+      title: tournament.name,
+      description,
+      images,
     },
   };
 }

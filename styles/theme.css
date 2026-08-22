@@ -3207,3 +3207,94 @@ button.ff-dash__link:hover {
   align-items: center;
   gap: 14px;
 }
+
+/* ===========================================================================
+   Round 9 — shadows on the custom cards, plain-text round labels with more
+   spacing, cleaner connectors + game numbers, the "next game" yellow highlight,
+   a divider under the Bracket title, and the flat gray share bar.
+   =========================================================================== */
+
+/* Shadow parity with .ff-card (the standard bubble) on the custom cards. */
+.ff-thero,
+.ff-pcard {
+  box-shadow: var(--ff-shadow-card);
+}
+
+/* A separator line under a bubble's title (used on the Bracket bubble). */
+.ff-bubble--divided .ff-bubble__head {
+  border-bottom: 1px solid var(--ff-border);
+  padding-bottom: 12px;
+}
+
+/* Round labels are just centered text now — no bubble. */
+.ff-bracket__round-label {
+  background: none;
+  border-radius: 0;
+  padding: 0 0 6px;
+  text-align: center;
+  color: var(--ff-text-dim);
+  font-weight: 700;
+  font-size: var(--ff-dash-text-sm);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* More room between rounds for the connectors and the game number. */
+.ff-bracket__rounds {
+  gap: 48px;
+}
+/* A clean horizontal connector spanning the gap to the next round. */
+.ff-bracket__rounds
+  .ff-bracket__round:not(:last-child)
+  .ff-bracket__match::after {
+  width: 48px;
+  height: 2px;
+  background: var(--ff-border);
+}
+/* Game number in small gray to the right of the match (clear of the line). */
+.ff-bracket__match-no {
+  left: calc(100% + 8px);
+  top: 4px;
+  transform: none;
+}
+
+/* The next game to be played: a clear yellow-highlighted card (no text label). */
+.ff-bracket__match[data-state="open"] {
+  border-color: var(--ff-accent);
+  box-shadow:
+    0 0 0 1px var(--ff-accent),
+    inset 3px 0 0 var(--ff-accent);
+  background: rgba(255, 238, 88, 0.07);
+}
+
+/* Flat gray share bar (marketing-site style): icons only, a divider after the
+   native Share action, no button bubbles. */
+.ff-share__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--ff-text-dim);
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    color var(--ff-transition),
+    transform 0.1s ease;
+}
+.ff-share__icon:hover {
+  color: #fff;
+  transform: scale(1.12);
+}
+.ff-share__divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--ff-border);
+}
+.ff-share__copied {
+  margin-left: 4px;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-ok);
+}

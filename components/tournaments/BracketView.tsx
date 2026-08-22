@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  MATCH_STATUS_LABELS,
   type BracketSnapshot,
   type SnapshotMatch,
   type SnapshotParticipant,
@@ -267,11 +266,6 @@ function MatchCard({
         score={b}
         winner={!!match.winnerId && match.winnerId === match.player2Id}
       />
-      {match.state !== "complete" ? (
-        <div className="ff-bracket__match-state">
-          {MATCH_STATUS_LABELS[match.state]}
-        </div>
-      ) : null}
     </div>
   );
 }

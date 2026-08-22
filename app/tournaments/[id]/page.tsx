@@ -180,12 +180,14 @@ export default async function TournamentPage({
           </div>
         </section>
 
-        {/* Bracket. */}
+        {/* Bracket — blank until it's published; only then does the results
+            table (inside BracketView) appear. */}
         <Bubble
           title="Bracket"
           span="full"
+          className="ff-bubble--divided"
           actions={
-            tournament.externalUrl ? (
+            initial && tournament.externalUrl ? (
               <a
                 className="ff-btn ff-btn--soft ff-btn--sm"
                 href={tournament.externalUrl}
@@ -200,9 +202,7 @@ export default async function TournamentPage({
           {initial ? (
             <BracketView tournamentId={tournament.id} initial={initial} />
           ) : (
-            <p className="ff-auth__hint">
-              The bracket appears here once the tournament starts.
-            </p>
+            <p className="ff-ticket-empty">No bracket has been published yet.</p>
           )}
         </Bubble>
 

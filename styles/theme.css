@@ -2265,11 +2265,17 @@ button.ff-dash__link:hover {
   padding: 5px 12px;
   border-radius: var(--ff-radius-pill);
   border: 1px solid var(--ff-border);
+  /* Transparent, not the UA default — these are used on <button> (the
+     tournament filters) as well as <a> (the ticket queue), and a bare button
+     otherwise shows the browser's white background. */
+  background: transparent;
   color: #dfe9f4;
+  font-family: inherit;
   font-size: var(--ff-dash-text-sm);
   font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
   transition:
     background var(--ff-transition),
     color var(--ff-transition);

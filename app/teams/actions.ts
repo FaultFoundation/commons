@@ -23,7 +23,6 @@ import {
   addChallongeParticipant,
   removeChallongeParticipant,
 } from "@/lib/challonge";
-import { getPlatformIdentity } from "@/lib/platform-identities";
 import { listUnverifiedMembers } from "@/lib/tournaments";
 import {
   INVITE_PROBLEM_MESSAGES,
@@ -727,17 +726,18 @@ export async function enterTournament(
   }
 
   // Add the team as a Challonge participant first: if that fails there is no
-  // half-entered state. The Challonge entry carries the team's display name;
-  // if the registering captain has connected Challonge, we pass their handle so
-  // the tournament also lands in their Challonge history.
+  // half-entered state. The *team* is the participant, named for the team — we
+  // deliberately don't link the captain's Challonge account here. A Challonge
+  // account can only be one participant per tournament, so a captain who manages
+  // two teams would collide ("name has already been taken"), and the entrant is
+  // the team, not the person. Account-linking belongs to solo tournaments, which
+  // aren't built yet.
   if (!tournament.externalId) {
     return { ok: false, error: "That tournament isn't linked to Challonge yet." };
   }
-  const challongeIdentity = await getPlatformIdentity(userId, "challonge");
   const entryName = teamRow.tag ? `${teamRow.name} [${teamRow.tag}]` : teamRow.name;
   const added = await addChallongeParticipant(tournament.externalId, {
     name: entryName,
-    username: challongeIdentity?.handle ?? null,
   });
   if (!added.ok) return { ok: false, error: added.error };
 

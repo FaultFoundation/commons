@@ -55,8 +55,10 @@ type JsonApiResource = {
 type JsonApiBody = {
   data?: JsonApiResource | JsonApiResource[];
   errors?: Array<{
-    title?: string;
-    detail?: string;
+    // Challonge sometimes puts a nested {field: [messages]} object here rather
+    // than a plain string, so these are unknown and stringified on render.
+    title?: unknown;
+    detail?: unknown;
     code?: string;
     // JSON:API points at the offending field here — the difference between a
     // useful "name is missing" and a baffling "is missing".
@@ -123,7 +125,13 @@ async function request(
         field = (at >= 0 ? segs.slice(at + 1) : segs).join(".");
       }
       field = field || e.source?.parameter;
-      const reason = e.detail || e.title || "was rejected";
+      const raw = e.detail ?? e.title;
+      const reason =
+        raw == null
+          ? "was rejected"
+          : typeof raw === "string"
+            ? raw
+            : JSON.stringify(raw);
       return field ? `${field} ${reason}` : reason;
     });
     const msg = parts.length
@@ -208,13 +216,16 @@ export async function createChallongeTournament(
   if (input.holdThirdPlaceMatch != null) {
     attributes.hold_third_place_match = input.holdThirdPlaceMatch;
   }
-  // Round robin needs a ranking method for standings; give it a sensible
-  // default so the format is fully specified at create time.
+  // Challonge requires the format's options object to be *present* for round
+  // robin and swiss (a missing one is rejected outright); empty is fine —
+  // Challonge fills in its own defaults, and swiss rounds derive from the field
+  // size when not set. Only send what we actually configure.
   if (input.format === "round_robin") {
-    attributes.round_robin_options = { ranking: "match wins" };
+    attributes.round_robin_options = {};
   }
-  if (input.format === "swiss" && input.swissRounds != null) {
-    attributes.swiss_options = { rounds: input.swissRounds };
+  if (input.format === "swiss") {
+    attributes.swiss_options =
+      input.swissRounds != null ? { rounds: input.swissRounds } : {};
   }
   // Deliberately no registration_options: we don't use Challonge's own signup
   // page (entrants are added through the API), and sending a partial

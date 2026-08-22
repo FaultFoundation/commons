@@ -1,0 +1,1 @@
+ALTER TABLE `tournaments` ADD `academic_verification_required` integer DEFAULT true NOT NULL;

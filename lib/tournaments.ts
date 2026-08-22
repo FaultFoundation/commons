@@ -1,15 +1,18 @@
 import { cache } from "react";
-import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 
 import {
+  programMemberships,
   teams,
   teamMembers,
   tournamentBrackets,
   tournaments,
   tournamentParticipants,
+  user,
 } from "@/db/schema";
 import { getDb } from "@/lib/db";
 import { requireStaffCapability, type StaffCheck } from "@/lib/staff";
+import { can, type TeamRole } from "@/lib/teams-shared";
 import { fetchChallongeState } from "@/lib/challonge";
 import {
   TOURNAMENT_ID_MAX,
@@ -50,6 +53,7 @@ export type TournamentRow = {
   bestOf: number;
   swissRounds: number | null;
   thirdPlaceMatch: boolean;
+  academicVerificationRequired: boolean;
   rulesUrl: string | null;
   version: number;
   bracketGeneratedAt: Date | null;
@@ -238,6 +242,128 @@ export async function listMyTournaments(userId: string) {
     )
     .where(isNull(tournamentParticipants.withdrawnAt))
     .orderBy(tournaments.startsAt);
+}
+
+// ---------------------------------------------------------------------------
+// Registration eligibility
+//
+// A team can enter if the viewer manages it (manager/captain), it's in the
+// tournament's program, and — when academic verification is required — every
+// active member has a VERIFIED collegiate membership. The UI shows this per
+// team; enterTournament re-checks it server-side.
+// ---------------------------------------------------------------------------
+
+export type RegisterableTeam = {
+  id: string;
+  name: string;
+  tag: string | null;
+  role: TeamRole;
+  entered: boolean;
+  memberCount: number;
+  /** Active members without a VERIFIED collegiate membership. */
+  unverifiedCount: number;
+};
+
+export async function listRegisterableTeams(
+  userId: string,
+  tournament: TournamentRow,
+): Promise<RegisterableTeam[]> {
+  const db = getDb();
+  const mine = await db
+    .select({
+      id: teams.id,
+      name: teams.name,
+      tag: teams.tag,
+      role: teamMembers.role,
+    })
+    .from(teamMembers)
+    .innerJoin(teams, eq(teams.id, teamMembers.teamId))
+    .where(
+      and(
+        eq(teamMembers.userId, userId),
+        eq(teamMembers.status, "active"),
+        isNull(teams.disbandedAt),
+        eq(teams.programId, tournament.programId),
+      ),
+    );
+  const managed = mine.filter((t) =>
+    can(t.role as TeamRole, "enterTournaments"),
+  );
+  if (!managed.length) return [];
+  const ids = managed.map((t) => t.id);
+
+  const [enteredRows, memberRows] = await Promise.all([
+    db
+      .select({ teamId: tournamentParticipants.teamId })
+      .from(tournamentParticipants)
+      .where(
+        and(
+          eq(tournamentParticipants.tournamentId, tournament.id),
+          inArray(tournamentParticipants.teamId, ids),
+          isNull(tournamentParticipants.withdrawnAt),
+        ),
+      ),
+    db
+      .select({
+        teamId: teamMembers.teamId,
+        status: programMemberships.status,
+      })
+      .from(teamMembers)
+      .leftJoin(
+        programMemberships,
+        and(
+          eq(programMemberships.userId, teamMembers.userId),
+          eq(programMemberships.programId, tournament.programId),
+        ),
+      )
+      .where(
+        and(
+          inArray(teamMembers.teamId, ids),
+          eq(teamMembers.status, "active"),
+        ),
+      ),
+  ]);
+
+  const entered = new Set(enteredRows.map((r) => r.teamId));
+  const memberCount = new Map<string, number>();
+  const unverified = new Map<string, number>();
+  for (const m of memberRows) {
+    memberCount.set(m.teamId, (memberCount.get(m.teamId) ?? 0) + 1);
+    if (m.status !== "VERIFIED") {
+      unverified.set(m.teamId, (unverified.get(m.teamId) ?? 0) + 1);
+    }
+  }
+
+  return managed.map((t) => ({
+    id: t.id,
+    name: t.name,
+    tag: t.tag,
+    role: t.role as TeamRole,
+    entered: entered.has(t.id),
+    memberCount: memberCount.get(t.id) ?? 0,
+    unverifiedCount: unverified.get(t.id) ?? 0,
+  }));
+}
+
+/** Names of a team's active members who aren't academically verified for the
+    program — the enforcement side of academicVerificationRequired. */
+export async function listUnverifiedMembers(
+  teamId: string,
+  programId: string,
+): Promise<string[]> {
+  const rows = await getDb()
+    .select({ name: user.name, status: programMemberships.status })
+    .from(teamMembers)
+    .innerJoin(user, eq(user.id, teamMembers.userId))
+    .leftJoin(
+      programMemberships,
+      and(
+        eq(programMemberships.userId, teamMembers.userId),
+        eq(programMemberships.programId, programId),
+      ),
+    )
+    .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.status, "active")));
+  return rows.filter((r) => r.status !== "VERIFIED").map((r) => r.name);
 }
 
 // ---------------------------------------------------------------------------

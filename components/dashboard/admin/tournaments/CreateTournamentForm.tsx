@@ -26,6 +26,7 @@ export function CreateTournamentForm() {
   const [name, setName] = useState("");
   const [format, setFormat] = useState<string>("single_elim");
   const [maxParticipants, setMaxParticipants] = useState("32");
+  const [verificationRequired, setVerificationRequired] = useState(true);
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -35,6 +36,7 @@ export function CreateTournamentForm() {
         name,
         format,
         maxParticipants: Number(maxParticipants) || undefined,
+        academicVerificationRequired: verificationRequired,
       });
       if (!result.ok) {
         setError(result.error);
@@ -104,9 +106,28 @@ export function CreateTournamentForm() {
         }
       />
 
+      <BubbleRow
+        label="Academic verification"
+        note={
+          verificationRequired
+            ? "Every team member must be academically verified to enter."
+            : "Any team can enter, verified or not."
+        }
+        value={verificationRequired ? "Required" : "Not required"}
+        action={
+          <button
+            className="ff-btn ff-btn--soft ff-btn--sm"
+            type="button"
+            onClick={() => setVerificationRequired((v) => !v)}
+          >
+            {verificationRequired ? "Make optional" : "Require"}
+          </button>
+        }
+      />
+
       <div className="ff-row__buttons">
         <button
-          className="ff-btn ff-btn--outline"
+          className="ff-btn ff-btn--soft"
           type="submit"
           disabled={pending || !name.trim()}
         >

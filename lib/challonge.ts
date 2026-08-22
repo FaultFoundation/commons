@@ -108,18 +108,29 @@ async function request(
   }
 
   if (!res.ok) {
-    // Name the field(s) Challonge is complaining about — its errors carry the
+    // Name the field(s) Challonge is complaining about. Its errors carry the
     // reason ("is missing", "is invalid") in `detail`/`title` and the field in
-    // `source.pointer` (".../data/attributes/name"), which we stitch together.
+    // `source.pointer` (".../data/attributes/round_robin_options/ranking"). We
+    // keep the whole path after "attributes" (dot-joined) so a nested field
+    // reads "round_robin_options.ranking is missing", not a bare "ranking".
     const errs = parsed.errors ?? [];
     const parts = errs.map((e) => {
-      const field =
-        e.source?.pointer?.split("/").filter(Boolean).pop() ??
-        e.source?.parameter;
+      let field: string | undefined;
+      const ptr = e.source?.pointer;
+      if (ptr) {
+        const segs = ptr.split("/").filter(Boolean);
+        const at = segs.indexOf("attributes");
+        field = (at >= 0 ? segs.slice(at + 1) : segs).join(".");
+      }
+      field = field || e.source?.parameter;
       const reason = e.detail || e.title || "was rejected";
       return field ? `${field} ${reason}` : reason;
     });
-    const msg = parts.length ? parts.join("; ") : `request failed (${res.status})`;
+    const msg = parts.length
+      ? parts.join("; ")
+      : errs.length
+        ? JSON.stringify(errs)
+        : `request failed (${res.status})`;
     return { ok: false, error: `Challonge: ${msg}` };
   }
 
@@ -197,7 +208,12 @@ export async function createChallongeTournament(
   if (input.holdThirdPlaceMatch != null) {
     attributes.hold_third_place_match = input.holdThirdPlaceMatch;
   }
-  if (input.swissRounds != null) {
+  // Round robin needs a ranking method for standings; give it a sensible
+  // default so the format is fully specified at create time.
+  if (input.format === "round_robin") {
+    attributes.round_robin_options = { ranking: "match wins" };
+  }
+  if (input.format === "swiss" && input.swissRounds != null) {
     attributes.swiss_options = { rounds: input.swissRounds };
   }
   // Deliberately no registration_options: we don't use Challonge's own signup

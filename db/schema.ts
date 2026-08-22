@@ -649,6 +649,14 @@ export const tournaments = sqliteTable(
     thirdPlaceMatch: integer("third_place_match", { mode: "boolean" })
       .notNull()
       .default(false),
+    // When true, a team can only enter if every active roster member has
+    // completed academic (collegiate) verification. Default on — these are
+    // collegiate events — but can be turned off for open/exhibition brackets.
+    academicVerificationRequired: integer("academic_verification_required", {
+      mode: "boolean",
+    })
+      .notNull()
+      .default(true),
     rulesUrl: text("rules_url"),
     // Bumped on every mutating action; readers compare to detect stale state.
     version: integer("version").notNull().default(0),

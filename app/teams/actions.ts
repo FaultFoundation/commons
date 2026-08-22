@@ -24,6 +24,7 @@ import {
   removeChallongeParticipant,
 } from "@/lib/challonge";
 import { getPlatformIdentity } from "@/lib/platform-identities";
+import { listUnverifiedMembers } from "@/lib/tournaments";
 import {
   INVITE_PROBLEM_MESSAGES,
   cleanName,
@@ -690,6 +691,7 @@ export async function enterTournament(
       status: tournaments.status,
       programId: tournaments.programId,
       externalId: tournaments.externalId,
+      academicVerificationRequired: tournaments.academicVerificationRequired,
     })
     .from(tournaments)
     .where(eq(tournaments.id, tournamentId))
@@ -700,6 +702,19 @@ export async function enterTournament(
   }
   if (tournament.status !== "registration") {
     return { ok: false, error: `${tournament.name} isn't taking entries.` };
+  }
+
+  // Academic verification gate: every active member must be verified.
+  if (tournament.academicVerificationRequired) {
+    const unverified = await listUnverifiedMembers(teamId, tournament.programId);
+    if (unverified.length) {
+      const names = unverified.slice(0, 5).join(", ");
+      const more = unverified.length > 5 ? ` and ${unverified.length - 5} more` : "";
+      return {
+        ok: false,
+        error: `This tournament requires academic verification. These members aren't verified yet: ${names}${more}.`,
+      };
+    }
   }
 
   const conflicts = await entryConflicts(teamId, tournamentId);

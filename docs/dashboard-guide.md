@@ -455,11 +455,22 @@ lazy TTL). Portal conventions specific to this surface:
   Start), Bracket (Start button, then a per-match result-entry row), Danger Zone
   (reset/delete, both hitting Challonge). "Blue commits, outline doesn't" holds;
   reset/delete are `ff-btn--danger` behind a `ConfirmDialog`.
-- **Public bracket** (`/t/<id>/<name>/`): signed-out-safe, its own `ff-bracket`
-  layout (rounds as columns, matches as cards, a standings table), polling
-  `/api/tournaments/[id]/bracket` on the interval the server dictates
-  (`nextPollMs`) and pausing on a hidden tab — the same request-budget
-  discipline the ticket queue uses.
+- **In-app view** (`/tournaments/<id>/`, inside `DashboardShell`): the member's
+  landing when they click a tournament — a condensed info bubble, the bracket
+  bubble (the same `BracketView`), then a two-column row of **Register** + a
+  **Participants** list. Registration is here: a manager/captain picks one of
+  their teams and enters. When the tournament has `academic_verification_required`
+  on, a team with any unverified member can't enter and the row says how many
+  need verifying (`listRegisterableTeams`); `enterTournament` re-checks it
+  server-side (`listUnverifiedMembers`). Adding a team is one Challonge
+  participant; withdrawing removes it.
+- **Public bracket** (`/t/<id>/<name>/`): the signed-out **share** link (same
+  `ff-bracket` layout) — no shell, no registration, polling
+  `/api/tournaments/[id]/bracket` on the server-dictated interval (`nextPollMs`)
+  and pausing on a hidden tab, the same request-budget discipline the ticket
+  queue uses.
+- **Academic-verification toggle** is on the admin create form and the Game Info
+  settings — it gates registration, nothing on Challonge.
 
 ## Backend notes
 

@@ -86,7 +86,7 @@ export function TournamentLifecycle({
           {options.map((to) => (
             <button
               key={to}
-              className="ff-btn ff-btn--outline ff-btn--sm"
+              className="ff-btn ff-btn--soft ff-btn--sm"
               type="button"
               disabled={pending || (to === "seeding" && entrantCount < 2)}
               title={EXPLAIN[to]}

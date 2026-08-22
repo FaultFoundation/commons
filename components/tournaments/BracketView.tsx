@@ -82,7 +82,7 @@ export function BracketView({
       {snapshot.tournament.challongeUrl ? (
         <p className="ff-bracket__source">
           <a
-            className="ff-btn ff-btn--outline ff-btn--sm"
+            className="ff-btn ff-btn--soft ff-btn--sm"
             href={snapshot.tournament.challongeUrl}
             target="_blank"
             rel="noreferrer noopener"

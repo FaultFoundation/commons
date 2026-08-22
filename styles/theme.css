@@ -2606,3 +2606,45 @@ button.ff-dash__link:hover {
   color: var(--ff-text-dim);
   border-top: 1px solid var(--ff-border);
 }
+
+/* ===========================================================================
+   Tournament admin — layout + button treatments that the base kit didn't carry.
+   =========================================================================== */
+
+/* Soft outline button: a subtle border against the background, matching the
+   ticket filter pills. Reads correctly on any surface, unlike --outline whose
+   currentColor border renders stark white (or vanishes on light bubbles). */
+.ff-btn--soft {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--ff-border);
+  color: #dfe9f4;
+}
+.ff-btn--soft:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+/* Two side-by-side columns of stacked bubbles inside a .ff-bubble-grid. Each
+   column flows independently (flex) so unequal heights don't leave ragged gaps;
+   the container spans the full parent grid and collapses to one column when
+   narrow. Without this, bubbles placed in .ff-bubble-columns have no layout and
+   collide. */
+.ff-bubble-columns {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.ff-bubble-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+@media (max-width: 720px) {
+  .ff-bubble-columns {
+    grid-template-columns: 1fr;
+  }
+}

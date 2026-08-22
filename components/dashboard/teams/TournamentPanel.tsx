@@ -70,7 +70,7 @@ export function TournamentPanel({
           action={
             manages ? (
               <button
-                className="ff-btn ff-btn--outline ff-btn--sm"
+                className="ff-btn ff-btn--soft ff-btn--sm"
                 type="button"
                 disabled={pending}
                 onClick={() =>
@@ -92,7 +92,7 @@ export function TournamentPanel({
           action={
             manages ? (
               <button
-                className="ff-btn ff-btn--outline ff-btn--sm"
+                className="ff-btn ff-btn--soft ff-btn--sm"
                 type="button"
                 disabled={pending}
                 onClick={() => run(() => enterTournament(teamId, tournament.id))}

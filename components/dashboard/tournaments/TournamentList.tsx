@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import {
   TOURNAMENT_FORMAT_LABELS,
   TOURNAMENT_STATUS_LABELS,
-  tournamentPath,
   type TournamentFormat,
   type TournamentStatus,
 } from "@/lib/tournaments-shared";
@@ -94,10 +93,7 @@ export function TournamentList({
               {visible.map((t) => (
                 <tr key={t.id}>
                   <td>
-                    <a
-                      className="ff-ticket-subject"
-                      href={tournamentPath(t.id, t.name)}
-                    >
+                    <a className="ff-ticket-subject" href={`/tournaments/${t.id}/`}>
                       {t.name}
                     </a>
                   </td>

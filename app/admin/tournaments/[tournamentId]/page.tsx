@@ -5,7 +5,11 @@ import { BracketControl } from "@/components/dashboard/admin/tournaments/Bracket
 import { SeedEditor } from "@/components/dashboard/admin/tournaments/SeedEditor";
 import { TournamentDanger } from "@/components/dashboard/admin/tournaments/TournamentDanger";
 import { TournamentLifecycle } from "@/components/dashboard/admin/tournaments/TournamentLifecycle";
-import { TournamentSettings } from "@/components/dashboard/admin/tournaments/TournamentSettings";
+import {
+  TournamentBasicInfo,
+  TournamentGameInfo,
+  TournamentSchedule,
+} from "@/components/dashboard/admin/tournaments/TournamentSettings";
 import { AdminGate } from "@/components/dashboard/admin/AdminGate";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
@@ -76,12 +80,12 @@ async function TournamentContent({ tournamentId }: { tournamentId: string }) {
         }
       >
         <div className="ff-row__buttons ff-bubble__nav">
-          <a className="ff-btn ff-btn--outline ff-btn--sm" href="/admin/tournaments/">
+          <a className="ff-btn ff-btn--soft ff-btn--sm" href="/admin/tournaments/">
             All Tournaments
           </a>
           {tournament.status !== "draft" ? (
             <a
-              className="ff-btn ff-btn--outline ff-btn--sm"
+              className="ff-btn ff-btn--soft ff-btn--sm"
               href={publicUrl}
               target="_blank"
               rel="noreferrer noopener"
@@ -91,7 +95,7 @@ async function TournamentContent({ tournamentId }: { tournamentId: string }) {
           ) : null}
           {tournament.externalUrl ? (
             <a
-              className="ff-btn ff-btn--outline ff-btn--sm"
+              className="ff-btn ff-btn--soft ff-btn--sm"
               href={tournament.externalUrl}
               target="_blank"
               rel="noreferrer noopener"
@@ -113,34 +117,57 @@ async function TournamentContent({ tournamentId }: { tournamentId: string }) {
               : String(participants.length)
           }
         />
-      </Bubble>
-
-      <div className="ff-bubble-columns">
-        <Bubble title="Lifecycle">
-          <TournamentLifecycle
-            tournamentId={tournament.id}
-            status={tournament.status}
-            entrantCount={participants.length}
-          />
-        </Bubble>
-
-        <TournamentSettings
+        <BubbleRow
+          label="Tournament ID"
+          value={tournament.id}
+          locked
+          lockTitle="Assigned on creation and permanent"
+        />
+        <BubbleRow label="Public URL" value={publicUrl} />
+        <TournamentBasicInfo
           tournamentId={tournament.id}
           name={tournament.name}
-          publicUrl={publicUrl}
-          format={tournament.format}
-          bestOf={tournament.bestOf}
-          maxParticipants={tournament.maxParticipants}
-          swissRounds={tournament.swissRounds}
-          thirdPlaceMatch={tournament.thirdPlaceMatch}
           rulesUrl={tournament.rulesUrl}
-          startsAt={toLocalInput(tournament.startsAt)}
-          endsAt={toLocalInput(tournament.endsAt)}
-          registrationOpensAt={toLocalInput(tournament.registrationOpensAt)}
-          registrationClosesAt={toLocalInput(tournament.registrationClosesAt)}
-          rosterLockAt={toLocalInput(tournament.rosterLockAt)}
-          formatLocked={generated}
         />
+      </Bubble>
+
+      {/* Left column: lifecycle + game info. Right column: schedule. */}
+      <div className="ff-bubble-columns">
+        <div className="ff-bubble-column">
+          <Bubble title="Lifecycle">
+            <TournamentLifecycle
+              tournamentId={tournament.id}
+              status={tournament.status}
+              entrantCount={participants.length}
+            />
+          </Bubble>
+
+          <Bubble title="Game Info">
+            <TournamentGameInfo
+              tournamentId={tournament.id}
+              format={tournament.format}
+              bestOf={tournament.bestOf}
+              maxParticipants={tournament.maxParticipants}
+              swissRounds={tournament.swissRounds}
+              thirdPlaceMatch={tournament.thirdPlaceMatch}
+              academicVerificationRequired={tournament.academicVerificationRequired}
+              formatLocked={generated}
+            />
+          </Bubble>
+        </div>
+
+        <div className="ff-bubble-column">
+          <Bubble title="Schedule">
+            <TournamentSchedule
+              tournamentId={tournament.id}
+              startsAt={toLocalInput(tournament.startsAt)}
+              endsAt={toLocalInput(tournament.endsAt)}
+              registrationOpensAt={toLocalInput(tournament.registrationOpensAt)}
+              registrationClosesAt={toLocalInput(tournament.registrationClosesAt)}
+              rosterLockAt={toLocalInput(tournament.rosterLockAt)}
+            />
+          </Bubble>
+        </div>
       </div>
 
       <Bubble

@@ -20,6 +20,13 @@ next-env.d.ts
 logs/
 temp/
 .claude/
+.turbo/
+*.log
+
+# NOTE: drizzle/ is NOT ignored on purpose — the generated *.sql migrations and
+# meta/ snapshots are the schema history that `wrangler d1 migrations apply`
+# runs, so they must be committed. Only the local D1 *state* (.wrangler/) and
+# build output are temporary.
 
 # local-only reference material (not part of the commons app)
 reference/

@@ -222,7 +222,7 @@ here — they live on Challonge and are pulled into `tournament_brackets`.
 
 | App concept | Table | Key mappings |
 |---|---|---|
-| Tournament | `tournaments` | 6-digit `id` (public identifier; no slug — the URL name segment is derived from `name`); `format` ∈ `single_elim` \| `double_elim` \| `round_robin` \| `swiss` (maps to Challonge `tournament_type`); `status` ∈ `draft` \| `registration` \| `seeding` \| `active` \| `completed` \| `cancelled` (our lifecycle, mapped to Challonge start/finalize/reset in the admin actions); `source = "challonge"` with `external_id` = the Challonge tournament id and `external_url` the deep link, `UNIQUE(source, external_id)`; `max_participants`, `best_of`, `swiss_rounds`, `third_place_match`, registration/roster-lock timestamps, `version` (bumped on every mutation → forces a snapshot rebuild), `bracket_generated_at` (set on Start) |
+| Tournament | `tournaments` | 6-digit `id` (public identifier; no slug — the URL name segment is derived from `name`); `format` ∈ `single_elim` \| `double_elim` \| `round_robin` \| `swiss` (maps to Challonge `tournament_type`); `status` ∈ `draft` \| `registration` \| `seeding` \| `active` \| `completed` \| `cancelled` (our lifecycle, mapped to Challonge start/finalize/reset in the admin actions); `source = "challonge"` with `external_id` = the Challonge tournament id and `external_url` the deep link, `UNIQUE(source, external_id)`; `max_participants`, `best_of`, `swiss_rounds`, `third_place_match`, `academic_verification_required` (default 1 — every roster member must be VERIFIED to enter), registration/roster-lock timestamps, `version` (bumped on every mutation → forces a snapshot rebuild), `bracket_generated_at` (set on Start) |
 | Competitor | `tournament_participants` | team **XOR** solo user (`CHECK`); `challonge_participant_id` maps our row to the Challonge participant; `seed`; `withdrawn_at` keeps the row but drops it out of every "who is entered" query, including the one-team-per-tournament conflict check. Two `UNIQUE(tournament_id, team_id)` / `(tournament_id, user_id)` indexes close the enter race. No standings columns — Challonge is the scorer |
 | Cached bracket | `tournament_brackets` | one row per tournament (`tournament_id` PK): `payload` (the JSON `SnapshotPayload` `lib/challonge.ts` builds and `BracketView` renders), `version` (the tournament version it was built at) and `fetched_at`. Rebuilt from Challonge lazily on read past a status TTL, or immediately when `version` moves (an admin mutation). Workers has no cron — this is the "refresh on read" cache |
 | External match (connected platform) | `external_matches` | a member's FACEIT / start.gg / Challonge matches for the pending personal calendar — flat per-user schedule rows: `provider`, `external_id`, `opponent_name`, `round`, `status` ∈ `scheduled` \| `live` \| `finished` \| `cancelled`, `scheduled_at`, optional `tournament_id`. `UNIQUE(user_id, provider, external_id)` (idempotent sync); indexed `(user_id, scheduled_at)` |
@@ -301,9 +301,9 @@ TEAM_DELETE_VOTES( *id, request_id→TEAM_DELETE_REQUESTS, user_id→USER, decis
 -- Tournaments (Challonge-backed; Challonge owns bracket/matches/standings)
 TOURNAMENTS(     *id, program_id→PROGRAMS, game_id→GAMES?, source, external_id?, external_url?,
                  name, format, status, max_participants?, best_of, swiss_rounds?,
-                 third_place_match, starts_at?, ends_at?, registration_opens_at?,
-                 registration_closes_at?, roster_lock_at?, rules_url?, version,
-                 bracket_generated_at?,
+                 third_place_match, academic_verification_required, starts_at?,
+                 ends_at?, registration_opens_at?, registration_closes_at?,
+                 roster_lock_at?, rules_url?, version, bracket_generated_at?,
                  UNIQUE(source, external_id) )
 TOURNAMENT_PARTICIPANTS( *id, tournament_id→TOURNAMENTS, team_id→TEAMS?, user_id→USER?,
                  registered_by_user_id→USER?, challonge_participant_id?, seed?,

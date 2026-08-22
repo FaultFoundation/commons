@@ -87,6 +87,7 @@ export async function createTournament(input: {
   name: string;
   format: string;
   maxParticipants?: number;
+  academicVerificationRequired?: boolean;
 }): Promise<ActionResult<{ tournamentId: string }>> {
   const gate = await requireActor();
   if (!gate.ok) return gate;
@@ -132,6 +133,7 @@ export async function createTournament(input: {
     format: input.format,
     status: "draft",
     maxParticipants,
+    academicVerificationRequired: input.academicVerificationRequired ?? true,
     createdAt: now,
     updatedAt: now,
   });
@@ -159,6 +161,7 @@ export async function updateTournamentSettings(
     rosterLockAt?: string;
     swissRounds?: number;
     thirdPlaceMatch?: boolean;
+    academicVerificationRequired?: boolean;
   },
 ): Promise<ActionResult> {
   const gate = await requireActor();
@@ -206,6 +209,10 @@ export async function updateTournamentSettings(
   if (patch.thirdPlaceMatch !== undefined) {
     fields.thirdPlaceMatch = patch.thirdPlaceMatch;
     challongeAttrs.hold_third_place_match = patch.thirdPlaceMatch;
+  }
+  if (patch.academicVerificationRequired !== undefined) {
+    // Our own gate (checked at registration); nothing to push to Challonge.
+    fields.academicVerificationRequired = patch.academicVerificationRequired;
   }
   if (patch.rulesUrl !== undefined) {
     if (patch.rulesUrl.trim()) {

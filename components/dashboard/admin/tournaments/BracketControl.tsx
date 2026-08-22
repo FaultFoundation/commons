@@ -74,7 +74,7 @@ export function BracketControl({
         </p>
         <div className="ff-row__buttons">
           <button
-            className="ff-btn ff-btn--outline ff-btn--sm"
+            className="ff-btn ff-btn--soft ff-btn--sm"
             type="button"
             disabled={pending || status !== "seeding" || entrantCount < 2}
             onClick={start}
@@ -187,7 +187,7 @@ function ResultRow({
               <option value={match.player2Id!}>{bName}</option>
             </select>
             <button
-              className="ff-btn ff-btn--outline ff-btn--sm"
+              className="ff-btn ff-btn--soft ff-btn--sm"
               type="button"
               disabled={pending}
               onClick={report}

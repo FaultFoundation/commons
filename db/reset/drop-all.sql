@@ -25,7 +25,14 @@ DROP TABLE IF EXISTS lfg_connections;
 DROP TABLE IF EXISTS team_listings;
 DROP TABLE IF EXISTS lfg_profiles;
 
--- Layer 8 — tournaments (Challonge-backed) + the personal-calendar mirror
+-- Layer 8 — tournaments (Challonge-backed) + the personal-calendar mirror.
+-- Also drops the removed self-hosted engine tables (matches/match_games/stages):
+-- the baseline migrations still create them before 0013 drops them, and a
+-- database left on the pre-Challonge schema still has them — DROP ... IF EXISTS
+-- makes clearing them harmless either way. Children before parents.
+DROP TABLE IF EXISTS match_games;
+DROP TABLE IF EXISTS matches;
+DROP TABLE IF EXISTS stages;
 DROP TABLE IF EXISTS external_matches;
 DROP TABLE IF EXISTS tournament_brackets;
 DROP TABLE IF EXISTS tournament_participants;

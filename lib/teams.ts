@@ -342,6 +342,25 @@ export async function joinConflicts(
     );
 }
 
+/**
+ * Emails allowed to bypass the one-team-per-tournament rule.
+ *
+ * TEST-ONLY escape hatch: a single account can flood a tournament with entries
+ * to exercise the bracket, which a real member (limited to one team per
+ * tournament) can't. Remove this before a public launch.
+ */
+const ENTRY_LIMIT_EXEMPT_EMAILS = new Set(["oscar.labit@fault.foundation"]);
+
+export async function isEntryLimitExempt(userId: string): Promise<boolean> {
+  const rows = await getDb()
+    .select({ email: user.email })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+  const email = rows[0]?.email?.toLowerCase();
+  return email ? ENTRY_LIMIT_EXEMPT_EMAILS.has(email) : false;
+}
+
 export type EntryConflict = { playerName: string; teamName: string };
 
 /**

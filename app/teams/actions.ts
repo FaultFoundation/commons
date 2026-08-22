@@ -37,6 +37,7 @@ import {
   getManagerUserIds,
   getTeamMembership,
   inviteProblem,
+  isEntryLimitExempt,
   isVerifiedMember,
   joinConflicts,
   nameTaken,
@@ -716,7 +717,10 @@ export async function enterTournament(
     }
   }
 
-  const conflicts = await entryConflicts(teamId, tournamentId);
+  // One team per tournament — bypassed for the test allowlist so brackets can
+  // be exercised with many entries from one account.
+  const exempt = await isEntryLimitExempt(userId);
+  const conflicts = exempt ? [] : await entryConflicts(teamId, tournamentId);
   if (conflicts.length) {
     const names = conflicts.map((c) => `${c.playerName} (${c.teamName})`);
     return {

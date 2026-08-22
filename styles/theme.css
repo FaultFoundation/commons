@@ -2991,3 +2991,99 @@ button.ff-dash__link:hover {
 .ff-bracket__slot--winner {
   background: rgba(255, 238, 88, 0.08);
 }
+
+/* ===========================================================================
+   Tournament page refinements (round 7): drop the accent bar next to bracket
+   section titles, participant cards (seed in the corner), the hero entry CTA,
+   and the entry-management dialog rows.
+   =========================================================================== */
+
+/* Requested: no yellow line next to the bracket section titles. */
+.ff-bracket__section-title {
+  border-left: 0;
+  padding-left: 0;
+}
+
+/* Entry CTA pinned to the hero banner's top-right (blue button). */
+.ff-thero__cta {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+}
+
+/* Participant cards — team name is the emphasis, seed is a small number in the
+   top-right corner, with a slot for the average SR we're adding soon. */
+.ff-pcard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.ff-pcard {
+  position: relative;
+  padding: 12px 14px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-surface-2);
+}
+.ff-pcard__seed {
+  position: absolute;
+  top: 8px;
+  right: 11px;
+  font-size: var(--ff-dash-text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ff-text-dim);
+}
+.ff-pcard__name {
+  padding-right: 22px;
+  font-size: var(--ff-dash-text-md);
+  font-weight: 700;
+}
+.ff-pcard__sr {
+  margin-top: 6px;
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+}
+.ff-pcard__sr-val {
+  color: #dfe9f4;
+  font-weight: 700;
+}
+
+/* Entry-management dialog rows. */
+.ff-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ff-entry__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ff-entry__name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+}
+.ff-entry__tag {
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-entry__tag--in {
+  color: var(--ff-ok);
+}
+.ff-dialog__hint {
+  margin: 4px 0 0;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-entry__row .ff-auth__input {
+  flex: 1;
+}
+
+/* A subtle white divider under each bracket section title (Winners / Losers /
+   Results) to visually separate the sections. */
+.ff-bracket__section-title {
+  border-bottom: 1px solid var(--ff-border);
+  padding-bottom: 8px;
+}

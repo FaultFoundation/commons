@@ -104,6 +104,7 @@ export function BracketView({
 
       <Standings
         participants={snapshot.participants}
+        matches={snapshot.matches}
         completed={snapshot.tournament.status === "completed"}
       />
     </div>
@@ -278,39 +279,73 @@ function Slot({
   );
 }
 
+/**
+ * A Challonge-style results table: rank, team, match record, points. Records
+ * are computed from the completed matches in the snapshot — we track teams, not
+ * individual players, so none are listed. Points = match wins.
+ */
 function Standings({
   participants,
+  matches,
   completed,
 }: {
   participants: SnapshotParticipant[];
+  matches: SnapshotMatch[];
   completed: boolean;
 }) {
   if (!participants.length) return null;
-  const ranked = [...participants].sort((a, b) => {
-    if (a.finalRank != null && b.finalRank != null) return a.finalRank - b.finalRank;
-    if (a.finalRank != null) return -1;
-    if (b.finalRank != null) return 1;
-    return (a.seed ?? 999) - (b.seed ?? 999);
-  });
+
+  const record = new Map<string, { w: number; l: number }>();
+  for (const p of participants) record.set(p.id, { w: 0, l: 0 });
+  for (const m of matches) {
+    if (m.state !== "complete" || !m.winnerId) continue;
+    const won = record.get(m.winnerId);
+    if (won) won.w += 1;
+    const loserId =
+      m.winnerId === m.player1Id ? m.player2Id : m.player1Id;
+    const lost = loserId ? record.get(loserId) : undefined;
+    if (lost) lost.l += 1;
+  }
+
+  const anyPlayed = matches.some((m) => m.state === "complete");
+  const rows = participants
+    .map((p) => {
+      const r = record.get(p.id) ?? { w: 0, l: 0 };
+      return { ...p, w: r.w, l: r.l };
+    })
+    .sort((a, b) => {
+      if (a.finalRank != null && b.finalRank != null) {
+        return a.finalRank - b.finalRank;
+      }
+      if (a.finalRank != null) return -1;
+      if (b.finalRank != null) return 1;
+      if (b.w !== a.w) return b.w - a.w;
+      if (a.l !== b.l) return a.l - b.l;
+      return (a.seed ?? 999) - (b.seed ?? 999);
+    });
 
   return (
     <section className="ff-bracket__section">
-      <h2 className="ff-bracket__section-title">
-        {completed ? "Final Standings" : "Entrants"}
-      </h2>
+      <h2 className="ff-bracket__section-title">Results</h2>
       <div className="ff-ticket-table-wrap">
         <table className="ff-ticket-table">
           <thead>
             <tr>
-              <th scope="col">{completed ? "Place" : "Seed"}</th>
-              <th scope="col">Entrant</th>
+              <th scope="col">#</th>
+              <th scope="col">Team</th>
+              <th scope="col">W–L</th>
+              <th scope="col">Pts</th>
             </tr>
           </thead>
           <tbody>
-            {ranked.map((p) => (
+            {rows.map((p, index) => (
               <tr key={p.id}>
-                <td>{completed ? (p.finalRank ?? "—") : (p.seed ?? "—")}</td>
+                <td>
+                  {completed && p.finalRank != null ? p.finalRank : index + 1}
+                </td>
                 <td>{p.name}</td>
+                <td>{anyPlayed ? `${p.w}–${p.l}` : "—"}</td>
+                <td>{anyPlayed ? p.w : "—"}</td>
               </tr>
             ))}
           </tbody>

@@ -4,7 +4,6 @@ import { notFound, redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
-import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { TournamentRegister } from "@/components/dashboard/tournaments/TournamentRegister";
 import { BracketView } from "@/components/tournaments/BracketView";
 import { getAuth } from "@/lib/auth";
@@ -88,6 +87,23 @@ export default async function TournamentPage({
                 : undefined
             }
           >
+            <div className="ff-thero__cta">
+              <TournamentRegister
+                tournamentId={tournament.id}
+                registrationOpen={registrationOpen}
+                academicVerificationRequired={
+                  tournament.academicVerificationRequired
+                }
+                teams={registerableTeams.map((t) => ({
+                  id: t.id,
+                  name: t.name,
+                  tag: t.tag,
+                  entered: t.entered,
+                  memberCount: t.memberCount,
+                  unverifiedCount: t.unverifiedCount,
+                }))}
+              />
+            </div>
             <div className="ff-thero__head">
               <span
                 className={`ff-thero__status${live ? " ff-thero__status--live" : ""}`}
@@ -168,47 +184,35 @@ export default async function TournamentPage({
           )}
         </Bubble>
 
-        {/* Bottom two columns: registration + participants. */}
-        <div className="ff-bubble-columns">
-          <div className="ff-bubble-column">
-            <Bubble title="Register">
-              <TournamentRegister
-                tournamentId={tournament.id}
-                registrationOpen={registrationOpen}
-                academicVerificationRequired={
-                  tournament.academicVerificationRequired
-                }
-                teams={registerableTeams.map((t) => ({
-                  id: t.id,
-                  name: t.name,
-                  tag: t.tag,
-                  entered: t.entered,
-                  memberCount: t.memberCount,
-                  unverifiedCount: t.unverifiedCount,
-                }))}
-              />
-            </Bubble>
-          </div>
-
-          <div className="ff-bubble-column">
-            <Bubble
-              title="Participants"
-              actions={<span className="ff-row__note">{participants.length}</span>}
-            >
-              {participants.length === 0 ? (
-                <p className="ff-auth__hint">No teams entered yet.</p>
-              ) : (
-                participants.map((p) => (
-                  <BubbleRow
-                    key={p.id}
-                    label={entrantLabel(p.teamName, p.teamTag)}
-                    note={p.seed ? `Seed ${p.seed}` : undefined}
-                  />
-                ))
-              )}
-            </Bubble>
-          </div>
-        </div>
+        {/* Participants — one card per team, seed as a small number in the
+            corner, plus a placeholder for the average SR we're adding soon. */}
+        <Bubble
+          title="Participants"
+          span="full"
+          actions={<span className="ff-row__note">{participants.length}</span>}
+        >
+          {participants.length === 0 ? (
+            <p className="ff-auth__hint">No teams entered yet.</p>
+          ) : (
+            <div className="ff-pcard-grid">
+              {participants.map((p) => (
+                <div className="ff-pcard" key={p.id}>
+                  {p.seed ? (
+                    <span className="ff-pcard__seed" title={`Seed ${p.seed}`}>
+                      {p.seed}
+                    </span>
+                  ) : null}
+                  <div className="ff-pcard__name">
+                    {entrantLabel(p.teamName, p.teamTag)}
+                  </div>
+                  <div className="ff-pcard__sr">
+                    Avg SR <span className="ff-pcard__sr-val">—</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Bubble>
       </div>
     </DashboardShell>
   );

@@ -25,14 +25,15 @@ export const AVATAR_ACCEPT = "image/png,image/jpeg,image/webp";
 /** Rejects a huge camera original before the browser tries to decode it. */
 export const AVATAR_MAX_SOURCE_BYTES = 10 * 1024 * 1024;
 
-export type AvatarScope = "user" | "team";
+export type AvatarScope = "user" | "team" | "tournament";
 
 export type PutResult =
   | { ok: true; url: string }
   | { ok: false; error: string };
 
 /** The one shape the serving route will resolve; anything else 404s. */
-const KEY_PATTERN = /^(user|team)\/[A-Za-z0-9_-]{1,64}\/[a-f0-9]{16}\.webp$/;
+const KEY_PATTERN =
+  /^(user|team|tournament)\/[A-Za-z0-9_-]{1,64}\/[a-f0-9]{16}\.webp$/;
 
 const URL_PREFIX = "/api/avatars/";
 

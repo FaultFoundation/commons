@@ -59,6 +59,8 @@ export default async function TournamentPage({
     tournament.registrationOpensAt?.getTime() ?? null,
     tournament.registrationClosesAt?.getTime() ?? null,
   );
+  const live =
+    tournament.status === "registration" || tournament.status === "active";
 
   const initial: BracketSnapshot | null = snapshot
     ? {
@@ -75,65 +77,85 @@ export default async function TournamentPage({
     <DashboardShell active="tournaments" setupUserId={session.user.id}>
       <h1 className="screen-reader-text">{tournament.name}</h1>
       <div className="ff-bubble-grid">
-        {/* Top: condensed info. */}
-        <Bubble
-          title={tournament.name}
-          span="full"
-          actions={
-            <span className="ff-badge">
-              {TOURNAMENT_STATUS_LABELS[tournament.status] ?? tournament.status}
-            </span>
-          }
-        >
-          <div className="ff-row__buttons ff-bubble__nav">
-            {tournament.rulesUrl ? (
+        {/* Hero: banner (or branded gradient) with the name over it, then a
+            description and a tight row of stats — no more full-width label rows. */}
+        <section className="ff-thero">
+          <div
+            className="ff-thero__banner"
+            style={
+              tournament.bannerUrl
+                ? { backgroundImage: `url(${tournament.bannerUrl})` }
+                : undefined
+            }
+          >
+            <div className="ff-thero__head">
+              <span
+                className={`ff-thero__status${live ? " ff-thero__status--live" : ""}`}
+              >
+                {TOURNAMENT_STATUS_LABELS[tournament.status] ?? tournament.status}
+              </span>
+              <h2 className="ff-thero__title">{tournament.name}</h2>
+            </div>
+          </div>
+          <div className="ff-thero__body">
+            {tournament.description ? (
+              <p className="ff-thero__desc">{tournament.description}</p>
+            ) : null}
+            <div className="ff-thero__stats">
+              <div className="ff-stat">
+                <span className="ff-stat__label">Format</span>
+                <span className="ff-stat__value">
+                  {TOURNAMENT_FORMAT_LABELS[tournament.format] ?? tournament.format}
+                </span>
+              </div>
+              <div className="ff-stat">
+                <span className="ff-stat__label">Entrants</span>
+                <span className="ff-stat__value ff-stat__value--hi">
+                  {participants.length}
+                  {tournament.maxParticipants
+                    ? ` / ${tournament.maxParticipants}`
+                    : ""}
+                </span>
+              </div>
+              {tournament.startsAt ? (
+                <div className="ff-stat">
+                  <span className="ff-stat__label">Starts</span>
+                  <span className="ff-stat__value">
+                    {tournament.startsAt.toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                </div>
+              ) : null}
+              <div className="ff-stat">
+                <span className="ff-stat__label">Verification</span>
+                <span className="ff-stat__value">
+                  {tournament.academicVerificationRequired ? "Required" : "Open"}
+                </span>
+              </div>
+            </div>
+            <div className="ff-row__buttons">
+              {tournament.rulesUrl ? (
+                <a
+                  className="ff-btn ff-btn--soft ff-btn--sm"
+                  href={tournament.rulesUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  Rules
+                </a>
+              ) : null}
               <a
                 className="ff-btn ff-btn--soft ff-btn--sm"
-                href={tournament.rulesUrl}
-                target="_blank"
-                rel="noreferrer noopener"
+                href={tournamentPath(tournament.id, tournament.name)}
               >
-                Rules
+                Share link
               </a>
-            ) : null}
-            <a
-              className="ff-btn ff-btn--soft ff-btn--sm"
-              href={tournamentPath(tournament.id, tournament.name)}
-            >
-              Share link
-            </a>
+            </div>
           </div>
-          <BubbleRow
-            label="Format"
-            value={
-              TOURNAMENT_FORMAT_LABELS[tournament.format] ?? tournament.format
-            }
-          />
-          <BubbleRow
-            label="Entrants"
-            value={
-              tournament.maxParticipants
-                ? `${participants.length} of ${tournament.maxParticipants}`
-                : String(participants.length)
-            }
-          />
-          {tournament.startsAt ? (
-            <BubbleRow
-              label="Starts"
-              value={tournament.startsAt.toLocaleDateString(undefined, {
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}
-            />
-          ) : null}
-          <BubbleRow
-            label="Academic verification"
-            value={
-              tournament.academicVerificationRequired ? "Required" : "Not required"
-            }
-          />
-        </Bubble>
+        </section>
 
         {/* Bracket. */}
         <Bubble title="Bracket" span="full">
@@ -180,7 +202,7 @@ export default async function TournamentPage({
                   <BubbleRow
                     key={p.id}
                     label={entrantLabel(p.teamName, p.teamTag)}
-                    value={p.seed ? `Seed ${p.seed}` : undefined}
+                    note={p.seed ? `Seed ${p.seed}` : undefined}
                   />
                 ))
               )}

@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 
 import { tournamentBrackets, tournaments, tournamentParticipants } from "@/db/schema";
 import { requireAdminUnlock } from "@/lib/admin-unlock";
+import { deleteAvatarByUrl, putAvatar } from "@/lib/avatars";
 import { getAuth } from "@/lib/auth";
 import {
   changeChallongeState,
@@ -162,6 +163,7 @@ export async function updateTournamentSettings(
     swissRounds?: number;
     thirdPlaceMatch?: boolean;
     academicVerificationRequired?: boolean;
+    description?: string;
   },
 ): Promise<ActionResult> {
   const gate = await requireActor();
@@ -213,6 +215,11 @@ export async function updateTournamentSettings(
   if (patch.academicVerificationRequired !== undefined) {
     // Our own gate (checked at registration); nothing to push to Challonge.
     fields.academicVerificationRequired = patch.academicVerificationRequired;
+  }
+  if (patch.description !== undefined) {
+    const description = patch.description.trim().slice(0, 500);
+    fields.description = description || null;
+    challongeAttrs.description = description;
   }
   if (patch.rulesUrl !== undefined) {
     if (patch.rulesUrl.trim()) {
@@ -529,6 +536,71 @@ export async function deleteTournament(tournamentId: string): Promise<ActionResu
     db.delete(tournamentParticipants).where(eq(tournamentParticipants.tournamentId, tournamentId)),
     db.delete(tournaments).where(eq(tournaments.id, tournamentId)),
   ]);
+  await deleteAvatarByUrl(tournament.bannerUrl);
+
+  revalidateTournament(tournamentId, tournament.name);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Hero banner — stored in the AVATARS R2 bucket under the "tournament" scope
+// ---------------------------------------------------------------------------
+
+export async function uploadTournamentBanner(
+  tournamentId: string,
+  form: FormData,
+): Promise<ActionResult> {
+  const gate = await requireActor();
+  if (!gate.ok) return gate;
+
+  const tournament = await getTournament(tournamentId);
+  if (!tournament) return { ok: false, error: "Tournament not found." };
+
+  const file = form.get("file");
+  if (!(file instanceof File)) {
+    return { ok: false, error: "Choose an image to upload." };
+  }
+
+  const stored = await putAvatar(
+    "tournament",
+    tournamentId,
+    await file.arrayBuffer(),
+  );
+  if (!stored.ok) return stored;
+
+  await getDb()
+    .update(tournaments)
+    .set({
+      bannerUrl: stored.url,
+      version: tournament.version + 1,
+      updatedAt: new Date(),
+    })
+    .where(eq(tournaments.id, tournamentId));
+
+  // Content-addressed keys: re-uploading the same image lands on the key we
+  // just wrote, so only delete a genuinely different previous banner.
+  if (tournament.bannerUrl && tournament.bannerUrl !== stored.url) {
+    await deleteAvatarByUrl(tournament.bannerUrl);
+  }
+
+  revalidateTournament(tournamentId, tournament.name);
+  return { ok: true };
+}
+
+export async function removeTournamentBanner(
+  tournamentId: string,
+): Promise<ActionResult> {
+  const gate = await requireActor();
+  if (!gate.ok) return gate;
+
+  const tournament = await getTournament(tournamentId);
+  if (!tournament) return { ok: false, error: "Tournament not found." };
+
+  await getDb()
+    .update(tournaments)
+    .set({ bannerUrl: null, version: tournament.version + 1, updatedAt: new Date() })
+    .where(eq(tournaments.id, tournamentId));
+  await deleteAvatarByUrl(tournament.bannerUrl);
 
   revalidateTournament(tournamentId, tournament.name);
   return { ok: true };

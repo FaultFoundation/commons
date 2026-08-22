@@ -657,6 +657,12 @@ export const tournaments = sqliteTable(
     })
       .notNull()
       .default(true),
+    // Short blurb shown under the name on the tournament hero (also synced to
+    // Challonge's `description`).
+    description: text("description"),
+    // Hero banner image — an /api/avatars/tournament/… path in the AVATARS R2
+    // bucket (lib/avatars.ts), or null for the branded-gradient fallback.
+    bannerUrl: text("banner_url"),
     rulesUrl: text("rules_url"),
     // Bumped on every mutating action; readers compare to detect stale state.
     version: integer("version").notNull().default(0),

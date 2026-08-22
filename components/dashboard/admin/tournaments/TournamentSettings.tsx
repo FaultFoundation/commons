@@ -86,10 +86,12 @@ function ErrorBanner({ error }: { error: string | null }): ReactNode {
 export function TournamentBasicInfo({
   tournamentId,
   name,
+  description,
   rulesUrl,
 }: {
   tournamentId: string;
   name: string;
+  description: string | null;
   rulesUrl: string | null;
 }) {
   const { error, saveField } = useTournamentPatch(tournamentId);
@@ -102,6 +104,15 @@ export function TournamentBasicInfo({
         inputLabel="Tournament name"
         maxLength={TOURNAMENT_NAME_MAX}
         onSave={saveField("name")}
+      />
+      <FieldRow
+        label="Description"
+        value={description ?? ""}
+        inputLabel="Short description"
+        maxLength={500}
+        required={false}
+        placeholder="A short blurb shown under the name."
+        onSave={saveField("description")}
       />
       <FieldRow
         label="Rules Link"

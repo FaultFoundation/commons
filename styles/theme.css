@@ -2848,7 +2848,7 @@ button.ff-dash__link:hover {
     background var(--ff-transition);
 }
 .ff-switch--on {
-  background: var(--ff-accent);
+  background: #fff;
   border-color: transparent;
 }
 .ff-switch--on .ff-switch__thumb {
@@ -2862,4 +2862,132 @@ button.ff-dash__link:hover {
 .ff-switch:focus-visible {
   outline: 2px solid var(--ff-accent);
   outline-offset: 2px;
+}
+
+/* ===========================================================================
+   Tournament hero — the big top card on /tournaments/<id>/. A banner image (or
+   the branded gradient) with the name over it, then a description and a tight
+   stat row, replacing the old stack of full-width label/value rows.
+   =========================================================================== */
+
+.ff-thero {
+  grid-column: 1 / -1;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-lg);
+  background: var(--ff-surface-2);
+  overflow: hidden;
+}
+.ff-thero__banner {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: 200px;
+  background: var(--ff-grad-brand) center / cover no-repeat;
+}
+/* Legibility scrim so the title reads over any banner. */
+.ff-thero__banner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(0, 10, 25, 0.85),
+    rgba(0, 10, 25, 0.15) 55%,
+    rgba(0, 10, 25, 0.05)
+  );
+}
+.ff-thero__head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 22px 24px;
+}
+.ff-thero__status {
+  align-self: flex-start;
+  padding: 3px 11px;
+  border-radius: var(--ff-radius-pill);
+  background: rgba(0, 0, 0, 0.38);
+  color: #fff;
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.ff-thero__status--live {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
+}
+.ff-thero__title {
+  margin: 0;
+  font-size: clamp(1.6rem, 4vw, 2.3rem);
+  font-weight: 800;
+  line-height: 1.08;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+.ff-thero__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 20px 18px;
+}
+.ff-thero__desc {
+  margin: 0;
+  max-width: 72ch;
+  font-size: var(--ff-dash-text-md);
+  color: var(--ff-text-dim);
+}
+.ff-thero__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 30px;
+}
+.ff-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ff-stat__label {
+  font-size: var(--ff-dash-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ff-text-dim);
+}
+.ff-stat__value {
+  font-size: var(--ff-dash-text-lg);
+  font-weight: 800;
+}
+.ff-stat__value--hi {
+  color: var(--ff-accent);
+}
+
+/* Small banner preview on the admin Banner row. */
+.ff-banner-thumb {
+  display: block;
+  width: 64px;
+  height: 36px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-surface-2) center / cover no-repeat;
+}
+
+/* More yellow in the bracket: a section accent bar, live matches called out in
+   accent (border + left bar + a "Ready" pill), and a subtle tint on winners. */
+.ff-bracket__section-title {
+  border-left: 3px solid var(--ff-accent);
+  padding-left: 10px;
+}
+.ff-bracket__match[data-state="open"] {
+  border-color: var(--ff-accent);
+  box-shadow: inset 3px 0 0 var(--ff-accent);
+}
+.ff-bracket__match[data-state="open"] .ff-bracket__match-state {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
+  font-weight: 700;
+}
+.ff-bracket__slot--winner {
+  background: rgba(255, 238, 88, 0.08);
 }

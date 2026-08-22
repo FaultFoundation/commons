@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
+import { BannerUploadRow } from "@/components/dashboard/admin/tournaments/BannerUploadRow";
 import { BracketControl } from "@/components/dashboard/admin/tournaments/BracketControl";
 import { SeedEditor } from "@/components/dashboard/admin/tournaments/SeedEditor";
 import { TournamentDanger } from "@/components/dashboard/admin/tournaments/TournamentDanger";
@@ -127,7 +128,12 @@ async function TournamentContent({ tournamentId }: { tournamentId: string }) {
         <TournamentBasicInfo
           tournamentId={tournament.id}
           name={tournament.name}
+          description={tournament.description}
           rulesUrl={tournament.rulesUrl}
+        />
+        <BannerUploadRow
+          tournamentId={tournament.id}
+          currentUrl={tournament.bannerUrl}
         />
       </Bubble>
 

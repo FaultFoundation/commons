@@ -54,6 +54,8 @@ export type TournamentRow = {
   swissRounds: number | null;
   thirdPlaceMatch: boolean;
   academicVerificationRequired: boolean;
+  description: string | null;
+  bannerUrl: string | null;
   rulesUrl: string | null;
   version: number;
   bracketGeneratedAt: Date | null;

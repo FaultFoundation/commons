@@ -14,6 +14,7 @@ export function Bubble({
   className,
   media,
   actions,
+  dragHandle,
   children,
   ...rest
 }: {
@@ -34,12 +35,17 @@ export function Bubble({
   media?: ReactNode;
   /** Right side of the header: a badge, count, or small button. */
   actions?: ReactNode;
+  /** A reorder grip, pinned bottom-right. Pass a <DragGrip> from a
+      useReorderableGrid() when this bubble is one of a draggable set — the
+      standard "drag to move this tile" affordance. Presence alone shows it. */
+  dragHandle?: ReactNode;
   children?: ReactNode;
   /** Anything else lands on the <section>: drag handlers, aria-*, data-*. */
 } & Omit<ComponentPropsWithoutRef<"section">, "id" | "title" | "className">) {
   const classes = ["ff-card", "ff-bubble"];
   if (variant !== "default") classes.push(`ff-bubble--${variant}`);
   if (span === "full") classes.push("ff-bubble--full");
+  if (dragHandle) classes.push("ff-bubble--has-grip");
   if (className) classes.push(className);
 
   return (
@@ -52,6 +58,7 @@ export function Bubble({
         {actions ? <div className="ff-bubble__actions">{actions}</div> : null}
       </header>
       <div className="ff-bubble__body">{children}</div>
+      {dragHandle ? <div className="ff-bubble__grip">{dragHandle}</div> : null}
     </section>
   );
 }

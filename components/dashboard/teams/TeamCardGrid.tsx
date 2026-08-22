@@ -1,74 +1,34 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useTransition, type DragEvent } from "react";
-
 import { reorderMyTeams } from "@/app/teams/actions";
 import { Avatar } from "@/components/dashboard/Avatar";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
+import { DragGrip } from "@/components/dashboard/bubbles/DragGrip";
+import { useReorderableGrid } from "@/components/dashboard/bubbles/useReorderableGrid";
 import { CopyInviteButton } from "@/components/dashboard/teams/CopyInviteButton";
 import type { MyTeam } from "@/lib/teams";
 import { TEAM_ROLE_LABELS } from "@/lib/teams-shared";
-
-/** Pure move-one-item helper, so drag and the arrow buttons share the logic. */
-function move(teams: MyTeam[], from: number, to: number): MyTeam[] {
-  if (from === to || to < 0 || to >= teams.length) return teams;
-  const next = [...teams];
-  const [card] = next.splice(from, 1);
-  next.splice(to, 0, card);
-  return next;
-}
 
 /**
  * The member's teams, in their own order, rearrangeable.
  *
  * The server page still does every read and hands down plain `MyTeam[]`; this
- * component owns nothing but the order. The first card always spans the grid
- * (the universal top-bubble rule), which makes "drag a team to the front"
- * double as "feature this team".
+ * component owns nothing but the order (via the shared useReorderableGrid
+ * template). The first card always spans the grid (the universal top-bubble
+ * rule), which makes "drag a team to the front" double as "feature this team".
  *
- * Pointer drag is the fast path, but drag events are pointer-only — the Move
- * up / Move down buttons in each header are the keyboard and screen-reader
- * path, and both drive the same reorder.
+ * A drag starts only from the grip in each card's bottom-right; the Move up /
+ * Move down buttons in the header are the keyboard and screen-reader path, and
+ * both drive the same reorder.
  */
 export function TeamCardGrid({ teams: initial }: { teams: MyTeam[] }) {
-  const router = useRouter();
-  const [, startTransition] = useTransition();
-  const [teams, setTeams] = useState(initial);
-  const [dragging, setDragging] = useState<string | null>(null);
-  const [over, setOver] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  /** Optimistic: the grid rearranges now, and rolls back only if D1 refuses. */
-  function commit(next: MyTeam[]) {
-    if (next === teams) return;
-    const previous = teams;
-    setTeams(next);
-    setError(null);
-
-    startTransition(async () => {
-      const result = await reorderMyTeams(next.map((team) => team.id));
-      if (!result.ok) {
-        setTeams(previous);
-        setError(result.error);
-        return;
-      }
-      router.refresh();
+  const { order, error, reorder, bubbleProps, handleProps } =
+    useReorderableGrid({
+      items: initial,
+      getId: (team) => team.id,
+      onReorder: (ids) => reorderMyTeams(ids),
     });
-  }
-
-  function reorder(from: number, to: number) {
-    commit(move(teams, from, to));
-  }
-
-  function onDrop(event: DragEvent, index: number) {
-    event.preventDefault();
-    const from = teams.findIndex((team) => team.id === dragging);
-    setDragging(null);
-    setOver(null);
-    if (from !== -1) reorder(from, index);
-  }
 
   return (
     <>
@@ -79,105 +39,78 @@ export function TeamCardGrid({ teams: initial }: { teams: MyTeam[] }) {
       ) : null}
 
       <div className="ff-bubble-grid">
-        {teams.map((team, index) => {
-          const classes = ["ff-bubble--draggable"];
-          if (team.id === dragging) classes.push("ff-bubble--dragging");
-          if (team.id === over && team.id !== dragging) {
-            classes.push("ff-bubble--dropzone");
-          }
-
-          return (
-            <Bubble
-              key={team.id}
-              // The universal top-bubble rule, applied to whatever the member
-              // dragged into first place.
-              span={index === 0 ? "full" : undefined}
-              className={classes.join(" ")}
-              title={team.tag ? `${team.name} [${team.tag}]` : team.name}
-              media={
-                <Avatar
-                  src={team.logoUrl}
-                  name={team.name}
-                  shape="team"
-                  size="md"
-                />
+        {order.map((team, index) => (
+          <Bubble
+            key={team.id}
+            // The universal top-bubble rule, applied to whatever the member
+            // dragged into first place.
+            span={index === 0 ? "full" : undefined}
+            title={team.tag ? `${team.name} [${team.tag}]` : team.name}
+            media={
+              <Avatar src={team.logoUrl} name={team.name} shape="team" size="md" />
+            }
+            dragHandle={
+              <DragGrip {...handleProps(index)} label={`Move ${team.name}`} />
+            }
+            {...bubbleProps(index)}
+            actions={
+              <>
+                <span className="ff-reorder" role="group" aria-label="Reorder">
+                  <button
+                    className="ff-reorder__btn"
+                    type="button"
+                    disabled={index === 0}
+                    title="Move up"
+                    onClick={() => reorder(index, index - 1)}
+                  >
+                    <span className="screen-reader-text">Move {team.name} up</span>
+                    <Chevron up />
+                  </button>
+                  <button
+                    className="ff-reorder__btn"
+                    type="button"
+                    disabled={index === order.length - 1}
+                    title="Move down"
+                    onClick={() => reorder(index, index + 1)}
+                  >
+                    <span className="screen-reader-text">
+                      Move {team.name} down
+                    </span>
+                    <Chevron />
+                  </button>
+                </span>
+                <span className={`ff-badge ff-badge--${team.role}`}>
+                  {TEAM_ROLE_LABELS[team.role]}
+                </span>
+              </>
+            }
+          >
+            <BubbleRow
+              label="Roster"
+              value={`${team.memberCount} ${team.memberCount === 1 ? "member" : "members"}`}
+              note={team.collegeName ?? undefined}
+            />
+            <BubbleRow
+              label="Tournaments"
+              value={
+                team.tournaments.length
+                  ? team.tournaments.join(", ")
+                  : "Not entered"
               }
-              draggable
-              onDragStart={() => setDragging(team.id)}
-              onDragEnd={() => {
-                setDragging(null);
-                setOver(null);
-              }}
-              onDragOver={(event: DragEvent) => {
-                // Without preventDefault the browser refuses the drop.
-                event.preventDefault();
-                setOver(team.id);
-              }}
-              onDragLeave={() => setOver((id) => (id === team.id ? null : id))}
-              onDrop={(event: DragEvent) => onDrop(event, index)}
-              actions={
-                <>
-                  <span className="ff-reorder" role="group" aria-label="Reorder">
-                    <button
-                      className="ff-reorder__btn"
-                      type="button"
-                      disabled={index === 0}
-                      title="Move up"
-                      onClick={() => reorder(index, index - 1)}
-                    >
-                      <span className="screen-reader-text">
-                        Move {team.name} up
-                      </span>
-                      <Chevron up />
-                    </button>
-                    <button
-                      className="ff-reorder__btn"
-                      type="button"
-                      disabled={index === teams.length - 1}
-                      title="Move down"
-                      onClick={() => reorder(index, index + 1)}
-                    >
-                      <span className="screen-reader-text">
-                        Move {team.name} down
-                      </span>
-                      <Chevron />
-                    </button>
-                  </span>
-                  <span className={`ff-badge ff-badge--${team.role}`}>
-                    {TEAM_ROLE_LABELS[team.role]}
-                  </span>
-                </>
-              }
-            >
-              <BubbleRow
-                label="Roster"
-                value={`${team.memberCount} ${team.memberCount === 1 ? "member" : "members"}`}
-                note={team.collegeName ?? undefined}
-              />
-              <BubbleRow
-                label="Tournaments"
-                value={
-                  team.tournaments.length
-                    ? team.tournaments.join(", ")
-                    : "Not entered"
-                }
-              />
-              <div className="ff-row__buttons">
-                {team.inviteToken ? (
-                  <CopyInviteButton token={team.inviteToken} small />
-                ) : null}
-                <a
-                  className="ff-btn ff-btn--outline ff-btn--sm"
-                  href={`/teams/${team.id}/`}
-                  // A card-wide drag would otherwise start from the link.
-                  draggable={false}
-                >
-                  {team.inviteToken ? "Manage" : "Open"}
-                </a>
-              </div>
-            </Bubble>
-          );
-        })}
+            />
+            <div className="ff-row__buttons">
+              {team.inviteToken ? (
+                <CopyInviteButton token={team.inviteToken} small />
+              ) : null}
+              <a
+                className="ff-btn ff-btn--outline ff-btn--sm"
+                href={`/teams/${team.id}/`}
+              >
+                {team.inviteToken ? "Manage" : "Open"}
+              </a>
+            </div>
+          </Bubble>
+        ))}
       </div>
     </>
   );

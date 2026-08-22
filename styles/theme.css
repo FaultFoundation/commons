@@ -2654,3 +2654,164 @@ button.ff-dash__link:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* ===========================================================================
+   Tournament list — modern card grid + compact toggle. The card layout echoes
+   the marketing site's news grid: a rounded, slightly-raised card with a
+   branded banner (in place of a news thumbnail), then date, title and meta.
+   =========================================================================== */
+
+/* Header row above the list: filter chips left, view toggle right. */
+.ff-list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.ff-list-head .ff-ticket-views {
+  margin-bottom: 0;
+}
+
+/* Compact / modern segmented toggle. */
+.ff-viewtoggle {
+  display: inline-flex;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-pill);
+  overflow: hidden;
+}
+.ff-viewtoggle__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 10px;
+  background: transparent;
+  border: 0;
+  color: var(--ff-text-dim);
+  cursor: pointer;
+  transition:
+    background var(--ff-transition),
+    color var(--ff-transition);
+}
+.ff-viewtoggle__btn + .ff-viewtoggle__btn {
+  border-left: 1px solid var(--ff-border);
+}
+.ff-viewtoggle__btn:hover {
+  color: #fff;
+}
+.ff-viewtoggle__btn[aria-pressed="true"] {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
+}
+
+/* The card grid. */
+.ff-tcard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+.ff-tcard {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-lg);
+  background: var(--ff-surface-2);
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition:
+    transform var(--ff-transition),
+    border-color var(--ff-transition),
+    box-shadow var(--ff-transition);
+}
+.ff-tcard:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: var(--ff-shadow-card);
+}
+.ff-tcard__banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 68px;
+  padding: 12px 14px;
+  background: var(--ff-grad-brand);
+}
+.ff-tcard__format {
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+.ff-tcard__status {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: var(--ff-radius-pill);
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ff-tcard__status--live {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
+}
+.ff-tcard__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px 14px;
+}
+.ff-tcard__date {
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-tcard__title {
+  margin: 0;
+  font-size: var(--ff-dash-text-lg);
+  font-weight: 800;
+  line-height: 1.25;
+}
+.ff-tcard__meta {
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+}
+
+/* ===========================================================================
+   Reorder grip — the reusable "drag this tile" handle (components/dashboard/
+   bubbles/DragGrip.tsx + useReorderableGrid.ts + the Bubble `dragHandle` slot).
+   The grip is pinned bottom-right; a drag only starts from it.
+   =========================================================================== */
+
+.ff-bubble--has-grip {
+  position: relative;
+}
+.ff-bubble__grip {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  line-height: 0;
+}
+.ff-drag-grip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  color: var(--ff-text-dim);
+  cursor: grab;
+  /* Keep the pointer gesture a drag, not a scroll/select, so arming is clean. */
+  touch-action: none;
+  opacity: 0.7;
+  transition:
+    color var(--ff-transition),
+    opacity var(--ff-transition);
+}
+.ff-drag-grip:hover {
+  color: #fff;
+  opacity: 1;
+}
+.ff-drag-grip:active {
+  cursor: grabbing;
+}

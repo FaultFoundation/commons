@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
+import { ShareBar } from "@/components/dashboard/tournaments/ShareBar";
 import { TournamentRegister } from "@/components/dashboard/tournaments/TournamentRegister";
 import { BracketView } from "@/components/tournaments/BracketView";
 import { getAuth } from "@/lib/auth";
@@ -38,7 +39,8 @@ export default async function TournamentPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  const hdrs = await headers();
+  const session = await getAuth().api.getSession({ headers: hdrs });
   if (!session) redirect("/login/");
   if (!isTournamentId(id)) notFound();
 
@@ -60,6 +62,12 @@ export default async function TournamentPage({
   );
   const live =
     tournament.status === "registration" || tournament.status === "active";
+
+  // The public share link (short, no slug), absolute so share intents work.
+  const host = hdrs.get("host") ?? "commons.fault.foundation";
+  const shareUrl = `https://${host}${tournamentPath(tournament.id)}`;
+  // Placeholder default share message — swap for the copy the org wants.
+  const shareMessage = `🏆 ${tournament.name} is live on The Fault Foundation — follow the bracket!`;
 
   const initial: BracketSnapshot | null = snapshot
     ? {
@@ -87,23 +95,6 @@ export default async function TournamentPage({
                 : undefined
             }
           >
-            <div className="ff-thero__cta">
-              <TournamentRegister
-                tournamentId={tournament.id}
-                registrationOpen={registrationOpen}
-                academicVerificationRequired={
-                  tournament.academicVerificationRequired
-                }
-                teams={registerableTeams.map((t) => ({
-                  id: t.id,
-                  name: t.name,
-                  tag: t.tag,
-                  entered: t.entered,
-                  memberCount: t.memberCount,
-                  unverifiedCount: t.unverifiedCount,
-                }))}
-              />
-            </div>
             <div className="ff-thero__head">
               <span
                 className={`ff-thero__status${live ? " ff-thero__status--live" : ""}`}
@@ -151,8 +142,25 @@ export default async function TournamentPage({
                   {tournament.academicVerificationRequired ? "Required" : "Open"}
                 </span>
               </div>
+              <div className="ff-thero__stats-cta">
+                <TournamentRegister
+                  tournamentId={tournament.id}
+                  registrationOpen={registrationOpen}
+                  academicVerificationRequired={
+                    tournament.academicVerificationRequired
+                  }
+                  teams={registerableTeams.map((t) => ({
+                    id: t.id,
+                    name: t.name,
+                    tag: t.tag,
+                    entered: t.entered,
+                    memberCount: t.memberCount,
+                    unverifiedCount: t.unverifiedCount,
+                  }))}
+                />
+              </div>
             </div>
-            <div className="ff-row__buttons">
+            <div className="ff-thero__actions">
               {tournament.rulesUrl ? (
                 <a
                   className="ff-btn ff-btn--soft ff-btn--sm"
@@ -163,18 +171,32 @@ export default async function TournamentPage({
                   Rules
                 </a>
               ) : null}
-              <a
-                className="ff-btn ff-btn--soft ff-btn--sm"
-                href={tournamentPath(tournament.id, tournament.name)}
-              >
-                Share link
-              </a>
+              <ShareBar
+                url={shareUrl}
+                title={tournament.name}
+                message={shareMessage}
+              />
             </div>
           </div>
         </section>
 
         {/* Bracket. */}
-        <Bubble title="Bracket" span="full">
+        <Bubble
+          title="Bracket"
+          span="full"
+          actions={
+            tournament.externalUrl ? (
+              <a
+                className="ff-btn ff-btn--soft ff-btn--sm"
+                href={tournament.externalUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                View on Challonge
+              </a>
+            ) : undefined
+          }
+        >
           {initial ? (
             <BracketView tournamentId={tournament.id} initial={initial} />
           ) : (

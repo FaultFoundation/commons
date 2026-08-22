@@ -79,19 +79,6 @@ export function BracketView({
 
   return (
     <div className="ff-bracket">
-      {snapshot.tournament.challongeUrl ? (
-        <p className="ff-bracket__source">
-          <a
-            className="ff-btn ff-btn--soft ff-btn--sm"
-            href={snapshot.tournament.challongeUrl}
-            target="_blank"
-            rel="noreferrer noopener"
-          >
-            View on Challonge
-          </a>
-        </p>
-      ) : null}
-
       {snapshot.matches.length === 0 ? (
         <p className="ff-ticket-empty">
           The bracket isn&apos;t live yet — check back once play begins.
@@ -115,6 +102,40 @@ export function BracketView({
 // Elimination — winners (and, for double-elim, losers) brackets as columns.
 // ---------------------------------------------------------------------------
 
+type RoundGroup = { round: number; matches: SnapshotMatch[] };
+type RoundKind = "winners" | "losers" | "rr";
+
+/** Group matches into rounds (winners keep their round; losers use |round|),
+    each round's matches in play order. */
+function groupRounds(
+  matches: SnapshotMatch[],
+  byRound: (round: number) => number,
+): RoundGroup[] {
+  const groups = new Map<number, SnapshotMatch[]>();
+  for (const m of matches) {
+    const key = byRound(m.round);
+    const list = groups.get(key) ?? [];
+    list.push(m);
+    groups.set(key, list);
+  }
+  return [...groups.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([round, list]) => ({
+      round,
+      matches: list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    }));
+}
+
+/** The last round is the Finals and the one before it the Semifinals; earlier
+    (and all round-robin / losers) rounds are just numbered. */
+function roundLabel(index: number, total: number, kind: RoundKind): string {
+  if (kind === "winners") {
+    if (index === total - 1) return "Finals";
+    if (index === total - 2 && total > 1) return "Semifinals";
+  }
+  return `Round ${index + 1}`;
+}
+
 function EliminationBracket({
   matches,
   nameById,
@@ -122,70 +143,26 @@ function EliminationBracket({
   matches: SnapshotMatch[];
   nameById: Map<string, SnapshotParticipant>;
 }) {
-  const winners = matches.filter((m) => m.side !== "L");
-  const losers = matches.filter((m) => m.side === "L");
+  const winners = useMemo(
+    () => groupRounds(matches.filter((m) => m.side !== "L"), (r) => r),
+    [matches],
+  );
+  const losers = useMemo(
+    () => groupRounds(matches.filter((m) => m.side === "L"), (r) => Math.abs(r)),
+    [matches],
+  );
 
   return (
     <>
-      <BracketColumns
-        title="Winners"
-        matches={winners}
-        nameById={nameById}
-        byRound={(r) => r}
-      />
+      {/* No title here — the page's "Bracket" bubble already names it. */}
+      <RoundGrid rounds={winners} nameById={nameById} kind="winners" />
       {losers.length ? (
-        <BracketColumns
-          title="Losers"
-          matches={losers}
-          nameById={nameById}
-          byRound={(r) => Math.abs(r)}
-        />
+        <section className="ff-bracket__section">
+          <h2 className="ff-bracket__section-title">Losers Bracket</h2>
+          <RoundGrid rounds={losers} nameById={nameById} kind="losers" />
+        </section>
       ) : null}
     </>
-  );
-}
-
-function BracketColumns({
-  title,
-  matches,
-  nameById,
-  byRound,
-}: {
-  title: string;
-  matches: SnapshotMatch[];
-  nameById: Map<string, SnapshotParticipant>;
-  byRound: (round: number) => number;
-}) {
-  const rounds = useMemo(() => {
-    const groups = new Map<number, SnapshotMatch[]>();
-    for (const m of matches) {
-      const key = byRound(m.round);
-      const list = groups.get(key) ?? [];
-      list.push(m);
-      groups.set(key, list);
-    }
-    return [...groups.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([round, list]) => ({
-        round,
-        matches: list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
-      }));
-  }, [matches, byRound]);
-
-  return (
-    <section className="ff-bracket__section">
-      <h2 className="ff-bracket__section-title">{title}</h2>
-      <div className="ff-bracket__rounds">
-        {rounds.map(({ round, matches: list }) => (
-          <div className="ff-bracket__round" key={round}>
-            <div className="ff-bracket__round-label">Round {round}</div>
-            {list.map((m) => (
-              <MatchCard key={m.id} match={m} nameById={nameById} />
-            ))}
-          </div>
-        ))}
-      </div>
-    </section>
   );
 }
 
@@ -200,29 +177,61 @@ function RoundList({
   matches: SnapshotMatch[];
   nameById: Map<string, SnapshotParticipant>;
 }) {
-  const rounds = useMemo(() => {
-    const groups = new Map<number, SnapshotMatch[]>();
-    for (const m of matches) {
-      const list = groups.get(m.round) ?? [];
-      list.push(m);
-      groups.set(m.round, list);
-    }
-    return [...groups.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([round, list]) => ({
-        round,
-        matches: list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
-      }));
-  }, [matches]);
+  const rounds = useMemo(() => groupRounds(matches, (r) => r), [matches]);
+  return <RoundGrid rounds={rounds} nameById={nameById} kind="rr" />;
+}
+
+/**
+ * The scrollable round columns. Round headers sit at the top, centered over each
+ * column and aligned across columns. On load the container scrolls so the
+ * *current* round (the earliest with an open match) is centered — clamped so a
+ * short bracket never leaves white space on the right.
+ */
+function RoundGrid({
+  rounds,
+  nameById,
+  kind,
+}: {
+  rounds: RoundGroup[];
+  nameById: Map<string, SnapshotParticipant>;
+  kind: RoundKind;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const currentIndex = useMemo(() => {
+    const i = rounds.findIndex((r) => r.matches.some((m) => m.state === "open"));
+    return i >= 0 ? i : rounds.length - 1;
+  }, [rounds]);
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const col = container.querySelector<HTMLElement>(
+      `[data-round-index="${currentIndex}"]`,
+    );
+    if (!col) return;
+    const target = col.offsetLeft + col.offsetWidth / 2 - container.clientWidth / 2;
+    const max = container.scrollWidth - container.clientWidth;
+    container.scrollLeft = Math.max(0, Math.min(target, max));
+  }, [currentIndex]);
 
   return (
-    <div className="ff-bracket__rounds">
-      {rounds.map(({ round, matches: list }) => (
-        <div className="ff-bracket__round" key={round}>
-          <div className="ff-bracket__round-label">Round {round}</div>
-          {list.map((m) => (
-            <MatchCard key={m.id} match={m} nameById={nameById} />
-          ))}
+    <div className="ff-bracket__rounds" ref={scrollRef}>
+      {rounds.map((r, index) => (
+        <div
+          className="ff-bracket__round"
+          data-round-index={index}
+          data-current={index === currentIndex ? "" : undefined}
+          key={r.round}
+        >
+          <div className="ff-bracket__round-label">
+            {roundLabel(index, rounds.length, kind)}
+          </div>
+          <div className="ff-bracket__round-matches">
+            {r.matches.map((m) => (
+              <MatchCard key={m.id} match={m} nameById={nameById} />
+            ))}
+          </div>
         </div>
       ))}
     </div>
@@ -243,6 +252,11 @@ function MatchCard({
   const [a, b] = splitScores(match.scores);
   return (
     <div className="ff-bracket__match" data-state={match.state}>
+      {match.order != null ? (
+        <span className="ff-bracket__match-no" title={`Match ${match.order}`}>
+          {match.order}
+        </span>
+      ) : null}
       <Slot
         name={nameById.get(match.player1Id ?? "")?.name ?? "TBD"}
         score={a}

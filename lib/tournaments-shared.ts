@@ -161,9 +161,11 @@ export function slugifyName(name: string): string {
   return slug || "tournament";
 }
 
-/** Canonical public path. The single builder — never interpolate `/t/` by hand. */
-export function tournamentPath(id: string, name: string): string {
-  return `/t/${id}/${slugifyName(name)}/`;
+/** Canonical public path — just the id, no cosmetic name slug (kept short and
+    rename-proof). The single builder — never interpolate `/t/` by hand. The
+    optional `name` arg is ignored; it stays for call-site compatibility. */
+export function tournamentPath(id: string, _name?: string): string {
+  return `/t/${id}/`;
 }
 
 // ---------------------------------------------------------------------------

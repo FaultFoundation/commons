@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { BracketView } from "@/components/tournaments/BracketView";
 import { getOrRefreshSnapshot, getTournament } from "@/lib/tournaments";
@@ -8,7 +8,6 @@ import {
   TOURNAMENT_STATUS_LABELS,
   isPublic,
   isTournamentId,
-  slugifyName,
   tournamentPath,
   type BracketSnapshot,
 } from "@/lib/tournaments-shared";
@@ -19,22 +18,19 @@ export const dynamic = "force-dynamic";
 const ORIGIN = "https://commons.fault.foundation";
 
 // ---------------------------------------------------------------------------
-// The public bracket, at /t/<id>/<name>/.
+// The public bracket, at /t/<id>/.
 //
 // Lives at /t/ rather than /tournaments/[…] because app/robots.ts disallows the
-// whole /tournaments/ prefix (the signed-in member tab). The id is the only
-// thing looked up; the name segment is cosmetic and re-derived on every render,
-// so a stale segment (renamed, or mistyped) redirects to the canonical path
-// rather than 404ing — no shared link ever dies.
-//
-// Deliberately signed-out-safe: no session read, nothing gated. A draft
+// whole /tournaments/ prefix (the signed-in member tab). The id is the whole
+// URL — no cosmetic name slug — so the link is short and never goes stale on a
+// rename. Deliberately signed-out-safe: no session read, nothing gated. A draft
 // tournament 404s so its existence stays private.
 // ---------------------------------------------------------------------------
 
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ id: string; slug: string }>;
+  params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
   const tournament = isTournamentId(id) ? await getTournament(id) : null;
@@ -44,7 +40,7 @@ export async function generateMetadata({
   }
 
   const format = TOURNAMENT_FORMAT_LABELS[tournament.format] ?? tournament.format;
-  const canonical = `${ORIGIN}${tournamentPath(tournament.id, tournament.name)}`;
+  const canonical = `${ORIGIN}${tournamentPath(tournament.id)}`;
 
   return {
     title: `${tournament.name} · The Commons`,
@@ -62,9 +58,9 @@ export async function generateMetadata({
 export default async function PublicBracketPage({
   params,
 }: {
-  params: Promise<{ id: string; slug: string }>;
+  params: Promise<{ id: string }>;
 }) {
-  const { id, slug } = await params;
+  const { id } = await params;
 
   if (!isTournamentId(id)) notFound();
 
@@ -72,12 +68,6 @@ export default async function PublicBracketPage({
   // A draft tournament is staff-only; 404 rather than 403 keeps its existence
   // out of the answer.
   if (!tournament || !isPublic(tournament.status)) notFound();
-
-  // Canonicalize the cosmetic segment. Done after the visibility check so a
-  // redirect can't be used to probe for drafts.
-  if (slug !== slugifyName(tournament.name)) {
-    redirect(tournamentPath(tournament.id, tournament.name));
-  }
 
   const snapshot = await getOrRefreshSnapshot(tournament);
   const initial: BracketSnapshot = {

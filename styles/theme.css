@@ -3087,3 +3087,123 @@ button.ff-dash__link:hover {
   border-bottom: 1px solid var(--ff-border);
   padding-bottom: 8px;
 }
+
+/* ===========================================================================
+   Bracket columns (round 8): round headers pinned at the top and centered over
+   each column, a small gray game number to the right of each match sitting on a
+   simple horizontal connector, and horizontal scrolling with the current round
+   auto-centered (handled in BracketView).
+   =========================================================================== */
+
+.ff-bracket__round {
+  justify-content: flex-start;
+  gap: 10px;
+}
+/* Header bar, centered over the column and aligned across columns. */
+.ff-bracket__round-label {
+  text-align: center;
+  padding: 7px 8px;
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-surface-2);
+  color: #dfe9f4;
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+  letter-spacing: normal;
+  text-transform: none;
+}
+/* Matches fill the column below the header, evenly spaced so pairs line up
+   between rounds. */
+.ff-bracket__round-matches {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 14px;
+}
+/* Let the game number and connectors sit outside the card. */
+.ff-bracket__match {
+  position: relative;
+  overflow: visible;
+}
+/* Simple horizontal connector out of each match that feeds a later round. */
+.ff-bracket__rounds
+  .ff-bracket__round:not(:last-child)
+  .ff-bracket__match::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  width: 20px;
+  height: 1px;
+  background: var(--ff-border);
+}
+/* Game number in small gray, just right of the match (on the connector). */
+.ff-bracket__match-no {
+  position: absolute;
+  left: calc(100% + 5px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===========================================================================
+   Share bar — circular icon buttons in the marketing site's social style,
+   brand-tinted on hover. (components/dashboard/tournaments/ShareBar.tsx)
+   =========================================================================== */
+
+.ff-share {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ff-share__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    transform 0.1s ease,
+    background var(--ff-transition),
+    color var(--ff-transition);
+}
+.ff-share__btn:hover {
+  transform: scale(1.1);
+}
+.ff-share__btn--x:hover {
+  background: #000;
+}
+.ff-share__btn--bluesky:hover {
+  background: #0a7aff;
+}
+.ff-share__btn--facebook:hover {
+  background: #0866ff;
+}
+.ff-share__btn--linkedin:hover {
+  background: #0d66c2;
+}
+.ff-share__btn--reddit:hover {
+  background: #ff4500;
+}
+
+/* Register CTA sharing the stat row, pushed to the right. */
+.ff-thero__stats-cta {
+  margin-left: auto;
+  align-self: center;
+}
+.ff-thero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}

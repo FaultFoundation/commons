@@ -11,7 +11,6 @@ import {
   TOURNAMENT_FORMATS,
   TOURNAMENT_FORMAT_LABELS,
   TOURNAMENT_NAME_MAX,
-  slugifyName,
 } from "@/lib/tournaments-shared";
 
 /**
@@ -57,11 +56,7 @@ export function CreateTournamentForm() {
 
       <BubbleRow
         label="Name"
-        note={
-          name.trim()
-            ? `Public bracket: /t/<id>/${slugifyName(name)}/ — the ID is assigned on create.`
-            : "The public URL is built from this; a six-digit ID is assigned automatically."
-        }
+        note="A six-digit ID is assigned on create; the public bracket lives at /t/<id>/."
         field={
           <input
             className="ff-auth__input"

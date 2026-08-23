@@ -3298,3 +3298,57 @@ button.ff-dash__link:hover {
   font-size: var(--ff-dash-text-xs);
   color: var(--ff-ok);
 }
+
+/* ===========================================================================
+   Round 10 — elbow connectors (SVG overlay), border-only "next game" highlight.
+   =========================================================================== */
+
+/* The next game to play: border only, no fill or glow. */
+.ff-bracket__match[data-state="open"] {
+  border-color: var(--ff-accent);
+  box-shadow: none;
+  background: var(--ff-surface-2);
+}
+
+/* The old horizontal stub is replaced by the measured elbow overlay. */
+.ff-bracket__rounds
+  .ff-bracket__round:not(:last-child)
+  .ff-bracket__match::after {
+  content: none;
+}
+.ff-bracket__rounds {
+  position: relative;
+}
+.ff-bracket__connectors {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.ff-bracket__connectors path {
+  fill: none;
+  stroke: var(--ff-border);
+  stroke-width: 2;
+}
+/* Match cards sit above the connector lines, so an elbow tucks under the card. */
+.ff-bracket__match {
+  z-index: 1;
+}
+
+/* Withdrawal warning inside the entry dialog. */
+.ff-entry__warn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--ff-danger-border);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-danger-bg);
+}
+.ff-entry__warn-text {
+  margin: 0;
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-danger-text);
+}

@@ -66,8 +66,7 @@ export default async function TournamentPage({
   // The public share link (short, no slug), absolute so share intents work.
   const host = hdrs.get("host") ?? "commons.fault.foundation";
   const shareUrl = `https://${host}${tournamentPath(tournament.id)}`;
-  // Placeholder default share message — swap for the copy the org wants.
-  const shareMessage = `🏆 ${tournament.name} is live on The Fault Foundation — follow the bracket!`;
+  const shareMessage = `The bracket for ${tournament.name} is live! Follow along at The Fault Foundation 🎮`;
 
   const initial: BracketSnapshot | null = snapshot
     ? {
@@ -146,6 +145,7 @@ export default async function TournamentPage({
                 <TournamentRegister
                   tournamentId={tournament.id}
                   registrationOpen={registrationOpen}
+                  started={generated}
                   academicVerificationRequired={
                     tournament.academicVerificationRequired
                   }

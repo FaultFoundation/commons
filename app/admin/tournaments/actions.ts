@@ -325,13 +325,31 @@ export async function setTournamentStatus(
     if (count < 2) return { ok: false, error: "At least 2 entrants are needed to seed." };
   }
 
-  // Completing finalizes on Challonge; the others are lifecycle-only on our side.
+  // Completing finalizes on Challonge.
   if (to === "completed" && tournament.externalId) {
     const res = await changeChallongeState(tournament.externalId, "finalize");
     if (!res.ok) return res;
   }
 
-  const result = await transitionStatus(tournamentId, tournament.status, to);
+  // Moving a STARTED tournament back to a pre-play state (e.g. cancel → reopen)
+  // must reset the Challonge bracket to "pending". Otherwise Challonge stays
+  // underway/complete and rejects entrants ("participants can no longer join"),
+  // and previously-removed teams stay DQ'd with their names still taken. Reset
+  // un-starts it and re-activates the participants, keeping the two sides in sync.
+  const backToPreplay =
+    to === "draft" || to === "registration" || to === "seeding";
+  const wasStarted = Boolean(tournament.bracketGeneratedAt);
+  if (backToPreplay && wasStarted && tournament.externalId) {
+    const res = await changeChallongeState(tournament.externalId, "reset");
+    if (!res.ok) return res;
+  }
+
+  const result = await transitionStatus(
+    tournamentId,
+    tournament.status,
+    to,
+    backToPreplay && wasStarted ? { bracketGeneratedAt: null } : undefined,
+  );
   if (!result.ok) return result;
 
   await buildSnapshot(tournamentId);

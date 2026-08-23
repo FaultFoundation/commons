@@ -239,9 +239,18 @@ export function clampSwissRounds(n: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Bracket snapshot — the shape the server builds from Challonge (lib/challonge.ts
-// -> lib/tournaments.ts) and the client renders (BracketView). Defined here so
-// both sides share one type and can't drift; it stays client-safe (no imports).
+// Bracket snapshot — the PROVIDER-NEUTRAL bracket format.
+//
+// This is deliberately generic, not Challonge-shaped: BracketView renders it and
+// nothing here knows where the data came from. Challonge is mapped into it in
+// lib/challonge.ts (`fetchChallongeState`); a future scraper for another site or
+// API (FACEIT, start.gg, a manual import) just writes its own mapper to these
+// same fields and everything downstream — the bracket, results, connectors —
+// works unchanged. So keep the vocabulary standard: `round` (signed; <0 =
+// losers), `side` (W/L/group), `player1Id`/`player2Id`/`winnerId`/`loserId`
+// (participant ids, teams or solo), `scores` (a set list "3-1,2-3,3-0"), `state`
+// (pending/open/complete), `order` (play order), `seed`, `finalRank`. Defined
+// here so server and client share one type and can't drift; stays client-safe.
 // ---------------------------------------------------------------------------
 
 export type SnapshotParticipant = {

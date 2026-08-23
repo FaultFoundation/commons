@@ -815,9 +815,10 @@ export async function withdrawFromTournament(
   )[0];
   if (!entry) return { ok: true }; // already out — nothing to do
 
-  // Remove the Challonge participant (best-effort: a bracket that has already
-  // started refuses removal, in which case the team stays in on Challonge and
-  // staff manage it there — we still withdraw on our side).
+  // Remove/DQ on Challonge. Before the bracket starts this deletes the
+  // participant cleanly and the team can re-register; after it starts Challonge
+  // disqualifies them instead and the entry can't be undone — the UI warns about
+  // that before confirming. Best-effort either way: our row is the record.
   if (entry.challongeParticipantId && entry.externalId) {
     await removeChallongeParticipant(entry.externalId, entry.challongeParticipantId);
   }

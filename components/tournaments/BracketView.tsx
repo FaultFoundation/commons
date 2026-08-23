@@ -185,6 +185,11 @@ function RoundList({
  * column and aligned across columns. On load the container scrolls so the
  * *current* round (the earliest with an open match) is centered — clamped so a
  * short bracket never leaves white space on the right.
+ *
+ * Elbow connectors (elimination only) are drawn as an SVG overlay measured from
+ * the rendered match positions: round-N match `m` feeds round-(N+1) match
+ * `floor(m/2)` — the standard single-elimination tree — so each match's line
+ * runs right → to the mid-gap → up/down to its successor's centre → into it.
  */
 function RoundGrid({
   rounds,
@@ -196,6 +201,11 @@ function RoundGrid({
   kind: RoundKind;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [connectors, setConnectors] = useState<{
+    width: number;
+    height: number;
+    paths: string[];
+  }>({ width: 0, height: 0, paths: [] });
 
   const currentIndex = useMemo(() => {
     const i = rounds.findIndex((r) => r.matches.some((m) => m.state === "open"));
@@ -214,8 +224,77 @@ function RoundGrid({
     container.scrollLeft = Math.max(0, Math.min(target, max));
   }, [currentIndex]);
 
+  // Measure match rects and draw the elbows. Recomputed on resize/reflow.
+  useEffect(() => {
+    if (kind === "rr" || rounds.length < 2) {
+      setConnectors({ width: 0, height: 0, paths: [] });
+      return;
+    }
+    const container = scrollRef.current;
+    if (!container) return;
+
+    function compute() {
+      const cont = scrollRef.current;
+      if (!cont) return;
+      const base = cont.getBoundingClientRect();
+      const rects = new Map<string, { x: number; y: number; w: number; h: number }>();
+      cont
+        .querySelectorAll<HTMLElement>(".ff-bracket__match[data-r]")
+        .forEach((el) => {
+          const rect = el.getBoundingClientRect();
+          rects.set(`${el.dataset.r}:${el.dataset.m}`, {
+            x: rect.left - base.left + cont.scrollLeft,
+            y: rect.top - base.top + cont.scrollTop,
+            w: rect.width,
+            h: rect.height,
+          });
+        });
+
+      const paths: string[] = [];
+      for (let r = 0; r < rounds.length - 1; r += 1) {
+        for (let m = 0; m < rounds[r].matches.length; m += 1) {
+          const from = rects.get(`${r}:${m}`);
+          const to = rects.get(`${r + 1}:${Math.floor(m / 2)}`);
+          if (!from || !to) continue;
+          const startX = from.x + from.w;
+          const startY = from.y + from.h / 2;
+          const endX = to.x;
+          const endY = to.y + to.h / 2;
+          const midX = (startX + endX) / 2;
+          paths.push(`M ${startX} ${startY} H ${midX} V ${endY} H ${endX}`);
+        }
+      }
+      setConnectors({
+        width: cont.scrollWidth,
+        height: cont.scrollHeight,
+        paths,
+      });
+    }
+
+    compute();
+    const observer = new ResizeObserver(compute);
+    observer.observe(container);
+    window.addEventListener("resize", compute);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", compute);
+    };
+  }, [rounds, kind]);
+
   return (
     <div className="ff-bracket__rounds" ref={scrollRef}>
+      {connectors.paths.length ? (
+        <svg
+          className="ff-bracket__connectors"
+          width={connectors.width}
+          height={connectors.height}
+          aria-hidden="true"
+        >
+          {connectors.paths.map((d, i) => (
+            <path key={i} d={d} />
+          ))}
+        </svg>
+      ) : null}
       {rounds.map((r, index) => (
         <div
           className="ff-bracket__round"
@@ -227,8 +306,14 @@ function RoundGrid({
             {roundLabel(index, rounds.length, kind)}
           </div>
           <div className="ff-bracket__round-matches">
-            {r.matches.map((m) => (
-              <MatchCard key={m.id} match={m} nameById={nameById} />
+            {r.matches.map((m, matchIndex) => (
+              <MatchCard
+                key={m.id}
+                match={m}
+                nameById={nameById}
+                roundIndex={index}
+                matchIndex={matchIndex}
+              />
             ))}
           </div>
         </div>
@@ -244,13 +329,23 @@ function RoundGrid({
 function MatchCard({
   match,
   nameById,
+  roundIndex,
+  matchIndex,
 }: {
   match: SnapshotMatch;
   nameById: Map<string, SnapshotParticipant>;
+  /** Position in the grid, for the connector overlay to measure by. */
+  roundIndex?: number;
+  matchIndex?: number;
 }) {
   const [a, b] = splitScores(match.scores);
   return (
-    <div className="ff-bracket__match" data-state={match.state}>
+    <div
+      className="ff-bracket__match"
+      data-state={match.state}
+      data-r={roundIndex}
+      data-m={matchIndex}
+    >
       {match.order != null ? (
         <span className="ff-bracket__match-no" title={`Match ${match.order}`}>
           {match.order}

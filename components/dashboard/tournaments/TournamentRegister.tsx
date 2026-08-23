@@ -24,11 +24,14 @@ export type RegisterTeam = {
 export function TournamentRegister({
   tournamentId,
   registrationOpen,
+  started,
   academicVerificationRequired,
   teams,
 }: {
   tournamentId: string;
   registrationOpen: boolean;
+  /** The bracket has been generated — withdrawing now disqualifies the team. */
+  started: boolean;
   academicVerificationRequired: boolean;
   teams: RegisterTeam[];
 }) {
@@ -37,6 +40,8 @@ export function TournamentRegister({
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // The team whose withdrawal is awaiting confirmation.
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   const label = (t: RegisterTeam) => (t.tag ? `${t.name} [${t.tag}]` : t.name);
   const entered = teams.filter((t) => t.entered);
@@ -106,22 +111,53 @@ export function TournamentRegister({
           </p>
         ) : (
           <div className="ff-entry">
-            {entered.map((t) => (
-              <div className="ff-entry__row" key={t.id}>
-                <span className="ff-entry__name">{label(t)}</span>
-                <span className="ff-entry__tag ff-entry__tag--in">Entered</span>
-                <button
-                  className="ff-btn ff-btn--soft ff-btn--sm"
-                  type="button"
-                  disabled={pending}
-                  onClick={() =>
-                    run(() => withdrawFromTournament(t.id, tournamentId))
-                  }
-                >
-                  Withdraw
-                </button>
-              </div>
-            ))}
+            {entered.map((t) =>
+              confirming === t.id ? (
+                <div className="ff-entry__warn" key={t.id}>
+                  <p className="ff-entry__warn-text">
+                    {started
+                      ? "This will disqualify your team from the tournament and you will be unable to rejoin."
+                      : `Withdraw ${label(t)} from this tournament? You can re-register while registration is open.`}
+                  </p>
+                  <div className="ff-row__buttons">
+                    <button
+                      className="ff-btn ff-btn--danger ff-btn--sm"
+                      type="button"
+                      disabled={pending}
+                      onClick={() =>
+                        run(() => withdrawFromTournament(t.id, tournamentId))
+                      }
+                    >
+                      {pending ? "Withdrawing…" : "Withdraw"}
+                    </button>
+                    <button
+                      className="ff-btn ff-btn--outline ff-btn--sm"
+                      type="button"
+                      disabled={pending}
+                      onClick={() => setConfirming(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="ff-entry__row" key={t.id}>
+                  <span className="ff-entry__name">{label(t)}</span>
+                  <span className="ff-entry__tag ff-entry__tag--in">Entered</span>
+                  <button
+                    className="ff-btn ff-btn--soft ff-btn--sm"
+                    type="button"
+                    disabled={pending}
+                    onClick={() => {
+                      setError(null);
+                      setConfirming(t.id);
+                    }}
+                  >
+                    Withdraw
+                  </button>
+                </div>
+              ),
+            )}
 
             {blocked.map((t) => (
               <div className="ff-entry__row" key={t.id}>

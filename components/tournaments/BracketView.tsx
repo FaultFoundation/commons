@@ -260,8 +260,13 @@ function RoundGrid({
           const startY = from.y + from.h / 2;
           const endX = to.x;
           const endY = to.y + to.h / 2;
+          // A smooth S-curve: a cubic Bézier whose control points sit at the
+          // horizontal midpoint, so the line leaves the match horizontally,
+          // eases up/down, and arrives horizontally at its successor.
           const midX = (startX + endX) / 2;
-          paths.push(`M ${startX} ${startY} H ${midX} V ${endY} H ${endX}`);
+          paths.push(
+            `M ${startX} ${startY} C ${midX} ${startY} ${midX} ${endY} ${endX} ${endY}`,
+          );
         }
       }
       setConnectors({

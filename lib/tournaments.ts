@@ -117,6 +117,7 @@ export type TournamentListItem = {
   endsAt: Date | null;
   createdAt: Date;
   entrantCount: number;
+  bannerUrl: string | null;
 };
 
 export async function listTournaments(opts?: {
@@ -138,6 +139,7 @@ export async function listTournaments(opts?: {
       startsAt: tournaments.startsAt,
       endsAt: tournaments.endsAt,
       createdAt: tournaments.createdAt,
+      bannerUrl: tournaments.bannerUrl,
       entrantCount:
         sql<number>`(SELECT count(*) FROM tournament_participants WHERE tournament_id = ${tournaments.id} AND withdrawn_at IS NULL)`.as(
           "entrant_count",

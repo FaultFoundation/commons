@@ -38,6 +38,7 @@ export default async function TournamentsPage() {
               entrantCount: t.entrantCount,
               maxParticipants: t.maxParticipants,
               startsAt: t.startsAt ? t.startsAt.getTime() : null,
+              bannerUrl: t.bannerUrl,
             }))}
           />
         </Bubble>

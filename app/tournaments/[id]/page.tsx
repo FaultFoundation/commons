@@ -22,6 +22,7 @@ import {
   isRegistrationOpen,
   isTournamentId,
   tournamentPath,
+  tournamentShareText,
   type BracketSnapshot,
 } from "@/lib/tournaments-shared";
 
@@ -66,7 +67,7 @@ export default async function TournamentPage({
   // The public share link (short, no slug), absolute so share intents work.
   const host = hdrs.get("host") ?? "commons.fault.foundation";
   const shareUrl = `https://${host}${tournamentPath(tournament.id)}`;
-  const shareMessage = `The bracket for ${tournament.name} is live! Follow along at The Fault Foundation 🎮`;
+  const shareMessage = tournamentShareText(tournament.name);
 
   const initial: BracketSnapshot | null = snapshot
     ? {

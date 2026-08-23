@@ -17,6 +17,7 @@ export type TournamentListEntry = {
   entrantCount: number;
   maxParticipants: number | null;
   startsAt: number | null;
+  bannerUrl: string | null;
 };
 
 /** The filter chips, in the order a member actually looks for things. */
@@ -136,7 +137,10 @@ function TournamentCard({ tournament: t }: { tournament: TournamentListEntry }) 
   const live = t.status === "registration" || t.status === "active";
   return (
     <a className="ff-tcard" href={`/tournaments/${t.id}/`} data-status={t.status}>
-      <div className="ff-tcard__banner">
+      <div
+        className="ff-tcard__banner"
+        style={t.bannerUrl ? { backgroundImage: `url(${t.bannerUrl})` } : undefined}
+      >
         <span className="ff-tcard__format">
           {TOURNAMENT_FORMAT_LABELS[t.format as TournamentFormat] ?? t.format}
         </span>

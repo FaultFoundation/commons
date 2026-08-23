@@ -3352,3 +3352,25 @@ button.ff-dash__link:hover {
   font-size: var(--ff-dash-text-sm);
   color: var(--ff-danger-text);
 }
+
+/* ===========================================================================
+   Round 12 — thin white outline on each game box (also makes the connectors
+   read); shadow + banner images on the tournament list cards, matching the
+   detail page.
+   =========================================================================== */
+
+/* The game box (around both team slots) — thin white, not gray. The "next game"
+   accent border still wins (defined later / more specific). */
+.ff-bracket__match {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* List cards get the standard shadow, and their banner can carry an image. */
+.ff-tcard {
+  box-shadow: var(--ff-shadow-card);
+}
+.ff-tcard__banner {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}

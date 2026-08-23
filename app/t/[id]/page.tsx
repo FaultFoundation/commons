@@ -10,6 +10,7 @@ import {
   isPublic,
   isTournamentId,
   tournamentPath,
+  tournamentShareText,
   type BracketSnapshot,
 } from "@/lib/tournaments-shared";
 
@@ -40,9 +41,10 @@ export async function generateMetadata({
     return { title: "Tournament", robots: { index: false } };
   }
 
-  const format = TOURNAMENT_FORMAT_LABELS[tournament.format] ?? tournament.format;
   const canonical = `${ORIGIN}${tournamentPath(tournament.id)}`;
-  const description = `${format} bracket, standings and results for ${tournament.name}.`;
+  // The share message doubles as the preview description so Facebook/LinkedIn —
+  // which never take prefilled post text — still carry it.
+  const description = tournamentShareText(tournament.name);
 
   // The link preview (Open Graph / Twitter card) shows the tournament's banner
   // and name. The banner is an /api/avatars/… path, so make it absolute against

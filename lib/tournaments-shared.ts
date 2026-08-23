@@ -168,6 +168,14 @@ export function tournamentPath(id: string, _name?: string): string {
   return `/t/${id}/`;
 }
 
+/** The default share text. Used both as the prefilled compose text on the
+    platforms that allow one (X, Bluesky) AND as the link-preview (Open Graph)
+    description — Facebook and LinkedIn ignore prefilled text entirely and only
+    read the preview, so this is the only way the message reaches them. */
+export function tournamentShareText(name: string): string {
+  return `The bracket for ${name} is live! Follow along at The Fault Foundation 🎮`;
+}
+
 // ---------------------------------------------------------------------------
 // Lifecycle: which states allow which operations
 // ---------------------------------------------------------------------------

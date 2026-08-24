@@ -100,12 +100,8 @@ export function getAuth() {
             authorizationUrl: "https://auth.faceit.com/v1/authorize",
             tokenUrl: "https://api.faceit.com/auth/v1/oauth/token",
             scopes: ["openid", "email", "profile"],
-            // MUST be false. FACEIT's OIDC discovery advertises no
-            // code_challenge_methods, so it doesn't support PKCE — sending a
-            // code_challenge (S256) makes its authorize endpoint silently fail
-            // when the user grants (the tab "greys out and does nothing").
-            // Confirmed from the live authorize URL. FACEIT is a confidential
-            // client (client_secret), so PKCE isn't needed anyway.
+            // No code_challenge_methods in FACEIT's discovery and it's a
+            // confidential client, so PKCE stays off.
             pkce: false,
             // FACEIT's token endpoint only accepts client_secret_basic (per its
             // OIDC discovery: token_endpoint_auth_methods_supported). Better Auth

@@ -3,8 +3,10 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { Bubble } from "@/components/dashboard/bubbles/Bubble";
+import { ScheduleView } from "@/components/dashboard/schedule/ScheduleView";
 import { getAuth } from "@/lib/auth";
+import { loadConnectIntegrations } from "@/lib/integrations";
+import { loadSchedule } from "@/lib/schedule";
 
 // Session-gated: always rendered per request.
 export const dynamic = "force-dynamic";
@@ -15,25 +17,30 @@ export const metadata: Metadata = {
 };
 
 export default async function SchedulePage() {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  const requestHeaders = await headers();
+  const session = await getAuth().api.getSession({ headers: requestHeaders });
   if (!session) {
     redirect("/login/");
   }
 
+  const userId = session.user.id;
+  // Sync-on-read + the calendar, and the connect state (to steer the empty
+  // state toward Integrations when nothing is linked). Both are best-effort and
+  // degrade to an empty calendar rather than failing the page.
+  const [{ upcoming, past }, connects] = await Promise.all([
+    loadSchedule(userId, requestHeaders),
+    loadConnectIntegrations(userId),
+  ]);
+  const anyConnected = connects.some((c) => c.linked);
+
   return (
-    <DashboardShell active="schedule" setupUserId={session.user.id}>
+    <DashboardShell active="schedule" setupUserId={userId}>
       <h1 className="screen-reader-text">Schedule</h1>
-      <div className="ff-bubble-grid">
-        {/* The top bubble of a tab always spans the grid — see the guide. */}
-        <Bubble title="Upcoming Matches" variant="wip" span="full">
-          <div className="ff-bubble__wip">
-            Your next matches land here once you&rsquo;re on a roster.
-          </div>
-        </Bubble>
-        <Bubble title="Results" variant="wip">
-          <div className="ff-bubble__wip">Work in progress</div>
-        </Bubble>
-      </div>
+      <ScheduleView
+        upcoming={upcoming}
+        past={past}
+        anyConnected={anyConnected}
+      />
     </DashboardShell>
   );
 }

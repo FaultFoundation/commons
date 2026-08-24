@@ -3374,3 +3374,10 @@ button.ff-dash__link:hover {
   background-position: center;
   background-repeat: no-repeat;
 }
+
+/* Schedule calendar — a vertical stack of BubbleRow entries inside a Bubble. */
+.ff-schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

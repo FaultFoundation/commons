@@ -776,6 +776,10 @@ export const externalMatches = sqliteTable(
     }),
     provider: text("provider").notNull(),
     externalId: text("external_id").notNull(),
+    // The event/tournament display name for this row. Held here (rather than on
+    // a joined tournaments row) because external events don't get a tournaments
+    // row — the calendar reads them flat. Null for a bare matchmaking match.
+    title: text("title"),
     opponentName: text("opponent_name"),
     round: text("round"),
     // scheduled | live | finished | cancelled — provider-normalized.

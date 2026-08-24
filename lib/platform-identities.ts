@@ -25,9 +25,10 @@ const BATTLENET_USERINFO = "https://oauth.battle.net/userinfo";
 const FACEIT_USERINFO = "https://api.faceit.com/auth/v1/resources/userinfo";
 // start.gg is GraphQL-only; identity is the `currentUser` query.
 const STARTGG_GQL = "https://api.start.gg/gql/alpha";
-// Challonge API v2 "me" (the `me` scope). Exact response shape is parsed
-// defensively — confirm the fields against a live token when wiring the app.
-const CHALLONGE_ME = "https://api.challonge.com/v2/me.json";
+// Challonge API v2.1 "me" (the `me` scope), on the same base version as the
+// org-key client in lib/challonge.ts. Exact response shape is parsed defensively
+// — confirm the fields against a live token when wiring the app.
+const CHALLONGE_ME = "https://api.challonge.com/v2.1/me.json";
 const PROVIDER_TIMEOUT_MS = 3000;
 
 /**

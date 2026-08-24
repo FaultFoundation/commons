@@ -220,6 +220,29 @@ The public bracket is at `/t/<id>/<name>/` (not `/tournaments/[…]` — `robots
 disallows that prefix); the id is the whole lookup and the name segment is
 cosmetic, re-derived from `name` so a rename never orphans a link.
 
+### Esports connects and the personal schedule
+
+Members link **FACEIT / start.gg / Challonge** as connect-only OAuth (never a
+sign-in: `disableSignUp`) alongside Discord/Battle.net. The configs live in
+[lib/auth.ts](lib/auth.ts) (`genericOAuth`), the profile fetchers and the
+`platform_identities` mirror in [lib/platform-identities.ts](lib/platform-identities.ts),
+the client-safe registry in [lib/integrations-shared.ts](lib/integrations-shared.ts).
+Each card degrades to disabled when its OAuth secrets are unset. This member
+`CHALLONGE_CLIENT_*` OAuth is distinct from the org `CHALLONGE_API_V1_KEY` that
+runs the tournament backend (above).
+
+`/schedule` is the payoff: [lib/schedule.ts](lib/schedule.ts) pulls each
+connected member's matches/tournaments into `external_matches` and the page
+renders them as one calendar. Same Workers-shaped constraints as everything
+else — **no cron, so it syncs lazily on read** past a 15-min per-provider TTL
+(stamped in `platform_identities.metadata`), every provider call is best-effort
+(4s timeout, never throws, `[]` on failure), and writes go through `db.batch`.
+Provider auth differs: Challonge/start.gg use the member's OAuth token (Challonge
+sends `Authorization-Type: v2` — the act-on-behalf path, vs the org key's `v1`),
+while FACEIT reads its server Data API key (`FACEIT_API_KEY`) keyed by the player
+guid. Live-verified for Challonge only; the FACEIT/start.gg adapters are written
+against documented shapes and parse defensively pending a live token.
+
 ### Styling
 
 **No CSS framework.** `styles/theme.css` is the design system (every selector

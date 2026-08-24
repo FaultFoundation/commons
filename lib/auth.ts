@@ -133,8 +133,11 @@ export function getAuth() {
           },
         ]
       : []),
-    // Challonge — OAuth 2.0. The `me` scope is a thin profile (username +
-    // email); the tournament read scopes are added when the schedule sync lands.
+    // Challonge — OAuth 2.0. `me` is a thin profile (username + email);
+    // `tournaments:read`/`matches:read` let the personal schedule sync
+    // (lib/schedule.ts) read the member's own Challonge tournaments. Accounts
+    // linked before these scopes shipped carry only `me`, so the sync gates on
+    // hasScope() and skips rather than 403 (see loadChallongeSchedule).
     ...(env.CHALLONGE_CLIENT_ID && env.CHALLONGE_CLIENT_SECRET
       ? [
           {
@@ -143,7 +146,7 @@ export function getAuth() {
             clientSecret: env.CHALLONGE_CLIENT_SECRET,
             authorizationUrl: "https://api.challonge.com/oauth/authorize",
             tokenUrl: "https://api.challonge.com/oauth/token",
-            scopes: ["me"],
+            scopes: ["me", "tournaments:read", "matches:read"],
             disableSignUp: true,
             getUserInfo: async (tokens: OAuthTokens) => {
               const p = await fetchChallongeProfile(tokens.accessToken);

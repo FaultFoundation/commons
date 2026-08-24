@@ -1,0 +1,1 @@
+ALTER TABLE `external_matches` ADD `title` text;

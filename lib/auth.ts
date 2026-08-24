@@ -94,6 +94,12 @@ export function getAuth() {
             discoveryUrl: "https://api.faceit.com/auth/v1/openid_configuration",
             scopes: ["openid", "email", "profile"],
             pkce: true,
+            // FACEIT's token endpoint only accepts client_secret_basic (per its
+            // OIDC discovery: token_endpoint_auth_methods_supported). Better Auth
+            // defaults to client_secret_post (creds in the body), which FACEIT
+            // rejects — the exchange fails with oauth_code_verification_failed and
+            // the link silently doesn't complete. Send the credentials as Basic.
+            authentication: "basic" as const,
             disableSignUp: true,
             getUserInfo: async (tokens: OAuthTokens) => {
               const p = await fetchFaceitProfile(tokens.accessToken);

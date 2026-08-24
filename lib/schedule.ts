@@ -152,6 +152,8 @@ async function loadChallongeSchedule(token: string): Promise<SyncedMatch[]> {
       headers: {
         Authorization: `Bearer ${token}`,
         "Authorization-Type": "v2",
+        // v2.1 (JSON:API) 415s without this, even on a GET.
+        "Content-Type": "application/vnd.api+json",
         Accept: "application/json",
       },
       signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),

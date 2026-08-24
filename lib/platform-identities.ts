@@ -218,7 +218,16 @@ export async function fetchChallongeProfile(
   if (!accessToken) return null;
   try {
     const res = await fetch(CHALLONGE_ME, {
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+      // v2.1 is JSON:API: it 415s without the vnd.api+json content type, and an
+      // OAuth (member) token is the `v2` authorization type — vs the org key's
+      // `v1` in lib/challonge.ts. Missing either → the link fails
+      // "user_info_is_missing" because this returns null.
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Authorization-Type": "v2",
+        "Content-Type": "application/vnd.api+json",
+        Accept: "application/json",
+      },
       signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
     });
     if (!res.ok) return null;

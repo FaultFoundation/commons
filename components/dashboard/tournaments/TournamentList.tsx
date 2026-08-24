@@ -18,6 +18,18 @@ export type TournamentListEntry = {
   maxParticipants: number | null;
   startsAt: number | null;
   bannerUrl: string | null;
+  // External (cen-sql) tournaments carry a source; internal Commons ones leave
+  // these unset. `externalUrl` is the native-site link the card opens for now
+  // (a branded Commons view for external tournaments is the next step).
+  source?: string | null; // 'startgg' | 'faceit'
+  externalUrl?: string | null;
+  game?: string | null;
+};
+
+/** Native-site label for an external tournament's source. */
+const SOURCE_LABELS: Record<string, string> = {
+  startgg: "start.gg",
+  faceit: "FACEIT",
 };
 
 /** The filter chips, in the order a member actually looks for things. */
@@ -135,15 +147,35 @@ export function TournamentList({
 
 function TournamentCard({ tournament: t }: { tournament: TournamentListEntry }) {
   const live = t.status === "registration" || t.status === "active";
+  const external = Boolean(t.source);
+  // Internal → the branded Commons view; external → out to the native site
+  // (a Commons view for external tournaments is the next step).
+  const href = external ? (t.externalUrl ?? "#") : `/tournaments/${t.id}/`;
+  // Banner corner: the source for external (start.gg / FACEIT), the format for
+  // internal Commons tournaments.
+  const corner = external
+    ? (SOURCE_LABELS[t.source as string] ?? t.source)
+    : (TOURNAMENT_FORMAT_LABELS[t.format as TournamentFormat] ?? t.format);
+  const meta = external
+    ? [t.game, t.entrantCount ? `${t.entrantCount} entrants` : null]
+        .filter(Boolean)
+        .join(" · ")
+    : `${t.entrantCount}${t.maxParticipants ? ` / ${t.maxParticipants}` : ""} ${
+        t.entrantCount === 1 ? "team" : "teams"
+      }`;
+
   return (
-    <a className="ff-tcard" href={`/tournaments/${t.id}/`} data-status={t.status}>
+    <a
+      className="ff-tcard"
+      href={href}
+      data-status={t.status}
+      {...(external ? { target: "_blank", rel: "noreferrer noopener" } : {})}
+    >
       <div
         className="ff-tcard__banner"
         style={t.bannerUrl ? { backgroundImage: `url(${t.bannerUrl})` } : undefined}
       >
-        <span className="ff-tcard__format">
-          {TOURNAMENT_FORMAT_LABELS[t.format as TournamentFormat] ?? t.format}
-        </span>
+        <span className="ff-tcard__format">{corner}</span>
         <span
           className={`ff-tcard__status${live ? " ff-tcard__status--live" : ""}`}
         >
@@ -161,11 +193,7 @@ function TournamentCard({ tournament: t }: { tournament: TournamentListEntry }) 
             : "Date TBD"}
         </span>
         <h3 className="ff-tcard__title">{t.name}</h3>
-        <span className="ff-tcard__meta">
-          {t.entrantCount}
-          {t.maxParticipants ? ` / ${t.maxParticipants}` : ""}{" "}
-          {t.entrantCount === 1 ? "team" : "teams"}
-        </span>
+        <span className="ff-tcard__meta">{meta || "—"}</span>
       </div>
     </a>
   );
@@ -189,20 +217,33 @@ function CompactTable({
           </tr>
         </thead>
         <tbody>
-          {tournaments.map((t) => (
+          {tournaments.map((t) => {
+            const external = Boolean(t.source);
+            const href = external
+              ? (t.externalUrl ?? "#")
+              : `/tournaments/${t.id}/`;
+            return (
             <tr key={t.id}>
               <td>
-                <a className="ff-ticket-subject" href={`/tournaments/${t.id}/`}>
+                <a
+                  className="ff-ticket-subject"
+                  href={href}
+                  {...(external
+                    ? { target: "_blank", rel: "noreferrer noopener" }
+                    : {})}
+                >
                   {t.name}
                 </a>
               </td>
               <td>
-                {TOURNAMENT_FORMAT_LABELS[t.format as TournamentFormat] ??
-                  t.format}
+                {external
+                  ? (SOURCE_LABELS[t.source as string] ?? t.source)
+                  : (TOURNAMENT_FORMAT_LABELS[t.format as TournamentFormat] ??
+                    t.format)}
               </td>
               <td>
                 {t.entrantCount}
-                {t.maxParticipants ? ` / ${t.maxParticipants}` : ""}
+                {!external && t.maxParticipants ? ` / ${t.maxParticipants}` : ""}
               </td>
               <td>
                 {t.startsAt
@@ -225,7 +266,8 @@ function CompactTable({
                 )}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

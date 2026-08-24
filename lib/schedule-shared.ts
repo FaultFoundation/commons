@@ -14,11 +14,20 @@ export const SCHEDULE_PROVIDERS = ["faceit", "startgg", "challonge"] as const;
 
 export type ScheduleProvider = (typeof SCHEDULE_PROVIDERS)[number];
 
-/** Brand name shown on a calendar entry's provider chip. */
-export const SCHEDULE_PROVIDER_LABELS: Record<ScheduleProvider, string> = {
+/**
+ * A calendar entry's source: one of the connected external platforms, or
+ * "commons" for a tournament that lives in our own system (the member's team is
+ * entered in it). Commons entries link into the branded tournament view; the
+ * external ones link out to the native site.
+ */
+export type ScheduleSource = ScheduleProvider | "commons";
+
+/** Brand name shown on a calendar entry's source chip. */
+export const SCHEDULE_PROVIDER_LABELS: Record<ScheduleSource, string> = {
   faceit: "FACEIT",
   startgg: "start.gg",
   challonge: "Challonge",
+  commons: "The Commons",
 };
 
 /**
@@ -43,7 +52,7 @@ export function isUpcomingStatus(status: ScheduleStatus): boolean {
  */
 export type ScheduleEntry = {
   id: string;
-  provider: ScheduleProvider;
+  provider: ScheduleSource;
   /** Event/tournament name, or "Match" when the provider gives none. */
   title: string;
   /** Opponent, when the provider resolves one (else null). */
@@ -53,8 +62,11 @@ export type ScheduleEntry = {
   status: ScheduleStatus;
   /** Epoch ms, or null when the provider gives no time. */
   scheduledAt: number | null;
-  /** Deep link to the match/tournament on the provider. */
+  /** Deep link to the match/tournament on the provider's native site. */
   url: string | null;
+  /** Internal Commons tournament view (e.g. /tournaments/<id>/). When set, the
+      row clicks into our branded view instead of linking out. */
+  href: string | null;
 };
 
 /** Narrow an arbitrary string to a ScheduleProvider (adapter/read guard). */

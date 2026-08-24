@@ -246,6 +246,36 @@ it has no server-side "this member's tournaments" read. OAuth still runs the
 Live-verified for Challonge only; the FACEIT/start.gg adapters are written
 against documented shapes and parse defensively pending a live key.
 
+### External tournaments — the second D1 (`cen-sql`)
+
+The Tournaments tab unifies **internal** Challonge-backed tournaments (in
+`website-sql`) with **external** ones scraped from start.gg/FACEIT. The external
+data lives in a **separate D1 database, `cen-sql`**, bound read-only to the
+Commons as `CEN` — deliberately not joined to `website-sql` at the DB level
+(D1 can't JOIN across bindings; join in app code by external id, like the bot's
+Sheets↔D1 split). It is a lean **projection** ([db/cen-schema.ts](db/cen-schema.ts):
+`ext_tournaments`/`ext_events`/`ext_standings`), not the scraper's full
+normalized model. Its migrations version independently in `drizzle-cen/`
+(`npm run db:cen:*`), separate from `website-sql`'s `drizzle/`.
+
+- **The Commons never writes `cen-sql`.** The writer is the scraper
+  (`cen-news-notifications`), a Python poller in a sibling repo. Phase 1 seeds
+  cen-sql by **one-time import**: `scripts/cen-project.mjs` reads that repo's
+  `data/cen.db` and flattens it into `cen-seed.sql` (gitignored — a local
+  artifact, only public tournament data, no PII), loaded with
+  `wrangler d1 execute cen-sql --file`. Phase 2 replaces the import with a
+  scheduled Worker writing cen-sql directly (a plain Worker with a cron trigger —
+  the Commons OpenNext Worker structurally can't host `scheduled`).
+- **Reads degrade** ([lib/external-tournaments.ts](lib/external-tournaments.ts),
+  over [lib/cen-db.ts](lib/cen-db.ts) `getCenDb()`): no `CEN` binding, an
+  empty table, or a query error returns nothing, so the tab renders the internal
+  tournaments alone. Tournament `status` is **derived** from the start/end window
+  (the scraper has no single tournament state).
+- The list ([app/tournaments/page.tsx](app/tournaments/page.tsx)) merges both
+  into one `TournamentListEntry[]`; external cards carry a `source` and link out
+  to the native site for now (a branded Commons view for external tournaments is
+  the next Phase-1 step, reusing the internal templates).
+
 ### Styling
 
 **No CSS framework.** `styles/theme.css` is the design system (every selector

@@ -66,13 +66,18 @@ function EntryRow({ entry }: { entry: ScheduleEntry }) {
     ? `${SCHEDULE_PROVIDER_LABELS[entry.provider]} · ${entry.round}`
     : SCHEDULE_PROVIDER_LABELS[entry.provider];
 
-  return (
+  const row = (
     <BubbleRow
       label={label}
       value={entry.title}
       note={meta.join(" · ")}
       action={
-        entry.url ? (
+        entry.href ? (
+          // The whole row is the link (below); this is just the affordance.
+          <span className="ff-btn ff-btn--soft ff-btn--sm" aria-hidden="true">
+            View
+          </span>
+        ) : entry.url ? (
           <a
             className="ff-btn ff-btn--soft ff-btn--sm"
             href={entry.url}
@@ -84,6 +89,16 @@ function EntryRow({ entry }: { entry: ScheduleEntry }) {
         ) : undefined
       }
     />
+  );
+
+  // A Commons tournament clicks into our branded view (same tab); an external
+  // one keeps its "Open" link out to the native site inside the row.
+  return entry.href ? (
+    <a className="ff-schedule-entry" href={entry.href}>
+      {row}
+    </a>
+  ) : (
+    row
   );
 }
 

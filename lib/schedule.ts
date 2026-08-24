@@ -1,7 +1,14 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
-import { account, externalMatches, platformIdentities } from "@/db/schema";
+import {
+  account,
+  externalMatches,
+  platformIdentities,
+  teamMembers,
+  tournamentParticipants,
+  tournaments,
+} from "@/db/schema";
 import {
   challongeAuthEnabled,
   faceitAuthEnabled,
@@ -528,7 +535,74 @@ function toEntry(row: {
     status: row.status as ScheduleStatus,
     scheduledAt: row.scheduledAt ? row.scheduledAt.getTime() : null,
     url: row.url,
+    href: null, // external — links out to the native site, not a Commons view
   };
+}
+
+/** Our tournament lifecycle → the calendar's normalized status. */
+function internalStatus(status: string): ScheduleStatus {
+  switch (status) {
+    case "active":
+    case "seeding":
+      return "live";
+    case "completed":
+      return "finished";
+    case "cancelled":
+      return "cancelled";
+    default:
+      return "scheduled"; // registration (draft is filtered out before here)
+  }
+}
+
+/**
+ * Commons tournaments the member is signed up for — a team they're an active
+ * member of is entered and hasn't withdrawn. These click into the branded
+ * tournament view (which carries its own "View on Challonge" native-site
+ * button), so they carry an internal `href` and no external `url`.
+ */
+async function loadInternalTournaments(userId: string): Promise<ScheduleEntry[]> {
+  const rows = await getDb()
+    .select({
+      id: tournaments.id,
+      name: tournaments.name,
+      status: tournaments.status,
+      startsAt: tournaments.startsAt,
+    })
+    .from(tournamentParticipants)
+    .innerJoin(
+      teamMembers,
+      eq(teamMembers.teamId, tournamentParticipants.teamId),
+    )
+    .innerJoin(
+      tournaments,
+      eq(tournaments.id, tournamentParticipants.tournamentId),
+    )
+    .where(
+      and(
+        eq(teamMembers.userId, userId),
+        eq(teamMembers.status, "active"),
+        isNull(tournamentParticipants.withdrawnAt),
+      ),
+    );
+
+  // A member on two entered teams in one tournament matches twice — dedupe by
+  // tournament id, and skip drafts (staff-only, never shown to a member).
+  const byId = new Map<string, ScheduleEntry>();
+  for (const t of rows) {
+    if (t.status === "draft" || byId.has(t.id)) continue;
+    byId.set(t.id, {
+      id: `commons-${t.id}`,
+      provider: "commons",
+      title: t.name,
+      opponent: null,
+      round: null,
+      status: internalStatus(t.status),
+      scheduledAt: t.startsAt ? t.startsAt.getTime() : null,
+      url: null,
+      href: `/tournaments/${t.id}/`,
+    });
+  }
+  return [...byId.values()];
 }
 
 /**
@@ -542,22 +616,25 @@ export async function loadSchedule(
 ): Promise<LoadedSchedule> {
   await syncSchedule(userId, requestHeaders);
 
-  const rows = await getDb()
-    .select({
-      id: externalMatches.id,
-      provider: externalMatches.provider,
-      title: externalMatches.title,
-      opponentName: externalMatches.opponentName,
-      round: externalMatches.round,
-      status: externalMatches.status,
-      scheduledAt: externalMatches.scheduledAt,
-      url: externalMatches.url,
-    })
-    .from(externalMatches)
-    .where(eq(externalMatches.userId, userId))
-    .orderBy(asc(externalMatches.scheduledAt));
+  const [rows, internal] = await Promise.all([
+    getDb()
+      .select({
+        id: externalMatches.id,
+        provider: externalMatches.provider,
+        title: externalMatches.title,
+        opponentName: externalMatches.opponentName,
+        round: externalMatches.round,
+        status: externalMatches.status,
+        scheduledAt: externalMatches.scheduledAt,
+        url: externalMatches.url,
+      })
+      .from(externalMatches)
+      .where(eq(externalMatches.userId, userId))
+      .orderBy(asc(externalMatches.scheduledAt)),
+    loadInternalTournaments(userId),
+  ]);
 
-  const entries = rows.map(toEntry);
+  const entries = [...rows.map(toEntry), ...internal];
   const upcoming = entries
     .filter((e) => isUpcomingStatus(e.status))
     .sort(byTime(true));

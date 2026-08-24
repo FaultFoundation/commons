@@ -22,6 +22,17 @@
 			"database_name": "website-sql",
 			"database_id": "5268b495-2952-4570-bd37-295e9d452753",
 			"migrations_dir": "drizzle"
+		},
+		{
+			// cen-sql — the external-tournaments projection (read-only from the
+			// Commons; the scraper/import is the only writer). Create it with
+			// `wrangler d1 create cen-sql` and paste the returned id below; until
+			// then reads degrade to "no external tournaments". Local dev keys its
+			// state off this id, so any valid uuid works for `--local`.
+			"binding": "CEN",
+			"database_name": "cen-sql",
+			"database_id": "3feadba0-76a5-4429-acdf-a6434eba8f49",
+			"migrations_dir": "drizzle-cen"
 		}
 	],
 	// Profile pictures and team logos. Objects are content-addressed and served

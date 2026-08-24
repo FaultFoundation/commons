@@ -1013,6 +1013,14 @@ button.ff-dash__link:hover {
 .ff-dash__foot .ff-btn {
   width: 100%;
 }
+/* The mobile-only drawer chrome. Hidden by default so on ≥600px only the
+   <aside> is a grid item and the two-column layout is untouched; the mobile
+   query below turns these on. */
+.ff-dash__hamburger,
+.ff-dash__scrim,
+.ff-dash__drawer-close {
+  display: none;
+}
 /* Tablet: rail collapses to a horizontal pill row above the content (same
    breakpoint as the policy TOC). The slide is dropped here — the active panel
    simply shows as pills and the inert one is removed from the flow. */
@@ -1023,9 +1031,8 @@ button.ff-dash__link:hover {
   .ff-dash__nav {
     position: static;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 6px;
-    overflow-x: auto;
   }
   .ff-dash__nav-viewport {
     flex: 1;
@@ -1040,10 +1047,12 @@ button.ff-dash__link:hover {
   .ff-dash__nav-panel[inert] {
     display: none;
   }
+  /* Pills wrap onto as many rows as it takes, so every tab stays visible —
+     no horizontal scroll hiding Teams / Account / Admin off the right edge. */
   .ff-dash__nav-panel {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
-    overflow-x: auto;
   }
   .ff-dash__link {
     padding: 8px 14px;
@@ -1062,6 +1071,111 @@ button.ff-dash__link:hover {
   }
   .ff-dash__foot .ff-btn {
     width: auto;
+    white-space: nowrap;
+  }
+}
+/* Phone: the pill bar would wrap to too many rows, so the rail becomes a
+   left slide-out drawer opened by a hamburger. 767.98px is the standard phone
+   ceiling, so every phone in portrait (and most in landscape) gets the drawer;
+   768–1023px tablets keep the wrapping pill bar. The drawer and scrim are
+   position:fixed (out of the grid flow), so .ff-dash is a single column of
+   hamburger-over-content. This block re-establishes the vertical two-panel
+   slide inside the drawer, overriding the tablet pill-row rules above. */
+@media (max-width: 767.98px) {
+  .ff-dash {
+    gap: 14px;
+  }
+  .ff-dash__hamburger {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: max-content;
+    align-self: start;
+    position: sticky;
+    top: calc(var(--ff-header-h) + 8px);
+    z-index: 20;
+    padding: 8px 14px;
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-pill);
+    background: var(--ff-surface-1);
+    color: #dfe9f4;
+    font-weight: 700;
+    font-size: var(--ff-dash-text-sm);
+    cursor: pointer;
+  }
+  .ff-dash__scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55; /* above the sticky site header (z-index 50) */
+    background: rgba(0, 0, 0, 0.55);
+  }
+  /* The rail, off-canvas on the left until [data-open]. */
+  .ff-dash__nav {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 60;
+    width: min(84vw, 300px);
+    margin: 0;
+    border-radius: 0;
+    overflow-y: auto;
+    display: block;
+    transform: translateX(-100%);
+    transition: transform var(--ff-transition);
+    background: var(--ff-bg);
+  }
+  .ff-dash__nav[data-open] {
+    transform: translateX(0);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  }
+  .ff-dash__drawer-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 0 8px auto;
+    padding: 6px;
+    background: transparent;
+    border: 0;
+    color: var(--ff-text-dim);
+    cursor: pointer;
+  }
+  /* Restore the desktop vertical two-panel slide inside the drawer (undo the
+     tablet pill row). */
+  .ff-dash__nav-viewport {
+    overflow: hidden;
+  }
+  .ff-dash__nav-track {
+    display: flex;
+    width: 200%;
+  }
+  .ff-dash__nav-track[data-open="sub"] {
+    transform: translateX(-50%) !important;
+  }
+  .ff-dash__nav-panel {
+    display: grid;
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+  /* The off-screen panel stays laid out (the track slides it away) rather than
+     display:none as on tablet, so the Admin sub-tab slide works in the drawer. */
+  .ff-dash__nav-panel[inert] {
+    display: grid;
+  }
+  .ff-dash__link {
+    white-space: normal;
+  }
+  .ff-dash__link--group,
+  .ff-dash__back {
+    width: 100%;
+  }
+  .ff-dash__foot {
+    margin: 14px 0 0 0;
+    padding: 14px 0 0 0;
+    border-top: 1px solid var(--ff-border);
+    border-left: 0;
+  }
+  .ff-dash__foot .ff-btn {
+    width: 100%;
     white-space: nowrap;
   }
 }
@@ -3380,4 +3494,14 @@ button.ff-dash__link:hover {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+/* A Commons entry whose whole row links into the branded tournament view. */
+.ff-schedule-entry {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+.ff-schedule-entry:hover .ff-row {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.03);
 }

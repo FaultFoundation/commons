@@ -7,6 +7,7 @@ import {
   type NavChild,
   type NavItem,
 } from "@/components/dashboard/DashboardNav";
+import { DashboardRail } from "@/components/dashboard/DashboardRail";
 import { DensityCookie } from "@/components/dashboard/accounts/DensityCookie";
 import { SetupBanner } from "@/components/dashboard/SetupBanner";
 import { isAdminUnlocked } from "@/lib/admin-unlock";
@@ -135,7 +136,7 @@ export async function DashboardShell({
         data-density={density}
         data-surface={surface}
         className="ff-container ff-container--wide ff-section--tight ff-dash">
-        <aside className="ff-card ff-dash__nav" aria-label="Dashboard">
+        <DashboardRail>
           <DashboardNav
             items={items}
             active={active}
@@ -145,7 +146,7 @@ export async function DashboardShell({
           <div className="ff-dash__foot">
             <SignOutButton />
           </div>
-        </aside>
+        </DashboardRail>
         <div className="ff-dash__content">
           {setupUserId ? <SetupBanner userId={setupUserId} /> : null}
           {children}

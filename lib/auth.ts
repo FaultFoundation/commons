@@ -82,16 +82,23 @@ export function getAuth() {
           },
         ]
       : []),
-    // FACEIT ("FACEIT Connect") — OpenID Connect. Endpoints come from FACEIT's
-    // OIDC discovery doc, which sidesteps the authorize-host ambiguity in their
-    // written docs. Returns a real email, so no synthetic address is needed.
+    // FACEIT ("FACEIT Connect") — OpenID Connect, but its endpoints are set
+    // EXPLICITLY, not via discoveryUrl. FACEIT's own openid_configuration returns
+    // the WRONG authorization_endpoint (accounts.faceit.com/accounts — the
+    // account/login page, where the user sees their profile but granting
+    // silently "greys out and does nothing"). The real OAuth authorize endpoint,
+    // per the FACEIT Connect 3.0 docs, is auth.faceit.com/v1/authorize. Using
+    // discoveryUrl would overwrite authorizationUrl with the bad value (see
+    // better-auth's generic-oauth routes), so we can't use it. getUserInfo below
+    // reads the userinfo endpoint directly (fetchFaceitProfile).
     ...(env.FACEIT_CLIENT_ID && env.FACEIT_CLIENT_SECRET
       ? [
           {
             providerId: "faceit",
             clientId: env.FACEIT_CLIENT_ID,
             clientSecret: env.FACEIT_CLIENT_SECRET,
-            discoveryUrl: "https://api.faceit.com/auth/v1/openid_configuration",
+            authorizationUrl: "https://auth.faceit.com/v1/authorize",
+            tokenUrl: "https://api.faceit.com/auth/v1/oauth/token",
             scopes: ["openid", "email", "profile"],
             // MUST be false. FACEIT's OIDC discovery advertises no
             // code_challenge_methods, so it doesn't support PKCE — sending a

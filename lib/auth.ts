@@ -93,7 +93,13 @@ export function getAuth() {
             clientSecret: env.FACEIT_CLIENT_SECRET,
             discoveryUrl: "https://api.faceit.com/auth/v1/openid_configuration",
             scopes: ["openid", "email", "profile"],
-            pkce: true,
+            // MUST be false. FACEIT's OIDC discovery advertises no
+            // code_challenge_methods, so it doesn't support PKCE — sending a
+            // code_challenge (S256) makes its authorize endpoint silently fail
+            // when the user grants (the tab "greys out and does nothing").
+            // Confirmed from the live authorize URL. FACEIT is a confidential
+            // client (client_secret), so PKCE isn't needed anyway.
+            pkce: false,
             // FACEIT's token endpoint only accepts client_secret_basic (per its
             // OIDC discovery: token_endpoint_auth_methods_supported). Better Auth
             // defaults to client_secret_post (creds in the body), which FACEIT

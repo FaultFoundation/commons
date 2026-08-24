@@ -9,6 +9,12 @@ const nextConfig: NextConfig = {
   skipTrailingSlashRedirect: true,
   // Markup uses plain <img>; no Next image optimization.
   images: { unoptimized: true },
+  // Skip the in-build type-check and lint to shorten the deploy: `npx tsc
+  // --noEmit` is the verification gate we run separately, and ESLint isn't
+  // installed (see CLAUDE.md), so `next build` re-running them only adds time.
+  // Keep running `npx tsc --noEmit` before deploying — it's still the gate.
+  typescript: { ignoreBuildErrors: true },
+  eslint: { ignoreDuringBuilds: true },
 };
 
 export default nextConfig;

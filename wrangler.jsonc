@@ -44,10 +44,6 @@
 		{
 			"binding": "AVATARS",
 			"bucket_name": "commons-avatars"
-		},
-		{
-			"bucket_name": "commons-avatars",
-			"binding": "commons_avatars"
 		}
 	],
 	// Non-secret runtime config. Secrets (BETTER_AUTH_SECRET, DISCORD_CLIENT_*,

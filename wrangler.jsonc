@@ -43,10 +43,10 @@
 	// BATTLENET_CLIENT_*, SUPPORT_EMAIL_APP_PASSWORD) are set with
 	// `wrangler secret put` in production and .dev.vars locally.
 	"vars": {
-		// The origin the Commons is actually served from. Flip to
-		// https://commons.fault.foundation once that DNS record is live —
-		// lib/auth.ts already trusts both, so no code change is needed.
-		"BETTER_AUTH_URL": "https://commons.oscarlabit9729.workers.dev",
+		// The origin the Commons is actually served from — the custom domain now
+		// that its DNS is live. lib/auth.ts trustedOrigins still lists the
+		// workers.dev alias too, so that hostname keeps working as a fallback.
+		"BETTER_AUTH_URL": "https://commons.fault.foundation",
 		// The mailbox verification codes are sent from — also the SMTP account
 		// we authenticate as (its app password is the SUPPORT_EMAIL_APP_PASSWORD
 		// secret). Sender and account match, so Gmail leaves the From header be.

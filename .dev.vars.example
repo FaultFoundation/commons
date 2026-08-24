@@ -60,6 +60,10 @@ BETTER_AUTH_URL=http://localhost:3999
 # callback provider segment is "startgg".
 # STARTGG_CLIENT_ID=
 # STARTGG_CLIENT_SECRET=
+# start.gg server-side personal access token (same developer settings page) —
+# separate from the OAuth app. Only needed for the schedule sync, which reads a
+# member's tournaments by their start.gg id with this token (mirrors FACEIT_API_KEY).
+# STARTGG_API_KEY=
 
 # Challonge member connect (OAuth 2.0) — register at connect.challonge.com.
 # Used only to read a member's Challonge handle so their tournament entry can be

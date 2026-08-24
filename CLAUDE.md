@@ -237,11 +237,14 @@ renders them as one calendar. Same Workers-shaped constraints as everything
 else — **no cron, so it syncs lazily on read** past a 15-min per-provider TTL
 (stamped in `platform_identities.metadata`), every provider call is best-effort
 (4s timeout, never throws, `[]` on failure), and writes go through `db.batch`.
-Provider auth differs: Challonge/start.gg use the member's OAuth token (Challonge
-sends `Authorization-Type: v2` — the act-on-behalf path, vs the org key's `v1`),
-while FACEIT reads its server Data API key (`FACEIT_API_KEY`) keyed by the player
-guid. Live-verified for Challonge only; the FACEIT/start.gg adapters are written
-against documented shapes and parse defensively pending a live token.
+Provider auth differs: FACEIT and start.gg read **server-side keys**
+(`FACEIT_API_KEY`, `STARTGG_API_KEY`) keyed by the member's stored external id —
+no per-member OAuth token — while Challonge uses the member's OAuth token
+(`Authorization-Type: v2`, the act-on-behalf path, vs the org key's `v1`) because
+it has no server-side "this member's tournaments" read. OAuth still runs the
+*connect* (capturing the external id); the server keys do the data reads.
+Live-verified for Challonge only; the FACEIT/start.gg adapters are written
+against documented shapes and parse defensively pending a live key.
 
 ### Styling
 

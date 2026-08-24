@@ -212,28 +212,35 @@ function challongeState(state: string | undefined): ScheduleStatus {
 }
 
 /**
- * The member's upcoming start.gg tournaments, via the GraphQL `currentUser`
- * query. Tournament-level for the MVP (start.gg's set-level schedule is a later
- * layer). `startAt` is unix seconds.
+ * The member's upcoming start.gg tournaments, read server-side with the org's
+ * personal access token (STARTGG_API_KEY) keyed by the member's start.gg user
+ * id — no per-member OAuth token needed, mirroring FACEIT. Tournament-level for
+ * the MVP (start.gg's set-level schedule is a later layer). `startAt` is unix
+ * seconds. Whether `user(id:).tournaments` returns another user's events under a
+ * server token is worth confirming against a live token.
  */
-async function loadStartggSchedule(token: string): Promise<SyncedMatch[]> {
+async function loadStartggSchedule(
+  apiToken: string,
+  startggUserId: string,
+): Promise<SyncedMatch[]> {
   try {
     const res = await fetch(STARTGG_GQL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${apiToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         query:
-          "query{currentUser{tournaments(query:{perPage:20,filter:{upcoming:true}}){nodes{id name slug startAt}}}}",
+          "query($id:ID!){user(id:$id){tournaments(query:{perPage:20,filter:{upcoming:true}}){nodes{id name slug startAt}}}}",
+        variables: { id: startggUserId },
       }),
       signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
     });
     if (!res.ok) return [];
     const body = (await res.json()) as {
       data?: {
-        currentUser?: {
+        user?: {
           tournaments?: {
             nodes?: Array<{
               id?: number | string;
@@ -245,7 +252,7 @@ async function loadStartggSchedule(token: string): Promise<SyncedMatch[]> {
         };
       };
     };
-    const nodes = body.data?.currentUser?.tournaments?.nodes ?? [];
+    const nodes = body.data?.user?.tournaments?.nodes ?? [];
     return nodes.flatMap((t) => {
       if (t.id == null) return [];
       return [
@@ -456,18 +463,24 @@ export async function syncSchedule(
               identity.externalId,
             );
           }
-        } else {
+        } else if (provider === "startgg") {
+          // start.gg likewise reads through the server personal access token,
+          // keyed by the member's start.gg user id — no per-member OAuth token.
+          if (env.STARTGG_API_KEY && identity.externalId) {
+            matches = await loadStartggSchedule(
+              env.STARTGG_API_KEY,
+              identity.externalId,
+            );
+          }
+        } else if (provider === "challonge") {
+          // Challonge has no server-side "this member's tournaments" read (the
+          // org key reads the org's events, not the member's), so it still uses
+          // the member's OAuth token + the tournaments:read scope. Accounts
+          // linked before that scope shipped carry only `me` and are skipped
+          // rather than 403'd.
           const linked = await connectAccount(userId, provider);
           if (!linked) return;
-          // Challonge's schedule needs the tournaments:read scope; accounts
-          // linked before it shipped carry only `me` and are skipped rather
-          // than 403'd.
-          if (
-            provider === "challonge" &&
-            !hasScope(linked.scope, "tournaments:read")
-          ) {
-            return;
-          }
+          if (!hasScope(linked.scope, "tournaments:read")) return;
           const token = await accessTokenFor(
             userId,
             provider,
@@ -475,10 +488,7 @@ export async function syncSchedule(
             requestHeaders,
           );
           if (!token) return;
-          matches =
-            provider === "challonge"
-              ? await loadChallongeSchedule(token)
-              : await loadStartggSchedule(token);
+          matches = await loadChallongeSchedule(token);
         }
 
         await upsertMatches(userId, provider, matches);

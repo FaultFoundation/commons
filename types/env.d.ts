@@ -32,6 +32,11 @@ interface CloudflareEnv {
   // GraphQL API; connect-only.
   STARTGG_CLIENT_ID?: string;
   STARTGG_CLIENT_SECRET?: string;
+  // start.gg server-side personal access token (start.gg developer settings).
+  // Separate from the OAuth client above: identity is OAuth, but the schedule
+  // sync reads a member's tournaments server-side by their stored start.gg id
+  // with this token — no per-member OAuth token needed, mirroring FACEIT_API_KEY.
+  STARTGG_API_KEY?: string;
   // Challonge OAuth client (connect.challonge.com). OAuth 2.0; connect-only —
   // this is the *member* "Connect Challonge" flow, used only to read a member's
   // Challonge handle so their tournament entry can be linked to their account.

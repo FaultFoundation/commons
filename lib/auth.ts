@@ -96,9 +96,14 @@ export function getAuth() {
             clientSecret: env.FACEIT_CLIENT_SECRET,
             discoveryUrl: "https://api.faceit.com/auth/v1/openid_configuration",
             scopes: ["openid", "email", "profile"],
-            // No code_challenge_methods in FACEIT's discovery and it's a
-            // confidential client, so PKCE stays off.
-            pkce: false,
+            // MUST be true — FACEIT's authorize endpoint REQUIRES PKCE. Without a
+            // code_challenge, api/v1/authorize 400s ("Unauthorized client" /
+            // "pkce_required") and the grant silently fails. (FACEIT's discovery
+            // omits code_challenge_methods, which misled an earlier pkce:false —
+            // but the original app demonstrably worked WITH a code_challenge, so
+            // PKCE is supported and required.) Better Auth generates the verifier/
+            // challenge and sends code_verifier at the token exchange itself.
+            pkce: true,
             // FACEIT's token endpoint only accepts client_secret_basic (per its
             // OIDC discovery: token_endpoint_auth_methods_supported). Better Auth
             // defaults to client_secret_post (creds in the body), which FACEIT

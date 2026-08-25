@@ -12,17 +12,6 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
-	// CPU ceiling per request. On the Workers *Paid* plan the default is already
-	// 30s and the max is 5min; this makes the intent explicit and gives headroom
-	// for the heaviest SSR render. On the *Free* plan it is a no-op — Free hard-
-	// caps CPU at 10ms regardless, which a Next.js/OpenNext render routinely
-	// exceeds (this is the source of the "Error 1102 — Worker exceeded resource
-	// limits" seen when clicking between tabs). The durable fix for real traffic
-	// is upgrading to Workers Paid, which also removes Free's 100k-requests/day
-	// cap that ~1000 users would otherwise blow through. See CLAUDE.md.
-	"limits": {
-		"cpu_ms": 30000
-	},
 	"assets": {
 		"directory": ".open-next/assets",
 		"binding": "ASSETS"

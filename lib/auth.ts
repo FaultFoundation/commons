@@ -82,23 +82,19 @@ export function getAuth() {
           },
         ]
       : []),
-    // FACEIT ("FACEIT Connect") — OpenID Connect, but its endpoints are set
-    // EXPLICITLY, not via discoveryUrl. FACEIT's own openid_configuration returns
-    // the WRONG authorization_endpoint (accounts.faceit.com/accounts — the
-    // account/login page, where the user sees their profile but granting
-    // silently "greys out and does nothing"). The real OAuth authorize endpoint,
-    // per the FACEIT Connect 3.0 docs, is auth.faceit.com/v1/authorize. Using
-    // discoveryUrl would overwrite authorizationUrl with the bad value (see
-    // better-auth's generic-oauth routes), so we can't use it. getUserInfo below
-    // reads the userinfo endpoint directly (fetchFaceitProfile).
+    // FACEIT ("FACEIT Connect") — OpenID Connect. Endpoints come from FACEIT's
+    // OIDC discovery (authorization_endpoint = https://accounts.faceit.com — the
+    // real, DNS-resolving authorize host).
+    // ⚠️ DO NOT set authorizationUrl to https://auth.faceit.com/... — that host
+    // does NOT resolve (ERR_NAME_NOT_RESOLVED / DNS_PROBE_STARTED). FACEIT's
+    // Connect 3.0 PDF documents it, but it's dead. Keep discoveryUrl.
     ...(env.FACEIT_CLIENT_ID && env.FACEIT_CLIENT_SECRET
       ? [
           {
             providerId: "faceit",
             clientId: env.FACEIT_CLIENT_ID,
             clientSecret: env.FACEIT_CLIENT_SECRET,
-            authorizationUrl: "https://auth.faceit.com/v1/authorize",
-            tokenUrl: "https://api.faceit.com/auth/v1/oauth/token",
+            discoveryUrl: "https://api.faceit.com/auth/v1/openid_configuration",
             scopes: ["openid", "email", "profile"],
             // No code_challenge_methods in FACEIT's discovery and it's a
             // confidential client, so PKCE stays off.

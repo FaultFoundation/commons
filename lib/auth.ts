@@ -146,8 +146,10 @@ export function getAuth() {
                   headers: {
                     "Content-Type": "application/x-www-form-urlencoded",
                     Accept: "application/json",
-                    // Some WAF/edge setups reject requests with no User-Agent.
-                    "User-Agent": "TheFaultFoundation-Commons/1.0",
+                    // Browser-like UA to rule out FACEIT's Cloudflare bot layer
+                    // treating a Worker subrequest as automated.
+                    "User-Agent":
+                      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
                     Authorization: `Basic ${basic}`,
                   },
                   body: form.toString(),

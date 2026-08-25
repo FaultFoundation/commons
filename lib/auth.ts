@@ -111,6 +111,64 @@ export function getAuth() {
             // the link silently doesn't complete. Send the credentials as Basic.
             authentication: "basic" as const,
             disableSignUp: true,
+            // FACEIT's token endpoint returns a bare 401 that Better Auth wraps
+            // as `oauth_code_verification_failed`, hiding the real reason. Do the
+            // exchange ourselves — Basic auth per FACEIT's docs — and log
+            // FACEIT's actual response body, so the true error (e.g.
+            // invalid_client) is visible in `wrangler tail`. Overriding getToken
+            // also removes any ambiguity about how Better Auth authenticates.
+            getToken: async ({
+              code,
+              redirectURI,
+              codeVerifier,
+            }: {
+              code: string;
+              redirectURI: string;
+              codeVerifier?: string;
+            }) => {
+              const basic = Buffer.from(
+                `${env.FACEIT_CLIENT_ID}:${env.FACEIT_CLIENT_SECRET}`,
+              ).toString("base64");
+              const form = new URLSearchParams({
+                grant_type: "authorization_code",
+                code,
+                redirect_uri: redirectURI,
+              });
+              if (codeVerifier) form.set("code_verifier", codeVerifier);
+              const res = await fetch(
+                "https://api.faceit.com/auth/v1/oauth/token",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    Accept: "application/json",
+                    Authorization: `Basic ${basic}`,
+                  },
+                  body: form.toString(),
+                },
+              );
+              const text = await res.text();
+              if (!res.ok) {
+                console.error(`FACEIT token exchange ${res.status}: ${text}`);
+                throw new Error(`FACEIT token ${res.status}`);
+              }
+              const data = JSON.parse(text) as Record<string, unknown>;
+              return {
+                accessToken: data.access_token as string | undefined,
+                refreshToken: data.refresh_token as string | undefined,
+                tokenType: data.token_type as string | undefined,
+                idToken: data.id_token as string | undefined,
+                accessTokenExpiresAt:
+                  typeof data.expires_in === "number"
+                    ? new Date(Date.now() + data.expires_in * 1000)
+                    : undefined,
+                scopes:
+                  typeof data.scope === "string"
+                    ? data.scope.split(" ")
+                    : undefined,
+                raw: data,
+              };
+            },
             getUserInfo: async (tokens: OAuthTokens) => {
               const p = await fetchFaceitProfile(tokens.accessToken);
               if (!p) return null;

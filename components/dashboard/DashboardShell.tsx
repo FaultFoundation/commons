@@ -8,6 +8,7 @@ import {
   type NavItem,
 } from "@/components/dashboard/DashboardNav";
 import { DashboardRail } from "@/components/dashboard/DashboardRail";
+import { OAuthPopupBridge } from "@/components/dashboard/accounts/OAuthPopupBridge";
 import { DensityCookie } from "@/components/dashboard/accounts/DensityCookie";
 import { SetupBanner } from "@/components/dashboard/SetupBanner";
 import { isAdminUnlocked } from "@/lib/admin-unlock";
@@ -132,6 +133,7 @@ export async function DashboardShell({
   return (
     <main id="wp--skip-link--target" className="ff-main ff-main--fill">
       <DensityCookie value={density} />
+      <OAuthPopupBridge />
       <div
         data-density={density}
         data-surface={surface}

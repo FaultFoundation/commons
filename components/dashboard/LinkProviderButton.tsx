@@ -36,10 +36,14 @@ export function LinkProviderButton({
   async function fetchAuthorizeUrl(): Promise<string | null> {
     const endpoint =
       provider === "discord" ? "/api/auth/link-social" : "/api/auth/oauth2/link";
+    // Mark the return URL so OAuthPopupBridge on the landing page knows this tab
+    // is the connect popup — it then closes itself and refreshes the opener.
+    const marked =
+      callbackURL + (callbackURL.includes("?") ? "&" : "?") + "ff_oauth=1";
     const body =
       provider === "discord"
-        ? { provider: "discord", callbackURL, disableRedirect: true }
-        : { providerId: provider, callbackURL };
+        ? { provider: "discord", callbackURL: marked, disableRedirect: true }
+        : { providerId: provider, callbackURL: marked };
     try {
       const res = await fetch(endpoint, {
         method: "POST",

@@ -270,7 +270,7 @@ data lives in a **separate D1 database, `cen-sql`**, bound read-only to the
 Commons as `CEN` — deliberately not joined to `website-sql` at the DB level
 (D1 can't JOIN across bindings; join in app code by external id, like the bot's
 Sheets↔D1 split). It is a lean **projection** ([db/cen-schema.ts](db/cen-schema.ts):
-`ext_tournaments`/`ext_events`/`ext_standings`), not the scraper's full
+`ext_tournaments`/`ext_events`/`ext_matches`/`ext_standings`), not the scraper's full
 normalized model. Its migrations version independently in `drizzle-cen/`
 (`npm run db:cen:*`), separate from `website-sql`'s `drizzle/`.
 
@@ -285,12 +285,27 @@ normalized model. Its migrations version independently in `drizzle-cen/`
 - **Reads degrade** ([lib/external-tournaments.ts](lib/external-tournaments.ts),
   over [lib/cen-db.ts](lib/cen-db.ts) `getCenDb()`): no `CEN` binding, an
   empty table, or a query error returns nothing, so the tab renders the internal
-  tournaments alone. Tournament `status` is **derived** from the start/end window
-  (the scraper has no single tournament state).
+  tournaments alone. Tournament `status` is **derived**, never written: terminal
+  event states first, then the end date, then a 30-day fallback only when the
+  provider omitted an end date. This keeps stale rows out of Active without
+  mutating the scraper's source data.
+- The 30-day derived fallback applies to **external scraped tournaments only**.
+  Native Challonge lifecycle remains staff-authoritative: its current snapshot
+  shape has no match-activity timestamp, and `fetchedAt` is cache freshness,
+  not evidence that a match happened. Add a dedicated persisted activity field
+  before applying the same rule to native tournaments; never guess from fetch
+  time or parse every bracket payload on the list path.
 - The list ([app/tournaments/page.tsx](app/tournaments/page.tsx)) merges both
   into one `TournamentListEntry[]`; external cards carry a `source` and link out
   to the native site for now (a branded Commons view for external tournaments is
   the next Phase-1 step, reusing the internal templates).
+- `/schedule` reads `ext_matches` for its **All Matches** calendar. FACEIT rows
+  come from a championship-matches request the scraper already makes for roster
+  data; start.gg set page 1 rides the existing deep query and only additional
+  pages cost extra calls. start.gg frequently leaves `startedAt` null before a
+  set begins, so those rows deliberately render under Date TBD. Until a new
+  scraper run and projection import populate `ext_matches`, the calendar falls
+  back to tournament start windows rather than rendering empty.
 
 ### Styling
 

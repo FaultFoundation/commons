@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type DragEvent } from "react";
+import { useEffect, useState, useTransition, type DragEvent } from "react";
 
 // ---------------------------------------------------------------------------
 // Reusable "drag a tile to reorder" template for any .ff-bubble-grid.
@@ -46,6 +46,12 @@ export function useReorderableGrid<T>({
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Router refreshes deliver a new server-owned list after creates, joins, and
+  // successful reorders. Keep the local drag order in sync with that source.
+  useEffect(() => {
+    setOrder(items);
+  }, [items]);
 
   function commit(next: T[]) {
     if (next === order) return;

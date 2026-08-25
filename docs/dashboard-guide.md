@@ -11,7 +11,7 @@ now 308s via `middleware.ts`). `/` stays the public Commons landing page.
 | Route                          | Tab         | What                         |
 | ------------------------------ | ----------- | ---------------------------- |
 | `/home/`                       | Home        | Condensed widget views       |
-| `/schedule/`                   | Schedule    | WIP                          |
+| `/schedule/`                   | Schedule    | All/public + personal match calendar |
 | `/tournaments/`                | Tournaments | List of open/live/finished tournaments |
 | `/t/<id>/<name>/`              | —           | Public branded bracket (signed-out-safe) |
 | `/admin/tournaments/`          | Admin       | Create + manage (Challonge-backed) |
@@ -130,21 +130,50 @@ the names, labels, and `asDensity()` normalizer, shared by both sides.
 - Deliberately not on `<html>`: the root layout is shared with the public
   marketing pages, and reading `cookies()` there would make them all dynamic.
 
-## Button colour means one thing
+## Proposed semantic control system
 
-**Blue commits a change. Outline doesn't.** This is a site-wide rule, not a
-per-page choice:
+Use this as the target for new controls and migrate existing surfaces together
+rather than changing one page at a time. Appearance communicates **semantics**,
+not visual variety:
 
 | Look | Class | Use for |
 | --- | --- | --- |
-| Blue (filled) | `ff-btn` | The click that actually writes something — Save Changes once a field differs, Save in an editor, Turn On |
-| White outline | `ff-btn ff-btn--outline` | Everything else: opening an editor (Change, Edit, Add), a secondary or cancelling action, and any commit button with nothing yet to commit |
-| Red | `ff-btn ff-btn--danger` | Destructive confirmation |
+| Blue filled | `ff-btn` | The one primary command or commit in a context: Save, Create, Send, Confirm. Blue hover stays blue; it must not turn yellow. |
+| White outline | `ff-btn ff-btn--outline` | Secondary, navigation, reveal, dismiss, copy, and non-mutating commands: Back, Cancel, Edit, Manage, Open. |
+| Yellow selected | `aria-pressed="true"` / `aria-current="page"` on segmented controls or tabs | Current view/mode only. Yellow is state, never a submit button or hover color. |
+| Red filled | `ff-btn ff-btn--danger` | The final destructive confirmation only, never the button that merely opens a confirmation dialog. |
+| Provider brand | `ff-oauth--<provider>` | OAuth/connect buttons only, where provider guidelines override the application palette. |
 
-A control that *becomes* live swaps class rather than only toggling
-`disabled` — `FieldRow`'s Save Changes is outline-and-disabled until the value
-differs, then turns blue. A page of live inputs has to read as settled at a
-glance, and greying out a blue button doesn't achieve that.
+Binary settings use `Switch`: neutral when off and blue when on. View choices
+use a segmented control or tabs, never a row of command buttons. `ff-btn--soft`
+is a legacy secondary treatment; do not add new uses—consolidate it into the
+outline role during the site-wide migration. A control that becomes actionable
+may stay outline-and-disabled until valid, then become blue.
+
+Proposed component API, when the site-wide migration is scheduled:
+
+```tsx
+<Button variant="primary" size="sm">Save</Button>
+<Button variant="secondary" size="sm">Cancel</Button>
+<Button variant="danger" size="sm">Delete</Button>
+<SegmentedControl value={view} options={views} />
+```
+
+`Button.variant` should be a closed `"primary" | "secondary" | "danger"`
+union mapping to the existing classes; provider buttons remain their own
+component. `SegmentedControl` owns yellow current-state styling, so callers
+cannot accidentally use yellow for a command. Do not expose `soft` from the new
+API: migrate its existing call sites to `secondary` together.
+
+### Schedule calendar
+
+The first Schedule bubble is a month grid with **All Matches / Your Matches**
+in its header. All Matches reads the public `cen-sql.ext_matches` projection;
+Your Matches reads the member's lazily synced `website-sql.external_matches`
+plus Commons tournament entries. Provider rows without an exact time belong in
+Date TBD. Until the match projection has been populated by a schema-v4 scraper
+run and imported, All Matches intentionally falls back to external tournament
+start windows so the calendar degrades rather than disappearing.
 
 ## The template components
 

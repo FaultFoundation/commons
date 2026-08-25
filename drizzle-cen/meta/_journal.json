@@ -8,6 +8,13 @@
       "when": 1787611590169,
       "tag": "0000_far_hawkeye",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1787694266350,
+      "tag": "0001_bored_arachne",
+      "breakpoints": true
     }
   ]
 }

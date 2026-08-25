@@ -36,9 +36,10 @@ export type TournamentListEntry = {
   externalUrl?: string | null;
 };
 
-/** The two filters, in the order a member looks for things. "Active" is
-    everything that isn't finished; "Concluded" is the archive. */
+/** All is the complete catalog; Active remains the default working view and
+    Concluded is the archive. */
 const VIEWS = [
+  { key: "all", label: "All" },
   { key: "active", label: "Active" },
   { key: "concluded", label: "Concluded" },
 ] as const;
@@ -77,6 +78,16 @@ function byStartDesc(a: TournamentListEntry, b: TournamentListEntry): number {
   return b.startsAt - a.startsAt;
 }
 
+/** Upcoming first (soonest to latest), then past (newest to oldest). */
+function byTimeline(today: number) {
+  return (a: TournamentListEntry, b: TournamentListEntry): number => {
+    const aUpcoming = isUpcoming(a, today);
+    const bUpcoming = isUpcoming(b, today);
+    if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1;
+    return aUpcoming ? byStartAsc(a, b) : byStartDesc(a, b);
+  };
+}
+
 /**
  * The member's tournament list. **Active** (default) shows a featured hero — the
  * admin-set featured tournament, else the soonest upcoming — then tiles for
@@ -103,7 +114,7 @@ export function TournamentList({
     document.cookie = `${TOURNAMENT_LAYOUT_COOKIE}=${next}; path=/; max-age=${TOURNAMENT_LAYOUT_COOKIE_MAX_AGE}; samesite=lax`;
   }
 
-  const { featured, upcoming, past, concluded } = useMemo(() => {
+  const { featured, upcoming, past, concluded, all } = useMemo(() => {
     const today = startOfTodayMs();
     const active = tournaments.filter((t) => !isConcluded(t.status));
     const done = tournaments.filter((t) => isConcluded(t.status)).sort(byStartDesc);
@@ -124,10 +135,14 @@ export function TournamentList({
       upcoming: rest.filter((t) => isUpcoming(t, today)).sort(byStartAsc),
       past: rest.filter((t) => !isUpcoming(t, today)).sort(byStartDesc),
       concluded: done,
+      all: tournaments
+        .filter((t) => t.id !== hero?.id)
+        .sort(byTimeline(today)),
     };
   }, [tournaments]);
 
   const activeEmpty = !featured && upcoming.length === 0 && past.length === 0;
+  const allEmpty = !featured && all.length === 0;
 
   return (
     <>
@@ -170,7 +185,27 @@ export function TournamentList({
         </div>
       </div>
 
-      {view === "concluded" ? (
+      {view === "all" ? (
+        allEmpty ? (
+          <p className="ff-ticket-empty">No tournaments yet.</p>
+        ) : layout === "modern" ? (
+          <>
+            {featured ? <FeaturedHero tournament={featured} /> : null}
+            {all.length > 0 ? (
+              <div className="ff-tcard-grid">
+                {all.map((t) => (
+                  <TournamentCard key={t.id} tournament={t} />
+                ))}
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <>
+            {featured ? <FeaturedHero tournament={featured} /> : null}
+            <CompactTable tournaments={all} />
+          </>
+        )
+      ) : view === "concluded" ? (
         concluded.length === 0 ? (
           <p className="ff-ticket-empty">No concluded tournaments yet.</p>
         ) : layout === "modern" ? (

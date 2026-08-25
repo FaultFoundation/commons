@@ -70,6 +70,26 @@ export const extEvents = sqliteTable(
   (t) => [index("ext_events_tournament_idx").on(t.tournamentId)],
 );
 
+/** A provider match/set within an external event, used by /schedule's calendar. */
+export const extMatches = sqliteTable(
+  "ext_matches",
+  {
+    id: text("id").primaryKey(), // `${eventId}:${sourceMatchId}`
+    eventId: text("event_id").notNull(),
+    sourceMatchId: text("source_match_id").notNull(),
+    scheduledAt: integer("scheduled_at", { mode: "timestamp_ms" }),
+    state: text("state"),
+    round: text("round"),
+    entrant1Name: text("entrant_1_name"),
+    entrant2Name: text("entrant_2_name"),
+    url: text("url"),
+  },
+  (t) => [
+    index("ext_matches_event_idx").on(t.eventId),
+    index("ext_matches_scheduled_at_idx").on(t.scheduledAt),
+  ],
+);
+
 /** A final placement in an event — the "results" the Commons view renders. */
 export const extStandings = sqliteTable(
   "ext_standings",

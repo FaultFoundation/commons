@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ScheduleView } from "@/components/dashboard/schedule/ScheduleView";
+import { listUpcomingExternalScheduleEntries } from "@/lib/external-tournaments";
 import { getSessionCached } from "@/lib/session";
 import { loadConnectIntegrations } from "@/lib/integrations";
 import { loadSchedule } from "@/lib/schedule";
@@ -27,8 +28,9 @@ export default async function SchedulePage() {
   // Sync-on-read + the calendar, and the connect state (to steer the empty
   // state toward Integrations when nothing is linked). Both are best-effort and
   // degrade to an empty calendar rather than failing the page.
-  const [{ upcoming, past }, connects] = await Promise.all([
+  const [{ upcoming, past }, allUpcoming, connects] = await Promise.all([
     loadSchedule(userId, requestHeaders),
+    listUpcomingExternalScheduleEntries(),
     loadConnectIntegrations(userId),
   ]);
   const anyConnected = connects.some((c) => c.linked);
@@ -37,6 +39,7 @@ export default async function SchedulePage() {
     <DashboardShell active="schedule" setupUserId={userId}>
       <h1 className="screen-reader-text">Schedule</h1>
       <ScheduleView
+        allUpcoming={allUpcoming}
         upcoming={upcoming}
         past={past}
         anyConnected={anyConnected}

@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
@@ -11,33 +14,59 @@ import {
 /**
  * The member's cross-site calendar: two bubbles, Upcoming and Results, each a
  * list of normalized entries aggregated from their connected FACEIT / start.gg
- * / Challonge accounts (lib/schedule.ts). Pure server component — the data is
- * synced before render and there's nothing to poll, so no client directive.
+ * / Challonge accounts (lib/schedule.ts), plus the public scraped calendar.
+ * Client state owns the month and All/Your scope; data is still loaded once by
+ * the server page and there is no browser polling.
  */
 export function ScheduleView({
+  allUpcoming,
   upcoming,
   past,
   anyConnected,
 }: {
+  allUpcoming: ScheduleEntry[];
   upcoming: ScheduleEntry[];
   past: ScheduleEntry[];
   anyConnected: boolean;
 }) {
+  const [scope, setScope] = useState<"all" | "mine">("all");
+  const entries = scope === "all" ? allUpcoming : upcoming;
+
   return (
     <div className="ff-bubble-grid">
-      <Bubble title="Upcoming" span="full">
-        {upcoming.length > 0 ? (
-          <div className="ff-schedule-list">
-            {upcoming.map((e) => (
-              <EntryRow key={e.id} entry={e} />
-            ))}
+      <Bubble
+        title="Calendar"
+        span="full"
+        className="ff-schedule-calendar"
+        actions={
+          <div className="ff-segment ff-schedule-scope" role="group" aria-label="Matches shown">
+            <button
+              className="ff-segment__btn"
+              type="button"
+              aria-pressed={scope === "all"}
+              onClick={() => setScope("all")}
+            >
+              All Matches
+            </button>
+            <button
+              className="ff-segment__btn"
+              type="button"
+              aria-pressed={scope === "mine"}
+              onClick={() => setScope("mine")}
+            >
+              Your Matches
+            </button>
           </div>
-        ) : (
-          <EmptyState anyConnected={anyConnected} kind="upcoming" />
-        )}
+        }
+      >
+        <MonthCalendar
+          entries={entries}
+          scope={scope}
+          anyConnected={anyConnected}
+        />
       </Bubble>
 
-      <Bubble title="Results">
+      <Bubble title="Your Results">
         {past.length > 0 ? (
           <div className="ff-schedule-list">
             {past.map((e) => (
@@ -49,6 +78,234 @@ export function ScheduleView({
         )}
       </Bubble>
     </div>
+  );
+}
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function monthStartFor(entries: ScheduleEntry[]): number {
+  const dated = entries.find((entry) => entry.scheduledAt != null)?.scheduledAt;
+  const date = new Date(dated ?? Date.now());
+  return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
+}
+
+function dateKey(ms: number): string {
+  const date = new Date(ms);
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+function MonthCalendar({
+  entries,
+  scope,
+  anyConnected,
+}: {
+  entries: ScheduleEntry[];
+  scope: "all" | "mine";
+  anyConnected: boolean;
+}) {
+  const [month, setMonth] = useState(() => monthStartFor(entries));
+  const previousScope = useRef(scope);
+
+  useEffect(() => {
+    if (previousScope.current === scope) return;
+    previousScope.current = scope;
+    const visible = new Date(month);
+    const hasVisibleEntry = entries.some((entry) => {
+      if (entry.scheduledAt == null) return false;
+      const date = new Date(entry.scheduledAt);
+      return (
+        date.getFullYear() === visible.getFullYear() &&
+        date.getMonth() === visible.getMonth()
+      );
+    });
+    if (!hasVisibleEntry) setMonth(monthStartFor(entries));
+  }, [entries, month, scope]);
+
+  const { weeks, entriesByDay, label } = useMemo(() => {
+    const start = new Date(month);
+    const year = start.getFullYear();
+    const monthIndex = start.getMonth();
+    const leading = new Date(year, monthIndex, 1).getDay();
+    const days = new Date(year, monthIndex + 1, 0).getDate();
+    const cellCount = Math.ceil((leading + days) / 7) * 7;
+    const calendarCells = Array.from({ length: cellCount }, (_, index) => {
+      const day = index - leading + 1;
+      return day >= 1 && day <= days ? new Date(year, monthIndex, day) : null;
+    });
+    const calendarWeeks = Array.from(
+      { length: calendarCells.length / 7 },
+      (_, index) => calendarCells.slice(index * 7, index * 7 + 7),
+    );
+    const grouped = new Map<string, ScheduleEntry[]>();
+    for (const entry of entries) {
+      if (entry.scheduledAt == null) continue;
+      const key = dateKey(entry.scheduledAt);
+      const list = grouped.get(key) ?? [];
+      list.push(entry);
+      grouped.set(key, list);
+    }
+    return {
+      weeks: calendarWeeks,
+      entriesByDay: grouped,
+      label: start.toLocaleDateString(undefined, {
+        month: "long",
+        year: "numeric",
+      }),
+    };
+  }, [entries, month]);
+
+  const undated = entries.filter((entry) => entry.scheduledAt == null);
+  const today = dateKey(Date.now());
+
+  function moveMonth(offset: number) {
+    const current = new Date(month);
+    setMonth(
+      new Date(current.getFullYear(), current.getMonth() + offset, 1).getTime(),
+    );
+  }
+
+  return (
+    <>
+      <div className="ff-calendar__toolbar">
+        <button
+          className="ff-calendar__nav"
+          type="button"
+          title="Previous month"
+          aria-label="Previous month"
+          onClick={() => moveMonth(-1)}
+        >
+          <MonthChevron />
+        </button>
+        <time className="ff-calendar__month" dateTime={new Date(month).toISOString()}>
+          {label}
+        </time>
+        <button
+          className="ff-calendar__nav"
+          type="button"
+          title="Next month"
+          aria-label="Next month"
+          onClick={() => moveMonth(1)}
+        >
+          <MonthChevron next />
+        </button>
+      </div>
+
+      {entries.length === 0 ? (
+        <CalendarEmpty scope={scope} anyConnected={anyConnected} />
+      ) : (
+        <div className="ff-calendar__viewport">
+          <div className="ff-calendar" role="table" aria-label={label}>
+            <div className="ff-calendar__row ff-calendar__row--header" role="row">
+              {WEEKDAYS.map((day) => (
+                <div key={day} className="ff-calendar__weekday" role="columnheader">
+                  {day}
+                </div>
+              ))}
+            </div>
+            {weeks.map((week, weekIndex) => (
+              <div className="ff-calendar__row" role="row" key={`week-${weekIndex}`}>
+                {week.map((date, dayIndex) => {
+                  if (!date) {
+                    return (
+                      <div
+                        key={`blank-${weekIndex}-${dayIndex}`}
+                        className="ff-calendar__day ff-calendar__day--blank"
+                        role="cell"
+                      />
+                    );
+                  }
+                  const key = dateKey(date.getTime());
+                  const dayEntries = entriesByDay.get(key) ?? [];
+                  return (
+                    <div
+                      key={key}
+                      className="ff-calendar__day"
+                      data-today={key === today || undefined}
+                      role="cell"
+                    >
+                      <time dateTime={date.toISOString()} className="ff-calendar__date">
+                        {date.getDate()}
+                      </time>
+                      <div className="ff-calendar__events">
+                        {dayEntries.map((entry) => (
+                          <CalendarEntry key={entry.id} entry={entry} />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {undated.length > 0 ? (
+        <div className="ff-calendar__undated">
+          <strong>Date TBD</strong>
+          {undated.map((entry) => (
+            <CalendarEntry key={entry.id} entry={entry} />
+          ))}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function CalendarEntry({ entry }: { entry: ScheduleEntry }) {
+  const external = !entry.href && Boolean(entry.url);
+  const href = entry.href ?? entry.url;
+  const content = (
+    <>
+      <span className="ff-calendar__event-title">{entry.title}</span>
+      <span className="ff-calendar__event-meta">
+        {entry.scheduledAt ? formatTime(entry.scheduledAt) : "Time TBD"} ·{" "}
+        {SCHEDULE_PROVIDER_LABELS[entry.provider]}
+      </span>
+    </>
+  );
+
+  if (!href) return <span className="ff-calendar__event">{content}</span>;
+  return external ? (
+    <a
+      className="ff-calendar__event"
+      href={href}
+      target="_blank"
+      rel="noreferrer noopener"
+    >
+      {content}
+    </a>
+  ) : (
+    <Link className="ff-calendar__event" href={href} prefetch={false}>
+      {content}
+    </Link>
+  );
+}
+
+function CalendarEmpty({
+  scope,
+  anyConnected,
+}: {
+  scope: "all" | "mine";
+  anyConnected: boolean;
+}) {
+  if (scope === "all") {
+    return <div className="ff-bubble__wip">No upcoming public matches found.</div>;
+  }
+  return <EmptyState anyConnected={anyConnected} kind="upcoming" />;
+}
+
+function MonthChevron({ next }: { next?: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d={next ? "M6 3.5 10.5 8 6 12.5" : "M10 3.5 5.5 8l4.5 4.5"}
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
@@ -146,6 +403,13 @@ function formatWhen(ms: number | null): string {
   return new Date(ms).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function formatTime(ms: number): string {
+  return new Date(ms).toLocaleTimeString(undefined, {
     hour: "numeric",
     minute: "2-digit",
   });

@@ -1,7 +1,27 @@
-import { desc, eq, inArray } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  max,
+  or,
+  sql,
+} from "drizzle-orm";
 
-import { extEvents, extStandings, extTournaments } from "@/db/cen-schema";
+import {
+  extEvents,
+  extMatches,
+  extStandings,
+  extTournaments,
+} from "@/db/cen-schema";
 import { getCenDb } from "@/lib/cen-db";
+import {
+  isScheduleProvider,
+  type ScheduleEntry,
+} from "@/lib/schedule-shared";
 
 // ---------------------------------------------------------------------------
 // The Commons' read view over cen-sql (the external-tournaments projection).
@@ -32,9 +52,60 @@ export type ExternalTournamentListItem = {
  * label both the same way. The scraper has no single tournament "state"; the
  * dates are the reliable signal.
  */
-function deriveStatus(startAt: Date | null, endAt: Date | null): string {
+const STALE_TOURNAMENT_DAYS = 30;
+const STALE_TOURNAMENT_MS = STALE_TOURNAMENT_DAYS * 24 * 60 * 60 * 1000;
+const TERMINAL_EVENT_STATES = new Set([
+  "cancelled",
+  "canceled",
+  "complete",
+  "completed",
+  "finalized",
+  "finished",
+]);
+
+function deriveStatus(
+  startAt: Date | null,
+  endAt: Date | null,
+  eventStates: (string | null)[] = [],
+  lastObservedAt: Date | null = null,
+  latestMatchAt: Date | null = null,
+): string {
   const now = Date.now();
+  const knownStates = eventStates
+    .map((state) => state?.trim().toLowerCase())
+    .filter((state): state is string => Boolean(state));
+  if (
+    knownStates.length > 0 &&
+    knownStates.every((state) => TERMINAL_EVENT_STATES.has(state))
+  ) {
+    return "completed";
+  }
   if (endAt && endAt.getTime() < now) return "completed";
+  if (!endAt && latestMatchAt) {
+    if (latestMatchAt.getTime() < now - STALE_TOURNAMENT_MS) {
+      return "completed";
+    }
+    if (startAt && startAt.getTime() <= now) return "active";
+    return "registration";
+  }
+  // Some providers omit an end date and leave their event state stale. Once a
+  // tournament has been underway for a month with neither signal, treat it as
+  // concluded in the read model rather than leaving it Active forever.
+  if (
+    !endAt &&
+    startAt &&
+    startAt.getTime() < now - STALE_TOURNAMENT_MS
+  ) {
+    return "completed";
+  }
+  if (
+    !startAt &&
+    !endAt &&
+    lastObservedAt &&
+    lastObservedAt.getTime() < now - STALE_TOURNAMENT_MS
+  ) {
+    return "completed";
+  }
   if (startAt && startAt.getTime() <= now) return "active";
   return "registration";
 }
@@ -54,12 +125,69 @@ export async function listExternalTournaments(): Promise<
         game: extTournaments.game,
         startAt: extTournaments.startAt,
         endAt: extTournaments.endAt,
+        updatedAt: extTournaments.updatedAt,
         numAttendees: extTournaments.numAttendees,
         url: extTournaments.url,
       })
       .from(extTournaments)
       .orderBy(desc(extTournaments.startAt));
-    return rows.map((r) => ({ ...r, status: deriveStatus(r.startAt, r.endAt) }));
+    const eventRows = rows.length
+      ? await db
+          .select({
+            tournamentId: extEvents.tournamentId,
+            state: extEvents.state,
+          })
+          .from(extEvents)
+          .where(
+            inArray(
+              extEvents.tournamentId,
+              rows.map((row) => row.id),
+            ),
+          )
+      : [];
+    const statesByTournament = new Map<string, (string | null)[]>();
+    for (const event of eventRows) {
+      const states = statesByTournament.get(event.tournamentId) ?? [];
+      states.push(event.state);
+      statesByTournament.set(event.tournamentId, states);
+    }
+    const latestMatchByTournament = new Map<string, Date | null>();
+    try {
+      const matchRows = rows.length
+        ? await db
+            .select({
+              tournamentId: extEvents.tournamentId,
+              latestMatchAt: max(extMatches.scheduledAt),
+            })
+            .from(extMatches)
+            .innerJoin(extEvents, eq(extEvents.id, extMatches.eventId))
+            .where(
+              inArray(
+                extEvents.tournamentId,
+                rows.map((row) => row.id),
+              ),
+            )
+            .groupBy(extEvents.tournamentId)
+        : [];
+      for (const match of matchRows) {
+        latestMatchByTournament.set(
+          match.tournamentId,
+          match.latestMatchAt,
+        );
+      }
+    } catch {
+      // Older cen-sql schema: start/end and event-state derivation still works.
+    }
+    return rows.map(({ updatedAt, ...r }) => ({
+      ...r,
+      status: deriveStatus(
+        r.startAt,
+        r.endAt,
+        statesByTournament.get(r.id),
+        updatedAt,
+        latestMatchByTournament.get(r.id),
+      ),
+    }));
   } catch (error) {
     console.error("listExternalTournaments failed:", error);
     return [];
@@ -91,6 +219,159 @@ export type ExternalTournamentDetail = {
     }[];
   }[];
 };
+
+/**
+ * Upcoming public events for the schedule's All Matches calendar. A populated
+ * ext_matches projection is authoritative; an empty projection means an older
+ * scraper seed is still deployed, so tournament start windows bridge the
+ * rollout without inventing individual match times.
+ */
+export async function listUpcomingExternalScheduleEntries(): Promise<
+  ScheduleEntry[]
+> {
+  const db = getCenDb();
+  if (db) {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const staleCutoff = new Date(Date.now() - STALE_TOURNAMENT_MS);
+      const rows = await db
+        .select({
+          id: extMatches.id,
+          state: extMatches.state,
+          scheduledAt: extMatches.scheduledAt,
+          round: extMatches.round,
+          entrant1Name: extMatches.entrant1Name,
+          entrant2Name: extMatches.entrant2Name,
+          matchUrl: extMatches.url,
+          eventName: extEvents.name,
+          source: extTournaments.source,
+          tournamentName: extTournaments.name,
+          tournamentUrl: extTournaments.url,
+        })
+        .from(extMatches)
+        .innerJoin(extEvents, eq(extEvents.id, extMatches.eventId))
+        .innerJoin(
+          extTournaments,
+          eq(extTournaments.id, extEvents.tournamentId),
+        )
+        .where(
+          and(
+            or(
+              isNull(extMatches.scheduledAt),
+              gte(extMatches.scheduledAt, today),
+            ),
+            or(
+              gte(extTournaments.endAt, today),
+              and(
+                isNull(extTournaments.endAt),
+                or(
+                  gte(extTournaments.startAt, staleCutoff),
+                  and(
+                    isNull(extTournaments.startAt),
+                    gte(extTournaments.updatedAt, staleCutoff),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        )
+        .orderBy(
+          sql`${extMatches.scheduledAt} is null`,
+          asc(extMatches.scheduledAt),
+        )
+        .limit(1000);
+
+      // A populated match projection is authoritative even when every row is
+      // already terminal. An empty table means the old scraper seed is still
+      // deployed, so retain the tournament-window fallback below.
+      if (rows.length > 0) {
+        return rows
+          .flatMap((row): ScheduleEntry[] => {
+            if (!isScheduleProvider(row.source)) return [];
+            const state = externalMatchStatus(row.state);
+            if (state === "finished" || state === "cancelled") return [];
+            const matchup = [row.entrant1Name, row.entrant2Name]
+              .filter(Boolean)
+              .join(" vs ");
+            return [
+              {
+                id: `public:${row.id}`,
+                provider: row.source,
+                title: matchup || row.tournamentName,
+                opponent: null,
+                round: [row.tournamentName, row.eventName, row.round]
+                  .filter(Boolean)
+                  .join(" · "),
+                status: state,
+                scheduledAt: row.scheduledAt?.getTime() ?? null,
+                url: row.matchUrl ?? row.tournamentUrl,
+                href: null,
+              },
+            ];
+          })
+          .sort(
+            (a, b) =>
+              (a.scheduledAt ?? Infinity) - (b.scheduledAt ?? Infinity),
+          );
+      }
+
+      const projectionExists = await db
+        .select({ id: extMatches.id })
+        .from(extMatches)
+        .limit(1);
+      if (projectionExists.length > 0) return [];
+    } catch (error) {
+      console.error("listUpcomingExternalScheduleEntries matches failed:", error);
+    }
+  }
+
+  const tournaments = await listExternalTournaments();
+  return tournaments
+    .flatMap((tournament): ScheduleEntry[] => {
+      if (
+        !isScheduleProvider(tournament.source) ||
+        tournament.status === "completed" ||
+        !tournament.startAt
+      ) {
+        return [];
+      }
+      return [
+        {
+          id: `public:${tournament.id}`,
+          provider: tournament.source,
+          title: tournament.name,
+          opponent: null,
+          round: tournament.game,
+          status: tournament.status === "active" ? "live" : "scheduled",
+          scheduledAt: tournament.startAt.getTime(),
+          url: tournament.url,
+          href: null,
+        },
+      ];
+    })
+    .sort((a, b) => (a.scheduledAt ?? Infinity) - (b.scheduledAt ?? Infinity));
+}
+
+function externalMatchStatus(state: string | null): ScheduleEntry["status"] {
+  switch (state?.trim().toLowerCase()) {
+    case "cancelled":
+    case "canceled":
+      return "cancelled";
+    case "complete":
+    case "completed":
+    case "finished":
+    case "3": // start.gg SetState.COMPLETED
+      return "finished";
+    case "active":
+    case "ongoing":
+    case "ready":
+    case "2": // start.gg SetState.ACTIVE
+      return "live";
+    default:
+      return "scheduled";
+  }
+}
 
 /**
  * One external tournament with its events and final standings — the data the
@@ -146,7 +427,12 @@ export async function getExternalTournament(
       name: t.name,
       slug: t.slug,
       game: t.game,
-      status: deriveStatus(t.startAt, t.endAt),
+      status: deriveStatus(
+        t.startAt,
+        t.endAt,
+        events.map((event) => event.state),
+        t.updatedAt,
+      ),
       startAt: t.startAt,
       endAt: t.endAt,
       numAttendees: t.numAttendees,

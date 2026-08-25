@@ -36,7 +36,9 @@ const NAV_ITEMS: NavItem[] = [
   { key: "schedule", label: "Schedule", href: "/schedule/" },
   { key: "tournaments", label: "Tournaments", href: "/tournaments/" },
   { key: "teams", label: "Teams", href: "/teams/" },
-  { key: "account", label: "Account", href: "/account/" },
+  // Route stays /account/ (many callbackURLs and OAuth redirects point at it);
+  // only the label reads "Settings".
+  { key: "account", label: "Settings", href: "/account/" },
 ];
 
 /**

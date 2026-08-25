@@ -3,7 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 
-import { updateTournamentSettings } from "@/app/admin/tournaments/actions";
+import {
+  setTournamentFeatured,
+  updateTournamentSettings,
+} from "@/app/admin/tournaments/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { Disclosure } from "@/components/dashboard/bubbles/Disclosure";
 import { FieldRow } from "@/components/dashboard/bubbles/FieldRow";
@@ -88,13 +91,31 @@ export function TournamentBasicInfo({
   name,
   description,
   rulesUrl,
+  featured,
 }: {
   tournamentId: string;
   name: string;
   description: string | null;
   rulesUrl: string | null;
+  featured: boolean;
 }) {
   const { error, saveField } = useTournamentPatch(tournamentId);
+  const router = useRouter();
+  const [featurePending, startFeature] = useTransition();
+  const [featureError, setFeatureError] = useState<string | null>(null);
+
+  function toggleFeatured(next: boolean) {
+    setFeatureError(null);
+    startFeature(async () => {
+      const result = await setTournamentFeatured(tournamentId, next);
+      if (!result.ok) {
+        setFeatureError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
   return (
     <>
       <ErrorBanner error={error} />
@@ -123,6 +144,23 @@ export function TournamentBasicInfo({
         required={false}
         placeholder="https://…"
         onSave={saveField("rulesUrl")}
+      />
+      <ErrorBanner error={featureError} />
+      <BubbleRow
+        label="Featured"
+        note={
+          featured
+            ? "Shown as the hero at the top of the Tournaments tab."
+            : "Feature this as the hero at the top of the Tournaments tab (replaces any other featured tournament)."
+        }
+        action={
+          <Switch
+            checked={featured}
+            disabled={featurePending}
+            label="Feature this tournament"
+            onChange={toggleFeatured}
+          />
+        }
       />
     </>
   );

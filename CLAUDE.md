@@ -96,6 +96,19 @@ context. Nothing that touches them may be built at module scope:
   `cache` instead — `getSessionCached` ([lib/session.ts](lib/session.ts)),
   `getStaffRoles` ([lib/staff.ts](lib/staff.ts)). The Worker's CPU budget is
   real; rebuilding the Better Auth instance per component was a measurable cost.
+  `getAuth()` itself is now wrapped in React `cache` for the same reason, so the
+  several callers in one render share one construction. **Read the session with
+  `getSessionCached()`, never `getAuth().api.getSession()`** in a page/component —
+  a page that reads it directly re-validates the session a second time on top of
+  the shell's read.
+- **CPU limits are the sharpest constraint, and we're on the Workers _Free_
+  plan.** Free hard-caps CPU at **10 ms/request** (network/DB waits don't count),
+  which a Next.js/OpenNext SSR render routinely exceeds — this is the source of
+  "Error 1102 — Worker exceeded resource limits" when clicking between tabs. Keep
+  per-request synchronous work minimal (memoize, don't rebuild auth, prefer
+  client-side work). `wrangler.jsonc` sets `limits.cpu_ms` for when the site moves
+  to **Workers Paid** ($5/mo, 30 s CPU) — the durable fix for real traffic, which
+  also removes Free's 100k-requests/day cap. Until then, 1102 can recur under load.
 - Session-gated pages set `export const dynamic = "force-dynamic"`.
 - **D1 has no interactive transactions.** Drizzle's `transaction()` emits `BEGIN`,
   which D1 rejects — use `db.batch([...])` for writes that must land together.

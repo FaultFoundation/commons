@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ScheduleView } from "@/components/dashboard/schedule/ScheduleView";
-import { getAuth } from "@/lib/auth";
+import { getSessionCached } from "@/lib/session";
 import { loadConnectIntegrations } from "@/lib/integrations";
 import { loadSchedule } from "@/lib/schedule";
 
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 
 export default async function SchedulePage() {
   const requestHeaders = await headers();
-  const session = await getAuth().api.getSession({ headers: requestHeaders });
+  const session = await getSessionCached();
   if (!session) {
     redirect("/login/");
   }

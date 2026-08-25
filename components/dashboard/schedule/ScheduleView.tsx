@@ -66,39 +66,37 @@ function EntryRow({ entry }: { entry: ScheduleEntry }) {
     ? `${SCHEDULE_PROVIDER_LABELS[entry.provider]} · ${entry.round}`
     : SCHEDULE_PROVIDER_LABELS[entry.provider];
 
+  // Internal (Commons) entries carry an `href` into our branded view; external
+  // ones carry a `url` out to the native site. Either way the WHOLE row is the
+  // link, so every entry behaves the same on click — the button is just the
+  // (non-interactive) affordance.
+  const external = !entry.href && Boolean(entry.url);
+  const linkHref = entry.href ?? entry.url ?? null;
+
   const row = (
     <BubbleRow
       label={label}
       value={entry.title}
       note={meta.join(" · ")}
       action={
-        entry.href ? (
-          // The whole row is the link (below); this is just the affordance.
+        linkHref ? (
           <span className="ff-btn ff-btn--soft ff-btn--sm" aria-hidden="true">
-            View
+            {external ? "Open" : "View"}
           </span>
-        ) : entry.url ? (
-          <a
-            className="ff-btn ff-btn--soft ff-btn--sm"
-            href={entry.url}
-            target="_blank"
-            rel="noreferrer noopener"
-          >
-            Open
-          </a>
         ) : undefined
       }
     />
   );
 
-  // A Commons tournament clicks into our branded view (same tab); an external
-  // one keeps its "Open" link out to the native site inside the row.
-  return entry.href ? (
-    <a className="ff-schedule-entry" href={entry.href}>
+  if (!linkHref) return row;
+  return (
+    <a
+      className="ff-schedule-entry"
+      href={linkHref}
+      {...(external ? { target: "_blank", rel: "noreferrer noopener" } : {})}
+    >
       {row}
     </a>
-  ) : (
-    row
   );
 }
 

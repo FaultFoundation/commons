@@ -560,13 +560,19 @@ function internalStatus(status: string): ScheduleStatus {
  * tournament view (which carries its own "View on Challonge" native-site
  * button), so they carry an internal `href` and no external `url`.
  */
-async function loadInternalTournaments(userId: string): Promise<ScheduleEntry[]> {
+async function loadInternalTournaments(
+  userId: string,
+): Promise<{ entries: ScheduleEntry[]; challongeIds: Set<string> }> {
   const rows = await getDb()
     .select({
       id: tournaments.id,
       name: tournaments.name,
       status: tournaments.status,
       startsAt: tournaments.startsAt,
+      // The Challonge tournament id (source id) — used to drop the member's
+      // Challonge sync entry for the same event, since a Commons tournament IS
+      // hosted on Challonge and would otherwise show twice.
+      externalId: tournaments.externalId,
     })
     .from(tournamentParticipants)
     .innerJoin(
@@ -588,8 +594,10 @@ async function loadInternalTournaments(userId: string): Promise<ScheduleEntry[]>
   // A member on two entered teams in one tournament matches twice — dedupe by
   // tournament id, and skip drafts (staff-only, never shown to a member).
   const byId = new Map<string, ScheduleEntry>();
+  const challongeIds = new Set<string>();
   for (const t of rows) {
     if (t.status === "draft" || byId.has(t.id)) continue;
+    if (t.externalId) challongeIds.add(t.externalId);
     byId.set(t.id, {
       id: `commons-${t.id}`,
       provider: "commons",
@@ -602,7 +610,7 @@ async function loadInternalTournaments(userId: string): Promise<ScheduleEntry[]>
       href: `/tournaments/${t.id}/`,
     });
   }
-  return [...byId.values()];
+  return { entries: [...byId.values()], challongeIds };
 }
 
 /**
@@ -621,6 +629,7 @@ export async function loadSchedule(
       .select({
         id: externalMatches.id,
         provider: externalMatches.provider,
+        externalId: externalMatches.externalId,
         title: externalMatches.title,
         opponentName: externalMatches.opponentName,
         round: externalMatches.round,
@@ -634,7 +643,21 @@ export async function loadSchedule(
     loadInternalTournaments(userId),
   ]);
 
-  const entries = [...rows.map(toEntry), ...internal];
+  // Drop the member's Challonge sync rows that duplicate a Commons tournament:
+  // a Commons event is hosted on Challonge, so a member who linked Challonge sees
+  // both. The Commons entry is canonical (branded, internal link, and present
+  // even for members who never connected Challonge), so it always wins.
+  const commonsChallongeKeys = new Set(
+    [...internal.challongeIds].map((id) => `tournament-${id}`),
+  );
+  const externalEntries = rows
+    .filter(
+      (r) =>
+        !(r.provider === "challonge" && commonsChallongeKeys.has(r.externalId)),
+    )
+    .map(toEntry);
+
+  const entries = [...externalEntries, ...internal.entries];
   const upcoming = entries
     .filter((e) => isUpcomingStatus(e.status))
     .sort(byTime(true));

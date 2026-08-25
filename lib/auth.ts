@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import {
@@ -27,8 +28,15 @@ import { ensureVerificationTicket } from "@/lib/verification-ticket";
 type OAuthTokens = Parameters<NonNullable<GenericOAuthConfig["getUserInfo"]>>[0];
 
 // Server-side Better Auth instance. Built per-request because the D1 binding
-// and secrets only exist on the request's Cloudflare context.
-export function getAuth() {
+// and secrets only exist on the request's Cloudflare context — but memoized for
+// the request with React `cache`, so the several callers in one render (a page's
+// getSession, DashboardShell's getSessionCached, the integration/schedule token
+// reads) share ONE construction instead of rebuilding the whole plugin stack
+// (genericOAuth × 5 + twoFactor) each time. Rebuilding it was a measurable slice
+// of the Worker's per-request CPU, which matters acutely under the Free plan's
+// 10 ms ceiling (see CLAUDE.md "Runtime model"). This is request-scoped, NOT the
+// module-level caching the runtime rules forbid — same pattern as getSessionCached.
+export const getAuth = cache(function getAuth() {
   const { env } = getCloudflareContext();
   const isDev = process.env.NODE_ENV === "development";
 
@@ -458,7 +466,7 @@ export function getAuth() {
         : undefined,
     plugins,
   });
-}
+});
 
 /**
  * Battle.net's userinfo response. `sub` is the stable account id as a string;

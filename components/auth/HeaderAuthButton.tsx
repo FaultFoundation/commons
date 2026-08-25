@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
 import { setAuthHint } from "@/lib/auth-hint";
@@ -24,9 +24,15 @@ function UserSilhouette() {
  * html[data-auth] (stamped pre-paint from the localStorage hint) decides
  * which one shows, so there's no signed-out flash on page load. useSession
  * then verifies against the server and corrects the hint if it was stale.
+ *
+ * Signed in, the avatar is a dropdown toggle (Dashboard / Settings / Sign out),
+ * mirroring the News menu's click-outside + Escape handling.
  */
 export function HeaderAuthButton() {
   const { data: session, isPending, error } = authClient.useSession();
+  const [open, setOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Only sync the hint on a definitive answer. A failed/ambiguous check
@@ -36,23 +42,82 @@ export function HeaderAuthButton() {
     setAuthHint(Boolean(session));
   }, [session, isPending, error]);
 
+  // Close on click-outside / Escape, same as the News dropdown.
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  async function onSignOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    let signOutError: unknown;
+    try {
+      ({ error: signOutError } = await authClient.signOut());
+    } catch (thrown) {
+      signOutError = thrown;
+    }
+    if (signOutError) {
+      // Session still alive server-side — clearing the hint would repaint us
+      // signed-in and look broken. Leave the menu, let them retry.
+      console.error("Sign out failed:", signOutError);
+      setSigningOut(false);
+      return;
+    }
+    setAuthHint(false);
+    window.location.assign("/login/");
+  }
+
   return (
     <>
       <a className="ff-btn ff-btn--outline ff-auth-when-out" href="/login/">
         Sign In
       </a>
-      <a
-        className="ff-nav__avatar ff-auth-when-in"
-        href="/home/"
-        aria-label="Member area"
-        title="Member area"
-      >
-        {session?.user.image ? (
-          <img src={session.user.image} alt="" />
-        ) : (
-          <UserSilhouette />
-        )}
-      </a>
+      <div className={`ff-usermenu ff-auth-when-in${open ? " is-open" : ""}`} ref={menuRef}>
+        <button
+          type="button"
+          className="ff-nav__avatar"
+          aria-haspopup="true"
+          aria-expanded={open}
+          aria-label="Account menu"
+          title="Account"
+          onClick={() => setOpen((v) => !v)}
+        >
+          {session?.user.image ? (
+            <img src={session.user.image} alt="" />
+          ) : (
+            <UserSilhouette />
+          )}
+        </button>
+        <div className="ff-usermenu__menu" role="menu">
+          <a className="ff-usermenu__item" role="menuitem" href="/home/">
+            Dashboard
+          </a>
+          <a className="ff-usermenu__item" role="menuitem" href="/account/">
+            Settings
+          </a>
+          <button
+            type="button"
+            className="ff-usermenu__item ff-usermenu__item--danger"
+            role="menuitem"
+            onClick={onSignOut}
+            disabled={signingOut}
+          >
+            {signingOut ? "Signing out…" : "Sign out"}
+          </button>
+        </div>
+      </div>
     </>
   );
 }

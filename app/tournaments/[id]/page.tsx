@@ -7,7 +7,7 @@ import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { ShareBar } from "@/components/dashboard/tournaments/ShareBar";
 import { TournamentRegister } from "@/components/dashboard/tournaments/TournamentRegister";
 import { BracketView } from "@/components/tournaments/BracketView";
-import { getAuth } from "@/lib/auth";
+import { getSessionCached } from "@/lib/session";
 import {
   entrantLabel,
   getOrRefreshSnapshot,
@@ -41,7 +41,7 @@ export default async function TournamentPage({
 }) {
   const { id } = await params;
   const hdrs = await headers();
-  const session = await getAuth().api.getSession({ headers: hdrs });
+  const session = await getSessionCached();
   if (!session) redirect("/login/");
   if (!isTournamentId(id)) notFound();
 

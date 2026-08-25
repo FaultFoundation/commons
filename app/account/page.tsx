@@ -20,8 +20,9 @@ import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { FieldRow } from "@/components/dashboard/bubbles/FieldRow";
 import { account, twoFactor, user } from "@/db/schema";
-import { battlenetAuthEnabled, discordAuthEnabled, getAuth } from "@/lib/auth";
+import { battlenetAuthEnabled, discordAuthEnabled } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { getSessionCached } from "@/lib/session";
 import { DENSITY_COOKIE, asDensity } from "@/lib/density";
 import {
   discordServerNote,
@@ -35,7 +36,7 @@ import { getProfile, getRegistrationState } from "@/lib/registration";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Account",
+  title: "Settings",
   robots: { index: false },
 };
 
@@ -56,7 +57,7 @@ export default async function AccountPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  const session = await getSessionCached();
   if (!session) {
     redirect("/login/");
   }
@@ -118,7 +119,7 @@ export default async function AccountPage({
 
   return (
     <DashboardShell active="account" setupUserId={session.user.id}>
-      <h1 className="screen-reader-text">Account</h1>
+      <h1 className="screen-reader-text">Settings</h1>
       <div className="ff-bubble-grid">
         <Bubble title="Profile" span="full">
           {verifyError ? (

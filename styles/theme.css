@@ -471,6 +471,22 @@ button.ff-nav__link:hover {
   .ff-nav__cta .ff-btn {
     font-size: var(--wp--preset--font-size--large);
   }
+  /* In the full-screen overlay the account menu stacks inline, like the News
+     submenu, instead of floating off the avatar. */
+  .ff-usermenu__menu {
+    position: static;
+    min-width: 0;
+    margin: 6px 0 0 12px;
+    padding: 0 0 0 16px;
+    border: 0;
+    border-left: 2px solid var(--ff-border);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .ff-usermenu__item {
+    font-size: var(--wp--preset--font-size--large);
+  }
 }
 
 /* ---------- 7. Footer (full-bleed bar matching the header) ---------- */
@@ -783,9 +799,12 @@ select.ff-auth__input option {
   justify-content: center;
   width: 40px;
   height: 40px;
+  padding: 0;
+  border: none;
   border-radius: var(--ff-radius-pill);
   background: rgba(255, 255, 255, 0.16);
   color: #c3cedb;
+  cursor: pointer;
   transition:
     background var(--ff-transition),
     color var(--ff-transition);
@@ -803,6 +822,52 @@ select.ff-auth__input option {
   height: 100%;
   border-radius: inherit;
   object-fit: cover;
+}
+
+/* Account dropdown hanging off the header avatar (signed in). Mirrors the News
+   dropdown's panel styling; toggled open via .is-open (HeaderAuthButton). */
+.ff-usermenu {
+  position: relative;
+  display: inline-flex;
+}
+.ff-usermenu__menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 60;
+  min-width: 200px;
+  padding: 6px;
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-navy-900);
+  border: 1px solid var(--ff-border);
+  box-shadow: var(--ff-shadow-card);
+}
+.ff-usermenu.is-open .ff-usermenu__menu {
+  display: block;
+}
+.ff-usermenu__item {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-radius: var(--ff-radius-sm, 6px);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ff-usermenu__item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.ff-usermenu__item--danger {
+  color: #ff8a8a;
+}
+.ff-usermenu__item:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 /* Short pages (login/signup/dashboard opt in via ff-main--fill): stretch
@@ -2892,6 +2957,117 @@ button.ff-dash__link:hover {
 .ff-tcard__meta {
   font-size: var(--ff-dash-text-sm);
   color: var(--ff-text-dim);
+}
+
+/* Tile chrome: the banner carries a source mark (top-left), status pill
+   (top-right) and game mark (bottom-right), all positioned absolutely over the
+   brand gradient / banner image. Replaces the old in-flow format label. */
+.ff-tcard__banner {
+  position: relative;
+}
+.ff-tcard__source {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  max-width: 62%;
+  color: #fff;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
+.ff-tcard__source svg {
+  height: 22px;
+  width: auto;
+}
+.ff-brandword {
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+  white-space: nowrap;
+}
+.ff-tcard__status {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+}
+.ff-tcard__game {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ff-tcard__game-img {
+  height: 30px;
+  width: auto;
+  max-width: 72px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
+.ff-tcard__game--mono {
+  height: 28px;
+  min-width: 28px;
+  padding: 0 8px;
+  border-radius: var(--ff-radius-pill);
+  background: rgba(0, 0, 0, 0.32);
+  color: #fff;
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+/* Featured hero — the big, full-width tile at the top of the Active view. Its
+   ribbon sits top-left, so the source mark moves to the bottom-left corner. */
+.ff-tcard--hero {
+  margin-bottom: 16px;
+}
+.ff-tcard--hero .ff-tcard__banner {
+  min-height: 168px;
+}
+.ff-tcard--hero .ff-tcard__title {
+  font-size: var(--ff-dash-text-xl);
+}
+.ff-tcard--hero .ff-tcard__source {
+  top: auto;
+  bottom: 12px;
+  left: 14px;
+}
+.ff-tcard__ribbon {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  padding: 3px 10px;
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Past-tournaments disclosure below the upcoming tiles. */
+.ff-tpast {
+  margin-top: 16px;
+}
+.ff-tpast__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 6px 2px;
+  background: none;
+  border: none;
+  color: var(--ff-text-dim);
+  font: inherit;
+  font-weight: 700;
+  font-size: var(--ff-dash-text-sm);
+  cursor: pointer;
+}
+.ff-tpast__toggle:hover {
+  color: var(--ff-text);
 }
 
 /* ===========================================================================

@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
-import { getAuth } from "@/lib/auth";
+import { getSessionCached } from "@/lib/session";
 
 // Session-gated: always rendered per request.
 export const dynamic = "force-dynamic";
@@ -15,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  const session = await getSessionCached();
   if (!session) {
     redirect("/login/");
   }

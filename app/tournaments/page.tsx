@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { TournamentList } from "@/components/dashboard/tournaments/TournamentList";
-import { getAuth } from "@/lib/auth";
+import { getSessionCached } from "@/lib/session";
 import { listExternalTournaments } from "@/lib/external-tournaments";
 import { listTournaments } from "@/lib/tournaments";
 import type { TournamentListEntry } from "@/components/dashboard/tournaments/TournamentList";
@@ -19,7 +18,7 @@ export const metadata: Metadata = {
 };
 
 export default async function TournamentsPage() {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  const session = await getSessionCached();
   if (!session) {
     redirect("/login/");
   }
@@ -41,6 +40,9 @@ export default async function TournamentsPage() {
     maxParticipants: t.maxParticipants,
     startsAt: t.startsAt ? t.startsAt.getTime() : null,
     bannerUrl: t.bannerUrl,
+    featured: t.featured,
+    game: t.gameName,
+    gameLogoUrl: t.gameLogoUrl,
   }));
 
   const externalEntries: TournamentListEntry[] = external.map((t) => ({
@@ -52,15 +54,17 @@ export default async function TournamentsPage() {
     maxParticipants: null,
     startsAt: t.startAt ? t.startAt.getTime() : null,
     bannerUrl: null,
+    featured: false,
     source: t.source,
     externalUrl: t.url,
     game: t.game,
+    gameLogoUrl: null,
   }));
 
-  // Newest first across both, undated last.
-  const tournaments = [...internalEntries, ...externalEntries].sort(
-    (a, b) => (b.startsAt ?? 0) - (a.startsAt ?? 0),
-  );
+  // All entries; ordering and the featured/date split are decided in the client
+  // list (which already owns filtering, so a round trip per view would be a
+  // billed request for work a sort already does).
+  const tournaments = [...internalEntries, ...externalEntries];
 
   return (
     <DashboardShell active="tournaments" setupUserId={session.user.id}>

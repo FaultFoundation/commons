@@ -1,7 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 
 import { QrCode } from "./QrCode";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
@@ -149,16 +155,12 @@ function TwoFactorOff({ email }: { email: string }) {
   }
 
   return (
-    <BubbleRow
-      label="Two-factor authentication"
-      value="Off"
-      note={
-        step.name === "idle"
-          ? "Ask for a second code when signing in with your email and password."
-          : undefined
-      }
-      action={
-        step.name === "idle" ? (
+    <>
+      <BubbleRow
+        label="Two-factor authentication"
+        value="Off"
+        note="Ask for a second code when signing in with your email and password."
+        action={
           <button
             className="ff-btn ff-btn--sm"
             type="button"
@@ -169,10 +171,16 @@ function TwoFactorOff({ email }: { email: string }) {
           >
             Turn On
           </button>
-        ) : undefined
-      }
-    >
-      {step.name === "idle" ? undefined : (
+        }
+      />
+      <TwoFactorDialog
+        open={step.name !== "idle"}
+        busy={pending}
+        title="Set up two-factor authentication"
+        onClose={() => {
+          if (!pending) setStep({ name: "idle" });
+        }}
+      >
         <div className="ff-2fa">
           {error ? (
             <div className="ff-auth__error" role="alert">
@@ -268,8 +276,8 @@ function TwoFactorOff({ email }: { email: string }) {
             <BackupCodes codes={step.backupCodes} onDone={finish} />
           ) : null}
         </div>
-      )}
-    </BubbleRow>
+      </TwoFactorDialog>
+    </>
   );
 }
 
@@ -336,12 +344,12 @@ function AddAuthenticatorRow() {
   }
 
   return (
-    <BubbleRow
-      label="Authenticator app"
-      value="Not set up"
-      note="Adding one issues a fresh set of backup codes — the ones you have now stop working."
-      action={
-        step.name === "idle" ? (
+    <>
+      <BubbleRow
+        label="Authenticator app"
+        value="Not set up"
+        note="Adding one issues a fresh set of backup codes — the ones you have now stop working."
+        action={
           <button
             className="ff-btn ff-btn--outline ff-btn--sm"
             type="button"
@@ -352,10 +360,16 @@ function AddAuthenticatorRow() {
           >
             Add
           </button>
-        ) : undefined
-      }
-    >
-      {step.name === "idle" ? undefined : (
+        }
+      />
+      <TwoFactorDialog
+        open={step.name !== "idle"}
+        busy={pending}
+        title="Add authenticator app"
+        onClose={() => {
+          if (!pending) setStep({ name: "idle" });
+        }}
+      >
         <div className="ff-2fa">
           {error ? (
             <div className="ff-auth__error" role="alert">
@@ -402,8 +416,8 @@ function AddAuthenticatorRow() {
             />
           ) : null}
         </div>
-      )}
-    </BubbleRow>
+      </TwoFactorDialog>
+    </>
   );
 }
 
@@ -554,6 +568,48 @@ function DisableButton() {
 // ---------------------------------------------------------------------------
 // Shared pieces
 // ---------------------------------------------------------------------------
+
+/**
+ * The enrollment step machine, shown as a modal (native <dialog>, like
+ * ConfirmDialog / AdminUnlockDialog — Esc + focus trapping come free) rather
+ * than expanding inline, so turning on 2FA / adding an app feels like the code
+ * entry it leads to. Open state is derived from the step (idle = closed); Esc
+ * is blocked while a request is in flight.
+ */
+function TwoFactorDialog({
+  open,
+  busy,
+  title,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  busy: boolean;
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+    if (open && !dialog.open) dialog.showModal();
+    else if (!open && dialog.open) dialog.close();
+  }, [open]);
+  return (
+    <dialog
+      ref={ref}
+      className="ff-dialog"
+      onClose={onClose}
+      onCancel={(event) => {
+        if (busy) event.preventDefault();
+      }}
+    >
+      <h2 className="ff-dialog__title">{title}</h2>
+      {children}
+    </dialog>
+  );
+}
 
 /** QR + typed-key fallback + the code that proves the app is really set up. */
 function TotpSetup({

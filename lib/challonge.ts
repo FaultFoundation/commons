@@ -216,13 +216,21 @@ export async function createChallongeTournament(
   if (input.holdThirdPlaceMatch != null) {
     attributes.hold_third_place_match = input.holdThirdPlaceMatch;
   }
-  // Challonge requires the format's options object to be *present* for round
-  // robin and swiss (a missing one is rejected outright); empty is fine —
-  // Challonge fills in its own defaults, and swiss rounds derive from the field
-  // size when not set. Only send what we actually configure.
+  // Challonge requires the format's options object for round robin and swiss.
+  // Round robin is stricter than the docs imply: an empty object is rejected
+  // with `round_robin_options {"iterations":["is missing"],"ranking":["is
+  // missing"]}` — both fields are mandatory. Send Challonge's own defaults:
+  // one iteration (each pair plays once) ranked by match wins. `ranking` must be
+  // one of Challonge's fixed strings ("match wins", "game wins", "points
+  // scored", …); "match wins" is the standard collegiate default.
   if (input.format === "round_robin") {
-    attributes.round_robin_options = {};
+    attributes.round_robin_options = {
+      iterations: 1,
+      ranking: "match wins",
+    };
   }
+  // Swiss accepts an empty options object (rounds derive from the field size);
+  // send the round count only when we've set one.
   if (input.format === "swiss") {
     attributes.swiss_options =
       input.swissRounds != null ? { rounds: input.swissRounds } : {};

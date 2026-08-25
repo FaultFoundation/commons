@@ -142,6 +142,11 @@ export const games = sqliteTable("games", {
   id: text("id").primaryKey(),
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
+  // Optional brand art for the tournament tiles' bottom-right game mark. When
+  // null the UI renders a monogram chip from the name (components/brand/
+  // GameLogo). A path under /public (e.g. "/brand/games/overwatch.svg") or an
+  // absolute URL; the drop-in convention is documented in db/README.md.
+  logoUrl: text("logo_url"),
 });
 
 export const programs = sqliteTable("programs", {
@@ -664,6 +669,12 @@ export const tournaments = sqliteTable(
     // bucket (lib/avatars.ts), or null for the branded-gradient fallback.
     bannerUrl: text("banner_url"),
     rulesUrl: text("rules_url"),
+    // At most one tournament is featured at a time: the big hero at the top of
+    // the Tournaments tab (both tile and list views). Set from the admin
+    // settings ("Feature this tournament"), which clears the flag on every other
+    // row in one batch. When none is set the tab falls back to the soonest
+    // upcoming tournament, so this is an override, not a requirement.
+    featured: integer("featured", { mode: "boolean" }).notNull().default(false),
     // Bumped on every mutating action; readers compare to detect stale state.
     version: integer("version").notNull().default(0),
     // Set when the bracket is started on Challonge (status -> active).

@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 
 import { tournamentBrackets, tournaments, tournamentParticipants } from "@/db/schema";
 import { requireAdminUnlock } from "@/lib/admin-unlock";
@@ -194,6 +194,13 @@ export async function updateTournamentSettings(
     }
     fields.format = patch.format;
     challongeAttrs.tournament_type = CHALLONGE_TYPE[patch.format];
+    // Switching *into* round robin needs its mandatory options object, same as
+    // create — Challonge rejects the type change otherwise ("round_robin_options
+    // ... is missing"). Swiss's options are sent by the swissRounds branch below
+    // (or default from the field size), so nothing extra is needed there.
+    if (patch.format === "round_robin") {
+      challongeAttrs.round_robin_options = { iterations: 1, ranking: "match wins" };
+    }
   }
 
   if (patch.maxParticipants !== undefined) {
@@ -270,6 +277,52 @@ export async function updateTournamentSettings(
   if (newName !== tournament.name) {
     revalidatePath(tournamentPath(tournamentId, tournament.name), "layout");
   }
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Featured — the hero at the top of the public Tournaments tab
+// ---------------------------------------------------------------------------
+
+/**
+ * Set (or clear) the one featured tournament. Featuring a tournament clears the
+ * flag on every other row in the same batch, so at most one is ever featured;
+ * when none is, the public tab falls back to the soonest upcoming tournament.
+ * Purely presentational — no Challonge call.
+ */
+export async function setTournamentFeatured(
+  tournamentId: string,
+  featured: boolean,
+): Promise<ActionResult> {
+  const gate = await requireActor();
+  if (!gate.ok) return gate;
+
+  const tournament = await getTournament(tournamentId);
+  if (!tournament) return { ok: false, error: "Tournament not found." };
+
+  const db = getDb();
+  const now = new Date();
+  if (featured) {
+    // Clear any other featured row, then set this one — one batch, so the
+    // "at most one featured" invariant never has a window where two are on.
+    await db.batch([
+      db
+        .update(tournaments)
+        .set({ featured: false, updatedAt: now })
+        .where(and(ne(tournaments.id, tournamentId), eq(tournaments.featured, true))),
+      db
+        .update(tournaments)
+        .set({ featured: true, version: tournament.version + 1, updatedAt: now })
+        .where(eq(tournaments.id, tournamentId)),
+    ]);
+  } else {
+    await db
+      .update(tournaments)
+      .set({ featured: false, version: tournament.version + 1, updatedAt: now })
+      .where(eq(tournaments.id, tournamentId));
+  }
+
+  revalidateTournament(tournamentId, tournament.name);
   return { ok: true };
 }
 

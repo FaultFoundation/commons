@@ -3,7 +3,9 @@ import { alias } from "drizzle-orm/sqlite-core";
 
 import { getDb } from "@/lib/db";
 import {
+  collegiateRegistrations,
   colleges,
+  programMemberships,
   programs,
   teamDeleteRequests,
   teamDeleteVotes,
@@ -415,12 +417,58 @@ export type MyTeam = {
   tag: string | null;
   logoUrl: string | null;
   collegeName: string | null;
+  /** Distinct schools across the ACTIVE roster — a team can span several. */
+  schools: string[];
   role: TeamRole;
   memberCount: number;
   tournaments: string[];
   /** Only populated for roles that may hand out invites. */
   inviteToken: string | null;
 };
+
+/**
+ * Distinct school names across each team's ACTIVE members, taken from every
+ * member's own collegiate registration (not the team's single affiliation) —
+ * players on one team can be from different places, so a team surfaces the whole
+ * set. Members with no verified college contribute nothing. Returns a map keyed
+ * by team id; a team with no verified members is simply absent.
+ */
+export async function memberSchoolsByTeam(
+  teamIds: string[],
+): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  if (!teamIds.length) return map;
+  // A member's school lives on their collegiate registration, reached through
+  // their program membership: team_members → program_memberships (by user) →
+  // collegiate_registrations (by membership) → colleges. innerJoin on colleges
+  // drops members with no college on file.
+  const rows = await getDb()
+    .select({ teamId: teamMembers.teamId, school: colleges.name })
+    .from(teamMembers)
+    .innerJoin(
+      programMemberships,
+      and(
+        eq(programMemberships.userId, teamMembers.userId),
+        eq(programMemberships.programId, PROGRAM_COLLEGIATE_ID),
+      ),
+    )
+    .innerJoin(
+      collegiateRegistrations,
+      eq(collegiateRegistrations.membershipId, programMemberships.id),
+    )
+    .innerJoin(colleges, eq(colleges.id, collegiateRegistrations.collegeId))
+    .where(
+      and(inArray(teamMembers.teamId, teamIds), eq(teamMembers.status, "active")),
+    );
+  for (const r of rows) {
+    if (!r.school) continue;
+    const list = map.get(r.teamId) ?? [];
+    if (!list.includes(r.school)) list.push(r.school);
+    map.set(r.teamId, list);
+  }
+  for (const [k, v] of map) map.set(k, v.sort((a, b) => a.localeCompare(b)));
+  return map;
+}
 
 /**
  * Every live team the member is active on — the Teams tab's whole payload,
@@ -455,7 +503,7 @@ export async function listMyTeams(userId: string): Promise<MyTeam[]> {
   if (!mine.length) return [];
   const ids = mine.map((t) => t.id);
 
-  const [counts, entries, invites] = await Promise.all([
+  const [counts, entries, invites, schoolsByTeam] = await Promise.all([
     db
       .select({
         teamId: teamMembers.teamId,
@@ -501,6 +549,7 @@ export async function listMyTeams(userId: string): Promise<MyTeam[]> {
         ),
       )
       .orderBy(sql`${teamInvites.createdAt} desc`),
+    memberSchoolsByTeam(ids),
   ]);
 
   return mine.map((team) => {
@@ -511,6 +560,7 @@ export async function listMyTeams(userId: string): Promise<MyTeam[]> {
       tag: team.tag,
       logoUrl: team.logoUrl,
       collegeName: team.collegeName,
+      schools: schoolsByTeam.get(team.id) ?? [],
       role,
       memberCount: counts.find((c) => c.teamId === team.id)?.count ?? 0,
       tournaments: entries
@@ -685,6 +735,8 @@ export type TeamDetail = {
   /** null for a live team; a timestamp for a disbanded one (only reachable
       with `includeDisbanded`, which the admin panel passes). */
   disbandedAt: number | null;
+  /** Distinct schools across the active roster (members can be from several). */
+  schools: string[];
   roster: RosterMember[];
   invites: TeamInviteView[];
   inviteLinkToken: string | null;
@@ -730,7 +782,7 @@ export async function getTeamDetail(
   const team = teamRows[0];
   if (!team) return null;
 
-  const [rosterRows, inviteRows, entryRows, openRows, requestRows] =
+  const [rosterRows, inviteRows, entryRows, openRows, requestRows, schoolsMap] =
     await Promise.all([
       db
         .select({
@@ -808,6 +860,7 @@ export async function getTeamDetail(
           ),
         )
         .limit(1),
+      memberSchoolsByTeam([teamId]),
     ]);
 
   const roster: RosterMember[] = rosterRows
@@ -867,6 +920,7 @@ export async function getTeamDetail(
   return {
     ...team,
     disbandedAt: team.disbandedAt?.getTime() ?? null,
+    schools: schoolsMap.get(teamId) ?? [],
     roster,
     invites: usableInvites.map((i) => ({
       id: i.id,

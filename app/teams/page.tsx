@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { TeamCardGrid } from "@/components/dashboard/teams/TeamCardGrid";
 import { TeamsActions } from "@/components/dashboard/teams/TeamsActions";
-import { getAuth } from "@/lib/auth";
+import { getSessionCached } from "@/lib/session";
 import { isVerifiedMember, listMyTeams } from "@/lib/teams";
 
 // Session-gated: always rendered per request.
@@ -18,7 +17,7 @@ export const metadata: Metadata = {
 };
 
 export default async function TeamsPage() {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  const session = await getSessionCached();
   if (!session) {
     redirect("/login/");
   }

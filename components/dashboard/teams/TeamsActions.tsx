@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 
-import { CreateTeamForm } from "@/components/dashboard/teams/CreateTeamForm";
+import { StartTeamDialog } from "@/components/dashboard/teams/StartTeamDialog";
 
-type Panel = "create" | "lft" | "lfm";
+type Panel = "lft" | "lfm";
 
 /**
- * The Teams tab's action row. One panel expands at a time beneath the
- * buttons, so the tab opens on the member's teams rather than on three cards
- * of things they might do.
+ * The Teams tab's action row. "Start a Team" opens a modal (create → invite, see
+ * StartTeamDialog); Find a Team / Looking for Players expand an inline panel
+ * beneath the buttons, one at a time, so the tab opens on the member's teams
+ * rather than on three cards of things they might do.
  *
  * Find a Team / Looking for Players are the LFG surfaces: the tables
  * (lfg_profiles, team_listings, lfg_connections) shipped, the screens haven't,
@@ -17,6 +18,7 @@ type Panel = "create" | "lft" | "lfm";
  */
 export function TeamsActions({ verified }: { verified: boolean }) {
   const [open, setOpen] = useState<Panel | null>(null);
+  const [startOpen, setStartOpen] = useState(false);
 
   function toggle(panel: Panel) {
     setOpen((current) => (current === panel ? null : panel));
@@ -36,30 +38,22 @@ export function TeamsActions({ verified }: { verified: boolean }) {
   return (
     <div className="ff-actions">
       <div className="ff-actions__row">
-        {button("create", "Start a Team")}
+        <button
+          className="ff-btn"
+          type="button"
+          onClick={() => setStartOpen(true)}
+        >
+          Start a Team
+        </button>
         {button("lft", "Find a Team")}
         {button("lfm", "Looking for Players")}
       </div>
 
-      {open === "create" ? (
-        <div className="ff-card ff-actions__panel">
-          {verified ? (
-            <CreateTeamForm compact />
-          ) : (
-            <>
-              <p className="ff-auth__hint">
-                Teams are for verified members — verify your academic email and
-                this takes about a minute.
-              </p>
-              <div className="ff-row__buttons">
-                <a className="ff-btn ff-btn--sm" href="/account/setup/">
-                  Verify My Email
-                </a>
-              </div>
-            </>
-          )}
-        </div>
-      ) : null}
+      <StartTeamDialog
+        open={startOpen}
+        verified={verified}
+        onClose={() => setStartOpen(false)}
+      />
 
       {open === "lft" ? (
         <div className="ff-card ff-actions__panel">

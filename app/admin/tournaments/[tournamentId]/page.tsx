@@ -130,6 +130,7 @@ async function TournamentContent({ tournamentId }: { tournamentId: string }) {
           name={tournament.name}
           description={tournament.description}
           rulesUrl={tournament.rulesUrl}
+          featured={tournament.featured}
         />
         <BannerUploadRow
           tournamentId={tournament.id}

@@ -75,7 +75,9 @@ export const TOURNAMENT_STATUS_LABELS: Record<TournamentStatus, string> = {
   registration: "Registration Open",
   seeding: "Seeding",
   active: "Active",
-  completed: "Completed",
+  // "Concluded" is the one shared word for a finished tournament — the card
+  // status pill, the list filter, and anywhere else this label surfaces.
+  completed: "Concluded",
   cancelled: "Cancelled",
 };
 

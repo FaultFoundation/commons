@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
 import { Avatar } from "@/components/dashboard/Avatar";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
+import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { DangerZonePanel } from "@/components/dashboard/teams/DangerZonePanel";
 import { InvitePanel } from "@/components/dashboard/teams/InvitePanel";
 import { RosterPanel } from "@/components/dashboard/teams/RosterPanel";
 import { TeamSettingsRows } from "@/components/dashboard/teams/TeamSettingsRows";
 import { TournamentPanel } from "@/components/dashboard/teams/TournamentPanel";
-import { getAuth } from "@/lib/auth";
+import { getSessionCached } from "@/lib/session";
 import { listSchoolCountries } from "@/lib/registration";
 import { getTeamDetail, getTeamMembership } from "@/lib/teams";
 import { TEAM_ROLE_LABELS, can } from "@/lib/teams-shared";
@@ -37,7 +37,7 @@ export default async function TeamPage({
   params: Promise<{ teamId: string }>;
   searchParams: Promise<{ invited?: string }>;
 }) {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  const session = await getSessionCached();
   if (!session) {
     redirect("/login/");
   }
@@ -123,6 +123,13 @@ export default async function TeamPage({
           title="Roster"
           actions={<span className="ff-row__note">{team.roster.length}</span>}
         >
+          {team.schools.length ? (
+            <BubbleRow
+              label={team.schools.length === 1 ? "School" : "Schools"}
+              value={team.schools.join(", ")}
+              note="Across every registered player on the roster."
+            />
+          ) : null}
           <RosterPanel
             teamId={team.id}
             roster={team.roster}

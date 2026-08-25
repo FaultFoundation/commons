@@ -228,7 +228,7 @@ here — they live on Challonge and are pulled into `tournament_brackets`.
 
 | App concept | Table | Key mappings |
 |---|---|---|
-| Tournament | `tournaments` | 6-digit `id` (public identifier; no slug — the URL name segment is derived from `name`); `format` ∈ `single_elim` \| `double_elim` \| `round_robin` \| `swiss` (maps to Challonge `tournament_type`); `status` ∈ `draft` \| `registration` \| `seeding` \| `active` \| `completed` \| `cancelled` (our lifecycle, mapped to Challonge start/finalize/reset in the admin actions); `source = "challonge"` with `external_id` = the Challonge tournament id and `external_url` the deep link, `UNIQUE(source, external_id)`; `max_participants`, `best_of`, `swiss_rounds`, `third_place_match`, `academic_verification_required` (default 1 — every roster member must be VERIFIED to enter), `description` + `banner_url` (the hero blurb + an `/api/avatars/tournament/…` R2 path), registration/roster-lock timestamps, `version` (bumped on every mutation → forces a snapshot rebuild), `bracket_generated_at` (set on Start) |
+| Tournament | `tournaments` | 6-digit `id` (public identifier; no slug — the URL name segment is derived from `name`); `format` ∈ `single_elim` \| `double_elim` \| `round_robin` \| `swiss` (maps to Challonge `tournament_type`); `status` ∈ `draft` \| `registration` \| `seeding` \| `active` \| `completed` \| `cancelled` (our lifecycle, mapped to Challonge start/finalize/reset in the admin actions); `source = "challonge"` with `external_id` = the Challonge tournament id and `external_url` the deep link, `UNIQUE(source, external_id)`; `max_participants`, `best_of`, `swiss_rounds`, `third_place_match`, `academic_verification_required` (default 1 — every roster member must be VERIFIED to enter), `description` + `banner_url` (the hero blurb + an `/api/avatars/tournament/…` R2 path), registration/roster-lock timestamps, `featured` (boolean — at most one is set; the big hero at the top of the Tournaments tab, cleared on every other row when a new one is featured; falls back to soonest-upcoming when none is set), `version` (bumped on every mutation → forces a snapshot rebuild), `bracket_generated_at` (set on Start) |
 | Competitor | `tournament_participants` | team **XOR** solo user (`CHECK`); `challonge_participant_id` maps our row to the Challonge participant; `seed`; `withdrawn_at` keeps the row but drops it out of every "who is entered" query, including the one-team-per-tournament conflict check. Two `UNIQUE(tournament_id, team_id)` / `(tournament_id, user_id)` indexes close the enter race. No standings columns — Challonge is the scorer |
 | Cached bracket | `tournament_brackets` | one row per tournament (`tournament_id` PK): `payload` (the JSON `SnapshotPayload` `lib/challonge.ts` builds and `BracketView` renders), `version` (the tournament version it was built at) and `fetched_at`. Rebuilt from Challonge lazily on read past a status TTL, or immediately when `version` moves (an admin mutation). Workers has no cron — this is the "refresh on read" cache |
 | External match (connected platform) | `external_matches` | a member's FACEIT / start.gg / Challonge matches for the personal calendar — flat per-user schedule rows: `provider`, `external_id`, `title` (event/tournament name, since external events get no `tournaments` row), `opponent_name`, `round`, `status` ∈ `scheduled` \| `live` \| `finished` \| `cancelled`, `scheduled_at`, optional `tournament_id`. `UNIQUE(user_id, provider, external_id)` (idempotent sync); indexed `(user_id, scheduled_at)` |
@@ -267,7 +267,7 @@ TWO_FACTOR(      *id, user_id→USER, secret, backup_codes, verified,
                  failed_verification_count, locked_until? )
 
 -- Registry
-GAMES(           *id, slug UNIQUE, name )
+GAMES(           *id, slug UNIQUE, name, logo_url? )
 PROGRAMS(        *id, slug UNIQUE, name, description?, game_id→GAMES?, active )
 
 -- Tier 2 — person + cross-cutting satellites (all hang off USER)
@@ -309,7 +309,7 @@ TOURNAMENTS(     *id, program_id→PROGRAMS, game_id→GAMES?, source, external_
                  name, format, status, max_participants?, best_of, swiss_rounds?,
                  third_place_match, academic_verification_required, starts_at?,
                  ends_at?, registration_opens_at?, registration_closes_at?,
-                 roster_lock_at?, rules_url?, version, bracket_generated_at?,
+                 roster_lock_at?, rules_url?, featured, version, bracket_generated_at?,
                  UNIQUE(source, external_id) )
 TOURNAMENT_PARTICIPANTS( *id, tournament_id→TOURNAMENTS, team_id→TEAMS?, user_id→USER?,
                  registered_by_user_id→USER?, challonge_participant_id?, seed?,
@@ -614,7 +614,7 @@ Support Ticket   number, status, priority, assignee, discord_channel_id
 | Cross-site schedule & calendar | `external_matches`, `tournament_participants` | The connect OAuth (FACEIT / start.gg / Challonge) is live; the lazy sync (`lib/schedule.ts`) pulls each connected member's matches/tournaments into `external_matches` on read, and `/schedule` renders them. Live-verified for Challonge; FACEIT/start.gg adapters are code-complete against documented shapes, pending live tokens |
 | Matchmaking (LFG/LFM) | `lfg_profiles`, `team_listings`, `lfg_connections` | Schema-ready — `team_listings` is written by the team actions; `lfg_profiles` / `lfg_connections` have no code yet and the browse/apply UI is WIP |
 | Support tickets | `support_tickets`, `support_ticket_messages`, `support_ticket_notes`, `bot_outbox` | **Live** — staff queue, two-way Discord mirror, outbox bridge |
-| Reference data | `games`, `programs` | Seeded via `db/seed/bootstrap.sql` (`overwatch`, `collegiate-overwatch`) |
+| Reference data | `games`, `programs` | Seeded via `db/seed/bootstrap.sql` (`overwatch`, `collegiate-overwatch`). `games.logo_url` is optional brand art for the tournament tiles' bottom-right game mark: a `/public` path (drop the file at `public/brand/games/<slug>.svg`) or absolute URL; null renders a name monogram (`components/brand/GameLogo`). Source/platform marks (top-left) are inline in `components/brand/SourceLogo`, drop-in at `public/brand/sources/<key>.svg` |
 
 Schema source of truth: [`db/schema.ts`](schema.ts). Migrations:
 [`drizzle/`](../drizzle). Full rebuild: [`db/reset/drop-all.sql`](reset/drop-all.sql)

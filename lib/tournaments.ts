@@ -2,6 +2,7 @@ import { cache } from "react";
 import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 
 import {
+  games,
   programMemberships,
   teams,
   teamMembers,
@@ -57,6 +58,7 @@ export type TournamentRow = {
   description: string | null;
   bannerUrl: string | null;
   rulesUrl: string | null;
+  featured: boolean;
   version: number;
   bracketGeneratedAt: Date | null;
   createdAt: Date;
@@ -118,6 +120,9 @@ export type TournamentListItem = {
   createdAt: Date;
   entrantCount: number;
   bannerUrl: string | null;
+  featured: boolean;
+  gameName: string | null;
+  gameLogoUrl: string | null;
 };
 
 export async function listTournaments(opts?: {
@@ -140,12 +145,16 @@ export async function listTournaments(opts?: {
       endsAt: tournaments.endsAt,
       createdAt: tournaments.createdAt,
       bannerUrl: tournaments.bannerUrl,
+      featured: tournaments.featured,
+      gameName: games.name,
+      gameLogoUrl: games.logoUrl,
       entrantCount:
         sql<number>`(SELECT count(*) FROM tournament_participants WHERE tournament_id = ${tournaments.id} AND withdrawn_at IS NULL)`.as(
           "entrant_count",
         ),
     })
     .from(tournaments)
+    .leftJoin(games, eq(games.id, tournaments.gameId))
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(tournaments.createdAt));
 

@@ -88,8 +88,13 @@ export function TeamCardGrid({ teams: initial }: { teams: MyTeam[] }) {
             <BubbleRow
               label="Roster"
               value={`${team.memberCount} ${team.memberCount === 1 ? "member" : "members"}`}
-              note={team.collegeName ?? undefined}
             />
+            {team.schools.length ? (
+              <BubbleRow
+                label={team.schools.length === 1 ? "School" : "Schools"}
+                value={team.schools.join(", ")}
+              />
+            ) : null}
             <BubbleRow
               label="Tournaments"
               value={

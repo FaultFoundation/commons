@@ -2320,6 +2320,12 @@ button.ff-dash__link:hover {
   gap: 10px;
   margin-top: 18px;
 }
+.ff-team-invite__actions .ff-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-inline: 1em;
+  white-space: nowrap;
+}
 /* The admin two-factor step-up. Wider than a confirm prompt because it carries
    a labelled field plus the "email me a code instead" alternates, and those
    read badly wrapped into 420px. */

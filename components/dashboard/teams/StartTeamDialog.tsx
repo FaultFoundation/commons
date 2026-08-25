@@ -174,10 +174,6 @@ export function StartTeamDialog({
       ) : (
         <>
           <h2 className="ff-dialog__title">Invite your players</h2>
-          <p className="ff-dialog__text">
-            Your team is ready. Share this link — anyone who opens it lands on your
-            roster.
-          </p>
           <input
             className="ff-auth__input ff-copy__input"
             type="text"
@@ -186,17 +182,17 @@ export function StartTeamDialog({
             onFocus={(event) => event.currentTarget.select()}
             aria-label="Invite link"
           />
-          <div className="ff-dialog__actions">
+          <div className="ff-dialog__actions ff-team-invite__actions">
             {created ? (
               <a
                 className="ff-btn ff-btn--outline"
                 href={`/teams/${created.teamId}/`}
               >
-                Manage Team
+                Manage
               </a>
             ) : null}
             {created ? (
-              <CopyInviteButton token={created.token} label="Copy Invite Link" />
+              <CopyInviteButton token={created.token} label="Copy" />
             ) : null}
             <button type="button" className="ff-btn" onClick={finish}>
               Done

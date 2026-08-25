@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, eq } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
@@ -48,6 +49,17 @@ export type ProviderProfile = {
 /** Platform name shown on the member's Discord connection card. */
 const PLATFORM_NAME = "The Fault Foundation";
 
+/** Every connected identity for a member, freshly read for write-adjacent work. */
+export async function getPlatformIdentities(userId: string) {
+  return getDb()
+    .select()
+    .from(platformIdentities)
+    .where(eq(platformIdentities.userId, userId));
+}
+
+/** One identity-list read shared by all server render work in a request. */
+export const getPlatformIdentitiesCached = cache(getPlatformIdentities);
+
 /** A single connected platform identity (discord / battlenet / …), or null. */
 export async function getPlatformIdentity(userId: string, provider: string) {
   const db = getDb();
@@ -63,6 +75,14 @@ export async function getPlatformIdentity(userId: string, provider: string) {
     .limit(1);
   return rows[0] ?? null;
 }
+
+/** Request-scoped identity lookup for pages, components, and lazy read syncs. */
+export const getPlatformIdentityCached = cache(
+  async (userId: string, provider: string) => {
+    const rows = await getPlatformIdentitiesCached(userId);
+    return rows.find((row) => row.provider === provider) ?? null;
+  },
+);
 
 /**
  * Whether a stored `account.scope` (better-auth persists it comma-separated)

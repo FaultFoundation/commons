@@ -89,6 +89,24 @@ export function isTournamentStatus(value: unknown): value is TournamentStatus {
 }
 
 // ---------------------------------------------------------------------------
+// Tournament-list display preference
+// ---------------------------------------------------------------------------
+
+export const TOURNAMENT_LAYOUTS = ["modern", "compact"] as const;
+export type TournamentLayout = (typeof TOURNAMENT_LAYOUTS)[number];
+export const TOURNAMENT_LAYOUT_DEFAULT: TournamentLayout = "modern";
+export const TOURNAMENT_LAYOUT_COOKIE = "ff-tournaments-layout";
+export const TOURNAMENT_LAYOUT_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+
+export function asTournamentLayout(
+  value: string | null | undefined,
+): TournamentLayout {
+  return TOURNAMENT_LAYOUTS.includes(value as TournamentLayout)
+    ? (value as TournamentLayout)
+    : TOURNAMENT_LAYOUT_DEFAULT;
+}
+
+// ---------------------------------------------------------------------------
 // Match statuses — normalized from Challonge's match `state`
 // (open | pending | complete). Rendered by the bracket view.
 // ---------------------------------------------------------------------------

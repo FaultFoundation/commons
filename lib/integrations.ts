@@ -1,7 +1,8 @@
 import { and, eq } from "drizzle-orm";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
-import { account, platformIdentities } from "@/db/schema";
+import { account } from "@/db/schema";
+import { getAccountLinksCached } from "@/lib/account-links";
 import {
   challongeAuthEnabled,
   faceitAuthEnabled,
@@ -17,7 +18,8 @@ import {
   fetchDiscordUsername,
   fetchGuildMemberRoles,
   fetchIsInGuild,
-  getPlatformIdentity,
+  getPlatformIdentitiesCached,
+  getPlatformIdentityCached,
   hasScope,
   markIdentityRefreshed,
   pushRoleConnection,
@@ -112,8 +114,10 @@ export async function loadDiscordIntegration(
   requestHeaders: Headers,
 ): Promise<DiscordIntegration> {
   const [discordAccount, identity] = await Promise.all([
-    getDiscordAccount(userId),
-    getPlatformIdentity(userId, "discord"),
+    getAccountLinksCached(userId).then(
+      (rows) => rows.find((row) => row.providerId === "discord") ?? null,
+    ),
+    getPlatformIdentityCached(userId, "discord"),
   ]);
   if (!discordAccount) return NOT_LINKED;
 
@@ -289,19 +293,9 @@ const CONNECT_ENABLED: Record<ConnectProviderId, () => boolean> = {
 export async function loadConnectIntegrations(
   userId: string,
 ): Promise<ConnectIntegration[]> {
-  const db = getDb();
   const [identities, linkedRows] = await Promise.all([
-    db
-      .select({
-        provider: platformIdentities.provider,
-        handle: platformIdentities.handle,
-      })
-      .from(platformIdentities)
-      .where(eq(platformIdentities.userId, userId)),
-    db
-      .select({ providerId: account.providerId })
-      .from(account)
-      .where(eq(account.userId, userId)),
+    getPlatformIdentitiesCached(userId),
+    getAccountLinksCached(userId),
   ]);
   const linked = new Set(linkedRows.map((r) => r.providerId));
   const handleByProvider = new Map(identities.map((i) => [i.provider, i.handle]));

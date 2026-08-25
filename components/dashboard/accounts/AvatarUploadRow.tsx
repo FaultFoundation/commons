@@ -1,7 +1,8 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useRef, useState, type ChangeEvent } from "react";
-import AvatarEditor, { type AvatarEditorRef } from "react-avatar-editor";
+import type { AvatarEditorRef } from "react-avatar-editor";
 
 import { Avatar } from "@/components/dashboard/Avatar";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
@@ -13,6 +14,10 @@ import {
 } from "@/lib/avatars";
 
 const GENERIC_ERROR = "Something went wrong. Please try again.";
+
+const AvatarEditor = dynamic(() => import("react-avatar-editor"), {
+  ssr: false,
+});
 
 /** Room around the crop square for the parts of the photo being trimmed. */
 const EDITOR_BORDER = 32;

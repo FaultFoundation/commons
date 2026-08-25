@@ -8,12 +8,11 @@ import {
   type NavItem,
 } from "@/components/dashboard/DashboardNav";
 import { DashboardRail } from "@/components/dashboard/DashboardRail";
-import { OAuthPopupBridge } from "@/components/dashboard/accounts/OAuthPopupBridge";
 import { DensityCookie } from "@/components/dashboard/accounts/DensityCookie";
 import { SetupBanner } from "@/components/dashboard/SetupBanner";
 import { isAdminUnlocked } from "@/lib/admin-unlock";
 import { DENSITY_COOKIE, asDensity, type Density } from "@/lib/density";
-import { getProfile } from "@/lib/registration";
+import { getProfileCached } from "@/lib/registration";
 import { getSessionCached } from "@/lib/session";
 import { getStaffRoles } from "@/lib/staff";
 import {
@@ -86,14 +85,14 @@ async function resolveDensity(userId: string | null): Promise<Density> {
   const cached = (await cookies()).get(DENSITY_COOKIE)?.value;
   if (cached) return asDensity(cached);
   if (!userId) return asDensity(null);
-  return asDensity((await getProfile(userId))?.density);
+  return asDensity((await getProfileCached(userId))?.density);
 }
 
 /**
  * Shared shell for the member portal: sidebar rail (nav + sign out)
  * beside the page content, inside the regular site header/footer.
  * Active state comes from a prop — portal pages are server components
- * reached by full-page navigations.
+ * replaced through App Router navigation.
  */
 export async function DashboardShell({
   active,
@@ -135,7 +134,6 @@ export async function DashboardShell({
   return (
     <main id="wp--skip-link--target" className="ff-main ff-main--fill">
       <DensityCookie value={density} />
-      <OAuthPopupBridge />
       <div
         data-density={density}
         data-surface={surface}

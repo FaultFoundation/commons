@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import {
@@ -89,14 +91,23 @@ function EntryRow({ entry }: { entry: ScheduleEntry }) {
   );
 
   if (!linkHref) return row;
-  return (
+  return external ? (
     <a
       className="ff-schedule-entry"
       href={linkHref}
-      {...(external ? { target: "_blank", rel: "noreferrer noopener" } : {})}
+      target="_blank"
+      rel="noreferrer noopener"
     >
       {row}
     </a>
+  ) : (
+    <Link
+      className="ff-schedule-entry"
+      href={linkHref}
+      prefetch={false}
+    >
+      {row}
+    </Link>
   );
 }
 
@@ -111,9 +122,9 @@ function EmptyState({
     return (
       <div className="ff-bubble__wip">
         Connect your FACEIT, start.gg, or Challonge account under{" "}
-        <a className="ff-link" href="/account/">
+        <Link className="ff-link" href="/account/" prefetch={false}>
           Integrations
-        </a>{" "}
+        </Link>{" "}
         to see your matches here.
       </div>
     );

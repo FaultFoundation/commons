@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { reorderMyTeams } from "@/app/teams/actions";
 import { Avatar } from "@/components/dashboard/Avatar";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
@@ -107,12 +109,13 @@ export function TeamCardGrid({ teams: initial }: { teams: MyTeam[] }) {
               {team.inviteToken ? (
                 <CopyInviteButton token={team.inviteToken} small />
               ) : null}
-              <a
+              <Link
                 className="ff-btn ff-btn--outline ff-btn--sm"
                 href={`/teams/${team.id}/`}
+                prefetch={false}
               >
                 {team.inviteToken ? "Manage" : "Open"}
-              </a>
+              </Link>
             </div>
           </Bubble>
         ))}

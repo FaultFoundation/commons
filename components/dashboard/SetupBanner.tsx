@@ -1,8 +1,14 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
-import { account, teamMembers, tournamentParticipants } from "@/db/schema";
+import {
+  account,
+  programMemberships,
+  teamMembers,
+  tournamentParticipants,
+  user,
+} from "@/db/schema";
 import { getDb } from "@/lib/db";
-import { getRegistrationState } from "@/lib/registration";
+import { PROGRAM_COLLEGIATE_ID } from "@/lib/programs";
 
 /**
  * The amber "action required" bar the DashboardShell renders above every
@@ -16,23 +22,42 @@ import { getRegistrationState } from "@/lib/registration";
  */
 export async function SetupBanner({ userId }: { userId: string }) {
   const db = getDb();
-  const [reg, discordRows, teamRows] = await Promise.all([
-    getRegistrationState(userId),
-    db
-      .select({ id: account.id })
-      .from(account)
-      .where(and(eq(account.userId, userId), eq(account.providerId, "discord")))
-      .limit(1),
-    db
-      .select({ teamId: teamMembers.teamId })
-      .from(teamMembers)
-      .where(
-        and(eq(teamMembers.userId, userId), eq(teamMembers.status, "active")),
-      ),
-  ]);
+  const state = (
+    await db
+      .select({
+        emailVerified: sql<number>`exists(
+          select 1 from ${programMemberships}
+          where ${programMemberships.userId} = ${userId}
+            and ${programMemberships.programId} = ${PROGRAM_COLLEGIATE_ID}
+            and ${programMemberships.status} = ${"VERIFIED"}
+        )`,
+        discordLinked: sql<number>`exists(
+          select 1 from ${account}
+          where ${account.userId} = ${userId}
+            and ${account.providerId} = ${"discord"}
+        )`,
+        hasTeam: sql<number>`exists(
+          select 1 from ${teamMembers}
+          where ${teamMembers.userId} = ${userId}
+            and ${teamMembers.status} = ${"active"}
+        )`,
+        hasEntry: sql<number>`exists(
+          select 1 from ${tournamentParticipants}
+          where ${tournamentParticipants.withdrawnAt} is null
+            and ${tournamentParticipants.teamId} in (
+              select ${teamMembers.teamId} from ${teamMembers}
+              where ${teamMembers.userId} = ${userId}
+                and ${teamMembers.status} = ${"active"}
+            )
+        )`,
+      })
+      .from(user)
+      .where(eq(user.id, userId))
+      .limit(1)
+  )[0];
 
-  const emailVerified = reg?.status === "VERIFIED";
-  const discordLinked = discordRows.length > 0;
+  const emailVerified = Boolean(state?.emailVerified);
+  const discordLinked = Boolean(state?.discordLinked);
 
   if (!emailVerified || !discordLinked) {
     return (
@@ -43,7 +68,7 @@ export async function SetupBanner({ userId }: { userId: string }) {
     );
   }
 
-  if (teamRows.length === 0) {
+  if (!state?.hasTeam) {
     return (
       <Banner>
         Action Required: <a href="/teams/">Create or join a Team</a> to start
@@ -52,22 +77,7 @@ export async function SetupBanner({ userId }: { userId: string }) {
     );
   }
 
-  // Solo entries and team entries both count as "in something".
-  const entries = await db
-    .select({ id: tournamentParticipants.id })
-    .from(tournamentParticipants)
-    .where(
-      and(
-        inArray(
-          tournamentParticipants.teamId,
-          teamRows.map((r) => r.teamId),
-        ),
-        isNull(tournamentParticipants.withdrawnAt),
-      ),
-    )
-    .limit(1);
-
-  if (entries.length === 0) {
+  if (!state?.hasEntry) {
     return (
       <Banner>
         Action Required: <a href="/tournaments/">Join a Tournament</a> to get on

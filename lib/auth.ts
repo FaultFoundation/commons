@@ -293,6 +293,17 @@ export const getAuth = cache(function getAuth() {
     database: drizzleAdapter(getDb(), { provider: "sqlite" }),
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
+    // Serve repeat session checks from a signed cookie for one minute instead
+    // of reading D1 on every page and HeaderAuthButton request. The short TTL
+    // bounds revocation/profile staleness; privileged staff and unlock state is
+    // still re-derived by its own gates rather than trusted from the session.
+    session: {
+      cookieCache: {
+        enabled: true,
+        maxAge: 60,
+        strategy: "compact",
+      },
+    },
     // Cloudflare terminates TLS and puts the real client IP in CF-Connecting-IP.
     // Without this, Better Auth can't resolve an IP and rate-limits every client
     // into one shared per-path bucket — weakening brute-force protection on

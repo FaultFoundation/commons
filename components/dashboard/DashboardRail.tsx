@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
 /**
@@ -13,11 +14,16 @@ import { useEffect, useState, type ReactNode } from "react";
  *
  * The hamburger and scrim are display:none until the mobile breakpoint, so on
  * larger screens only the <aside> is a grid item and the two-column layout is
- * untouched. Full-page nav links close the drawer for free (the page reloads);
+ * untouched. A pathname change closes the drawer after client navigation;
  * Escape and a scrim tap close it otherwise.
  */
 export function DashboardRail({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!open) return;

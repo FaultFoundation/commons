@@ -1,8 +1,8 @@
+import { cache } from "react";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import {
-  account,
   profiles,
   colleges,
   programMemberships,
@@ -12,6 +12,10 @@ import {
   teams,
   user,
 } from "@/db/schema";
+import {
+  getAccountLinks,
+  getAccountLinksCached,
+} from "@/lib/account-links";
 import { PROGRAM_COLLEGIATE_ID } from "@/lib/programs";
 import { CODE_LENGTH } from "@/lib/registration-shared";
 
@@ -175,6 +179,9 @@ export async function getProfile(userId: string) {
   return rows[0] ?? null;
 }
 
+/** Request-scoped profile read for server-rendered pages and components. */
+export const getProfileCached = cache(getProfile);
+
 export type RegistrationState = {
   membershipId: string | null;
   status: string | null;
@@ -197,12 +204,13 @@ export type RegistrationState = {
  * profile fields. Returns null when the member has neither a profile nor a
  * membership yet.
  */
-export async function getRegistrationState(
+async function readRegistrationState(
   userId: string,
+  loadProfile: typeof getProfile,
 ): Promise<RegistrationState | null> {
   const db = getDb();
   const [profile, rows] = await Promise.all([
-    getProfile(userId),
+    loadProfile(userId),
     db
       .select({
         membershipId: programMemberships.id,
@@ -260,6 +268,18 @@ export async function getRegistrationState(
     collegeId: row?.collegeId ?? null,
   };
 }
+
+/** Fresh registration read for mutations and other write-adjacent work. */
+export async function getRegistrationState(
+  userId: string,
+): Promise<RegistrationState | null> {
+  return readRegistrationState(userId, getProfile);
+}
+
+/** Request-scoped registration read for server-rendered pages and components. */
+export const getRegistrationStateCached = cache((userId: string) =>
+  readRegistrationState(userId, getProfileCached),
+);
 
 /** A registration waiting on a staff decision — the verification queue's row. */
 export type ReviewMember = {
@@ -348,13 +368,14 @@ export const REQUIRED_PROVIDERS = ["discord", "battlenet"] as const;
  * checkmarks (SetupShell) and the resume redirect (/account/setup/), so the two
  * can't drift apart and send someone to a step the rail calls finished.
  */
-export async function getSetupProgress(userId: string): Promise<SetupProgress> {
+async function readSetupProgress(
+  userId: string,
+  loadRegistrationState: typeof getRegistrationState,
+  loadAccountLinks: typeof getAccountLinks,
+): Promise<SetupProgress> {
   const [reg, accountRows, teamRows] = await Promise.all([
-    getRegistrationState(userId),
-    getDb()
-      .select({ providerId: account.providerId })
-      .from(account)
-      .where(eq(account.userId, userId)),
+    loadRegistrationState(userId),
+    loadAccountLinks(userId),
     getDb()
       .select({ id: teamMembers.id })
       .from(teamMembers)
@@ -382,6 +403,20 @@ export async function getSetupProgress(userId: string): Promise<SetupProgress> {
     team: teamRows.length > 0,
   };
 }
+
+/** Fresh setup-progress read for write-adjacent work. */
+export async function getSetupProgress(userId: string): Promise<SetupProgress> {
+  return readSetupProgress(userId, getRegistrationState, getAccountLinks);
+}
+
+/** Request-scoped setup progress for server-rendered pages and components. */
+export const getSetupProgressCached = cache((userId: string) =>
+  readSetupProgress(
+    userId,
+    getRegistrationStateCached,
+    getAccountLinksCached,
+  ),
+);
 
 // ---------------------------------------------------------------------------
 // Write helpers (registration flow). Each ensures its row exists then patches.

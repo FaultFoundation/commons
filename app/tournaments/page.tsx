@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
@@ -7,6 +8,10 @@ import { TournamentList } from "@/components/dashboard/tournaments/TournamentLis
 import { getSessionCached } from "@/lib/session";
 import { listExternalTournaments } from "@/lib/external-tournaments";
 import { listTournaments } from "@/lib/tournaments";
+import {
+  TOURNAMENT_LAYOUT_COOKIE,
+  asTournamentLayout,
+} from "@/lib/tournaments-shared";
 import type { TournamentListEntry } from "@/components/dashboard/tournaments/TournamentList";
 
 // Session-gated: always rendered per request.
@@ -65,13 +70,19 @@ export default async function TournamentsPage() {
   // list (which already owns filtering, so a round trip per view would be a
   // billed request for work a sort already does).
   const tournaments = [...internalEntries, ...externalEntries];
+  const initialLayout = asTournamentLayout(
+    (await cookies()).get(TOURNAMENT_LAYOUT_COOKIE)?.value,
+  );
 
   return (
     <DashboardShell active="tournaments" setupUserId={session.user.id}>
       <h1 className="screen-reader-text">Tournaments</h1>
       <div className="ff-bubble-grid">
         <Bubble title="Tournaments" span="full">
-          <TournamentList tournaments={tournaments} />
+          <TournamentList
+            tournaments={tournaments}
+            initialLayout={initialLayout}
+          />
         </Bubble>
       </div>
     </DashboardShell>

@@ -2965,6 +2965,13 @@ button.ff-dash__link:hover {
 .ff-tcard__banner {
   position: relative;
 }
+.ff-tcard__banner-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .ff-tcard__source {
   position: absolute;
   top: 10px;
@@ -3655,14 +3662,9 @@ button.ff-dash__link:hover {
   border-color: rgba(255, 255, 255, 0.4);
 }
 
-/* List cards get the standard shadow, and their banner can carry an image. */
+/* List cards get the standard shadow. */
 .ff-tcard {
   box-shadow: var(--ff-shadow-card);
-}
-.ff-tcard__banner {
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
 }
 
 /* Schedule calendar — a vertical stack of BubbleRow entries inside a Bubble. */

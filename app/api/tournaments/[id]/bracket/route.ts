@@ -1,4 +1,8 @@
-import { getOrRefreshSnapshot, getTournament } from "@/lib/tournaments";
+import {
+  getCurrentSnapshotMetadata,
+  getOrRefreshSnapshot,
+  getTournament,
+} from "@/lib/tournaments";
 import {
   isPublic,
   isTournamentId,
@@ -71,25 +75,33 @@ export async function GET(
     return Response.json({ error: "Not found" }, { status: 404 });
   }
 
-  const snapshot = await getOrRefreshSnapshot(tournament);
-  const etag = `"v${snapshot.version}"`;
-  const headers = {
+  const responseHeaders = {
     "Content-Type": "application/json",
     "Cache-Control": cacheControl(tournament.status),
-    ETag: etag,
   };
 
-  // A matching ETag means the version hasn't moved: answer with no body.
-  if (request.headers.get("If-None-Match") === etag) {
-    return new Response(null, { status: 304, headers });
+  // Most polls are unchanged. Read only version/fetchedAt first so a matching,
+  // still-fresh ETag avoids selecting and JSON-parsing the full bracket blob.
+  const current = await getCurrentSnapshotMetadata(tournament);
+  const requestedEtag = request.headers.get("If-None-Match");
+  if (current) {
+    const etag = `"v${current.version}"`;
+    if (requestedEtag === etag) {
+      return new Response(null, {
+        status: 304,
+        headers: { ...responseHeaders, ETag: etag },
+      });
+    }
   }
 
+  const snapshot = await getOrRefreshSnapshot(tournament);
+  const etag = `"v${snapshot.version}"`;
   return new Response(
     JSON.stringify({
       ...snapshot.payload,
       version: snapshot.version,
       nextPollMs: nextPollMs(tournament.status),
     }),
-    { status: 200, headers },
+    { status: 200, headers: { ...responseHeaders, ETag: etag } },
   );
 }

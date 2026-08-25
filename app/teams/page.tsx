@@ -5,8 +5,9 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { TeamCardGrid } from "@/components/dashboard/teams/TeamCardGrid";
 import { TeamsActions } from "@/components/dashboard/teams/TeamsActions";
+import { getRegistrationStateCached } from "@/lib/registration";
 import { getSessionCached } from "@/lib/session";
-import { isVerifiedMember, listMyTeams } from "@/lib/teams";
+import { listMyTeams } from "@/lib/teams";
 
 // Session-gated: always rendered per request.
 export const dynamic = "force-dynamic";
@@ -22,10 +23,11 @@ export default async function TeamsPage() {
     redirect("/login/");
   }
 
-  const [myTeams, verified] = await Promise.all([
+  const [myTeams, registration] = await Promise.all([
     listMyTeams(session.user.id),
-    isVerifiedMember(session.user.id),
+    getRegistrationStateCached(session.user.id),
   ]);
+  const verified = registration?.status === "VERIFIED";
 
   return (
     <DashboardShell active="teams" setupUserId={session.user.id}>

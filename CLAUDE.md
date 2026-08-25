@@ -90,8 +90,9 @@ Cloudflare bindings (`DB`, `AVATARS`) and secrets only exist on the **request**
 context. Nothing that touches them may be built at module scope:
 
 - `getDb()` ([lib/db.ts](lib/db.ts)) and `getAuth()` ([lib/auth.ts](lib/auth.ts))
-  construct fresh per request, off `getCloudflareContext()`. Never hoist or
-  cache them into a module-level constant.
+  construct fresh per request, off `getCloudflareContext()`. Both use React
+  `cache()` so repeated callers in one request share the stateless wrapper;
+  never hoist either into a module-level constant or add cross-request caching.
 - Per-request work that several components repeat is memoized with React
   `cache` instead — `getSessionCached` ([lib/session.ts](lib/session.ts)),
   `getStaffRoles` ([lib/staff.ts](lib/staff.ts)). The Worker's CPU budget is
@@ -100,7 +101,9 @@ context. Nothing that touches them may be built at module scope:
   several callers in one render share one construction. **Read the session with
   `getSessionCached()`, never `getAuth().api.getSession()`** in a page/component —
   a page that reads it directly re-validates the session a second time on top of
-  the shell's read.
+  the shell's read. Better Auth's signed cookie cache keeps repeat validations
+  off D1 for 60 seconds; that cache is only identity/session convenience, never
+  a substitute for the D1-backed staff capability checks or admin unlock gate.
 - **CPU limits are the sharpest constraint, and we're on the Workers _Free_
   plan.** Free hard-caps CPU at **10 ms/request** (network/DB waits don't count),
   which a Next.js/OpenNext SSR render routinely exceeds — this is the source of

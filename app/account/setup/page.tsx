@@ -1,8 +1,10 @@
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { getAuth } from "@/lib/auth";
-import { getRegistrationState, getSetupProgress } from "@/lib/registration";
+import {
+  getRegistrationStateCached,
+  getSetupProgressCached,
+} from "@/lib/registration";
+import { getSessionCached } from "@/lib/session";
 
 // Session-gated: always rendered per request.
 export const dynamic = "force-dynamic";
@@ -13,12 +15,12 @@ export const dynamic = "force-dynamic";
  * so the resume logic lives in exactly one place.
  */
 export default async function SetupPage() {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  const session = await getSessionCached();
   if (!session) {
     redirect("/login/");
   }
 
-  const reg = await getRegistrationState(session.user.id);
+  const reg = await getRegistrationStateCached(session.user.id);
   const status = reg?.status ?? null;
 
   if (status === null) redirect("/account/setup/academic/");
@@ -28,7 +30,7 @@ export default async function SetupPage() {
   if (status !== "VERIFIED") redirect("/account/setup/academic/");
 
   // Same helper the step rail reads, so "finished" means one thing site-wide.
-  const progress = await getSetupProgress(session.user.id);
+  const progress = await getSetupProgressCached(session.user.id);
 
   redirect(
     progress.integrations

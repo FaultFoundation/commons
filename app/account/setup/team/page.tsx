@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
@@ -9,9 +8,9 @@ import { SetupShell } from "@/components/dashboard/setup/SetupShell";
 import { CopyInviteButton } from "@/components/dashboard/teams/CopyInviteButton";
 import { CreateTeamForm } from "@/components/dashboard/teams/CreateTeamForm";
 import { JoinByLinkForm } from "@/components/dashboard/teams/JoinByLinkForm";
-import { getAuth } from "@/lib/auth";
-import { getRegistrationState } from "@/lib/registration";
-import { isVerifiedMember, listMyTeams } from "@/lib/teams";
+import { getRegistrationStateCached } from "@/lib/registration";
+import { getSessionCached } from "@/lib/session";
+import { listMyTeams } from "@/lib/teams";
 
 // Session-gated: always rendered per request.
 export const dynamic = "force-dynamic";
@@ -22,17 +21,17 @@ export const metadata: Metadata = {
 };
 
 export default async function TeamSetupPage() {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  const session = await getSessionCached();
   if (!session) {
     redirect("/login/");
   }
 
-  const [myTeams, verified, reg] = await Promise.all([
+  const [myTeams, reg] = await Promise.all([
     listMyTeams(session.user.id),
-    isVerifiedMember(session.user.id),
-    getRegistrationState(session.user.id),
+    getRegistrationStateCached(session.user.id),
   ]);
   const status = reg?.status ?? null;
+  const verified = status === "VERIFIED";
 
   return (
     <SetupShell step={3}>

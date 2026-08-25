@@ -1,18 +1,17 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 
 import { CodeStep } from "@/components/dashboard/setup/CodeStep";
 import { SetupShell } from "@/components/dashboard/setup/SetupShell";
 import { schoolEmailVerifications } from "@/db/schema";
-import { getAuth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import {
   MAX_ATTEMPTS,
   RESEND_COOLDOWN_MS,
-  getRegistrationState,
+  getRegistrationStateCached,
 } from "@/lib/registration";
+import { getSessionCached } from "@/lib/session";
 
 // Session-gated: always rendered per request.
 export const dynamic = "force-dynamic";
@@ -23,12 +22,12 @@ export const metadata: Metadata = {
 };
 
 export default async function CodeSetupPage() {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  const session = await getSessionCached();
   if (!session) {
     redirect("/login/");
   }
 
-  const reg = await getRegistrationState(session.user.id);
+  const reg = await getRegistrationStateCached(session.user.id);
   // Nothing outstanding — the resolver knows where this member belongs.
   if (reg?.status !== "EMAIL_SENT") {
     redirect("/account/setup/");

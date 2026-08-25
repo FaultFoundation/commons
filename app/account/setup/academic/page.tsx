@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import {
@@ -7,8 +6,11 @@ import {
   type AcademicInitialState,
 } from "@/components/dashboard/setup/AcademicStep";
 import { SetupShell } from "@/components/dashboard/setup/SetupShell";
-import { getAuth } from "@/lib/auth";
-import { getRegistrationState, listSchoolCountries } from "@/lib/registration";
+import {
+  getRegistrationStateCached,
+  listSchoolCountries,
+} from "@/lib/registration";
+import { getSessionCached } from "@/lib/session";
 
 // Session-gated: always rendered per request.
 export const dynamic = "force-dynamic";
@@ -19,12 +21,12 @@ export const metadata: Metadata = {
 };
 
 export default async function AcademicSetupPage() {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  const session = await getSessionCached();
   if (!session) {
     redirect("/login/");
   }
 
-  const reg = await getRegistrationState(session.user.id);
+  const reg = await getRegistrationStateCached(session.user.id);
   const status = reg?.status ?? null;
 
   // EMAIL_SENT deliberately still renders the form: this is where "Wrong

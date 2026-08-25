@@ -10,8 +10,8 @@ import { useRouter } from "next/navigation";
 // this bridge runs: the popup tells its opener to refresh (BroadcastChannel,
 // with a postMessage fallback) and closes itself; the opener, which mounted the
 // same bridge earlier, hears the signal and re-renders with the new link. Same
-// origin throughout, so both channels are safe. Rendered on every portal page
-// via DashboardShell, so it's present as both the opener and the popup landing.
+// origin throughout, so both channels are safe. The Settings page owns this
+// bridge because it is both the opener and every provider's popup landing.
 const CHANNEL = "ff-oauth-link";
 const SIGNAL = "linked";
 

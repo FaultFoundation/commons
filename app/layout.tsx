@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -65,14 +66,18 @@ export default function RootLayout({
           {children}
           <SiteFooter />
         </div>
-        <script
+        <Script
           src="https://www.googletagmanager.com/gtag/js?id=GT-TNSMBN4N"
-          async
+          strategy="afterInteractive"
         />
-        <script dangerouslySetInnerHTML={{ __html: GTAG_INLINE }} />
-        <script
-          async
+        <Script
+          id="ff-gtag-bootstrap"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{ __html: GTAG_INLINE }}
+        />
+        <Script
           src="https://widgets.givebutter.com/latest.umd.cjs?acct=SyOqvC7iDnp3tRJY&p=wordpress"
+          strategy="lazyOnload"
         />
       </body>
     </html>

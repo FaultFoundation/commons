@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
-import { headers } from "next/headers";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { getAuth } from "@/lib/auth";
-import { getSetupProgress, type SetupProgress } from "@/lib/registration";
+import {
+  getSetupProgressCached,
+  type SetupProgress,
+} from "@/lib/registration";
+import { getSessionCached } from "@/lib/session";
 
 const STEPS = [
   {
@@ -43,8 +45,10 @@ export async function SetupShell({
   step: 1 | 2 | 3;
   children: ReactNode;
 }) {
-  const session = await getAuth().api.getSession({ headers: await headers() });
-  const progress = session ? await getSetupProgress(session.user.id) : null;
+  const session = await getSessionCached();
+  const progress = session
+    ? await getSetupProgressCached(session.user.id)
+    : null;
 
   return (
     <DashboardShell active="account">

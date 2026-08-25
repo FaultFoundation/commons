@@ -1,10 +1,19 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { AdminUnlockDialog } from "@/components/dashboard/admin/AdminUnlockDialog";
 import { sanitizeNextPath } from "@/lib/next-path";
+
+const AdminUnlockDialog = dynamic(
+  () =>
+    import("@/components/dashboard/admin/AdminUnlockDialog").then(
+      (module) => module.AdminUnlockDialog,
+    ),
+  { ssr: false },
+);
 
 // The sidebar rail, extracted from DashboardShell as a client island because it
 // now holds interactive state: a tab with sub-tabs (currently only Admin)
@@ -177,14 +186,15 @@ export function DashboardNav({
               );
             }
             return item.href ? (
-              <a
+              <Link
                 key={item.key}
                 className="ff-dash__link"
                 href={item.href}
+                prefetch={false}
                 aria-current={item.key === active ? "page" : undefined}
               >
                 {item.label}
-              </a>
+              </Link>
             ) : (
               <span
                 key={item.key}
@@ -209,10 +219,11 @@ export function DashboardNav({
             <span>{openItem ? openItem.label : "Back"}</span>
           </button>
           {openItem?.children?.map((child) => (
-            <a
+            <Link
               key={child.key}
               className="ff-dash__link ff-dash__link--child"
               href={child.href}
+              prefetch={false}
               aria-current={
                 active === openItem.key && activeChild === child.key
                   ? "page"
@@ -220,20 +231,22 @@ export function DashboardNav({
               }
             >
               {child.label}
-            </a>
+            </Link>
           ))}
         </nav>
       </div>
 
-      <AdminUnlockDialog
-        open={unlockOpen}
-        onClose={() => {
-          setUnlockOpen(false);
-          pendingGroup.current = null;
-          resumeTo.current = null;
-        }}
-        onUnlocked={handleUnlocked}
-      />
+      {unlockOpen ? (
+        <AdminUnlockDialog
+          open
+          onClose={() => {
+            setUnlockOpen(false);
+            pendingGroup.current = null;
+            resumeTo.current = null;
+          }}
+          onUnlocked={handleUnlocked}
+        />
+      ) : null}
     </div>
   );
 }

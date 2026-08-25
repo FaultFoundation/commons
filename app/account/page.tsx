@@ -8,6 +8,7 @@ import { ComingSoonIntegration } from "@/components/dashboard/accounts/ComingSoo
 import { DeleteAccount } from "@/components/dashboard/accounts/DeleteAccount";
 import { DensityRow } from "@/components/dashboard/accounts/DensityRow";
 import { IntegrationCard } from "@/components/dashboard/accounts/IntegrationCard";
+import { OAuthPopupBridge } from "@/components/dashboard/accounts/OAuthPopupBridge";
 import {
   AvatarRow,
   EmailRow,
@@ -19,7 +20,8 @@ import { TwoFactorRows } from "@/components/dashboard/accounts/TwoFactorRows";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { FieldRow } from "@/components/dashboard/bubbles/FieldRow";
-import { account, twoFactor, user } from "@/db/schema";
+import { twoFactor, user } from "@/db/schema";
+import { getAccountLinksCached } from "@/lib/account-links";
 import { battlenetAuthEnabled, discordAuthEnabled } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { getSessionCached } from "@/lib/session";
@@ -29,8 +31,11 @@ import {
   loadConnectIntegrations,
   loadDiscordIntegration,
 } from "@/lib/integrations";
-import { getPlatformIdentity } from "@/lib/platform-identities";
-import { getProfile, getRegistrationState } from "@/lib/registration";
+import { getPlatformIdentityCached } from "@/lib/platform-identities";
+import {
+  getProfileCached,
+  getRegistrationStateCached,
+} from "@/lib/registration";
 
 // Session-gated: always rendered per request.
 export const dynamic = "force-dynamic";
@@ -72,20 +77,17 @@ export default async function AccountPage({
     discord,
     battlenetIdentity,
     connectIntegrations,
-    accountRows,
+    accountLinks,
     twoFactorRows,
     profile,
     params,
   ] = await Promise.all([
-      getRegistrationState(session.user.id),
+      getRegistrationStateCached(session.user.id),
       // Also refreshes the stored Discord handle when it has gone stale.
       loadDiscordIntegration(session.user.id, await headers()),
-      getPlatformIdentity(session.user.id, "battlenet"),
+      getPlatformIdentityCached(session.user.id, "battlenet"),
       loadConnectIntegrations(session.user.id),
-      db
-        .select({ providerId: account.providerId })
-        .from(account)
-        .where(eq(account.userId, session.user.id)),
+      getAccountLinksCached(session.user.id),
       // Read from D1 rather than the session: `user.two_factor_enabled` is
       // what the sign-in challenge actually consults, and the session here can
       // be served from Better Auth's cookie cache — enrolling in another tab
@@ -104,11 +106,11 @@ export default async function AccountPage({
         .leftJoin(twoFactor, eq(twoFactor.userId, user.id))
         .where(eq(user.id, session.user.id))
         .limit(1),
-      densityCookie ? null : getProfile(session.user.id),
+      densityCookie ? null : getProfileCached(session.user.id),
       searchParams,
     ]);
-  const hasPassword = accountRows.some((r) => r.providerId === "credential");
-  const battlenetLinked = accountRows.some((r) => r.providerId === "battlenet");
+  const hasPassword = accountLinks.some((r) => r.providerId === "credential");
+  const battlenetLinked = accountLinks.some((r) => r.providerId === "battlenet");
   const twoFactorEnabled = twoFactorRows[0]?.enabled ?? false;
   const hasTotp = Boolean(twoFactorRows[0]?.totpVerified);
   const density = asDensity(densityCookie ?? profile?.density);
@@ -119,6 +121,7 @@ export default async function AccountPage({
 
   return (
     <DashboardShell active="account" setupUserId={session.user.id}>
+      <OAuthPopupBridge />
       <h1 className="screen-reader-text">Settings</h1>
       <div className="ff-bubble-grid">
         <Bubble title="Profile" span="full">

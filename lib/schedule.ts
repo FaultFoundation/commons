@@ -2,13 +2,13 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 import {
-  account,
   externalMatches,
   platformIdentities,
   teamMembers,
   tournamentParticipants,
   tournaments,
 } from "@/db/schema";
+import { getAccountLinksCached } from "@/lib/account-links";
 import {
   challongeAuthEnabled,
   faceitAuthEnabled,
@@ -16,7 +16,10 @@ import {
   startggAuthEnabled,
 } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { getPlatformIdentity, hasScope } from "@/lib/platform-identities";
+import {
+  getPlatformIdentitiesCached,
+  hasScope,
+} from "@/lib/platform-identities";
 import {
   SCHEDULE_PROVIDERS,
   isUpcomingStatus,
@@ -78,12 +81,8 @@ const enabledFor: Record<ScheduleProvider, () => boolean> = {
 
 /** The linked account row (id + granted scope) for a connect provider, or null. */
 async function connectAccount(userId: string, providerId: ScheduleProvider) {
-  const rows = await getDb()
-    .select({ accountId: account.accountId, scope: account.scope })
-    .from(account)
-    .where(and(eq(account.userId, userId), eq(account.providerId, providerId)))
-    .limit(1);
-  return rows[0] ?? null;
+  const rows = await getAccountLinksCached(userId);
+  return rows.find((row) => row.providerId === providerId) ?? null;
 }
 
 /**
@@ -451,13 +450,14 @@ export async function syncSchedule(
   requestHeaders: Headers,
 ): Promise<void> {
   const { env } = getCloudflareContext();
+  const identities = await getPlatformIdentitiesCached(userId);
 
   await Promise.all(
     SCHEDULE_PROVIDERS.map(async (provider) => {
       try {
         if (!enabledFor[provider]()) return;
 
-        const identity = await getPlatformIdentity(userId, provider);
+        const identity = identities.find((row) => row.provider === provider);
         if (!identity) return; // not connected
         if (Date.now() - readSyncedAt(identity.metadata) < SYNC_TTL_MS) return;
 

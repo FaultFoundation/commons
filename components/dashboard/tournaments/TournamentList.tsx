@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { GameLogo } from "@/components/brand/GameLogo";
 import { SourceLogo, sourceKey } from "@/components/brand/SourceLogo";
 import {
+  TOURNAMENT_LAYOUT_COOKIE,
+  TOURNAMENT_LAYOUT_COOKIE_MAX_AGE,
   TOURNAMENT_FORMAT_LABELS,
   TOURNAMENT_STATUS_LABELS,
+  type TournamentLayout,
   type TournamentFormat,
   type TournamentStatus,
 } from "@/lib/tournaments-shared";
@@ -40,9 +44,6 @@ const VIEWS = [
 ] as const;
 
 type ViewKey = (typeof VIEWS)[number]["key"];
-type Layout = "modern" | "compact";
-
-const LAYOUT_KEY = "ff-tournaments-layout";
 
 /** completed/cancelled are the "concluded" states; everything else is active. */
 function isConcluded(status: string): boolean {
@@ -82,26 +83,24 @@ function byStartDesc(a: TournamentListEntry, b: TournamentListEntry): number {
  * tournaments starting today or later (soonest first), with older still-running
  * ones tucked into a "Past tournaments" disclosure. **Concluded** is the archive,
  * most-recent first. Two layouts (modern card grid / compact table) toggle
- * top-right and persist in localStorage. All filtering is client-side: the server
- * hands down every visible tournament once (the list is small and bounded).
+ * top-right and persist in a cookie so the server can render the saved layout on
+ * first paint. All filtering is client-side: the server hands down every visible
+ * tournament once (the list is small and bounded).
  */
 export function TournamentList({
   tournaments,
+  initialLayout,
 }: {
   tournaments: TournamentListEntry[];
+  initialLayout: TournamentLayout;
 }) {
   const [view, setView] = useState<ViewKey>("active");
-  const [layout, setLayout] = useState<Layout>("modern");
+  const [layout, setLayout] = useState<TournamentLayout>(initialLayout);
   const [showPast, setShowPast] = useState(false);
 
-  useEffect(() => {
-    const saved = window.localStorage.getItem(LAYOUT_KEY);
-    if (saved === "modern" || saved === "compact") setLayout(saved);
-  }, []);
-
-  function chooseLayout(next: Layout) {
+  function chooseLayout(next: TournamentLayout) {
     setLayout(next);
-    window.localStorage.setItem(LAYOUT_KEY, next);
+    document.cookie = `${TOURNAMENT_LAYOUT_COOKIE}=${next}; path=/; max-age=${TOURNAMENT_LAYOUT_COOKIE_MAX_AGE}; samesite=lax`;
   }
 
   const { featured, upcoming, past, concluded } = useMemo(() => {
@@ -231,6 +230,41 @@ function hrefFor(t: TournamentListEntry): string {
   return t.source ? (t.externalUrl ?? "#") : `/tournaments/${t.id}/`;
 }
 
+function TournamentLink({
+  tournament,
+  className,
+  children,
+}: {
+  tournament: TournamentListEntry;
+  className: string;
+  children: ReactNode;
+}) {
+  const href = hrefFor(tournament);
+  if (tournament.source) {
+    return (
+      <a
+        className={className}
+        href={href}
+        data-status={tournament.status}
+        target="_blank"
+        rel="noreferrer noopener"
+      >
+        {children}
+      </a>
+    );
+  }
+  return (
+    <Link
+      className={className}
+      href={href}
+      prefetch={false}
+      data-status={tournament.status}
+    >
+      {children}
+    </Link>
+  );
+}
+
 function metaFor(t: TournamentListEntry): string {
   if (t.source) {
     return t.entrantCount ? `${t.entrantCount} entrants` : "";
@@ -269,19 +303,33 @@ function BannerChrome({ t }: { t: TournamentListEntry }) {
   );
 }
 
-function FeaturedHero({ tournament: t }: { tournament: TournamentListEntry }) {
-  const external = Boolean(t.source);
+function BannerImage({
+  url,
+  eager = false,
+}: {
+  url: string | null;
+  eager?: boolean;
+}) {
+  if (!url) return null;
   return (
-    <a
-      className="ff-tcard ff-tcard--hero"
-      href={hrefFor(t)}
-      data-status={t.status}
-      {...(external ? { target: "_blank", rel: "noreferrer noopener" } : {})}
-    >
-      <div
-        className="ff-tcard__banner"
-        style={t.bannerUrl ? { backgroundImage: `url(${t.bannerUrl})` } : undefined}
-      >
+    <img
+      className="ff-tcard__banner-img"
+      src={url}
+      alt=""
+      width={1280}
+      height={720}
+      loading={eager ? "eager" : "lazy"}
+      fetchPriority={eager ? "high" : undefined}
+      decoding="async"
+    />
+  );
+}
+
+function FeaturedHero({ tournament: t }: { tournament: TournamentListEntry }) {
+  return (
+    <TournamentLink tournament={t} className="ff-tcard ff-tcard--hero">
+      <div className="ff-tcard__banner">
+        <BannerImage url={t.bannerUrl} eager />
         <span className="ff-tcard__ribbon">Featured</span>
         <BannerChrome t={t} />
       </div>
@@ -290,23 +338,15 @@ function FeaturedHero({ tournament: t }: { tournament: TournamentListEntry }) {
         <h2 className="ff-tcard__title">{t.name}</h2>
         <span className="ff-tcard__meta">{metaFor(t) || "—"}</span>
       </div>
-    </a>
+    </TournamentLink>
   );
 }
 
 function TournamentCard({ tournament: t }: { tournament: TournamentListEntry }) {
-  const external = Boolean(t.source);
   return (
-    <a
-      className="ff-tcard"
-      href={hrefFor(t)}
-      data-status={t.status}
-      {...(external ? { target: "_blank", rel: "noreferrer noopener" } : {})}
-    >
-      <div
-        className="ff-tcard__banner"
-        style={t.bannerUrl ? { backgroundImage: `url(${t.bannerUrl})` } : undefined}
-      >
+    <TournamentLink tournament={t} className="ff-tcard">
+      <div className="ff-tcard__banner">
+        <BannerImage url={t.bannerUrl} />
         <BannerChrome t={t} />
       </div>
       <div className="ff-tcard__body">
@@ -314,7 +354,7 @@ function TournamentCard({ tournament: t }: { tournament: TournamentListEntry }) 
         <h3 className="ff-tcard__title">{t.name}</h3>
         <span className="ff-tcard__meta">{metaFor(t) || "—"}</span>
       </div>
-    </a>
+    </TournamentLink>
   );
 }
 
@@ -341,15 +381,24 @@ function CompactTable({
             return (
               <tr key={t.id}>
                 <td>
-                  <a
-                    className="ff-ticket-subject"
-                    href={hrefFor(t)}
-                    {...(external
-                      ? { target: "_blank", rel: "noreferrer noopener" }
-                      : {})}
-                  >
-                    {t.name}
-                  </a>
+                  {external ? (
+                    <a
+                      className="ff-ticket-subject"
+                      href={hrefFor(t)}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
+                      {t.name}
+                    </a>
+                  ) : (
+                    <Link
+                      className="ff-ticket-subject"
+                      href={hrefFor(t)}
+                      prefetch={false}
+                    >
+                      {t.name}
+                    </Link>
+                  )}
                 </td>
                 <td>
                   {external

@@ -537,6 +537,8 @@ export type LoadedSnapshot = {
   fetchedAt: number;
 };
 
+export type SnapshotMetadata = Omit<LoadedSnapshot, "payload">;
+
 function emptyPayload(t: TournamentRow): SnapshotPayload {
   return {
     tournament: {
@@ -661,6 +663,32 @@ async function readSnapshot(
   } catch {
     return null;
   }
+}
+
+/**
+ * Metadata-only poll fast path. Returns null when the snapshot must be loaded
+ * or refreshed; otherwise callers can answer a matching ETag without selecting
+ * or parsing the bracket JSON blob.
+ */
+export async function getCurrentSnapshotMetadata(
+  tournament: TournamentRow,
+): Promise<SnapshotMetadata | null> {
+  const rows = await getDb()
+    .select({
+      version: tournamentBrackets.version,
+      fetchedAt: tournamentBrackets.fetchedAt,
+    })
+    .from(tournamentBrackets)
+    .where(eq(tournamentBrackets.tournamentId, tournament.id))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+
+  const fetchedAt = row.fetchedAt.getTime();
+  const ttl = SNAPSHOT_TTL_MS[tournament.status] ?? 300_000;
+  const stale = Date.now() - fetchedAt > ttl;
+  const behind = row.version !== tournament.version;
+  return stale || behind ? null : { version: row.version, fetchedAt };
 }
 
 /**

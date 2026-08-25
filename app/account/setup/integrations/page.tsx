@@ -1,21 +1,20 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
 
 import { ComingSoonIntegration } from "@/components/dashboard/accounts/ComingSoonIntegration";
 import { IntegrationCard } from "@/components/dashboard/accounts/IntegrationCard";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { SetupShell } from "@/components/dashboard/setup/SetupShell";
-import { account } from "@/db/schema";
-import { battlenetAuthEnabled, discordAuthEnabled, getAuth } from "@/lib/auth";
-import { getDb } from "@/lib/db";
+import { getAccountLinksCached } from "@/lib/account-links";
+import { battlenetAuthEnabled, discordAuthEnabled } from "@/lib/auth";
 import {
   discordServerNote,
   loadConnectIntegrations,
   loadDiscordIntegration,
 } from "@/lib/integrations";
-import { getPlatformIdentity } from "@/lib/platform-identities";
+import { getPlatformIdentityCached } from "@/lib/platform-identities";
+import { getSessionCached } from "@/lib/session";
 
 // Session-gated: always rendered per request.
 export const dynamic = "force-dynamic";
@@ -26,26 +25,17 @@ export const metadata: Metadata = {
 };
 
 export default async function IntegrationsSetupPage() {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  const session = await getSessionCached();
   if (!session) {
     redirect("/login/");
   }
 
-  const [discord, battlenetIdentity, battlenetRows, connectIntegrations] =
+  const [discord, battlenetIdentity, accountLinks, connectIntegrations] =
     await Promise.all([
     // Also refreshes the stored Discord handle when it has gone stale.
     loadDiscordIntegration(session.user.id, await headers()),
-    getPlatformIdentity(session.user.id, "battlenet"),
-    getDb()
-      .select({ id: account.id })
-      .from(account)
-      .where(
-        and(
-          eq(account.userId, session.user.id),
-          eq(account.providerId, "battlenet"),
-        ),
-      )
-      .limit(1),
+    getPlatformIdentityCached(session.user.id, "battlenet"),
+    getAccountLinksCached(session.user.id),
     loadConnectIntegrations(session.user.id),
   ]);
 
@@ -67,7 +57,9 @@ export default async function IntegrationsSetupPage() {
             <IntegrationCard
               provider="battlenet"
               label="Blizzard"
-              linked={battlenetRows.length > 0}
+              linked={accountLinks.some(
+                (row) => row.providerId === "battlenet",
+              )}
               handle={battlenetIdentity?.handle ?? null}
               enabled={battlenetAuthEnabled()}
               linkLabel="Link Blizzard"

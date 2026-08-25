@@ -25,7 +25,13 @@ export function GameLogo({
       <span className="ff-tcard__game" title={label}>
         {/* Plain <img> to match the rest of the markup (next.config sets
             images.unoptimized). */}
-        <img className="ff-tcard__game-img" src={logoUrl} alt="" />
+        <img
+          className="ff-tcard__game-img"
+          src={logoUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+        />
       </span>
     );
   }

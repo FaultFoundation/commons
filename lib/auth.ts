@@ -126,8 +126,12 @@ export function getAuth() {
               redirectURI: string;
               codeVerifier?: string;
             }) => {
+              // Trim: `wrangler secret put` easily stores a trailing newline,
+              // which corrupts the Basic header and 401s with a valid secret.
+              const clientId = (env.FACEIT_CLIENT_ID ?? "").trim();
+              const clientSecret = (env.FACEIT_CLIENT_SECRET ?? "").trim();
               const basic = Buffer.from(
-                `${env.FACEIT_CLIENT_ID}:${env.FACEIT_CLIENT_SECRET}`,
+                `${clientId}:${clientSecret}`,
               ).toString("base64");
               const form = new URLSearchParams({
                 grant_type: "authorization_code",
@@ -142,6 +146,8 @@ export function getAuth() {
                   headers: {
                     "Content-Type": "application/x-www-form-urlencoded",
                     Accept: "application/json",
+                    // Some WAF/edge setups reject requests with no User-Agent.
+                    "User-Agent": "TheFaultFoundation-Commons/1.0",
                     Authorization: `Basic ${basic}`,
                   },
                   body: form.toString(),
@@ -149,7 +155,10 @@ export function getAuth() {
               );
               const text = await res.text();
               if (!res.ok) {
-                console.error(`FACEIT token exchange ${res.status}: ${text}`);
+                console.error(
+                  `FACEIT token exchange ${res.status} ` +
+                    `(clientId=${clientId} secretLen=${clientSecret.length}): ${text}`,
+                );
                 throw new Error(`FACEIT token ${res.status}`);
               }
               const data = JSON.parse(text) as Record<string, unknown>;

@@ -339,7 +339,7 @@ function EntryRow({ entry }: { entry: ScheduleEntry }) {
       note={meta.join(" · ")}
       action={
         linkHref ? (
-          <span className="ff-btn ff-btn--soft ff-btn--sm" aria-hidden="true">
+          <span className="ff-btn ff-btn--outline ff-btn--sm" aria-hidden="true">
             {external ? "Open" : "View"}
           </span>
         ) : undefined

@@ -72,7 +72,7 @@ async function TeamContent({ teamId }: { teamId: string }) {
           </a>
           {team.discordInviteUrl ? (
             <a
-              className="ff-btn ff-btn--sm"
+              className="ff-btn ff-btn--outline ff-btn--sm"
               href={team.discordInviteUrl}
               target="_blank"
               rel="noreferrer noopener"

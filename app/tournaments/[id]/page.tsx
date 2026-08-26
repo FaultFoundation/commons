@@ -164,7 +164,7 @@ export default async function TournamentPage({
             <div className="ff-thero__actions">
               {tournament.rulesUrl ? (
                 <a
-                  className="ff-btn ff-btn--soft ff-btn--sm"
+                  className="ff-btn ff-btn--outline ff-btn--sm"
                   href={tournament.rulesUrl}
                   target="_blank"
                   rel="noreferrer noopener"
@@ -190,7 +190,7 @@ export default async function TournamentPage({
           actions={
             initial && tournament.externalUrl ? (
               <a
-                className="ff-btn ff-btn--soft ff-btn--sm"
+                className="ff-btn ff-btn--outline ff-btn--sm"
                 href={tournament.externalUrl}
                 target="_blank"
                 rel="noreferrer noopener"

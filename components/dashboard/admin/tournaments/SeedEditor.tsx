@@ -73,7 +73,7 @@ export function SeedEditor({
             editable ? (
               <div className="ff-row__buttons">
                 <button
-                  className="ff-btn ff-btn--soft ff-btn--sm"
+                  className="ff-btn ff-btn--outline ff-btn--sm"
                   type="button"
                   disabled={pending || i === 0}
                   aria-label={`Move ${entry.label} up`}
@@ -82,7 +82,7 @@ export function SeedEditor({
                   ▲
                 </button>
                 <button
-                  className="ff-btn ff-btn--soft ff-btn--sm"
+                  className="ff-btn ff-btn--outline ff-btn--sm"
                   type="button"
                   disabled={pending || i === order.length - 1}
                   aria-label={`Move ${entry.label} down`}
@@ -99,7 +99,7 @@ export function SeedEditor({
       {editable ? (
         <div className="ff-row__buttons">
           <button
-            className="ff-btn ff-btn--soft ff-btn--sm"
+            className="ff-btn ff-btn--sm"
             type="button"
             disabled={pending}
             onClick={save}

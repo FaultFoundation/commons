@@ -117,7 +117,7 @@ export default async function PublicBracketPage({
         </p>
         {tournament.rulesUrl ? (
           <a
-            className="ff-btn ff-btn--soft ff-btn--sm"
+            className="ff-btn ff-btn--outline ff-btn--sm"
             href={tournament.rulesUrl}
             target="_blank"
             rel="noreferrer noopener"

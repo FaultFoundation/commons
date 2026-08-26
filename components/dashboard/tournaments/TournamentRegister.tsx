@@ -145,7 +145,7 @@ export function TournamentRegister({
                   <span className="ff-entry__name">{label(t)}</span>
                   <span className="ff-entry__tag ff-entry__tag--in">Entered</span>
                   <button
-                    className="ff-btn ff-btn--soft ff-btn--sm"
+                    className="ff-btn ff-btn--outline ff-btn--sm"
                     type="button"
                     disabled={pending}
                     onClick={() => {

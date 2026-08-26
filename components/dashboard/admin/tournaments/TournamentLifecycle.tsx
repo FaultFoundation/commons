@@ -36,6 +36,17 @@ const EXPLAIN: Partial<Record<TournamentStatus, string>> = {
   active: "Reopens the finalized bracket to correct a result.",
 };
 
+function isForwardCommit(
+  from: TournamentStatus,
+  to: TournamentStatus,
+): boolean {
+  return (
+    (from === "draft" && to === "registration") ||
+    (from === "registration" && to === "seeding") ||
+    (from === "active" && to === "completed")
+  );
+}
+
 export function TournamentLifecycle({
   tournamentId,
   status,
@@ -86,7 +97,11 @@ export function TournamentLifecycle({
           {options.map((to) => (
             <button
               key={to}
-              className="ff-btn ff-btn--soft ff-btn--sm"
+              className={
+                isForwardCommit(status, to)
+                  ? "ff-btn ff-btn--sm"
+                  : "ff-btn ff-btn--outline ff-btn--sm"
+              }
               type="button"
               disabled={pending || (to === "seeding" && entrantCount < 2)}
               title={EXPLAIN[to]}

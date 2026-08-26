@@ -8,6 +8,7 @@ import {
   closeTicket,
   setTicketPriority,
 } from "@/app/admin/tickets/actions";
+import { ConfirmDialog } from "@/components/dashboard/bubbles/ConfirmDialog";
 import {
   TICKET_PRIORITIES,
   TICKET_PRIORITY_LABELS,
@@ -31,10 +32,11 @@ export function TicketToolbar({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingClose, setConfirmingClose] = useState(false);
 
   const closed = status === "closed";
 
-  async function run(action: () => Promise<Result>) {
+  async function run(action: () => Promise<Result>, after?: () => void) {
     if (pending) return;
     setPending(true);
     setError(null);
@@ -44,6 +46,7 @@ export function TicketToolbar({
         setError(result.error);
         return;
       }
+      after?.();
       router.refresh();
     } catch {
       setError("Something went wrong. Please try again.");
@@ -54,7 +57,7 @@ export function TicketToolbar({
 
   return (
     <div className="ff-ticket-toolbar">
-      {error ? (
+      {error && !confirmingClose ? (
         <div className="ff-auth__error" role="alert">
           <p>{error}</p>
         </div>
@@ -103,15 +106,34 @@ export function TicketToolbar({
           <span className="ff-ticket-muted">Closed</span>
         ) : (
           <button
-            className="ff-btn ff-btn--danger ff-btn--sm"
+            className="ff-btn ff-btn--outline ff-btn--sm"
             type="button"
             disabled={pending}
-            onClick={() => run(() => closeTicket(ticketId))}
+            onClick={() => setConfirmingClose(true)}
           >
             Close ticket
           </button>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmingClose}
+        title="Close Ticket"
+        description="Close this support ticket and its Discord channel? The member receives the final transcript."
+        confirmLabel={pending ? "Closing…" : "Close ticket"}
+        danger
+        busy={pending}
+        error={error}
+        onConfirm={() =>
+          run(
+            () => closeTicket(ticketId),
+            () => setConfirmingClose(false),
+          )
+        }
+        onClose={() => {
+          if (!pending) setConfirmingClose(false);
+        }}
+      />
     </div>
   );
 }

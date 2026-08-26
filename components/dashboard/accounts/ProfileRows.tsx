@@ -332,7 +332,7 @@ export function SetPasswordRow() {
       action={
         !editing ? (
           <button
-            className="ff-btn ff-btn--sm"
+            className="ff-btn ff-btn--outline ff-btn--sm"
             type="button"
             onClick={() => {
               setError(null);

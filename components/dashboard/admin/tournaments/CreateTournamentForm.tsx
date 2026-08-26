@@ -120,7 +120,7 @@ export function CreateTournamentForm() {
 
       <div className="ff-row__buttons">
         <button
-          className="ff-btn ff-btn--soft"
+          className="ff-btn"
           type="submit"
           disabled={pending || !name.trim()}
         >

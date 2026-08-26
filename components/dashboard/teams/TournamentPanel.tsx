@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 
 import { enterTournament, withdrawFromTournament } from "@/app/teams/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
+import { ConfirmDialog } from "@/components/dashboard/bubbles/ConfirmDialog";
 import { can, type TeamRole } from "@/lib/teams-shared";
 import { TOURNAMENT_STATUS_LABELS } from "@/lib/tournaments-shared";
 
@@ -35,10 +36,14 @@ export function TournamentPanel({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<TeamEntry | null>(null);
 
   const manages = can(viewerRole, "enterTournaments");
 
-  function run(action: () => Promise<{ ok: boolean; error?: string }>) {
+  function run(
+    action: () => Promise<{ ok: boolean; error?: string }>,
+    after?: () => void,
+  ) {
     setError(null);
     startTransition(async () => {
       const result = await action();
@@ -46,13 +51,14 @@ export function TournamentPanel({
         setError(result.error ?? "Something went wrong.");
         return;
       }
+      after?.();
       router.refresh();
     });
   }
 
   return (
     <>
-      {error ? (
+      {error && !confirming ? (
         <div className="ff-auth__error" role="alert">
           <p>{error}</p>
         </div>
@@ -70,12 +76,10 @@ export function TournamentPanel({
           action={
             manages ? (
               <button
-                className="ff-btn ff-btn--soft ff-btn--sm"
+                className="ff-btn ff-btn--outline ff-btn--sm"
                 type="button"
                 disabled={pending}
-                onClick={() =>
-                  run(() => withdrawFromTournament(teamId, entry.tournamentId))
-                }
+                onClick={() => setConfirming(entry)}
               >
                 Withdraw
               </button>
@@ -92,7 +96,7 @@ export function TournamentPanel({
           action={
             manages ? (
               <button
-                className="ff-btn ff-btn--soft ff-btn--sm"
+                className="ff-btn ff-btn--sm"
                 type="button"
                 disabled={pending}
                 onClick={() => run(() => enterTournament(teamId, tournament.id))}
@@ -110,6 +114,30 @@ export function TournamentPanel({
           <a href="/tournaments/">Tournaments</a> tab.
         </p>
       ) : null}
+
+      <ConfirmDialog
+        open={confirming !== null}
+        title="Withdraw From Tournament"
+        description={
+          confirming
+            ? `Withdraw this team from ${confirming.tournamentName}? If play has started, this may disqualify the team and prevent re-entry.`
+            : undefined
+        }
+        confirmLabel={pending ? "Withdrawing…" : "Withdraw"}
+        danger
+        busy={pending}
+        error={error}
+        onConfirm={() => {
+          if (!confirming) return;
+          run(
+            () => withdrawFromTournament(teamId, confirming.tournamentId),
+            () => setConfirming(null),
+          );
+        }}
+        onClose={() => {
+          if (!pending) setConfirming(null);
+        }}
+      />
     </>
   );
 }

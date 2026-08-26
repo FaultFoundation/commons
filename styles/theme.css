@@ -12,6 +12,7 @@
   /* surfaces */
   --ff-bg: var(--wp--preset--color--custom-blue-main); /* #003167 */
   --ff-blue: var(--wp--preset--color--custom-blue-side); /* #0074a6 */
+  --ff-blue-hover: #0089bd;
   --ff-navy-900: #001d3d;
   --ff-surface-1: #06407e;
   --ff-surface-2: rgba(255, 255, 255, 0.06);
@@ -157,26 +158,35 @@ html.ff-no-scroll givebutter-widget {
     color var(--ff-transition),
     transform var(--ff-transition);
 }
-.ff-btn:hover {
-  background: var(--ff-accent);
-  color: var(--ff-navy-900);
+.ff-btn:hover:not([disabled]) {
+  background: var(--ff-blue-hover);
+  color: #fff;
   transform: translateY(-1px);
 }
 .ff-btn--outline {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px currentColor;
 }
-.ff-btn--outline:hover {
+.ff-btn--outline:hover:not([disabled]) {
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
   box-shadow: inset 0 0 0 1.5px #fff;
+}
+.ff-btn--outline[aria-pressed="true"] {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
+  box-shadow: none;
+}
+.ff-btn--outline[aria-pressed="true"]:hover:not([disabled]) {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
 }
 
 /* ---------- 4a. Branded OAuth buttons ---------- */
 /* Each provider's own "standard" sign-in / connect treatment, layered on
    .ff-btn so it keeps the pill shape, padding and font. The mark inherits the
-   button's text colour, so a single brand colour drives both glyph and label —
-   and each provider overrides the .ff-btn:hover accent swap with its own hover. */
+  button's text colour, so a single brand colour drives both glyph and label —
+  and each provider overrides the standard primary hover with its own hover. */
 .ff-oauth {
   gap: 0.6em;
 }
@@ -1979,8 +1989,8 @@ button.ff-dash__link:hover {
   color: #fff;
 }
 .ff-segment__btn[aria-pressed="true"] {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
 }
 .ff-segment__btn[disabled] {
   opacity: 0.55;
@@ -2000,7 +2010,7 @@ button.ff-dash__link:hover {
   color: var(--ff-danger-text);
   box-shadow: inset 0 0 0 1.5px var(--ff-danger-border);
 }
-.ff-btn--danger:hover {
+.ff-btn--danger:hover:not([disabled]) {
   background: var(--ff-danger);
   color: #fff;
   transform: translateY(-1px);
@@ -2796,24 +2806,6 @@ button.ff-dash__link:hover {
   font-size: var(--ff-dash-text-xs);
   color: var(--ff-text-dim);
   border-top: 1px solid var(--ff-border);
-}
-
-/* ===========================================================================
-   Tournament admin — layout + button treatments that the base kit didn't carry.
-   =========================================================================== */
-
-/* Soft outline button: a subtle border against the background, matching the
-   ticket filter pills. Reads correctly on any surface, unlike --outline whose
-   currentColor border renders stark white (or vanishes on light bubbles). */
-.ff-btn--soft {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--ff-border);
-  color: #dfe9f4;
-}
-.ff-btn--soft:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
 }
 
 /* Two side-by-side columns of stacked bubbles inside a .ff-bubble-grid. Each

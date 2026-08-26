@@ -66,8 +66,7 @@ deprecated `next lint`, and ESLint isn't installed — it drops into an
 interactive "configure ESLint?" prompt and fails. Verification is
 `npx tsc --noEmit` + `npm run build`, then exercising the change on :3000 or
 :3999. The `/verify` skill (`.claude/skills/verify/SKILL.md`) describes how to
-drive the app locally — note its claim that Playwright is a devDependency is
-stale; it isn't installed.
+drive the app locally; Playwright is not a project dependency.
 
 Database:
 
@@ -75,6 +74,7 @@ Database:
 npm run db:generate       # db/schema.ts change -> new SQL file in drizzle/
 npm run db:migrate:local  # apply to local D1 (.wrangler/state)
 npm run db:migrate:remote # apply to real D1 — run BEFORE npm run deploy
+npm run db:cen:generate   # db/cen-schema.ts -> migration in drizzle-cen/
 npm run staff:seed        # bootstrap the first staff owner (--email / --discord, --remote)
 wrangler d1 execute website-sql --local --command "SELECT …"   # inspect
 ```
@@ -86,7 +86,7 @@ the file to update in the same commit as any `db/generate` run (see above).
 
 ## Runtime model — the constraint behind most of the code
 
-Cloudflare bindings (`DB`, `AVATARS`) and secrets only exist on the **request**
+Cloudflare bindings (`DB`, `CEN`, `AVATARS`) and secrets only exist on the **request**
 context. Nothing that touches them may be built at module scope:
 
 - `getDb()` ([lib/db.ts](lib/db.ts)) and `getAuth()` ([lib/auth.ts](lib/auth.ts))
@@ -274,14 +274,12 @@ Sheets↔D1 split). It is a lean **projection** ([db/cen-schema.ts](db/cen-schem
 normalized model. Its migrations version independently in `drizzle-cen/`
 (`npm run db:cen:*`), separate from `website-sql`'s `drizzle/`.
 
-- **The Commons never writes `cen-sql`.** The writer is the scraper
-  (`cen-news-notifications`), a Python poller in a sibling repo. Phase 1 seeds
-  cen-sql by **one-time import**: `scripts/cen-project.mjs` reads that repo's
-  `data/cen.db` and flattens it into `cen-seed.sql` (gitignored — a local
-  artifact, only public tournament data, no PII), loaded with
-  `wrangler d1 execute cen-sql --file`. Phase 2 replaces the import with a
-  scheduled Worker writing cen-sql directly (a plain Worker with a cron trigger —
-  the Commons OpenNext Worker structurally can't host `scheduled`).
+- **The Commons app never writes `cen-sql`.** The writer and all scraping APIs
+  live in the separate `cen-news-notifications` repository, whose plain
+  TypeScript Worker deploys independently as `cen-scraper` and owns the hourly
+  UTC Cron Trigger. Keep this boundary strict: the Commons OpenNext Worker must
+  not import provider scraping code or host `scheduled`. `scripts/cen-project.mjs`
+  + `cen-seed.sql` remain a local/emergency compatibility import only.
 - **Reads degrade** ([lib/external-tournaments.ts](lib/external-tournaments.ts),
   over [lib/cen-db.ts](lib/cen-db.ts) `getCenDb()`): no `CEN` binding, an
   empty table, or a query error returns nothing, so the tab renders the internal

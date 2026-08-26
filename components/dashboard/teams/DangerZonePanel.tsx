@@ -44,7 +44,9 @@ export function DangerZonePanel({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState<"leave" | "delete" | null>(null);
+  const [confirming, setConfirming] = useState<
+    "leave" | "delete" | "approve" | null
+  >(null);
   const [reason, setReason] = useState("");
 
   const mayDelete = can(viewerRole, "deleteTeam");
@@ -113,12 +115,10 @@ export function DangerZonePanel({
               ) : (
                 <>
                   <button
-                    className="ff-btn ff-btn--danger ff-btn--sm"
+                    className="ff-btn ff-btn--outline ff-btn--sm"
                     type="button"
                     disabled={pending}
-                    onClick={() =>
-                      run(() => voteTeamDelete(deleteRequest.id, "approve"))
-                    }
+                    onClick={() => setConfirming("approve")}
                   >
                     Approve
                   </button>
@@ -156,7 +156,7 @@ export function DangerZonePanel({
           }
           action={
             <button
-              className="ff-btn ff-btn--danger ff-btn--sm"
+              className="ff-btn ff-btn--outline ff-btn--sm"
               type="button"
               onClick={() => setConfirming("delete")}
             >
@@ -165,6 +165,26 @@ export function DangerZonePanel({
           }
         />
       ) : null}
+
+      <ConfirmDialog
+        open={confirming === "approve"}
+        title="Approve Team Deletion"
+        description={`Approve deleting ${teamName}? If yours is the final required vote, the team is deleted immediately.`}
+        confirmLabel={pending ? "Approving…" : "Approve deletion"}
+        danger
+        busy={pending}
+        error={error}
+        onConfirm={() => {
+          if (!deleteRequest) return;
+          run(
+            () => voteTeamDelete(deleteRequest.id, "approve"),
+            () => setConfirming(null),
+          );
+        }}
+        onClose={() => {
+          if (!pending) setConfirming(null);
+        }}
+      />
 
       <ConfirmDialog
         open={confirming === "leave"}

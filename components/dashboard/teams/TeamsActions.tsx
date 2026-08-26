@@ -26,9 +26,10 @@ export function TeamsActions({ verified }: { verified: boolean }) {
 
   const button = (panel: Panel, label: string) => (
     <button
-      className={open === panel ? "ff-btn" : "ff-btn ff-btn--outline"}
+      className="ff-btn ff-btn--outline"
       type="button"
       aria-expanded={open === panel}
+      aria-pressed={open === panel}
       onClick={() => toggle(panel)}
     >
       {label}
@@ -39,7 +40,7 @@ export function TeamsActions({ verified }: { verified: boolean }) {
     <div className="ff-actions">
       <div className="ff-actions__row">
         <button
-          className="ff-btn"
+          className="ff-btn ff-btn--outline"
           type="button"
           onClick={() => setStartOpen(true)}
         >

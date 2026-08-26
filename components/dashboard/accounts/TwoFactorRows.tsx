@@ -162,7 +162,7 @@ function TwoFactorOff({ email }: { email: string }) {
         note="Ask for a second code when signing in with your email and password."
         action={
           <button
-            className="ff-btn ff-btn--sm"
+            className="ff-btn ff-btn--outline ff-btn--sm"
             type="button"
             onClick={() => {
               setError(null);
@@ -219,7 +219,7 @@ function TwoFactorOff({ email }: { email: string }) {
               </p>
               <div className="ff-row__buttons">
                 <button
-                  className="ff-btn ff-btn--sm"
+                  className="ff-btn ff-btn--outline ff-btn--sm"
                   type="button"
                   disabled={pending}
                   onClick={() =>

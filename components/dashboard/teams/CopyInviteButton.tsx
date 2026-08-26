@@ -51,7 +51,11 @@ export function CopyInviteButton({
   return (
     <>
       <button
-        className={small ? "ff-btn ff-btn--sm" : "ff-btn"}
+        className={
+          small
+            ? "ff-btn ff-btn--outline ff-btn--sm"
+            : "ff-btn ff-btn--outline"
+        }
         type="button"
         onClick={onCopy}
       >

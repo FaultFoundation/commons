@@ -42,6 +42,7 @@ Ships to `commons.fault.foundation`. The public marketing site is a
 | `lib/lfg-shared.ts` | Shapes for the matchmaking (LFG/LFM) JSON columns |
 | `db/schema.ts` | Drizzle schema: Better Auth tables + `profiles` |
 | `drizzle/` | Generated SQL migrations (`npm run db:generate`), applied with `npm run db:migrate:*` |
+| `db/cen-schema.ts`, `drizzle-cen/` | Read-only external-tournament projection + its independent migrations |
 | `styles/theme.css` | The `ff-` design system (imported last) |
 | `styles/wp-globals.css` | Brand tokens (`--wp--preset--*`) + element base styles — **do not edit** |
 | `public/wp-content/uploads/` | Logo and favicons, kept at their original paths |
@@ -70,6 +71,10 @@ Pushes to `main` auto-deploy once Workers Builds is connected. Full
 account-side setup — D1 database, secrets, custom domain — is in
 [docs/cloudflare-setup.md](docs/cloudflare-setup.md); the Discord and Blizzard
 developer-portal walkthrough is in [docs/oauth-setup.md](docs/oauth-setup.md).
+
+External tournament collection and its Cloudflare Cron Worker live in the
+separate `cen-news-notifications` repository. This app only reads its `cen-sql`
+projection.
 
 ## Licensing / provenance
 

@@ -21,9 +21,9 @@ Terminal**, inside this project folder) — never in the Cloudflare dashboard.
 > `user.two_factor_enabled` in the same deploy, and telling everyone affected
 > to enroll again.
 
-## Two Workers, two repos
+## Website Workers
 
-The account runs one Worker per repo. Don't mix them up:
+The two website repositories each deploy one Worker. Don't mix them up:
 
 | Worker | Repo | workers.dev | Domain |
 |---|---|---|---|
@@ -88,6 +88,11 @@ other origin is rejected by the auth origin check with a 403.
 
 Only the `commons` Worker may be connected to this repo — if a second one
 gets attached, its builds fight over the same repo.
+
+The external tournament scraper is a third Worker but belongs to the separate
+`cen-news-notifications` repository. Its Cron, D1 write migrations, provider
+secrets, health endpoint, and deployment runbook are maintained there. Do not
+configure or deploy `cen-scraper` from this repository.
 
 ### 3. Discord + Blizzard OAuth (optional — rows stay disabled until done)
 

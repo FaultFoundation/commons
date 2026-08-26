@@ -130,11 +130,10 @@ the names, labels, and `asDensity()` normalizer, shared by both sides.
 - Deliberately not on `<html>`: the root layout is shared with the public
   marketing pages, and reading `cookies()` there would make them all dynamic.
 
-## Proposed semantic control system
+## Button and control standard
 
-Use this as the target for new controls and migrate existing surfaces together
-rather than changing one page at a time. Appearance communicates **semantics**,
-not visual variety:
+Appearance communicates **semantics**, not visual variety. Use these existing
+classes directly in server or client components:
 
 | Look | Class | Use for |
 | --- | --- | --- |
@@ -145,25 +144,24 @@ not visual variety:
 | Provider brand | `ff-oauth--<provider>` | OAuth/connect buttons only, where provider guidelines override the application palette. |
 
 Binary settings use `Switch`: neutral when off and blue when on. View choices
-use a segmented control or tabs, never a row of command buttons. `ff-btn--soft`
-is a legacy secondary treatment; do not add new uses—consolidate it into the
-outline role during the site-wide migration. A control that becomes actionable
-may stay outline-and-disabled until valid, then become blue.
-
-Proposed component API, when the site-wide migration is scheduled:
+use `.ff-segment`/`.ff-segment__btn` or dedicated tabs, never a row of command
+buttons. A control that becomes actionable may stay outline-and-disabled until
+valid, then become blue. `ff-btn--soft` no longer exists; do not reintroduce a
+second secondary treatment.
 
 ```tsx
-<Button variant="primary" size="sm">Save</Button>
-<Button variant="secondary" size="sm">Cancel</Button>
-<Button variant="danger" size="sm">Delete</Button>
-<SegmentedControl value={view} options={views} />
+<button className="ff-btn">Save</button>
+<button className="ff-btn ff-btn--outline">Cancel</button>
+<button className="ff-btn ff-btn--danger">Delete</button>
+<div className="ff-segment" role="group" aria-label="View">
+  <button className="ff-segment__btn" aria-pressed={view === "all"}>All</button>
+</div>
 ```
 
-`Button.variant` should be a closed `"primary" | "secondary" | "danger"`
-union mapping to the existing classes; provider buttons remain their own
-component. `SegmentedControl` owns yellow current-state styling, so callers
-cannot accidentally use yellow for a command. Do not expose `soft` from the new
-API: migrate its existing call sites to `secondary` together.
+For destructive work, the button that **opens** `ConfirmDialog` is outline;
+only the dialog's final confirm sets `danger`. Primary hover remains blue.
+Yellow is produced by `aria-pressed="true"` / `aria-current="page"`, not by a
+command class.
 
 ### Schedule calendar
 

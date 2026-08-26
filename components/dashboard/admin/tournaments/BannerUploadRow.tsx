@@ -112,7 +112,7 @@ export function BannerUploadRow({
         action={
           <div className="ff-row__buttons">
             <button
-              className="ff-btn ff-btn--soft ff-btn--sm"
+              className="ff-btn ff-btn--outline ff-btn--sm"
               type="button"
               disabled={busy}
               onClick={() => inputRef.current?.click()}
@@ -121,7 +121,7 @@ export function BannerUploadRow({
             </button>
             {currentUrl ? (
               <button
-                className="ff-btn ff-btn--soft ff-btn--sm"
+                className="ff-btn ff-btn--outline ff-btn--sm"
                 type="button"
                 disabled={busy}
                 onClick={remove}

@@ -82,7 +82,7 @@ export function AdminTeamDanger({
       ) : null}
       <div className="ff-row__buttons">
         <button
-          className="ff-btn ff-btn--danger ff-btn--sm"
+          className="ff-btn ff-btn--outline ff-btn--sm"
           type="button"
           disabled={pending}
           onClick={() => {

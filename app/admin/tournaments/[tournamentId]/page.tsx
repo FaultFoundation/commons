@@ -81,12 +81,12 @@ async function TournamentContent({ tournamentId }: { tournamentId: string }) {
         }
       >
         <div className="ff-row__buttons ff-bubble__nav">
-          <a className="ff-btn ff-btn--soft ff-btn--sm" href="/admin/tournaments/">
+          <a className="ff-btn ff-btn--outline ff-btn--sm" href="/admin/tournaments/">
             All Tournaments
           </a>
           {tournament.status !== "draft" ? (
             <a
-              className="ff-btn ff-btn--soft ff-btn--sm"
+              className="ff-btn ff-btn--outline ff-btn--sm"
               href={publicUrl}
               target="_blank"
               rel="noreferrer noopener"
@@ -96,7 +96,7 @@ async function TournamentContent({ tournamentId }: { tournamentId: string }) {
           ) : null}
           {tournament.externalUrl ? (
             <a
-              className="ff-btn ff-btn--soft ff-btn--sm"
+              className="ff-btn ff-btn--outline ff-btn--sm"
               href={tournament.externalUrl}
               target="_blank"
               rel="noreferrer noopener"

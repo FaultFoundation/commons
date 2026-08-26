@@ -68,7 +68,7 @@ export function TournamentDanger({
       <div className="ff-row__buttons">
         {canReset ? (
           <button
-            className="ff-btn ff-btn--danger ff-btn--sm"
+            className="ff-btn ff-btn--outline ff-btn--sm"
             type="button"
             disabled={pending}
             onClick={() => {
@@ -80,7 +80,7 @@ export function TournamentDanger({
           </button>
         ) : null}
         <button
-          className="ff-btn ff-btn--danger ff-btn--sm"
+          className="ff-btn ff-btn--outline ff-btn--sm"
           type="button"
           disabled={pending}
           onClick={() => {

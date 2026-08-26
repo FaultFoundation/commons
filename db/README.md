@@ -130,6 +130,30 @@ wrangler d1 execute website-sql --remote --file=db/seed/bootstrap.sql
 npm run staff:seed -- --email you@example.com     # add --remote to seed production
 ```
 
+### One-time legacy bot import
+
+[`scripts/migrate-legacy-bot-data.mjs`](../scripts/migrate-legacy-bot-data.mjs)
+maps a sanitized JSON export of the former bot datastore into the existing
+identity, registration, platform-identity and support-ticket tables. It is
+local-only, deterministic and idempotent: it backs up `.wrangler/state/v3/d1`
+before `--apply`, refuses a remote target, and aborts when an email, provider
+account, profile, platform identity, college, membership, registration or ticket
+is already owned by a different row.
+
+The import is intentionally normalized rather than archival. `VERIFIED` stays
+verified; another lifecycle state receives `MANUAL_REVIEW` only when application
+data exists; identity-only join/leave rows get no invented membership. It never
+imports plaintext verification codes, attempts, code timestamps, kick/ban data,
+notes, bot configuration, changelog rows or raw form copies. Historical support
+descriptions become opening messages, but Discord remains the only source for
+conversation text that never existed in the old ticket sheet.
+
+The input and optional generated SQL contain PII and must live under ignored
+`temp/`. `--output-sql temp/<name>.sql` creates the exact reviewable SQL for a
+human-run remote upload without giving the importer a remote execution mode. A
+manually verified `canonicalDiscordId` can repair a source id damaged by Sheets
+number formatting while the original source value remains the stable user key.
+
 **Full reset** (destructive). Migrations are additive; to rebuild from a clean
 baseline, drop everything (including Wrangler's `d1_migrations` tracker) and
 re-apply. Unlike a re-derivable poller cache, registration, ticket and bracket

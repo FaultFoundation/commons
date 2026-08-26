@@ -75,6 +75,8 @@ npm run db:generate       # db/schema.ts change -> new SQL file in drizzle/
 npm run db:migrate:local  # apply to local D1 (.wrangler/state)
 npm run db:migrate:remote # apply to real D1 — run BEFORE npm run deploy
 npm run db:cen:generate   # db/cen-schema.ts -> migration in drizzle-cen/
+npm run db:import:legacy -- --input temp/legacy-bot-data.json [--apply]
+                          # normalized legacy bot import; local only, backs up first
 npm run staff:seed        # bootstrap the first staff owner (--email / --discord, --remote)
 wrangler d1 execute website-sql --local --command "SELECT …"   # inspect
 ```
@@ -115,6 +117,9 @@ context. Nothing that touches them may be built at module scope:
 - Session-gated pages set `export const dynamic = "force-dynamic"`.
 - **D1 has no interactive transactions.** Drizzle's `transaction()` emits `BEGIN`,
   which D1 rejects — use `db.batch([...])` for writes that must land together.
+- Wrangler D1 also rejects `CREATE TEMP TABLE` with `SQLITE_AUTH`. One-shot
+  scripts that need a fail-closed guard must use a uniquely named normal table
+  and drop it in the same file, as the legacy bot importer does.
 - There is no `scheduled` handler: OpenNext generates `.open-next/worker.js`, so
   cron work has nowhere to hang without a wrapper or second Worker. Refresh-style
   work is done lazily on read (see the TTL in [lib/integrations.ts](lib/integrations.ts)).
@@ -316,64 +321,56 @@ bubble/row component vocabulary, the "blue commits a change, outline doesn't"
 button rule, and the density system are all specified in
 [docs/dashboard-guide.md](docs/dashboard-guide.md).
 
-## The Discord bot and its database
+## The Discord bot and the D1 boundary
 
 The Python bot lives at
 `/Users/oscar/Desktop/Code Projects/Fault Foundation DC Bot` (discord.py; its
 `docs/WEBSITE_TICKET_BRIDGE.md` is the other half of the bridge contract).
 
-### Two datastores, deliberately not joined
+### One operational datastore
 
-| | Store | Credential |
-|---|---|---|
-| Commons | D1 `website-sql`, via Drizzle | Worker binding `DB` (never leaves Cloudflare) |
-| Bot | Google Sheets (`GOOGLE_SHEET_ID`) + Apps Script | `service_account.json` |
+Commons D1 `website-sql` is the sole operational datastore for member identity,
+registration and support. The bot has no Google Sheets, Google Forms, Apps
+Script or local-database runtime; its retained surfaces are WordPress news,
+Givebutter notifications and support. Configuration comes from environment
+variables. Compact Discord channel-topic metadata is only enough to operate a
+ticket channel while Commons is unavailable; it is not a second source of truth.
 
-**There is no database-level connection between them, and there must not be.**
-The bot holds no D1 credential, no Cloudflare API token, and issues no SQL. The
-only channel is the HTTP bridge below. Keep it that way: handing the bot direct
-D1 access would put a full-database credential on managed third-party hosting.
+The bot still holds no D1 credential, no Cloudflare API token, and issues no
+SQL. The only channel is the HTTP bridge below. Keep it that way: handing the bot
+direct D1 access would put a full-database credential on managed third-party
+hosting.
 
-The two stores are joined by **the Discord user ID**:
-`platform_identities` (`provider = 'discord'`, `external_id`) is the site's side,
-resolved by `getUserIdByDiscordId` ([lib/tickets.ts:432](lib/tickets.ts#L432)),
-and it matches the bot's Sheets `Discord ID` column. Tickets carry a second key,
-the Discord channel id (`support_tickets.discord_channel_id`, uniquely indexed —
-one channel maps to exactly one ticket). Attribution degrades rather than fails:
+The systems join by **Discord user ID**. The bot sends that id; Commons resolves
+`platform_identities` (`provider = 'discord'`, `external_id`) through
+`getUserIdByDiscordId` ([lib/tickets.ts](lib/tickets.ts)). Tickets carry a second
+key, `support_tickets.discord_channel_id`, uniquely indexed so one Discord
+channel maps to one D1 ticket. Attribution degrades rather than fails:
 `support_tickets.user_id` is nullable and the Discord id/name are always
 captured, so a ticket from someone with no site account still works.
 
-### The direction of travel: move weight off the bot
+**Rule for new work:** add persistent state to `db/schema.ts` and expose it
+through a narrow bridge route when the bot needs it. Do not add another bot-side
+datastore or move registration, verification or moderation logic back into the
+bot.
 
-Much of the current work is **shrinking what the bot carries**. The bot's Sheets
-`Users` tab (19 columns, `src/sheet_schema.py`) is a legacy duplicate of what D1
-now models properly:
+### Historical Google migration
 
-| Sheets `Users` column | D1 home |
-|---|---|
-| Discord ID, Username | `platform_identities` (`provider = 'discord'`) |
-| Blizzard BattleTag / Steam Friend Code | `platform_identities` (`battlenet` / `steam`) |
-| User Type, Graduation Date | `collegiate_registrations` |
-| School Name / Website | `colleges` (resolved via the `schools` lookup) |
-| Email | `user.email` / `collegiate_registrations.school_email` |
-| Verification Code / Expires At / Attempts | `school_email_verifications` (**hashed**) |
-| Status, Verified At | `program_memberships.status` / `verified_at` |
-| DM Preference | `profiles.dm_preference` |
-| KICK_TIME / BAN_TIME | `moderation_actions` |
-| Form Row, Last Updated | no equivalent — Sheets bookkeeping, drops on migration |
+The old Google workbook remains untouched as historical source material; the
+bot no longer reads it. `scripts/migrate-legacy-bot-data.mjs` consumes a
+sanitized, untracked JSON export and maps normalized users, registrations,
+platform handles and ticket metadata into existing D1 tables. IDs are
+deterministic, ownership conflicts fail closed, `--apply` backs up local D1, and
+there is deliberately no remote execution mode. `--output-sql` writes only
+below ignored `temp/` for a human-reviewed remote upload.
 
-Tickets have already made this trip: the `support_*` tables (LAYER 10 in
-`db/schema.ts`) replaced the 13-column "Tickets" sheet, and
-`scripts/migrate_tickets_to_website.py` in the bot repo was the one-time copy.
-
-**Rule for new work:** D1 is the system of record. The bot should hold only
-Discord-side state (channel ids, message ids, role ids) and reach for everything
-else through the bridge. Don't add a column to the Sheets `Users` tab; add it to
-`db/schema.ts` and expose it. Where a flow still exists in both places, the D1
-one is the stronger path — e.g. Sheets stores the verification code in
-plaintext alongside an attempts counter, while D1 stores only
-`sha256(userId:code)`, compared in constant time with a TTL, a 5-attempt cap and
-send throttling ([lib/registration.ts](lib/registration.ts)).
+The migration never carries plaintext verification codes, attempts, code
+timestamps, kick/ban data, notes, secrets, bot config, changelog rows or raw form
+copies into D1. `VERIFIED` remains verified; non-verified application rows go to
+`MANUAL_REVIEW`; lifecycle-only rows receive identity records without an
+invented membership. Pre-created Discord `account` rows are claimed by Better
+Auth on first OAuth login, when fresh tokens replace their intentionally empty
+token fields.
 
 ### The bridge
 
@@ -448,11 +445,9 @@ makes the bot routes 503.
 - `BETTER_AUTH_SECRET` encrypts TOTP secrets and backup codes and signs the
   admin unlock cookie. **Rotating it breaks every enrolled member's 2FA, with
   no reset path.**
-- `BOT_API_SECRET` must match on both sides — and on the bot side it lives in
-  the **Google Sheets "Config" tab**, not in a vault. Its blast radius is
-  therefore everyone with access to that spreadsheet plus the service account:
-  treat sheet access as secret access, and rotate the site secret and the Config
-  cell together or the bridge goes dark.
+- `BOT_API_SECRET` must match on both sides. The site stores it as a Wrangler
+  secret; the bot reads it from its process environment (`.env` only for local
+  development). Rotate both environment values together or the bridge goes dark.
 - `.dev.vars` still carries `BOT_BRIDGE_SECRET` / `BOT_BRIDGE_URL` from the
   removed inbound-server design. Nothing in either repo reads them — dead keys,
   safe to drop.
@@ -470,15 +465,15 @@ for `.dev.vars`, `.env`, and `service_account.json`). Keeping that true:
 - Some real values are **public by design and shouldn't be scrubbed**:
   `DISCORD_GUILD_ID`, the D1 `database_id` in `wrangler.jsonc`, and the
   workers.dev hostname are identifiers, not credentials.
-- **PII is the bigger hazard than keys.** The bot's Sheets `Users` tab holds
-  real members' emails, school emails, graduation dates and (until migrated)
-  live verification codes; ticket threads hold support conversations. Never copy
-  sheet rows, exports, transcripts, or D1 dumps into either repo — not as
-  fixtures, tests, seed files, or doc examples. Seed data is the public schools
-  dataset plus the bootstrap registry rows, nothing else.
-- `service_account.json` is a live Google credential sitting untracked in the
-  bot's working tree. It's clean in history today; re-check before that repo is
-  made public, and prefer rotating it at publication time regardless.
+- **PII is the bigger hazard than keys.** The historical Google workbook and
+  local migration exports contain real member and ticket data. Never copy sheet
+  rows, exports, transcripts, generated migration SQL or D1 dumps into either
+  repo — not as fixtures, tests, seed files, or doc examples. The importer
+  enforces generated SQL under ignored `temp/`; seed data is the public schools
+  dataset plus bootstrap registry rows, nothing else.
+- `service_account.json` remains an untracked historical-export credential in
+  the bot working tree, not a runtime dependency. It is clean in history today;
+  re-check before publication and rotate or remove the local credential then.
 - Licensing/provenance is tracked in [README.md](README.md) — `wp-globals.css`
   is GPL-2.0+ WordPress output, the Manrope fonts are OFL, the schools dataset
   is MIT, and site content isn't implicitly licensed. Keep that list accurate as

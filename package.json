@@ -13,6 +13,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply website-sql --local",
     "db:migrate:remote": "wrangler d1 migrations apply website-sql --remote",
+    "db:import:legacy": "node scripts/migrate-legacy-bot-data.mjs",
     "db:cen:generate": "drizzle-kit generate --config drizzle.cen.config.ts",
     "db:cen:migrate:local": "wrangler d1 migrations apply cen-sql --local",
     "db:cen:migrate:remote": "wrangler d1 migrations apply cen-sql --remote",

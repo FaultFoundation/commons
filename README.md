@@ -38,11 +38,12 @@ Ships to `commons.fault.foundation`. The public marketing site is a
 | `lib/auth.ts`, `lib/db.ts` | Per-request Better Auth / Drizzle-D1 instances (bindings only exist on the request context) |
 | `lib/registration.ts` | Registration flow: school-email verification, Discord identity mirroring |
 | `lib/teams.ts`, `lib/teams-shared.ts` | Team reads + the role/capability model (managers, captains, coaches, players) |
-| `lib/scoring.ts` | Match reporting and standings recomputation |
+| `lib/tournaments.ts`, `lib/challonge.ts` | Cached tournament snapshots and the sole Challonge API client |
 | `lib/lfg-shared.ts` | Shapes for the matchmaking (LFG/LFM) JSON columns |
 | `db/schema.ts` | Drizzle schema: Better Auth tables + `profiles` |
 | `drizzle/` | Generated SQL migrations (`npm run db:generate`), applied with `npm run db:migrate:*` |
 | `db/cen-schema.ts`, `drizzle-cen/` | Read-only external-tournament projection + its independent migrations |
+| `scripts/migrate-legacy-bot-data.mjs` | Idempotent, local-only import of normalized legacy bot users and tickets |
 | `styles/theme.css` | The `ff-` design system (imported last) |
 | `styles/wp-globals.css` | Brand tokens (`--wp--preset--*`) + element base styles — **do not edit** |
 | `public/wp-content/uploads/` | Logo and favicons, kept at their original paths |
@@ -63,6 +64,30 @@ npm run preview                  # real Workers runtime (workerd) on :3999
 Schema changes: edit `db/schema.ts` → `npm run db:generate` →
 `npm run db:migrate:local` (and `db:migrate:remote` when shipping). After
 editing `wrangler.jsonc` or `.dev.vars`, rerun `npm run cf-typegen`.
+
+### Legacy bot data
+
+The one-time importer consumes a sanitized JSON export under ignored `temp/`.
+It pre-creates Better Auth Discord accounts, normalized registrations and
+historical ticket metadata; it deliberately excludes verification codes,
+attempt counters, kick/ban data, notes, secrets, and raw form/changelog copies.
+
+```sh
+npm run db:import:legacy -- --input temp/legacy-bot-data.json            # dry run
+npm run db:import:legacy -- --input temp/legacy-bot-data.json --apply    # local D1 only; backs up first
+npm run db:import:legacy -- --input temp/legacy-bot-data.json \
+  --output-sql temp/legacy-bot-data.sql                                  # reviewable handoff
+```
+
+There is intentionally no remote flag. After review, the generated SQL can be
+uploaded manually with
+`npx wrangler d1 execute website-sql --remote --file temp/legacy-bot-data.sql`.
+Both JSON and SQL contain member PII and must stay under `temp/`; Google is
+read-only historical source material and is not changed by the importer.
+If a source Discord ID was damaged by spreadsheet number formatting, add a
+manually verified `canonicalDiscordId` to that user object before regenerating
+the SQL. The original source value remains the deterministic user key, so the
+correction does not create a parallel user.
 
 ## Deploy (Cloudflare Workers)
 

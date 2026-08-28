@@ -23,13 +23,12 @@ export function DiscordMark() {
   );
 }
 
-/** Official FACEIT mark (the angular swoosh), from Simple Icons. */
+/** Official FACEIT mark, supplied by the org as a square PNG-in-SVG lockup
+    (not a single-path glyph, so unlike the marks here it can't adopt
+    `currentColor` — it carries its own white background). Plain <img> to
+    match the Blizzard/Commons marks (next.config sets images.unoptimized). */
 export function FaceitMark() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" role="presentation">
-      <path d="M23.999 2.705a.167.167 0 00-.312-.1 1141.27 1141.27 0 00-6.053 9.375H.218c-.221 0-.301.282-.11.352 7.227 2.73 17.667 6.836 23.5 9.134.15.06.39-.08.39-.18z" />
-    </svg>
-  );
+  return <img src="/brand/sources/faceit.svg" alt="" />;
 }
 
 /**

@@ -1670,13 +1670,10 @@ button.ff-dash__link:hover {
 .ff-integration__logo--discord {
   color: #fff;
 }
-/* Esports-connect brand tints. FACEIT and Challonge ship single-path
-   `currentColor` marks (see ProviderMark) tinted to their brand colour here.
-   start.gg's mark is two-tone and carries its own official colours directly,
-   so it takes no tint. */
-.ff-integration__logo--faceit {
-  color: #ff5500;
-}
+/* Esports-connect brand tint. Challonge ships a single-path `currentColor`
+   mark (see ProviderMark) tinted to its brand colour here. FACEIT and
+   start.gg carry their own official colours directly (an <img> and a
+   two-tone mark respectively), so neither takes a tint. */
 .ff-integration__logo--challonge {
   color: #ff7146;
 }
@@ -2599,6 +2596,42 @@ button.ff-dash__link:hover {
 .ff-ticket-subject:hover {
   text-decoration: underline;
 }
+/* The tournament list view's leading marks — same source/divider/game group
+   as the card banners (.ff-tcard__brandrow), but inline and unshadowed since
+   there's a plain row background here, not a photo. */
+.ff-ticket-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.ff-ticket-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.ff-ticket-brand .ff-tcard__source {
+  height: 16px;
+  filter: none;
+}
+.ff-ticket-brand .ff-tcard__source svg,
+.ff-ticket-brand .ff-tcard__source img {
+  height: 16px;
+}
+.ff-ticket-brand .ff-tcard__brandsep {
+  height: 14px;
+}
+.ff-ticket-brand .ff-tcard__game-img {
+  height: 16px;
+  max-width: 44px;
+  filter: none;
+}
+.ff-ticket-brand .ff-tcard__game--mono {
+  height: 16px;
+  min-width: 16px;
+  padding: 0 6px;
+  font-size: 9px;
+}
 .ff-ticket-tag {
   margin-left: 8px;
   color: var(--ff-text-dim);
@@ -3046,13 +3079,9 @@ button.ff-dash__link:hover {
   object-fit: cover;
 }
 .ff-tcard__source {
-  position: absolute;
-  top: 10px;
-  left: 12px;
   display: inline-flex;
   align-items: center;
   height: 22px;
-  max-width: 62%;
   color: #fff;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
 }
@@ -3063,33 +3092,48 @@ button.ff-dash__link:hover {
 }
 .ff-tcard__status {
   position: absolute;
-  top: 10px;
+  top: 12px;
   right: 12px;
 }
 .ff-tcard__game {
-  position: absolute;
-  right: 12px;
-  bottom: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 .ff-tcard__game-img {
-  height: 30px;
+  height: 22px;
   width: auto;
-  max-width: 72px;
+  max-width: 60px;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
 }
 .ff-tcard__game--mono {
-  height: 28px;
-  min-width: 28px;
-  padding: 0 8px;
+  height: 22px;
+  min-width: 22px;
+  padding: 0 7px;
   border-radius: var(--ff-radius-pill);
   background: rgba(0, 0, 0, 0.32);
   color: #fff;
   font-size: var(--ff-dash-text-xs);
   font-weight: 800;
   letter-spacing: 0.02em;
+}
+/* Every tile groups source mark + divider + game mark into one row, top-left,
+   so the whole row is a single absolutely-positioned unit — the individual
+   marks above are plain inline-flex items with no positioning of their own. */
+.ff-tcard__brandrow {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 90px);
+}
+.ff-tcard__brandsep {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.6);
 }
 
 /* Featured hero — the big, full-width tile at the top of the Active view. */
@@ -3101,31 +3145,6 @@ button.ff-dash__link:hover {
 }
 .ff-tcard--hero .ff-tcard__title {
   font-size: var(--ff-dash-text-xl);
-}
-.ff-tcard--hero .ff-tcard__status {
-  top: 12px;
-}
-/* The hero groups source + game into one row (regular cards keep them in
-   opposite corners — see .ff-tcard__source / .ff-tcard__game above), so both
-   marks drop their own absolute positioning and lay out inline instead. */
-.ff-tcard__brandrow {
-  position: absolute;
-  top: 12px;
-  left: 14px;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  max-width: calc(100% - 90px);
-}
-.ff-tcard__brandrow .ff-tcard__source,
-.ff-tcard__brandrow .ff-tcard__game {
-  position: static;
-}
-.ff-tcard__brandsep {
-  flex: none;
-  width: 1px;
-  height: 20px;
-  background: rgba(255, 255, 255, 0.6);
 }
 
 /* Past-tournaments disclosure below the upcoming tiles. */

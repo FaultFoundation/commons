@@ -359,37 +359,21 @@ function formatDate(ms: number | null): string {
     : "Date TBD";
 }
 
-/** The banner overlay shared by the hero and the regular card: status pill
-    top-right, plus either a source mark top-left / game mark bottom-right (the
-    regular card, where each corner is free), or — on the hero, which has no
-    ribbon competing for the top-left anymore — the source mark, a divider and
-    the game mark grouped into one row top-left. */
-function BannerChrome({ t, hero = false }: { t: TournamentListEntry; hero?: boolean }) {
+/** The banner overlay shared by the hero and the regular card: the source
+    mark, a divider and the game mark grouped into one row top-left, plus the
+    status pill top-right. */
+function BannerChrome({ t }: { t: TournamentListEntry }) {
   const live = t.status === "registration" || t.status === "active";
-  const status = (
-    <span className={`ff-tcard__status${live ? " ff-tcard__status--live" : ""}`}>
-      {TOURNAMENT_STATUS_LABELS[t.status as TournamentStatus] ?? t.status}
-    </span>
-  );
-
-  if (hero) {
-    return (
-      <>
-        <div className="ff-tcard__brandrow">
-          <SourceLogo source={sourceKey(t.source)} />
-          <span className="ff-tcard__brandsep" aria-hidden="true" />
-          <GameLogo name={t.game} logoUrl={t.gameLogoUrl} />
-        </div>
-        {status}
-      </>
-    );
-  }
-
   return (
     <>
-      <SourceLogo source={sourceKey(t.source)} />
-      {status}
-      <GameLogo name={t.game} logoUrl={t.gameLogoUrl} />
+      <div className="ff-tcard__brandrow">
+        <SourceLogo source={sourceKey(t.source)} />
+        <span className="ff-tcard__brandsep" aria-hidden="true" />
+        <GameLogo name={t.game} logoUrl={t.gameLogoUrl} />
+      </div>
+      <span className={`ff-tcard__status${live ? " ff-tcard__status--live" : ""}`}>
+        {TOURNAMENT_STATUS_LABELS[t.status as TournamentStatus] ?? t.status}
+      </span>
     </>
   );
 }
@@ -421,7 +405,7 @@ function FeaturedHero({ tournament: t }: { tournament: TournamentListEntry }) {
     <TournamentLink tournament={t} className="ff-tcard ff-tcard--hero">
       <div className="ff-tcard__banner">
         <BannerImage url={t.bannerUrl} eager />
-        <BannerChrome t={t} hero />
+        <BannerChrome t={t} />
       </div>
       <div className="ff-tcard__body">
         <span className="ff-tcard__date">{formatDate(t.startsAt)}</span>
@@ -471,24 +455,31 @@ function CompactTable({
             return (
               <tr key={t.id}>
                 <td>
-                  {external ? (
-                    <a
-                      className="ff-ticket-subject"
-                      href={hrefFor(t)}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                    >
-                      {t.name}
-                    </a>
-                  ) : (
-                    <Link
-                      className="ff-ticket-subject"
-                      href={hrefFor(t)}
-                      prefetch={false}
-                    >
-                      {t.name}
-                    </Link>
-                  )}
+                  <span className="ff-ticket-row">
+                    <span className="ff-ticket-brand">
+                      <SourceLogo source={sourceKey(t.source)} />
+                      <span className="ff-tcard__brandsep" aria-hidden="true" />
+                      <GameLogo name={t.game} logoUrl={t.gameLogoUrl} />
+                    </span>
+                    {external ? (
+                      <a
+                        className="ff-ticket-subject"
+                        href={hrefFor(t)}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                      >
+                        {t.name}
+                      </a>
+                    ) : (
+                      <Link
+                        className="ff-ticket-subject"
+                        href={hrefFor(t)}
+                        prefetch={false}
+                      >
+                        {t.name}
+                      </Link>
+                    )}
+                  </span>
                 </td>
                 <td>
                   {external

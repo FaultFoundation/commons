@@ -9,14 +9,18 @@
 // Drop-in convention for official art is documented in db/README.md.
 
 /** Local art for games we ship an icon for, keyed by normalized name (so
-    "CS2", "Counter-Strike 2" etc. all resolve to the same file) — the fallback
-    used when there's no D1 `logoUrl`, which is always the case for external
-    (start.gg/FACEIT) tournaments. */
+    "CS2", "CS:GO", "Counter-Strike 2" etc. all resolve to the same file,
+    since FACEIT and start.gg don't always tag the same game the same way) —
+    the fallback used when there's no D1 `logoUrl`, which is always the case
+    for external (start.gg/FACEIT) tournaments. */
 const KNOWN_GAME_LOGOS: Record<string, string> = {
   overwatch: "/brand/games/overwatch.svg",
   overwatch2: "/brand/games/overwatch.svg",
   cs2: "/brand/games/cs2.svg",
   counterstrike2: "/brand/games/cs2.svg",
+  csgo: "/brand/games/cs2.svg",
+  counterstrikeglobaloffensive: "/brand/games/cs2.svg",
+  counterstrike: "/brand/games/cs2.svg",
   valorant: "/brand/games/valorant.svg",
   leagueoflegends: "/brand/games/league-of-legends.svg",
   lol: "/brand/games/league-of-legends.svg",

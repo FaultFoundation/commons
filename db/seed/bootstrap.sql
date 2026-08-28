@@ -3,9 +3,12 @@
 --   wrangler d1 execute website-sql --local  --file=db/seed/bootstrap.sql
 --   wrangler d1 execute website-sql --remote --file=db/seed/bootstrap.sql
 
-INSERT INTO games (id, slug, name) VALUES
-  ('overwatch', 'overwatch', 'Overwatch 2')
-ON CONFLICT(id) DO UPDATE SET slug = excluded.slug, name = excluded.name;
+INSERT INTO games (id, slug, name, logo_url) VALUES
+  ('overwatch', 'overwatch', 'Overwatch 2', '/brand/games/overwatch.svg')
+ON CONFLICT(id) DO UPDATE SET
+  slug = excluded.slug,
+  name = excluded.name,
+  logo_url = excluded.logo_url;
 
 INSERT INTO programs (id, slug, name, description, game_id, active) VALUES
   ('collegiate-overwatch', 'collegiate-overwatch', 'Collegiate Overwatch',

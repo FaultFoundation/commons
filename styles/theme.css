@@ -1670,17 +1670,15 @@ button.ff-dash__link:hover {
 .ff-integration__logo--discord {
   color: #fff;
 }
-/* Esports-connect brand tints. FACEIT ships a real single-path mark; start.gg
-   and Challonge fall back to lettermarks (see ProviderMark) until official art
-   is on hand, so their colours are placeholders to confirm alongside the art. */
+/* Esports-connect brand tints. FACEIT and Challonge ship single-path
+   `currentColor` marks (see ProviderMark) tinted to their brand colour here.
+   start.gg's mark is two-tone and carries its own official colours directly,
+   so it takes no tint. */
 .ff-integration__logo--faceit {
   color: #ff5500;
 }
 .ff-integration__logo--challonge {
   color: #ff7146;
-}
-.ff-integration__logo--startgg {
-  color: #fff;
 }
 /* A platform we can't connect yet (LeagueSpot): shown, but visibly inert. */
 .ff-integration--soon {
@@ -2981,16 +2979,10 @@ button.ff-dash__link:hover {
   color: #fff;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
 }
-.ff-tcard__source svg {
+.ff-tcard__source svg,
+.ff-tcard__source img {
   height: 22px;
   width: auto;
-}
-.ff-brandword {
-  font-size: var(--ff-dash-text-sm);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: #fff;
-  white-space: nowrap;
 }
 .ff-tcard__status {
   position: absolute;

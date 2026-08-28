@@ -1,15 +1,14 @@
-import { FaceitMark } from "@/components/brand/ProviderMark";
+import { ChallongeMark, FaceitMark, StartggMark } from "@/components/brand/ProviderMark";
 
 // The "website" mark shown top-left on a tournament tile: which platform the
 // tournament lives on. Internal Commons tournaments (hosted on the org's
 // Challonge, but branded as ours) show the Commons mark; scraped external ones
 // show start.gg / FACEIT.
 //
-// Marks are inline like the OAuth glyphs (components/brand/ProviderMark) so they
-// never depend on a network fetch and can't render broken. To swap in official
-// brand art later, drop an SVG at `public/brand/sources/<key>.svg` (keys:
-// commons, challonge, startgg, faceit) and replace the inline mark below with an
-// <img src="/brand/sources/<key>.svg" alt="" /> — see db/README.md.
+// Marks are inline like the OAuth glyphs (components/brand/ProviderMark), and
+// shared with them for challonge/faceit/startgg, so they never depend on a
+// network fetch and can't render broken. The Commons mark is the one exception:
+// it's real org art at `public/brand/sources/commons.svg`, loaded as an <img>.
 
 export type TournamentSource = "commons" | "challonge" | "startgg" | "faceit";
 
@@ -35,24 +34,10 @@ const SOURCE_NAMES: Record<TournamentSource, string> = {
   faceit: "FACEIT",
 };
 
-/** The Fault Foundation monogram — a bold "FF" in the brand accent. Placeholder
-    for the org's real mark; drop `public/brand/sources/commons.svg` to replace. */
+/** The Fault Foundation wordmark, white-on-transparent. Plain <img> to match
+    the rest of the markup (next.config sets images.unoptimized). */
 function CommonsMark() {
-  return (
-    <svg viewBox="0 0 24 24" role="presentation" fill="currentColor">
-      <text
-        x="12"
-        y="17"
-        textAnchor="middle"
-        fontSize={12}
-        fontWeight={900}
-        fontFamily="inherit"
-        letterSpacing="-1"
-      >
-        FF
-      </text>
-    </svg>
-  );
+  return <img src="/brand/sources/commons.svg" alt="" />;
 }
 
 export function SourceLogo({ source }: { source: TournamentSource }) {
@@ -67,12 +52,10 @@ export function SourceLogo({ source }: { source: TournamentSource }) {
         <FaceitMark />
       ) : source === "commons" ? (
         <CommonsMark />
+      ) : source === "startgg" ? (
+        <StartggMark />
       ) : (
-        // start.gg / Challonge present as wordmarks, which is how both brands
-        // style themselves; swap for an official single-path SVG when on hand.
-        <span className="ff-brandword" aria-hidden="true">
-          {source === "startgg" ? "start.gg" : "Challonge"}
-        </span>
+        <ChallongeMark />
       )}
     </span>
   );

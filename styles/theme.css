@@ -2604,11 +2604,15 @@ button.ff-dash__link:hover {
   align-items: center;
   gap: 10px;
 }
+/* Fixed width so the marks occupy a consistent column and every tournament
+   name below starts at the same x, regardless of how wide each logo is. */
 .ff-ticket-brand {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   flex: none;
+  width: 72px;
+  justify-content: flex-start;
 }
 .ff-ticket-brand .ff-tcard__source {
   height: 16px;
@@ -2623,7 +2627,7 @@ button.ff-dash__link:hover {
 }
 .ff-ticket-brand .ff-tcard__game-img {
   height: 16px;
-  max-width: 44px;
+  max-width: 30px;
   filter: none;
 }
 .ff-ticket-brand .ff-tcard__game--mono {

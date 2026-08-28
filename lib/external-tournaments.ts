@@ -138,12 +138,6 @@ export async function listExternalTournaments(): Promise<
             state: extEvents.state,
           })
           .from(extEvents)
-          .where(
-            inArray(
-              extEvents.tournamentId,
-              rows.map((row) => row.id),
-            ),
-          )
       : [];
     const statesByTournament = new Map<string, (string | null)[]>();
     for (const event of eventRows) {
@@ -161,12 +155,6 @@ export async function listExternalTournaments(): Promise<
             })
             .from(extMatches)
             .innerJoin(extEvents, eq(extEvents.id, extMatches.eventId))
-            .where(
-              inArray(
-                extEvents.tournamentId,
-                rows.map((row) => row.id),
-              ),
-            )
             .groupBy(extEvents.tournamentId)
         : [];
       for (const match of matchRows) {

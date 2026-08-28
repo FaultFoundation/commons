@@ -1,0 +1,1 @@
+ALTER TABLE `tournaments` ADD `provider_synced_at` integer;

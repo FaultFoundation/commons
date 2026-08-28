@@ -677,6 +677,9 @@ export const tournaments = sqliteTable(
     featured: integer("featured", { mode: "boolean" }).notNull().default(false),
     // Bumped on every mutating action; readers compare to detect stale state.
     version: integer("version").notNull().default(0),
+    // Last time the Commons checked this row against its provider. Used as an
+    // atomic lazy-sync lease so concurrent page loads do not duplicate API calls.
+    providerSyncedAt: integer("provider_synced_at", { mode: "timestamp_ms" }),
     // Set when the bracket is started on Challonge (status -> active).
     bracketGeneratedAt: integer("bracket_generated_at", {
       mode: "timestamp_ms",

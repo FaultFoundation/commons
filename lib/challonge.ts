@@ -34,7 +34,7 @@ const TIMEOUT_MS = 12_000;
 
 export type ChallongeResult<T> =
   | { ok: true; data: T }
-  | { ok: false; error: string };
+  | { ok: false; error: string; status?: number };
 
 /** Whether a server-side API key is present. UI uses this to explain the gap. */
 export function challongeConfigured(): boolean {
@@ -54,14 +54,21 @@ type JsonApiResource = {
 
 type JsonApiBody = {
   data?: JsonApiResource | JsonApiResource[];
-  errors?: Array<{
+  errors?: {
     // Challonge sometimes puts a nested {field: [messages]} object here rather
     // than a plain string, so these are unknown and stringified on render.
     title?: unknown;
     detail?: unknown;
-    code?: string;
+    code?: string | number;
+    status?: string | number;
     // JSON:API points at the offending field here — the difference between a
     // useful "name is missing" and a baffling "is missing".
+    source?: { pointer?: string; parameter?: string };
+  } | Array<{
+    title?: unknown;
+    detail?: unknown;
+    code?: string | number;
+    status?: string | number;
     source?: { pointer?: string; parameter?: string };
   }>;
 };
@@ -115,7 +122,11 @@ async function request(
     // `source.pointer` (".../data/attributes/round_robin_options/ranking"). We
     // keep the whole path after "attributes" (dot-joined) so a nested field
     // reads "round_robin_options.ranking is missing", not a bare "ranking".
-    const errs = parsed.errors ?? [];
+    const errs = Array.isArray(parsed.errors)
+      ? parsed.errors
+      : parsed.errors
+        ? [parsed.errors]
+        : [];
     const parts = errs.map((e) => {
       let field: string | undefined;
       const ptr = e.source?.pointer;
@@ -139,7 +150,7 @@ async function request(
       : errs.length
         ? JSON.stringify(errs)
         : `request failed (${res.status})`;
-    return { ok: false, error: `Challonge: ${msg}` };
+    return { ok: false, error: `Challonge: ${msg}`, status: res.status };
   }
 
   return { ok: true, data: parsed };
@@ -185,20 +196,65 @@ export type CreateTournamentInput = {
 
 export type ChallongeTournament = {
   id: string;
+  name: string | null;
   url: string | null;
   fullUrl: string | null;
   state: string | null;
   format: TournamentFormat;
+  description: string | null;
+  startsAt: string | null;
+  holdThirdPlaceMatch: boolean | null;
 };
 
 function readTournament(res: JsonApiResource): ChallongeTournament {
   const a = res.attributes ?? {};
   return {
     id: String(res.id),
+    name: asString(a.name),
     url: asString(a.url),
     fullUrl: asString(a.full_challonge_url ?? a.fullChallongeUrl),
     state: asString(a.state),
     format: fromChallongeType(asString(a.tournament_type)),
+    description: asString(a.description),
+    startsAt: asString(a.starts_at ?? a.startsAt),
+    holdThirdPlaceMatch:
+      typeof a.hold_third_place_match === "boolean"
+        ? a.hold_third_place_match
+        : null,
+  };
+}
+
+const TOURNAMENT_PAGE_SIZE = 100;
+const MAX_TOURNAMENT_PAGES = 100;
+
+/** Every tournament in the organization account, following v2.1 pagination. */
+export async function listChallongeTournaments(): Promise<
+  ChallongeResult<ChallongeTournament[]>
+> {
+  const tournaments: ChallongeTournament[] = [];
+  for (let page = 1; page <= MAX_TOURNAMENT_PAGES; page += 1) {
+    const res = await request(
+      "GET",
+      `/tournaments.json?page=${page}&per_page=${TOURNAMENT_PAGE_SIZE}`,
+    );
+    if (!res.ok) return res;
+
+    if (!Array.isArray(res.data.data)) {
+      return {
+        ok: false,
+        error: "Challonge returned an invalid tournament listing.",
+      };
+    }
+    const resources = res.data.data;
+    tournaments.push(...resources.filter((item) => item.id).map(readTournament));
+    if (resources.length < TOURNAMENT_PAGE_SIZE) {
+      return { ok: true, data: tournaments };
+    }
+  }
+
+  return {
+    ok: false,
+    error: "Challonge returned too many tournament pages to reconcile safely.",
   };
 }
 
@@ -264,7 +320,15 @@ export async function updateChallongeTournament(
   return {
     ok: true,
     data: resource ? readTournament(resource) : {
-      id: challongeId, url: null, fullUrl: null, state: null, format: "single_elim",
+      id: challongeId,
+      name: null,
+      url: null,
+      fullUrl: null,
+      state: null,
+      format: "single_elim",
+      description: null,
+      startsAt: null,
+      holdThirdPlaceMatch: null,
     },
   };
 }

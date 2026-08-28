@@ -524,6 +524,13 @@ lazy TTL). Portal conventions specific to this surface:
   `/api/tournaments/[id]/bracket` on the server-dictated interval (`nextPollMs`)
   and pausing on a hidden tab, the same request-budget discipline the ticket
   queue uses.
+- **Challonge reconciliation** runs lazily when either tournament list is read,
+  at most once per 24 hours. One paginated organization listing updates local
+  names, formats, descriptions, dates, links and lifecycle states; a local row
+  missing from a completely loaded listing is removed. `provider_synced_at` is
+  the D1 lease that keeps simultaneous page views to one provider sync. Bracket
+  participants and matches are a separate cache: 12 hours for open tournaments,
+  30 days for concluded ones, plus immediate refresh after Commons admin writes.
 - **Academic-verification toggle** is on the admin create form and the Game Info
   settings — it gates registration, nothing on Challonge.
 

@@ -222,9 +222,16 @@ shape.)
   in `tournament_brackets`. `BracketView` and the poll route
   (`app/api/tournaments/[id]/bracket`) consume that shape and never touch
   Challonge — the cache decouples viewer count from Challonge's metered API. It
-  refreshes **lazily on read** past a status TTL (Workers has no cron) and
+  refreshes **lazily on read** after 12 hours for an open tournament (30 days
+  for an archive; Workers has no cron) and
   **immediately** after any admin mutation (which bumps `tournaments.version`;
   `getOrRefreshSnapshot` rebuilds when the cache is behind that version).
+- **Provider metadata reconciles once daily on list access.** One paginated org
+  tournament read refreshes names, formats, descriptions, start times, URLs and
+  lifecycle states for every linked D1 row. `provider_synced_at` is the global
+  lazy-sync lease, so traffic cannot multiply API calls. A linked D1 row absent
+  from the complete Challonge listing is deleted locally; an API or pagination
+  failure never deletes anything.
 - **Admin lifecycle → Challonge.** Our status
   (`draft→registration→seeding→active→completed`) is richer than Challonge's;
   the mapping lives in [app/admin/tournaments/actions.ts](app/admin/tournaments/actions.ts):
@@ -291,13 +298,15 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   tournaments alone. Tournament `status` is **derived**, never written: terminal
   event states first, then the end date, then a 30-day fallback only when the
   provider omitted an end date. This keeps stale rows out of Active without
-  mutating the scraper's source data.
+  mutating the scraper's source data. List enrichment reads the indexed event
+  projection and grouped match timestamps directly; never expand the full
+  tournament catalog into a D1 `IN (...)` clause, which exceeds D1's bind limit
+  as the scraper projection grows and causes the degraded empty-list fallback.
 - The 30-day derived fallback applies to **external scraped tournaments only**.
-  Native Challonge lifecycle remains staff-authoritative: its current snapshot
-  shape has no match-activity timestamp, and `fetchedAt` is cache freshness,
-  not evidence that a match happened. Add a dedicated persisted activity field
-  before applying the same rule to native tournaments; never guess from fetch
-  time or parse every bracket payload on the list path.
+  Native Challonge lifecycle comes from explicit provider state during the
+  daily metadata reconciliation; its snapshot `fetchedAt` is cache freshness,
+  not evidence that a match happened. Never guess lifecycle from fetch time or
+  parse every bracket payload on the list path.
 - The list ([app/tournaments/page.tsx](app/tournaments/page.tsx)) merges both
   into one `TournamentListEntry[]`; external cards carry a `source` and link out
   to the native site for now (a branded Commons view for external tournaments is

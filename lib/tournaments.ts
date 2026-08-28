@@ -1,5 +1,14 @@
 import { cache } from "react";
-import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  sql,
+} from "drizzle-orm";
 
 import {
   games,
@@ -11,10 +20,15 @@ import {
   tournamentParticipants,
   user,
 } from "@/db/schema";
+import { deleteAvatarByUrl } from "@/lib/avatars";
 import { getDb } from "@/lib/db";
 import { requireStaffCapability, type StaffCheck } from "@/lib/staff";
 import { can, type TeamRole } from "@/lib/teams-shared";
-import { fetchChallongeState } from "@/lib/challonge";
+import {
+  fetchChallongeState,
+  listChallongeTournaments,
+  type ChallongeTournament,
+} from "@/lib/challonge";
 import {
   TOURNAMENT_ID_MAX,
   TOURNAMENT_ID_MIN,
@@ -60,6 +74,7 @@ export type TournamentRow = {
   rulesUrl: string | null;
   featured: boolean;
   version: number;
+  providerSyncedAt: Date | null;
   bracketGeneratedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -125,10 +140,179 @@ export type TournamentListItem = {
   gameLogoUrl: string | null;
 };
 
+const PROVIDER_SYNC_OPEN_MS = 24 * 60 * 60 * 1000;
+const PROVIDER_SYNC_ARCHIVE_MS = 30 * 24 * 60 * 60 * 1000;
+const SNAPSHOT_SYNC_OPEN_MS = 12 * 60 * 60 * 1000;
+
+function statusFromChallonge(
+  state: string | null,
+  current: TournamentStatus,
+): TournamentStatus {
+  switch (state?.trim().toLowerCase()) {
+    case "underway":
+    case "in_progress":
+      return "active";
+    case "complete":
+    case "completed":
+    case "ended":
+      return "completed";
+    case "pending":
+      return current === "active" || current === "completed"
+        ? "seeding"
+        : current === "cancelled"
+          ? "seeding"
+          : current;
+    default:
+      return current;
+  }
+}
+
+function parsedDate(value: string | null): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function sameDate(left: Date | null, right: Date | null): boolean {
+  return left?.getTime() === right?.getTime();
+}
+
+async function applyChallongeMetadata(
+  tournament: TournamentRow,
+  remote: ChallongeTournament,
+  checkedAt: Date,
+): Promise<void> {
+  const name = remote.name?.trim() || tournament.name;
+  const description = remote.description?.trim() || null;
+  const startsAt = parsedDate(remote.startsAt);
+  const externalUrl = remote.fullUrl ?? remote.url ?? tournament.externalUrl;
+  const status = statusFromChallonge(remote.state, tournament.status);
+  const thirdPlaceMatch =
+    remote.holdThirdPlaceMatch ?? tournament.thirdPlaceMatch;
+  const changed =
+    name !== tournament.name ||
+    description !== tournament.description ||
+    !sameDate(startsAt, tournament.startsAt) ||
+    externalUrl !== tournament.externalUrl ||
+    remote.format !== tournament.format ||
+    status !== tournament.status ||
+    thirdPlaceMatch !== tournament.thirdPlaceMatch;
+
+  if (!changed) {
+    await getDb()
+      .update(tournaments)
+      .set({ providerSyncedAt: checkedAt })
+      .where(eq(tournaments.id, tournament.id));
+    return;
+  }
+
+  await getDb()
+    .update(tournaments)
+    .set({
+      name,
+      description,
+      startsAt,
+      externalUrl,
+      format: remote.format,
+      status,
+      thirdPlaceMatch,
+      providerSyncedAt: checkedAt,
+      bracketGeneratedAt:
+        status === "active" || status === "completed"
+          ? tournament.bracketGeneratedAt ?? checkedAt
+          : null,
+      version: sql`${tournaments.version} + 1`,
+      updatedAt: checkedAt,
+    })
+    .where(
+      and(
+        eq(tournaments.id, tournament.id),
+        eq(tournaments.version, tournament.version),
+      ),
+    );
+}
+
+async function removeDeletedChallongeTournament(
+  tournament: TournamentRow,
+): Promise<void> {
+  const db = getDb();
+  await db.batch([
+    db
+      .delete(tournamentBrackets)
+      .where(eq(tournamentBrackets.tournamentId, tournament.id)),
+    db
+      .delete(tournamentParticipants)
+      .where(eq(tournamentParticipants.tournamentId, tournament.id)),
+    db.delete(tournaments).where(eq(tournaments.id, tournament.id)),
+  ]);
+  await deleteAvatarByUrl(tournament.bannerUrl);
+}
+
+/**
+ * Lazily reconcile every linked Commons tournament with one paginated account
+ * read. The lowest local id owns the global timestamp lease, so concurrent
+ * renders cannot multiply provider requests; missing rows are only removed
+ * after the complete remote account listing has loaded successfully.
+ */
+async function syncChallongeTournamentsIfStale(): Promise<void> {
+  const db = getDb();
+  const now = new Date();
+  const candidates = (await db
+    .select()
+    .from(tournaments)
+    .where(
+      and(
+        eq(tournaments.source, "challonge"),
+        isNotNull(tournaments.externalId),
+      ),
+    )
+    .orderBy(tournaments.id)) as TournamentRow[];
+  const lease = candidates[0];
+  if (!lease) return;
+  if (
+    lease.providerSyncedAt &&
+    now.getTime() - lease.providerSyncedAt.getTime() < PROVIDER_SYNC_OPEN_MS
+  ) {
+    return;
+  }
+
+  const claim = await db
+    .update(tournaments)
+    .set({ providerSyncedAt: now })
+    .where(
+      and(
+        eq(tournaments.id, lease.id),
+        lease.providerSyncedAt
+          ? eq(tournaments.providerSyncedAt, lease.providerSyncedAt)
+          : isNull(tournaments.providerSyncedAt),
+      ),
+    )
+    .returning({ id: tournaments.id });
+  if (!claim.length) return;
+
+  const remote = await listChallongeTournaments();
+  if (!remote.ok) {
+    console.error("Challonge tournament sync failed:", remote.error);
+    return;
+  }
+
+  const remoteById = new Map(remote.data.map((item) => [item.id, item]));
+  for (const tournament of candidates) {
+    if (!tournament.externalId) continue;
+    const match = remoteById.get(tournament.externalId);
+    if (match) {
+      await applyChallongeMetadata(tournament, match, now);
+    } else {
+      await removeDeletedChallongeTournament(tournament);
+    }
+  }
+}
+
 export async function listTournaments(opts?: {
   programId?: string;
   excludeDraft?: boolean;
 }): Promise<TournamentListItem[]> {
+  await syncChallongeTournamentsIfStale();
   const db = getDb();
   const conditions = [];
   if (opts?.programId) conditions.push(eq(tournaments.programId, opts.programId));
@@ -523,12 +707,12 @@ export async function transitionStatus(
 // directly — so a live bracket updates the instant staff enter a result, and
 // this TTL is only the safety net for changes made straight on Challonge.
 const SNAPSHOT_TTL_MS: Record<TournamentStatus, number> = {
-  draft: 300_000,
-  registration: 600_000,
-  seeding: 120_000,
-  active: 120_000,
-  completed: 86_400_000,
-  cancelled: 86_400_000,
+  draft: SNAPSHOT_SYNC_OPEN_MS,
+  registration: SNAPSHOT_SYNC_OPEN_MS,
+  seeding: SNAPSHOT_SYNC_OPEN_MS,
+  active: SNAPSHOT_SYNC_OPEN_MS,
+  completed: PROVIDER_SYNC_ARCHIVE_MS,
+  cancelled: PROVIDER_SYNC_ARCHIVE_MS,
 };
 
 export type LoadedSnapshot = {

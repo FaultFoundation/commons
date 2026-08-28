@@ -2483,6 +2483,83 @@ button.ff-dash__link:hover {
   border-color: transparent;
 }
 
+/* Game filter — a checkbox popover anchored to its own toggle button, styled
+   like the view tabs it sits beside. */
+.ff-filter {
+  position: relative;
+}
+.ff-filter__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ff-filter__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-navy-900);
+  color: var(--ff-accent);
+  font-size: 10px;
+  font-weight: 800;
+}
+.ff-filter__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  min-width: 200px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 10px;
+  border-radius: var(--ff-radius-md);
+  border: 1px solid var(--ff-border);
+  background: var(--ff-navy-900);
+  box-shadow: var(--ff-shadow-card);
+}
+.ff-filter__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ff-text-dim);
+}
+.ff-filter__clear {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--ff-accent);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+.ff-filter__options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ff-filter__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--ff-dash-text-sm);
+  color: #dfe9f4;
+  cursor: pointer;
+}
+.ff-filter__option input {
+  accent-color: var(--ff-accent);
+}
+
 /* Queue table */
 .ff-ticket-table-wrap {
   overflow-x: auto;
@@ -3015,8 +3092,7 @@ button.ff-dash__link:hover {
   letter-spacing: 0.02em;
 }
 
-/* Featured hero — the big, full-width tile at the top of the Active view. Its
-   ribbon sits top-left, so the source mark moves to the bottom-left corner. */
+/* Featured hero — the big, full-width tile at the top of the Active view. */
 .ff-tcard--hero {
   margin-bottom: 16px;
 }
@@ -3026,23 +3102,30 @@ button.ff-dash__link:hover {
 .ff-tcard--hero .ff-tcard__title {
   font-size: var(--ff-dash-text-xl);
 }
-.ff-tcard--hero .ff-tcard__source {
-  top: auto;
-  bottom: 12px;
-  left: 14px;
+.ff-tcard--hero .ff-tcard__status {
+  top: 12px;
 }
-.ff-tcard__ribbon {
+/* The hero groups source + game into one row (regular cards keep them in
+   opposite corners — see .ff-tcard__source / .ff-tcard__game above), so both
+   marks drop their own absolute positioning and lay out inline instead. */
+.ff-tcard__brandrow {
   position: absolute;
   top: 12px;
   left: 14px;
-  padding: 3px 10px;
-  border-radius: var(--ff-radius-pill);
-  background: var(--ff-accent);
-  color: var(--ff-navy-900);
-  font-size: var(--ff-dash-text-xs);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 90px);
+}
+.ff-tcard__brandrow .ff-tcard__source,
+.ff-tcard__brandrow .ff-tcard__game {
+  position: static;
+}
+.ff-tcard__brandsep {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.6);
 }
 
 /* Past-tournaments disclosure below the upcoming tiles. */

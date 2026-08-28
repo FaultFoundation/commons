@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { GameLogo } from "@/components/brand/GameLogo";
 import { SourceLogo, sourceKey } from "@/components/brand/SourceLogo";
@@ -108,16 +108,48 @@ export function TournamentList({
   const [view, setView] = useState<ViewKey>("active");
   const [layout, setLayout] = useState<TournamentLayout>(initialLayout);
   const [showPast, setShowPast] = useState(false);
+  // Which games to show; empty = no filter (every game shows). Kept as
+  // in-memory state and applied with a plain .filter() below — same
+  // client-side approach as the rest of this list, so toggling a game never
+  // costs a request or Worker CPU.
+  const [selectedGames, setSelectedGames] = useState<Set<string>>(new Set());
 
   function chooseLayout(next: TournamentLayout) {
     setLayout(next);
     document.cookie = `${TOURNAMENT_LAYOUT_COOKIE}=${next}; path=/; max-age=${TOURNAMENT_LAYOUT_COOKIE_MAX_AGE}; samesite=lax`;
   }
 
+  const availableGames = useMemo(() => {
+    const games = new Set<string>();
+    for (const t of tournaments) {
+      if (t.game) games.add(t.game);
+    }
+    return Array.from(games).sort((a, b) => a.localeCompare(b));
+  }, [tournaments]);
+
+  function toggleGame(game: string) {
+    setSelectedGames((prev) => {
+      const next = new Set(prev);
+      if (next.has(game)) {
+        next.delete(game);
+      } else {
+        next.add(game);
+      }
+      return next;
+    });
+  }
+
+  const visibleTournaments = useMemo(() => {
+    if (selectedGames.size === 0) return tournaments;
+    return tournaments.filter((t) => t.game != null && selectedGames.has(t.game));
+  }, [tournaments, selectedGames]);
+
   const { featured, upcoming, past, concluded, all } = useMemo(() => {
     const today = startOfTodayMs();
-    const active = tournaments.filter((t) => !isConcluded(t.status));
-    const done = tournaments.filter((t) => isConcluded(t.status)).sort(byStartDesc);
+    const active = visibleTournaments.filter((t) => !isConcluded(t.status));
+    const done = visibleTournaments
+      .filter((t) => isConcluded(t.status))
+      .sort(byStartDesc);
 
     // The hero: the admin-featured one, else the soonest upcoming, else the most
     // recent active tournament (so the slot is never empty when anything active
@@ -135,11 +167,11 @@ export function TournamentList({
       upcoming: rest.filter((t) => isUpcoming(t, today)).sort(byStartAsc),
       past: rest.filter((t) => !isUpcoming(t, today)).sort(byStartDesc),
       concluded: done,
-      all: tournaments
+      all: visibleTournaments
         .filter((t) => t.id !== hero?.id)
         .sort(byTimeline(today)),
     };
-  }, [tournaments]);
+  }, [visibleTournaments]);
 
   const activeEmpty = !featured && upcoming.length === 0 && past.length === 0;
   const allEmpty = !featured && all.length === 0;
@@ -159,6 +191,12 @@ export function TournamentList({
               {option.label}
             </button>
           ))}
+          <GameFilter
+            games={availableGames}
+            selected={selectedGames}
+            onToggle={toggleGame}
+            onClear={() => setSelectedGames(new Set())}
+          />
         </div>
 
         <div className="ff-viewtoggle" role="group" aria-label="View style">
@@ -321,18 +359,36 @@ function formatDate(ms: number | null): string {
     : "Date TBD";
 }
 
-/** The banner overlay shared by the hero and the regular card: source mark
-    top-left, status pill top-right, game mark bottom-right. */
-function BannerChrome({ t }: { t: TournamentListEntry }) {
+/** The banner overlay shared by the hero and the regular card: status pill
+    top-right, plus either a source mark top-left / game mark bottom-right (the
+    regular card, where each corner is free), or — on the hero, which has no
+    ribbon competing for the top-left anymore — the source mark, a divider and
+    the game mark grouped into one row top-left. */
+function BannerChrome({ t, hero = false }: { t: TournamentListEntry; hero?: boolean }) {
   const live = t.status === "registration" || t.status === "active";
+  const status = (
+    <span className={`ff-tcard__status${live ? " ff-tcard__status--live" : ""}`}>
+      {TOURNAMENT_STATUS_LABELS[t.status as TournamentStatus] ?? t.status}
+    </span>
+  );
+
+  if (hero) {
+    return (
+      <>
+        <div className="ff-tcard__brandrow">
+          <SourceLogo source={sourceKey(t.source)} />
+          <span className="ff-tcard__brandsep" aria-hidden="true" />
+          <GameLogo name={t.game} logoUrl={t.gameLogoUrl} />
+        </div>
+        {status}
+      </>
+    );
+  }
+
   return (
     <>
       <SourceLogo source={sourceKey(t.source)} />
-      <span
-        className={`ff-tcard__status${live ? " ff-tcard__status--live" : ""}`}
-      >
-        {TOURNAMENT_STATUS_LABELS[t.status as TournamentStatus] ?? t.status}
-      </span>
+      {status}
       <GameLogo name={t.game} logoUrl={t.gameLogoUrl} />
     </>
   );
@@ -365,8 +421,7 @@ function FeaturedHero({ tournament: t }: { tournament: TournamentListEntry }) {
     <TournamentLink tournament={t} className="ff-tcard ff-tcard--hero">
       <div className="ff-tcard__banner">
         <BannerImage url={t.bannerUrl} eager />
-        <span className="ff-tcard__ribbon">Featured</span>
-        <BannerChrome t={t} />
+        <BannerChrome t={t} hero />
       </div>
       <div className="ff-tcard__body">
         <span className="ff-tcard__date">{formatDate(t.startsAt)}</span>
@@ -470,6 +525,79 @@ function CompactTable({
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/** The game checkbox filter, next to the view tabs. Purely client-side: it
+    narrows the already-downloaded `tournaments` list in memory, so toggling a
+    game costs no request and no Worker CPU. */
+function GameFilter({
+  games,
+  selected,
+  onToggle,
+  onClear,
+}: {
+  games: string[];
+  selected: Set<string>;
+  onToggle: (game: string) => void;
+  onClear: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [open]);
+
+  if (games.length === 0) return null;
+
+  return (
+    <div className="ff-filter" ref={rootRef}>
+      <button
+        className="ff-ticket-view ff-filter__toggle"
+        type="button"
+        aria-haspopup="true"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        Filter
+        {selected.size > 0 ? (
+          <span className="ff-filter__count">{selected.size}</span>
+        ) : null}
+        <Chevron open={open} />
+      </button>
+      {open ? (
+        <div className="ff-filter__panel" role="menu">
+          <div className="ff-filter__section-head">
+            <span>Games</span>
+            {selected.size > 0 ? (
+              <button className="ff-filter__clear" type="button" onClick={onClear}>
+                Clear
+              </button>
+            ) : null}
+          </div>
+          <div className="ff-filter__options">
+            {games.map((game) => (
+              <label key={game} className="ff-filter__option">
+                <input
+                  type="checkbox"
+                  checked={selected.has(game)}
+                  onChange={() => onToggle(game)}
+                />
+                {game}
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

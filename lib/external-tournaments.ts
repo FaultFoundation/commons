@@ -44,6 +44,8 @@ export type ExternalTournamentListItem = {
   numAttendees: number | null;
   /** Deep link to the tournament on its native site. */
   url: string | null;
+  /** Cover/banner artwork (FACEIT cover_image, start.gg banner); null if none. */
+  bannerUrl: string | null;
 };
 
 /**
@@ -128,6 +130,7 @@ export async function listExternalTournaments(): Promise<
         updatedAt: extTournaments.updatedAt,
         numAttendees: extTournaments.numAttendees,
         url: extTournaments.url,
+        bannerUrl: extTournaments.bannerUrl,
       })
       .from(extTournaments)
       .orderBy(desc(extTournaments.startAt));
@@ -182,6 +185,16 @@ export async function listExternalTournaments(): Promise<
   }
 }
 
+export type ExternalTournamentMatch = {
+  id: string;
+  scheduledAt: Date | null;
+  state: string | null;
+  round: string | null;
+  entrant1Name: string | null;
+  entrant2Name: string | null;
+  url: string | null;
+};
+
 export type ExternalTournamentDetail = {
   id: string;
   source: string;
@@ -195,6 +208,10 @@ export type ExternalTournamentDetail = {
   city: string | null;
   country: string | null;
   url: string | null;
+  /** Cover/banner artwork (FACEIT cover_image, start.gg banner); null if none. */
+  bannerUrl: string | null;
+  /** Provider-authored blurb (FACEIT only); null for start.gg. */
+  description: string | null;
   events: {
     id: string;
     name: string | null;
@@ -205,6 +222,8 @@ export type ExternalTournamentDetail = {
       isTeam: boolean;
       placement: number | null;
     }[];
+    /** Bracket progression — the sets/matches, scheduled-soonest first. */
+    matches: ExternalTournamentMatch[];
   }[];
 };
 
@@ -372,27 +391,33 @@ export async function getExternalTournament(
   const db = getCenDb();
   if (!db) return null;
   try {
-    const t = (
-      await db
+    // Read the tournament and all its children in ONE db.batch so the branded
+    // view always renders a single consistent snapshot — even if the scraper
+    // rewrites this tournament (an atomic replaceTournament batch) between the
+    // reads. Children are keyed off a tournament-id subquery rather than an
+    // eventIds `IN (...)` list, which also keeps this off D1's bind limit.
+    const childEventIds = db
+      .select({ id: extEvents.id })
+      .from(extEvents)
+      .where(eq(extEvents.tournamentId, id));
+    const [tournamentRows, events, standings, matches] = await db.batch([
+      db
         .select()
         .from(extTournaments)
         .where(eq(extTournaments.id, id))
-        .limit(1)
-    )[0];
+        .limit(1),
+      db.select().from(extEvents).where(eq(extEvents.tournamentId, id)),
+      db
+        .select()
+        .from(extStandings)
+        .where(inArray(extStandings.eventId, childEventIds)),
+      db
+        .select()
+        .from(extMatches)
+        .where(inArray(extMatches.eventId, childEventIds)),
+    ]);
+    const t = tournamentRows[0];
     if (!t) return null;
-
-    const events = await db
-      .select()
-      .from(extEvents)
-      .where(eq(extEvents.tournamentId, id));
-
-    const eventIds = events.map((e) => e.id);
-    const standings = eventIds.length
-      ? await db
-          .select()
-          .from(extStandings)
-          .where(inArray(extStandings.eventId, eventIds))
-      : [];
 
     const byEvent = new Map<string, ExternalTournamentDetail["events"][number]["standings"]>();
     for (const s of standings) {
@@ -407,6 +432,30 @@ export async function getExternalTournament(
     // Best placement first within each event.
     for (const list of byEvent.values()) {
       list.sort((a, b) => (a.placement ?? 9999) - (b.placement ?? 9999));
+    }
+
+    // The bracket/sets, grouped per event, soonest-scheduled first (undated
+    // last). This is what the branded detail view renders as progression.
+    const matchesByEvent = new Map<string, ExternalTournamentMatch[]>();
+    for (const m of matches) {
+      const list = matchesByEvent.get(m.eventId) ?? [];
+      list.push({
+        id: m.id,
+        scheduledAt: m.scheduledAt,
+        state: m.state,
+        round: m.round,
+        entrant1Name: m.entrant1Name,
+        entrant2Name: m.entrant2Name,
+        url: m.url,
+      });
+      matchesByEvent.set(m.eventId, list);
+    }
+    for (const list of matchesByEvent.values()) {
+      list.sort(
+        (a, b) =>
+          (a.scheduledAt?.getTime() ?? Infinity) -
+          (b.scheduledAt?.getTime() ?? Infinity),
+      );
     }
 
     return {
@@ -427,12 +476,15 @@ export async function getExternalTournament(
       city: t.city,
       country: t.country,
       url: t.url,
+      bannerUrl: t.bannerUrl,
+      description: t.description,
       events: events.map((e) => ({
         id: e.id,
         name: e.name,
         state: e.state,
         numEntrants: e.numEntrants,
         standings: byEvent.get(e.id) ?? [],
+        matches: matchesByEvent.get(e.id) ?? [],
       })),
     };
   } catch (error) {

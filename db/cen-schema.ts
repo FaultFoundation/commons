@@ -43,6 +43,12 @@ export const extTournaments = sqliteTable(
     country: text("country"),
     // Deep link to the tournament on its native site (start.gg / FACEIT).
     url: text("url"),
+    // Cover/banner artwork for the branded tile + detail hero (FACEIT
+    // cover_image, start.gg banner image); null when the provider ships none.
+    bannerUrl: text("banner_url"),
+    // Provider-authored blurb (FACEIT championship description). start.gg has
+    // no standard description field, so it stays null there.
+    description: text("description"),
     // When this row was last written by the import/scraper.
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
   },

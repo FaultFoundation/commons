@@ -100,3 +100,14 @@ BETTER_AUTH_URL=http://localhost:3999
 # nothing on the bot needs to be publicly reachable. Leave unset and the ticket
 # dashboard still works (D1 is the source of truth); Discord just isn't wired up.
 # BOT_API_SECRET=replace-with-a-long-random-string
+
+# Optional — on-demand external-tournament refresh. When a member opens an
+# external (start.gg / FACEIT) tournament, the Commons asks the cen-scraper
+# Worker to re-pull just that one so the bracket is near-live. CEN_SCRAPER_URL
+# is the scraper Worker's base URL (e.g. http://localhost:8787 for a local
+# `wrangler dev`, or https://cen-scraper.<subdomain>.workers.dev in prod);
+# CEN_REFRESH_SECRET must match the same secret set on the scraper Worker.
+# Leave unset and the tab still works — it just renders the cached projection
+# without the live top-up.
+# CEN_SCRAPER_URL=http://localhost:8787
+# CEN_REFRESH_SECRET=replace-with-a-long-random-string

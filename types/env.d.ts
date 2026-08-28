@@ -67,4 +67,12 @@ interface CloudflareEnv {
   // POST bodies (app/api/bot/*) and bears it as a token on the outbox poll GET.
   // The bot only ever calls the site (outbound), so there is no reverse secret.
   BOT_API_SECRET?: string;
+  // On-demand external-tournament refresh (lib/external-refresh.ts): when a
+  // member opens an external tournament, the Commons asks the cen-scraper
+  // Worker to re-pull just that one so the bracket is near-live. CEN_SCRAPER_URL
+  // is the scraper Worker's base URL; CEN_REFRESH_SECRET is the bearer it
+  // checks (must match the scraper's own CEN_REFRESH_SECRET). Both unset → the
+  // Commons skips the top-up and renders the cached cen-sql projection.
+  CEN_SCRAPER_URL?: string;
+  CEN_REFRESH_SECRET?: string;
 }

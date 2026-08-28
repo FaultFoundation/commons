@@ -7,6 +7,8 @@ import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { ShareBar } from "@/components/dashboard/tournaments/ShareBar";
 import { TournamentRegister } from "@/components/dashboard/tournaments/TournamentRegister";
 import { BracketView } from "@/components/tournaments/BracketView";
+import { ExternalTournamentView } from "@/components/dashboard/tournaments/ExternalTournamentView";
+import { getExternalTournament } from "@/lib/external-tournaments";
 import { getSessionCached } from "@/lib/session";
 import {
   entrantLabel,
@@ -34,16 +36,41 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
+/** Decode a route param, tolerating a malformed sequence rather than throwing. */
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 export default async function TournamentPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
+  const { id: rawId } = await params;
+  // External ids carry a `source:` prefix, so the card links encode them; Next
+  // hands the param back still-encoded. Internal 6-digit ids are unaffected.
+  const id = safeDecode(rawId);
   const hdrs = await headers();
   const session = await getSessionCached();
   if (!session) redirect("/login/");
-  if (!isTournamentId(id)) notFound();
+
+  // External (start.gg / FACEIT) tournaments carry a `source:` prefixed id and
+  // are served the branded read-only view from the cen-sql projection. Internal
+  // Challonge-backed tournaments (6-digit ids) fall through to the flow below.
+  if (!isTournamentId(id)) {
+    const external = await getExternalTournament(id);
+    if (!external) notFound();
+    return (
+      <DashboardShell active="tournaments" setupUserId={session.user.id}>
+        <h1 className="screen-reader-text">{external.name}</h1>
+        <ExternalTournamentView tournament={external} />
+      </DashboardShell>
+    );
+  }
 
   const tournament = await getTournament(id);
   // Drafts are staff-only; members can't see them.

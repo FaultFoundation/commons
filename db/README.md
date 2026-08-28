@@ -25,22 +25,28 @@ by the sibling `cen-news-notifications` scraper. The Commons never writes it.
 
 | Feature | Relation | Shape |
 |---|---|---|
-| External tournament catalog | `ext_tournaments` | Source id, name/game, start/end window, location, native URL |
+| External tournament catalog | `ext_tournaments` | Source id, name/game, start/end window, location, native URL, `banner_url` (cover art) + `description` (blurb) for the branded tile/detail hero |
 | Provider bracket/event | `ext_events` | Tournament parent, provider event id/state, entrant count |
 | Public match calendar | `ext_matches` | Event parent, provider match id, optional schedule/state/round, two entrant labels, native URL |
 | Final results | `ext_standings` | Event parent, entrant label/type and placement |
 
-`ext_matches.scheduled_at` is nullable by design: FACEIT usually schedules a
-championship match, while start.gg often leaves a pending set's `startedAt`
-empty. The schedule renders those rows under **Date TBD** rather than inventing
-a time. All ids are deterministic strings from provider lineage, so projection
-imports upsert the same logical rows.
+`ext_matches.scheduled_at` is nullable by design: start.gg often leaves a
+pending set's `startedAt` empty. FACEIT rarely stamps an individual match, but
+the scraper backfills each match from its championship's per-round `schedule`
+(round → date), so most FACEIT matches carry an approximate round-level time
+instead of none; genuinely-undated rows still render under **Date TBD** rather
+than inventing a time. `banner_url` comes from FACEIT `cover_image` /
+start.gg's banner image, and `description` from the FACEIT championship blurb
+(start.gg exposes none, so it stays null there). All ids are deterministic
+strings from provider lineage, so projection imports upsert the same logical
+rows.
 
 Relational form:
 
 ```text
 EXT_TOURNAMENTS(*id, source, source_tournament_id, name, slug, game,
-                start_at?, end_at?, num_attendees?, city?, country?, url?)
+                start_at?, end_at?, num_attendees?, city?, country?, url?,
+                banner_url?, description?)
 EXT_EVENTS(*id, tournament_id→EXT_TOURNAMENTS, source_event_id, name?, state?,
            num_entrants?)
 EXT_MATCHES(*id, event_id→EXT_EVENTS, source_match_id, scheduled_at?, state?,

@@ -58,7 +58,7 @@ export default async function TournamentsPage() {
     entrantCount: t.numAttendees ?? 0,
     maxParticipants: null,
     startsAt: t.startAt ? t.startAt.getTime() : null,
-    bannerUrl: null,
+    bannerUrl: t.bannerUrl,
     featured: false,
     source: t.source,
     externalUrl: t.url,

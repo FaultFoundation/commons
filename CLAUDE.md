@@ -308,9 +308,38 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   not evidence that a match happened. Never guess lifecycle from fetch time or
   parse every bracket payload on the list path.
 - The list ([app/tournaments/page.tsx](app/tournaments/page.tsx)) merges both
-  into one `TournamentListEntry[]`; external cards carry a `source` and link out
-  to the native site for now (a branded Commons view for external tournaments is
-  the next Phase-1 step, reusing the internal templates).
+  into one `TournamentListEntry[]`; external cards carry a `source`, show the
+  scraped `banner_url`, and link **into** the branded Commons view (not out).
+  Their ids carry a `source:` prefix, so the card links percent-encode them and
+  [app/tournaments/[id]/page.tsx](app/tournaments/[id]/page.tsx) `safeDecode`s
+  the param and branches: `isTournamentId` (6-digit) → internal; otherwise
+  `getExternalTournament` → [ExternalTournamentView](components/dashboard/tournaments/ExternalTournamentView.tsx),
+  which reuses the internal hero template plus a bracket (scraped sets) + final
+  standings, and keeps a "View on start.gg/FACEIT" out-link.
+- **On-demand top-up refresh.** The branded view renders from the cached
+  projection first (never blank), then [ExternalTournamentRefresh](components/dashboard/tournaments/ExternalTournamentRefresh.tsx)
+  (client) POSTs `app/api/tournaments/external/[id]/refresh` on open;
+  [lib/external-refresh.ts](lib/external-refresh.ts) asks the **cen-scraper**
+  Worker (`CEN_SCRAPER_URL` + shared `CEN_REFRESH_SECRET`) to re-pull just that
+  tournament, and only a real change triggers a `router.refresh()`. The Commons
+  still never writes `cen-sql` — the scraper owns the write, gated by a bearer
+  secret and a per-tournament ~2 min TTL lease. Every hop degrades: no secret,
+  no scraper URL, a timeout, or an error just leaves the cached view in place.
+- **Reload consistency (the framework for when this data becomes writable).**
+  Today the projection is read-only from the Commons, but reads and writes are
+  already structured so a reader never catches cen-sql mid-reload: the scraper
+  rewrites a tournament as a single atomic `db.batch` (`replaceTournament` —
+  delete children + re-insert, all-or-nothing), and the Commons reads the whole
+  detail as a single atomic `db.batch` snapshot (`getExternalTournament` — the
+  tournament plus its events/standings/matches, children keyed off a
+  tournament-id subquery, which also sidesteps D1's bind limit). So a scrape or
+  on-demand refresh landing between reads can't produce a half-updated view.
+  On top of that: the refresh write is idempotent + TTL-bounded (safe under
+  concurrent opens), reads degrade rather than throw (missing binding/row →
+  empty/`notFound`), the `/tournaments` routes have `loading.tsx` skeleton
+  screens for the reload window, and `app/tournaments/[id]/error.tsx` catches
+  any unexpected throw with a retryable card. Keep new writers atomic-batched
+  and new multi-table reads snapshot-batched to preserve this.
 - `/schedule` reads `ext_matches` for its **All Matches** calendar. FACEIT rows
   come from a championship-matches request the scraper already makes for roster
   data; start.gg set page 1 rides the existing deep query and only additional

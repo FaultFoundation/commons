@@ -298,9 +298,13 @@ export function TournamentList({
   );
 }
 
-/** Where a card/hero links: internal → branded Commons view; external → out. */
+/** Where a card/hero links — always the branded Commons view now, for both
+    internal and external tournaments. External ids carry a `source:` prefix, so
+    they're encoded for the path (the internal 6-digit ids are unaffected); the
+    detail page branches on the id and, for external ones, keeps a "View on
+    start.gg/FACEIT" out-link. */
 function hrefFor(t: TournamentListEntry): string {
-  return t.source ? (t.externalUrl ?? "#") : `/tournaments/${t.id}/`;
+  return `/tournaments/${encodeURIComponent(t.id)}/`;
 }
 
 function TournamentLink({
@@ -312,24 +316,10 @@ function TournamentLink({
   className: string;
   children: ReactNode;
 }) {
-  const href = hrefFor(tournament);
-  if (tournament.source) {
-    return (
-      <a
-        className={className}
-        href={href}
-        data-status={tournament.status}
-        target="_blank"
-        rel="noreferrer noopener"
-      >
-        {children}
-      </a>
-    );
-  }
   return (
     <Link
       className={className}
-      href={href}
+      href={hrefFor(tournament)}
       prefetch={false}
       data-status={tournament.status}
     >
@@ -461,24 +451,13 @@ function CompactTable({
                       <span className="ff-tcard__brandsep" aria-hidden="true" />
                       <GameLogo name={t.game} logoUrl={t.gameLogoUrl} />
                     </span>
-                    {external ? (
-                      <a
-                        className="ff-ticket-subject"
-                        href={hrefFor(t)}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                      >
-                        {t.name}
-                      </a>
-                    ) : (
-                      <Link
-                        className="ff-ticket-subject"
-                        href={hrefFor(t)}
-                        prefetch={false}
-                      >
-                        {t.name}
-                      </Link>
-                    )}
+                    <Link
+                      className="ff-ticket-subject"
+                      href={hrefFor(t)}
+                      prefetch={false}
+                    >
+                      {t.name}
+                    </Link>
                   </span>
                 </td>
                 <td>

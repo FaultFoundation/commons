@@ -8,7 +8,7 @@ export function SiteHeader() {
         Skip to content
       </a>
       <div className="ff-header__inner">
-        <a href="/" className="ff-header__brand" rel="home">
+        <a href="https://fault.foundation/" className="ff-header__brand" rel="home">
           <img
             width="57"
             height="40"

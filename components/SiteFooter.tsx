@@ -45,7 +45,7 @@ export function SiteFooter() {
     <footer className="ff-footer">
       <div className="ff-footer__inner">
         <div className="ff-footer__brand">
-          <a href="/" rel="home">
+          <a href="https://fault.foundation/" rel="home">
             <img
               width="75"
               height="52"
@@ -58,7 +58,7 @@ export function SiteFooter() {
           </a>
           <div>
             <p className="ff-footer__title">
-              <a href="/" rel="home">
+              <a href="https://fault.foundation/" rel="home">
                 The Fault Foundation
               </a>
             </p>

@@ -3825,3 +3825,528 @@ button.ff-dash__link:hover {
   grid-column: 1 / -1;
   font-size: var(--ff-dash-text-sm);
 }
+
+/* ---------- 15. Home / landing page ---------- */
+/* Marketing surfaces for app/page.tsx. Reuses the layout primitives (§3),
+   buttons (§4), and cards (§5); everything here is the landing-specific
+   composition on top. The accent CTA is a marketing-only variant — the
+   dashboard's "blue commits, outline doesn't" rule (docs/dashboard-guide.md)
+   is scoped to the portal, not this front door. */
+
+.ff-btn--accent {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
+}
+.ff-btn--accent:hover:not([disabled]) {
+  background: #fff176; /* one step lighter than --ff-accent */
+  color: var(--ff-navy-900);
+}
+
+/* Shared section furniture */
+.ff-home-h2 {
+  margin: 0 0 clamp(20px, 3vw, 32px);
+  font-size: var(--wp--preset--font-size--x-large);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.ff-home-sub {
+  margin: -18px 0 clamp(20px, 3vw, 32px);
+  max-width: 52ch;
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--large);
+}
+.ff-home-accent {
+  color: var(--ff-accent);
+}
+.ff-home-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55em;
+  margin-bottom: 14px;
+  color: var(--ff-accent);
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.ff-home-eyebrow--muted {
+  color: var(--ff-text-dim);
+}
+.ff-home-eyebrow__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-accent);
+  box-shadow: 0 0 0 4px rgba(255, 238, 88, 0.2);
+}
+.ff-home-textlink {
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 1px;
+  transition: color var(--ff-transition);
+}
+.ff-home-textlink:hover {
+  color: #fff;
+  border-bottom-color: var(--ff-accent);
+}
+
+/* --- Hero --- */
+.ff-home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(28px, 5vw, 60px);
+  margin-block: clamp(36px, 6vw, 72px);
+}
+.ff-home-hero__title {
+  margin: 0;
+  font-size: clamp(2.6rem, 6.5vw, 4.5rem);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -1px;
+  text-transform: uppercase;
+}
+.ff-home-hero__lede {
+  margin: clamp(18px, 2.4vw, 26px) 0 0;
+  max-width: 46ch;
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--large);
+  line-height: 1.5;
+}
+.ff-home-hero__cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: clamp(22px, 3vw, 30px);
+}
+.ff-home-hero__note {
+  margin: 16px 0 0;
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--small);
+}
+
+/* Hero preview panel — a fake browser window over a sample feed */
+.ff-home-preview {
+  border-radius: var(--ff-radius-lg);
+  background: rgba(0, 20, 44, 0.72);
+  border: 1px solid var(--ff-border);
+  box-shadow: var(--ff-shadow-card);
+  overflow: hidden;
+  font-family: var(--wp--preset--font-family--fira-code), ui-monospace, monospace;
+}
+.ff-home-preview__bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--ff-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+.ff-home-preview__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--ff-radius-pill);
+  background: rgba(255, 255, 255, 0.22);
+}
+.ff-home-preview__url {
+  margin-left: auto;
+  color: var(--ff-text-dim);
+  font-size: 0.72rem;
+  letter-spacing: 0.3px;
+}
+.ff-home-preview__list {
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+}
+.ff-home-preview__row {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px;
+  border-radius: var(--ff-radius-md);
+}
+.ff-home-preview__row + .ff-home-preview__row {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.ff-home-preview__src {
+  color: var(--ff-text-dim);
+  font-size: 0.66rem;
+  text-transform: lowercase;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ff-home-preview__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ff-home-preview__name {
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ff-home-preview__meta {
+  color: var(--ff-text-dim);
+  font-size: 0.72rem;
+}
+.ff-home-preview__tag {
+  padding: 3px 9px;
+  border-radius: var(--ff-radius-pill);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.ff-home-preview__tag--next {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
+}
+.ff-home-preview__tag--reg {
+  color: var(--ff-accent);
+  border-color: rgba(255, 238, 88, 0.4);
+}
+.ff-home-preview__tag--result {
+  color: var(--ff-ok);
+  border-color: rgba(95, 208, 138, 0.4);
+}
+.ff-home-preview__tag--wait {
+  color: var(--ff-text-dim);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.ff-home-preview__foot {
+  padding: 12px 18px;
+  border-top: 1px solid var(--ff-border);
+  color: var(--ff-text-dim);
+  font-size: 0.72rem;
+}
+
+/* --- Sources strip --- */
+.ff-home-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  padding-block: clamp(16px, 2.5vw, 22px);
+  border-block: 1px solid var(--ff-border);
+}
+.ff-home-sources__label {
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-right: 4px;
+}
+.ff-home-sources__mark {
+  font-size: var(--wp--preset--font-size--large);
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+.ff-home-sources__mark--soon {
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--medium);
+  font-weight: 600;
+  padding: 5px 12px;
+  border: 1px dashed var(--ff-border);
+  border-radius: var(--ff-radius-pill);
+}
+
+/* --- Our goal (single .ff-card box, three columns split by dividers) --- */
+.ff-home-goals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.ff-home-goal {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: clamp(22px, 2.8vw, 34px);
+}
+/* Divider between columns rather than gaps, so the box reads as one surface. */
+.ff-home-goal + .ff-home-goal {
+  border-left: 1px solid var(--ff-border);
+}
+.ff-home-goal__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.ff-home-goal__icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--ff-radius-md);
+  background: rgba(0, 116, 166, 0.28);
+  color: #fff;
+}
+.ff-home-goal__icon svg {
+  width: 22px;
+  height: 22px;
+}
+.ff-home-goal__icon--accent {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
+}
+.ff-home-goal__headings {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.ff-home-goal__eyebrow {
+  color: var(--ff-text-dim);
+  font-family: var(--wp--preset--font-family--fira-code), ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.ff-home-goal__title {
+  margin: 0;
+  font-size: var(--wp--preset--font-size--large);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  line-height: 1.1;
+}
+.ff-home-goal__body {
+  margin: 0;
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--medium);
+  line-height: 1.5;
+}
+.ff-home-goal__cta {
+  margin-top: auto; /* pin the CTA to the bottom so columns line up */
+  padding-top: 4px;
+}
+
+/* --- Why we built this --- */
+.ff-home-why {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: clamp(24px, 4vw, 56px);
+  padding: clamp(28px, 4vw, 56px);
+}
+.ff-home-why__head {
+  margin: 0;
+  font-size: var(--wp--preset--font-size--x-large);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.ff-home-why__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ff-home-why__body p {
+  margin: 0;
+  font-size: var(--wp--preset--font-size--large);
+  line-height: 1.55;
+}
+.ff-home-why__sig {
+  margin-top: 6px !important;
+  font-weight: 800;
+  font-size: var(--wp--preset--font-size--medium) !important;
+}
+.ff-home-why__sig span {
+  display: block;
+  color: var(--ff-text-dim);
+  font-weight: 400;
+  font-family: var(--wp--preset--font-family--fira-code), ui-monospace, monospace;
+  font-size: var(--wp--preset--font-size--small);
+  letter-spacing: 0.3px;
+}
+
+/* --- Overfault band --- */
+.ff-home-overfault {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 0;
+  overflow: hidden;
+  /* No border: like .ff-card--gradient, the gradient carries the edge. A 1px
+     border here reads as a stray vertical line where the gradient's dark left
+     end meets the page background. */
+  border: 0;
+  background: var(--ff-grad-brand);
+}
+.ff-home-overfault__copy {
+  padding: clamp(26px, 3.5vw, 46px);
+}
+.ff-home-overfault__title {
+  margin: 0 0 20px;
+  font-size: var(--wp--preset--font-size--xx-large);
+  text-transform: uppercase;
+  letter-spacing: -0.5px;
+}
+.ff-home-overfault__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 26px;
+  margin: 0 0 20px;
+}
+.ff-home-overfault__meta dt {
+  color: var(--ff-text-dim);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 3px;
+}
+.ff-home-overfault__meta dd {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--wp--preset--font-size--medium);
+}
+.ff-home-overfault__body {
+  margin: 0 0 24px;
+  max-width: 44ch;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: var(--wp--preset--font-size--medium);
+  line-height: 1.5;
+}
+.ff-home-overfault__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+}
+.ff-home-overfault__art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: var(--wp--preset--font-family--fira-code), ui-monospace, monospace;
+  font-size: var(--wp--preset--font-size--medium);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  background-color: rgba(0, 20, 44, 0.4);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.05) 0,
+    rgba(255, 255, 255, 0.05) 2px,
+    transparent 2px,
+    transparent 12px
+  );
+}
+
+/* --- Roadmap --- */
+.ff-home-roadmap {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(12px, 1.6vw, 18px);
+}
+.ff-home-roadmap__card {
+  padding: clamp(18px, 2.2vw, 24px);
+  border-style: dashed;
+}
+.ff-home-roadmap__title {
+  margin: 0 0 8px;
+  font-size: var(--wp--preset--font-size--medium);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.ff-home-roadmap__body {
+  margin: 0;
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--small);
+  line-height: 1.5;
+}
+
+/* --- Program directors --- */
+.ff-home-program {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px 32px;
+  padding: clamp(24px, 3.2vw, 40px);
+}
+.ff-home-program__title {
+  margin: 0 0 8px;
+  font-size: var(--wp--preset--font-size--x-large);
+}
+.ff-home-program__body {
+  margin: 0;
+  max-width: 56ch;
+  color: var(--ff-text-dim);
+  font-size: var(--wp--preset--font-size--medium);
+  line-height: 1.5;
+}
+
+/* --- Final CTA --- */
+.ff-home-final {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px 32px;
+  padding: clamp(28px, 4vw, 52px);
+  border: 0;
+}
+.ff-home-final__title {
+  margin: 0 0 8px;
+  font-size: var(--wp--preset--font-size--xx-large);
+  text-transform: uppercase;
+}
+.ff-home-final__body {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: var(--wp--preset--font-size--large);
+}
+.ff-home-final__cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* --- Responsive --- */
+@media (max-width: 900px) {
+  .ff-home-hero,
+  .ff-home-why,
+  .ff-home-overfault {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ff-home-hero__lede {
+    max-width: none;
+  }
+  .ff-home-goals {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* Stacked: the divider moves to the top edge of each following column. */
+  .ff-home-goal + .ff-home-goal {
+    border-left: 0;
+    border-top: 1px solid var(--ff-border);
+  }
+  .ff-home-roadmap {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ff-home-overfault__art {
+    min-height: 130px;
+  }
+}
+@media (max-width: 560px) {
+  .ff-home-roadmap {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ff-home-hero__cta .ff-btn,
+  .ff-home-final__cta .ff-btn {
+    flex: 1 1 auto;
+  }
+}

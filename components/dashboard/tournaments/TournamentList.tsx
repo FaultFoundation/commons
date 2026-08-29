@@ -46,6 +46,24 @@ const VIEWS = [
 
 type ViewKey = (typeof VIEWS)[number]["key"];
 
+/** Per-page choices; 0 means "All" (no pagination). */
+const PAGE_SIZE_OPTIONS = [12, 24, 48, 0] as const;
+const DEFAULT_PAGE_SIZE = 12;
+
+/** A compact page-number window: first, last, and the pages around the current
+    one, with "…" gaps. */
+function pageWindow(current: number, total: number): (number | "…")[] {
+  const out: (number | "…")[] = [];
+  for (let i = 1; i <= total; i += 1) {
+    if (i === 1 || i === total || (i >= current - 1 && i <= current + 1)) {
+      out.push(i);
+    } else if (out[out.length - 1] !== "…") {
+      out.push("…");
+    }
+  }
+  return out;
+}
+
 /** completed/cancelled are the "concluded" states; everything else is active. */
 function isConcluded(status: string): boolean {
   return status === "completed" || status === "cancelled";
@@ -108,6 +126,8 @@ export function TournamentList({
   const [view, setView] = useState<ViewKey>("active");
   const [layout, setLayout] = useState<TournamentLayout>(initialLayout);
   const [showPast, setShowPast] = useState(false);
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
+  const [page, setPage] = useState(1);
   // Which games to show; empty = no filter (every game shows). Kept as
   // in-memory state and applied with a plain .filter() below — same
   // client-side approach as the rest of this list, so toggling a game never
@@ -176,6 +196,47 @@ export function TournamentList({
   const activeEmpty = !featured && upcoming.length === 0 && past.length === 0;
   const allEmpty = !featured && all.length === 0;
 
+  // The list that paginates for the current view. Active keeps its "Past
+  // tournaments" archive separate (a toggle below), so in card view its primary
+  // list is just `upcoming`; the compact table folds past in.
+  const primary =
+    view === "all"
+      ? all
+      : view === "concluded"
+        ? concluded
+        : layout === "compact"
+          ? [...upcoming, ...past]
+          : upcoming;
+
+  const totalPages =
+    pageSize > 0 ? Math.max(1, Math.ceil(primary.length / pageSize)) : 1;
+  // Clamp so a shrinking list (filtering, a smaller page size) never strands the
+  // viewer on an empty page.
+  const currentPage = Math.min(page, totalPages);
+  const pageItems =
+    pageSize > 0
+      ? primary.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+      : primary;
+
+  // Back to page 1 whenever the view, layout, filters, or page size change.
+  useEffect(() => {
+    setPage(1);
+  }, [view, layout, selectedGames, pageSize]);
+
+  const showFeatured = view !== "concluded";
+  const isEmpty =
+    view === "all"
+      ? allEmpty
+      : view === "concluded"
+        ? concluded.length === 0
+        : activeEmpty;
+  const emptyMessage =
+    view === "all"
+      ? "No tournaments yet."
+      : view === "concluded"
+        ? "No concluded tournaments yet."
+        : "Nothing here right now.";
+
   return (
     <>
       <div className="ff-list-head">
@@ -223,51 +284,29 @@ export function TournamentList({
         </div>
       </div>
 
-      {view === "all" ? (
-        allEmpty ? (
-          <p className="ff-ticket-empty">No tournaments yet.</p>
-        ) : layout === "modern" ? (
-          <>
-            {featured ? <FeaturedHero tournament={featured} /> : null}
-            {all.length > 0 ? (
+      {isEmpty ? (
+        <p className="ff-ticket-empty">{emptyMessage}</p>
+      ) : (
+        <>
+          {showFeatured && featured ? (
+            <FeaturedHero tournament={featured} />
+          ) : null}
+
+          {pageItems.length > 0 ? (
+            layout === "modern" ? (
               <div className="ff-tcard-grid">
-                {all.map((t) => (
+                {pageItems.map((t) => (
                   <TournamentCard key={t.id} tournament={t} />
                 ))}
               </div>
-            ) : null}
-          </>
-        ) : (
-          <>
-            {featured ? <FeaturedHero tournament={featured} /> : null}
-            <CompactTable tournaments={all} />
-          </>
-        )
-      ) : view === "concluded" ? (
-        concluded.length === 0 ? (
-          <p className="ff-ticket-empty">No concluded tournaments yet.</p>
-        ) : layout === "modern" ? (
-          <div className="ff-tcard-grid">
-            {concluded.map((t) => (
-              <TournamentCard key={t.id} tournament={t} />
-            ))}
-          </div>
-        ) : (
-          <CompactTable tournaments={concluded} />
-        )
-      ) : activeEmpty ? (
-        <p className="ff-ticket-empty">Nothing here right now.</p>
-      ) : layout === "modern" ? (
-        <>
-          {featured ? <FeaturedHero tournament={featured} /> : null}
-          {upcoming.length > 0 ? (
-            <div className="ff-tcard-grid">
-              {upcoming.map((t) => (
-                <TournamentCard key={t.id} tournament={t} />
-              ))}
-            </div>
+            ) : (
+              <CompactTable tournaments={pageItems} />
+            )
           ) : null}
-          {past.length > 0 ? (
+
+          {/* Active card view keeps still-running older tournaments behind a
+              toggle, separate from the paginated upcoming grid. */}
+          {view === "active" && layout === "modern" && past.length > 0 ? (
             <div className="ff-tpast">
               <button
                 className="ff-tpast__toggle"
@@ -287,14 +326,100 @@ export function TournamentList({
               ) : null}
             </div>
           ) : null}
-        </>
-      ) : (
-        <>
-          {featured ? <FeaturedHero tournament={featured} /> : null}
-          <CompactTable tournaments={[...upcoming, ...past]} />
+
+          <PaginationBar
+            total={primary.length}
+            totalPages={totalPages}
+            page={currentPage}
+            pageSize={pageSize}
+            onPage={setPage}
+            onPageSize={setPageSize}
+          />
         </>
       )}
     </>
+  );
+}
+
+/** Page numbers + a per-page dropdown, below the list. Hidden entirely when the
+    list is empty; the page numbers appear only when there's more than one page,
+    but the dropdown always shows so the viewer can change the page size. */
+function PaginationBar({
+  total,
+  totalPages,
+  page,
+  pageSize,
+  onPage,
+  onPageSize,
+}: {
+  total: number;
+  totalPages: number;
+  page: number;
+  pageSize: number;
+  onPage: (p: number) => void;
+  onPageSize: (n: number) => void;
+}) {
+  if (total === 0) return null;
+  return (
+    <div className="ff-pager">
+      {totalPages > 1 ? (
+        <nav className="ff-pager__pages" aria-label="Pagination">
+          <button
+            className="ff-pager__btn"
+            type="button"
+            disabled={page <= 1}
+            onClick={() => onPage(page - 1)}
+            aria-label="Previous page"
+          >
+            ‹
+          </button>
+          {pageWindow(page, totalPages).map((p, i) =>
+            p === "…" ? (
+              <span key={`gap-${i}`} className="ff-pager__gap" aria-hidden="true">
+                …
+              </span>
+            ) : (
+              <button
+                key={p}
+                className="ff-pager__btn"
+                type="button"
+                aria-current={p === page ? "page" : undefined}
+                onClick={() => onPage(p)}
+              >
+                {p}
+              </button>
+            ),
+          )}
+          <button
+            className="ff-pager__btn"
+            type="button"
+            disabled={page >= totalPages}
+            onClick={() => onPage(page + 1)}
+            aria-label="Next page"
+          >
+            ›
+          </button>
+        </nav>
+      ) : (
+        <span className="ff-pager__summary">
+          {total} {total === 1 ? "tournament" : "tournaments"}
+        </span>
+      )}
+      <label className="ff-pager__size">
+        <span>Per page</span>
+        <select
+          className="ff-pager__select"
+          value={pageSize}
+          onChange={(event) => onPageSize(Number(event.target.value))}
+        >
+          {PAGE_SIZE_OPTIONS.map((n) => (
+            <option key={n} value={n}>
+              {n === 0 ? "All" : n}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
   );
 }
 

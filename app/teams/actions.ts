@@ -49,6 +49,7 @@ import {
   asTeamRole,
   assignableRoles,
   can,
+  normalizeTeamColor,
   outranks,
   type TeamRole,
 } from "@/lib/teams-shared";
@@ -93,9 +94,11 @@ export async function createTeam(input: {
   name: string;
   tag?: string;
   /** Which game the team competes in — a games registry id, shown as the card's
-      corner mark and banner colour. Falls back to Overwatch (the program's game)
-      when unset or forged. */
+      corner mark. Falls back to Overwatch (the program's game) when unset or
+      forged. */
   gameId?: string;
+  /** Team accent colour (hex) chosen at sign-up; validated, else null. */
+  color?: string;
   /** The browser's own IANA zone — the only reliable read on where the
       creator actually plays. Validated here like any other input. */
   timezone?: string;
@@ -140,6 +143,7 @@ export async function createTeam(input: {
       collegeId: reg?.collegeId ?? null,
       name,
       tag: cleanTag(input.tag ?? ""),
+      color: normalizeTeamColor(input.color),
       region,
       // `undefined` means the browser sent something unusable — store nothing
       // rather than failing the creation over a cosmetic field.
@@ -184,6 +188,7 @@ export async function updateTeamSettings(
     timezone?: string;
     discordInviteUrl?: string;
     gameId?: string;
+    color?: string;
   },
 ): Promise<ActionResult> {
   const userId = await requireUserId();
@@ -199,6 +204,17 @@ export async function updateTeamSettings(
       return { ok: false, error: "Pick a game from the list." };
     }
     fields.gameId = patch.gameId;
+  }
+  if (patch.color !== undefined) {
+    // Empty string clears back to the default; a bad hex is rejected.
+    const trimmed = patch.color.trim();
+    if (trimmed === "") {
+      fields.color = null;
+    } else {
+      const color = normalizeTeamColor(trimmed);
+      if (!color) return { ok: false, error: "Enter a valid hex colour." };
+      fields.color = color;
+    }
   }
 
   if (patch.name !== undefined) {

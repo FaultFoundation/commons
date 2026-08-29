@@ -1713,6 +1713,47 @@ button.ff-dash__link:hover {
   color: var(--ff-warn);
   font-size: var(--ff-dash-text-xs);
 }
+
+/* Compact icon-only button (e.g. the Integrations re-check control), matching
+   the outline button treatment. */
+.ff-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: none;
+  color: var(--ff-text-dim);
+  cursor: pointer;
+  transition:
+    color var(--ff-transition),
+    border-color var(--ff-transition);
+}
+.ff-icon-btn:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.ff-icon-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.ff-spin {
+  transform-origin: center;
+  animation: ff-spin 0.8s linear infinite;
+}
+@keyframes ff-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ff-spin {
+    animation: none;
+  }
+}
 /* Pin the button to the bottom so buttons line up across cards of differing
    text length — that's what makes the row read as even blocks. */
 .ff-integration__action {
@@ -3124,9 +3165,18 @@ button.ff-dash__link:hover {
 
 .ff-bracket {
   display: grid;
+  /* An explicit min-0 column, not the implicit `auto`: an `auto` grid track
+     sizes to its content's max-content (the full width of every round column)
+     and overflows the card, which is what pushed the whole PAGE sideways. A
+     minmax(0, 1fr) track is capped at the bubble width, so the rounds/section
+     scroll containers below can do their own overflow-x instead. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--ff-space-section, 28px);
-  /* Let the scroll containers below shrink to the bubble instead of forcing
-     their intrinsic (max-content) width onto the card. */
+  min-width: 0;
+}
+/* Losers/Results are grid items in that single column — let them shrink too, so
+   their own .ff-bracket__rounds scrolls rather than widening the section. */
+.ff-bracket__section {
   min-width: 0;
 }
 .ff-bracket__source {
@@ -3306,6 +3356,76 @@ button.ff-dash__link:hover {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 16px;
+}
+
+/* Pagination bar under the tournament list — page numbers left, per-page
+   dropdown right. */
+.ff-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+.ff-pager__pages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.ff-pager__btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: none;
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    color var(--ff-transition),
+    border-color var(--ff-transition),
+    background var(--ff-transition);
+}
+.ff-pager__btn:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.ff-pager__btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* Current page: the yellow "selected" state, like the view tabs. */
+.ff-pager__btn[aria-current="page"] {
+  background: var(--ff-accent);
+  border-color: var(--ff-accent);
+  color: var(--ff-navy-900);
+}
+.ff-pager__gap {
+  padding: 0 4px;
+  color: var(--ff-text-dim);
+}
+.ff-pager__summary {
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+}
+.ff-pager__size {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+}
+.ff-pager__select {
+  padding: 5px 8px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-surface-2);
+  color: inherit;
+  font: inherit;
 }
 .ff-tcard {
   display: flex;
@@ -3674,18 +3794,23 @@ button.ff-dash__link:hover {
 }
 
 /* ===========================================================================
-   Team cards (/teams/) — the tournament menu's colour + graphics applied to a
-   team: a game-tinted banner (logo, name, role, game mark) over a stat row.
-   Reorderable, so they layer the ff-bubble--draggable state classes on top.
+   Team cards (/teams/) — a dark bubble accented with the team's chosen colour
+   (`--team-accent`, set inline): a top stripe + a ring on the logo, the game's
+   mark in the corner, and a stat row. Colour without a full banner. Reorderable,
+   so they layer the ff-bubble--draggable state classes on top.
    =========================================================================== */
 .ff-team-card {
+  --team-accent: var(--ff-blue);
   position: relative;
   display: flex;
   flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  /* The accent as a top stripe (thicker) over the normal card border. */
   border: 1px solid var(--ff-border);
+  border-top: 3px solid var(--team-accent);
   border-radius: var(--ff-radius-lg);
   background: var(--ff-surface-2);
-  overflow: hidden;
   box-shadow: var(--ff-shadow-card);
   transition:
     border-color var(--ff-transition),
@@ -3694,81 +3819,58 @@ button.ff-dash__link:hover {
 }
 .ff-team-card:hover {
   border-color: rgba(255, 255, 255, 0.22);
+  border-top-color: var(--team-accent);
 }
 .ff-team-card--feature {
   grid-column: 1 / -1;
 }
-.ff-team-card__banner {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 116px;
-  padding: 14px 16px;
-  /* background is set inline per game (lib/games-shared.ts gameGradient). */
-}
-/* Legibility scrim under the name, over any banner colour. */
-.ff-team-card__banner::after {
-  content: "";
+/* Game mark, top-right corner of the card. */
+.ff-team-card__gamechip {
   position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    180deg,
-    rgba(0, 10, 25, 0) 35%,
-    rgba(0, 10, 25, 0.5) 100%
-  );
-  pointer-events: none;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
 }
-.ff-team-card--feature .ff-team-card__banner {
-  min-height: 140px;
-}
-.ff-team-card__top,
-.ff-team-card__identity {
-  position: relative;
-  z-index: 1;
-}
-.ff-team-card__top {
+.ff-team-card__head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
+  align-items: center;
+  gap: 12px;
+  /* Clear of the corner game chip. */
+  padding-right: 40px;
+  min-width: 0;
 }
-/* Role badge over a bright banner: dark backdrop for legibility, role colour
-   kept only as the border hint. */
-.ff-team-card__top .ff-badge {
-  background: rgba(0, 0, 0, 0.35);
-  color: #fff;
+/* Colour ring on the logo — where the team colour reads most cleanly. */
+.ff-team-card__logo {
+  flex: none;
+  display: inline-flex;
+  border-radius: var(--ff-radius-md);
+  box-shadow: 0 0 0 2px var(--team-accent);
+}
+.ff-team-card__identity {
+  min-width: 0;
 }
 .ff-team-card__name {
   margin: 0;
   font-size: var(--ff-dash-text-lg);
   font-weight: 800;
   line-height: 1.2;
-  color: #fff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.ff-team-card--feature .ff-team-card__name {
-  font-size: clamp(1.25rem, 3vw, 1.75rem);
+.ff-team-card__badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin-top: 5px;
 }
 .ff-team-card__sub {
-  display: block;
-  margin-top: 2px;
   font-size: var(--ff-dash-text-sm);
-  color: rgba(255, 255, 255, 0.82);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-}
-.ff-team-card__game {
-  position: absolute;
-  right: 14px;
-  bottom: 12px;
-  z-index: 1;
-}
-.ff-team-card__body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px 16px;
+  color: var(--ff-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ff-team-card__stats {
   display: flex;
@@ -3797,12 +3899,61 @@ button.ff-dash__link:hover {
   gap: 8px;
 }
 
-/* The single-team page header — the same card, blown up. */
-.ff-team-hero__banner {
-  min-height: 152px;
+/* The single-team page header — the same card, a little larger. */
+.ff-team-hero {
+  gap: 16px;
+  padding: 20px;
 }
 .ff-team-hero .ff-team-card__name {
   font-size: clamp(1.35rem, 3.5vw, 2rem);
+}
+
+/* Team colour picker (create + settings). */
+.ff-color-picker {
+  display: flex;
+  align-items: center;
+}
+.ff-color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ff-color-swatch {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--ff-radius-pill);
+  background: var(--swatch);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow var(--ff-transition);
+}
+.ff-color-swatch:hover {
+  transform: scale(1.1);
+}
+.ff-color-swatch--on {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px var(--swatch);
+}
+/* Native custom colour input, framed to match the swatches. */
+.ff-color-custom {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px dashed var(--ff-border);
+  border-radius: var(--ff-radius-pill);
+  overflow: hidden;
+  cursor: pointer;
+}
+.ff-color-custom input[type="color"] {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
 }
 
 /* Roster SR: the value plus a "who reported it" tag, and the inline editor. */

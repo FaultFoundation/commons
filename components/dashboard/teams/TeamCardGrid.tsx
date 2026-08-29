@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { CSSProperties } from "react";
 
 import { reorderMyTeams } from "@/app/teams/actions";
 import { GameLogo } from "@/components/brand/GameLogo";
@@ -9,14 +10,13 @@ import { DragGrip } from "@/components/dashboard/bubbles/DragGrip";
 import { useReorderableGrid } from "@/components/dashboard/bubbles/useReorderableGrid";
 import { CopyInviteButton } from "@/components/dashboard/teams/CopyInviteButton";
 import type { MyTeam } from "@/lib/teams";
-import { gameGradient } from "@/lib/games-shared";
-import { TEAM_ROLE_LABELS } from "@/lib/teams-shared";
+import { TEAM_ROLE_LABELS, teamColor } from "@/lib/teams-shared";
 
 /**
- * The member's teams, in their own order, rearrangeable — redesigned to carry
- * the same colour and graphics as the tournament menu: a game-tinted banner with
- * the team logo, name and role, the game's mark in the corner, and a tight stat
- * row (roster · avg SR · tournaments) below.
+ * The member's teams, in their own order, rearrangeable. Each card is a dark
+ * bubble accented with the team's chosen colour (a top stripe + a ring on the
+ * logo), the game's mark in the corner, and a tight stat row (roster · avg SR ·
+ * tournaments) — colour without a full banner.
  *
  * The server page still does every read and hands down plain `MyTeam[]`; this
  * owns only the order (via the shared useReorderableGrid template). The first
@@ -50,64 +50,63 @@ export function TeamCardGrid({ teams: initial }: { teams: MyTeam[] }) {
               key={team.id}
               {...bp}
               className={`ff-team-card ${bp.className}${feature ? " ff-team-card--feature" : ""}`}
+              style={{ "--team-accent": teamColor(team.color) } as CSSProperties}
             >
-              <div
-                className="ff-team-card__banner"
-                style={{ background: gameGradient(team.gameId) }}
-              >
-                <div className="ff-team-card__top">
+              <span className="ff-team-card__gamechip">
+                <GameLogo name={team.gameName} logoUrl={team.gameLogoUrl} />
+              </span>
+              <div className="ff-team-card__head">
+                <span className="ff-team-card__logo">
                   <Avatar
                     src={team.logoUrl}
                     name={team.name}
                     shape="team"
                     size="md"
                   />
-                  <span className={`ff-badge ff-badge--${team.role}`}>
-                    {TEAM_ROLE_LABELS[team.role]}
-                  </span>
-                </div>
+                </span>
                 <div className="ff-team-card__identity">
                   <h3 className="ff-team-card__name">
                     {team.tag ? `${team.name} [${team.tag}]` : team.name}
                   </h3>
-                  {team.collegeName || team.schools.length ? (
-                    <span className="ff-team-card__sub">
-                      {team.collegeName ?? team.schools.join(", ")}
+                  <div className="ff-team-card__badges">
+                    <span className={`ff-badge ff-badge--${team.role}`}>
+                      {TEAM_ROLE_LABELS[team.role]}
                     </span>
-                  ) : null}
+                    {team.collegeName || team.schools.length ? (
+                      <span className="ff-team-card__sub">
+                        {team.collegeName ?? team.schools.join(", ")}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
-                <span className="ff-team-card__game">
-                  <GameLogo name={team.gameName} logoUrl={team.gameLogoUrl} />
-                </span>
               </div>
 
-              <div className="ff-team-card__body">
-                <div className="ff-team-card__stats">
-                  <div className="ff-stat">
-                    <span className="ff-stat__label">Roster</span>
-                    <span className="ff-stat__value">{team.memberCount}</span>
-                  </div>
-                  <div className="ff-stat">
-                    <span className="ff-stat__label">Avg SR</span>
-                    <span className="ff-stat__value ff-stat__value--hi">
-                      {team.avgSr ?? "—"}
-                    </span>
-                  </div>
-                  <div className="ff-stat">
-                    <span className="ff-stat__label">Tournaments</span>
-                    <span className="ff-stat__value">
-                      {team.tournaments.length}
-                    </span>
-                  </div>
+              <div className="ff-team-card__stats">
+                <div className="ff-stat">
+                  <span className="ff-stat__label">Roster</span>
+                  <span className="ff-stat__value">{team.memberCount}</span>
                 </div>
+                <div className="ff-stat">
+                  <span className="ff-stat__label">Avg SR</span>
+                  <span className="ff-stat__value ff-stat__value--hi">
+                    {team.avgSr ?? "—"}
+                  </span>
+                </div>
+                <div className="ff-stat">
+                  <span className="ff-stat__label">Tournaments</span>
+                  <span className="ff-stat__value">
+                    {team.tournaments.length}
+                  </span>
+                </div>
+              </div>
 
-                {team.tournaments.length ? (
-                  <p className="ff-team-card__events">
-                    {team.tournaments.join(" · ")}
-                  </p>
-                ) : null}
+              {team.tournaments.length ? (
+                <p className="ff-team-card__events">
+                  {team.tournaments.join(" · ")}
+                </p>
+              ) : null}
 
-                <div className="ff-team-card__foot">
+              <div className="ff-team-card__foot">
                   <span className="ff-team-card__actions">
                     {team.inviteToken ? (
                       <CopyInviteButton token={team.inviteToken} small />
@@ -154,7 +153,6 @@ export function TeamCardGrid({ teams: initial }: { teams: MyTeam[] }) {
                     <DragGrip {...handleProps(index)} label={`Move ${team.name}`} />
                   </span>
                 </div>
-              </div>
             </article>
           );
         })}

@@ -532,15 +532,17 @@ dropdowns (`RegionRow` uses the same `schools` country list the registration for
 does). The Tournaments bubble is the entry control — a manager/captain enters or
 withdraws the team, which adds/removes it as a Challonge participant.
 
-**Team cards + hero carry the tournament menu's colour and graphics.** Both the
-`.ff-team-card` grid tiles and the `TeamHero` header render a **game-tinted
-banner** (`gameGradient(gameId)` from `lib/games-shared.ts`) with the team logo,
-name, role badge and the game's mark (`components/brand/GameLogo`) in the corner,
-over a stat strip (roster · avg SR · tournaments). The game is chosen from a
-dropdown (`GameSelect`, options from `lib/games.ts` `listGames`) at creation and
-in Team Settings — `teams.game_id`. Cards stay draggable: `cursor: grab` lives on
-the `.ff-drag-grip` alone, never the whole card, so a card only drags from its
-9-dot grip.
+**Team cards + hero carry colour without a banner.** Both the `.ff-team-card`
+grid tiles and the `TeamHero` header are dark bubbles accented with the team's
+**chosen colour** — a top stripe and a ring on the logo, from `--team-accent`
+(set inline from `teams.color`; `teamColor()` falls back to the brand blue). The
+member picks it at sign-up and in Team Settings (`TeamColorPicker` — preset
+swatches + a custom hex), and the game's **mark** (`GameSelect` →
+`components/brand/GameLogo`) sits in the corner; both sit over a stat strip
+(roster · avg SR · tournaments). Colour is member-chosen, **not** game-derived —
+an earlier full game-tinted banner was dropped in favour of this lighter accent.
+Cards stay draggable: `cursor: grab` lives on the `.ff-drag-grip` alone, never
+the whole card, so a card only drags from its 9-dot grip.
 
 **Roster SR.** Each roster row shows the member's Overwatch SR with a tag saying
 who reported it — **self-reported** vs **reported by a manager** — derived from
@@ -588,6 +590,15 @@ lazy TTL). Portal conventions specific to this surface:
   30 days for concluded ones, plus immediate refresh after Commons admin writes.
 - **Academic-verification toggle** is on the admin create form and the Game Info
   settings — it gates registration, nothing on Challonge.
+- **The list** (`/tournaments/`, `TournamentList`) is all client-side over the
+  one payload the server hands down: view tabs (All / Active / Concluded), a game
+  filter, a card/compact layout toggle (cookie-persisted), and **pagination** —
+  page numbers plus a per-page dropdown (12 / 24 / 48 / All) at the bottom
+  (`PaginationBar`). Paginating in memory keeps a big catalog off Worker CPU;
+  the page resets on any view/filter/size change and clamps so a shrinking list
+  never strands the viewer on an empty page. The featured hero sits above the
+  paged grid; Active card-view keeps older still-running events in a separate
+  "Past tournaments" toggle.
 
 ## Backend notes
 

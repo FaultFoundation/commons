@@ -1,12 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { removeTeamLogo, setTeamLogo, updateTeamSettings } from "@/app/teams/actions";
 import { AvatarUploadRow } from "@/components/dashboard/accounts/AvatarUploadRow";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { FieldRow } from "@/components/dashboard/bubbles/FieldRow";
 import { GameSelect } from "@/components/dashboard/teams/GameSelect";
+import { TeamColorPicker } from "@/components/dashboard/teams/TeamColorPicker";
 import { RegionRow } from "@/components/dashboard/teams/RegionRow";
 import { TimezoneRow } from "@/components/dashboard/teams/TimezoneRow";
 import type { GameOption } from "@/lib/games-shared";
@@ -14,6 +16,7 @@ import {
   TEAM_DESCRIPTION_MAX,
   TEAM_NAME_MAX,
   TEAM_TAG_MAX,
+  teamColor,
 } from "@/lib/teams-shared";
 
 const SCHOOL_LOCK_NOTE = "Comes from your verified academic email";
@@ -33,6 +36,7 @@ export function TeamSettingsRows({
   timezone,
   discordInviteUrl,
   logoUrl,
+  color,
   gameId,
   gameName,
   games,
@@ -48,6 +52,7 @@ export function TeamSettingsRows({
   timezone: string | null;
   discordInviteUrl: string | null;
   logoUrl: string | null;
+  color: string | null;
   gameId: string | null;
   gameName: string | null;
   /** Selectable games; empty for read-only viewers (never fetched for them). */
@@ -57,6 +62,8 @@ export function TeamSettingsRows({
   editable: boolean;
 }) {
   const router = useRouter();
+  // Local mirror for a snappy swatch/picker preview; persists on change.
+  const [colorValue, setColorValue] = useState(teamColor(color));
 
   /** FieldRow wants an error message or null — exactly what the action
       returns the contents of. */
@@ -151,6 +158,22 @@ export function TeamSettingsRows({
         />
       ) : gameName ? (
         <BubbleRow label="Game" value={gameName} />
+      ) : null}
+
+      {editable ? (
+        <BubbleRow
+          label="Colour"
+          note="The accent on the team's card and header."
+          field={
+            <TeamColorPicker
+              value={colorValue}
+              onChange={(next) => {
+                setColorValue(next);
+                void save("color")(next);
+              }}
+            />
+          }
+        />
       ) : null}
 
       <BubbleRow

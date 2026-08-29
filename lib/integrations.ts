@@ -18,6 +18,7 @@ import {
   fetchDiscordUsername,
   fetchGuildMemberRoles,
   fetchIsInGuild,
+  getPlatformIdentities,
   getPlatformIdentitiesCached,
   getPlatformIdentityCached,
   hasScope,
@@ -405,15 +406,18 @@ async function startggUserPublic(
   }
 }
 
-/** Reachability for one connected identity, TTL-cached in its metadata. */
+/** Reachability for one connected identity, TTL-cached in its metadata. Pass
+    `force` to skip the TTL and always re-test (the manual re-check button). */
 async function connectReachability(
   identity: { id: string; externalId: string | null; metadata: string | null },
   provider: ConnectProviderId,
   env: CloudflareEnv,
+  force = false,
 ): Promise<boolean | null> {
   try {
     const cached = readConnectHealth(identity.metadata);
     if (
+      !force &&
       cached.checkedAt != null &&
       Date.now() - cached.checkedAt < CONNECT_HEALTH_TTL_MS
     ) {
@@ -478,6 +482,30 @@ export async function loadConnectIntegrations(
         enabled,
         reachable,
       };
+    }),
+  );
+}
+
+/**
+ * Force a fresh reachability test for every linked FACEIT/start.gg account,
+ * bypassing the TTL — what the "re-check" control on the Integrations bubble
+ * calls. Best-effort per provider; writes results back to metadata so the next
+ * render reads them. Reads identities fresh (not the request cache) since it runs
+ * from an action, not a render.
+ */
+export async function recheckConnectHealth(userId: string): Promise<void> {
+  const { env } = getCloudflareContext();
+  const [identities, linkedRows] = await Promise.all([
+    getPlatformIdentities(userId),
+    getAccountLinksCached(userId),
+  ]);
+  const linked = new Set(linkedRows.map((r) => r.providerId));
+  await Promise.all(
+    CONNECT_PROVIDERS.map(async (p) => {
+      if (!linked.has(p.id) || !CONNECT_ENABLED[p.id]()) return;
+      const identity = identities.find((i) => i.provider === p.id);
+      if (!identity) return;
+      await connectReachability(identity, p.id, env, true);
     }),
   );
 }

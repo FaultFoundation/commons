@@ -5,9 +5,14 @@ import { useState, useTransition, type FormEvent } from "react";
 
 import { createTeam } from "@/app/teams/actions";
 import { GameSelect } from "@/components/dashboard/teams/GameSelect";
+import { TeamColorPicker } from "@/components/dashboard/teams/TeamColorPicker";
 import { browserTimezone } from "@/components/dashboard/teams/TimezoneRow";
 import type { GameOption } from "@/lib/games-shared";
-import { TEAM_NAME_MAX, TEAM_TAG_MAX } from "@/lib/teams-shared";
+import {
+  DEFAULT_TEAM_COLOR,
+  TEAM_NAME_MAX,
+  TEAM_TAG_MAX,
+} from "@/lib/teams-shared";
 
 /**
  * Create a team in one submit. Lands on the new team's page with the invite
@@ -32,6 +37,7 @@ export function CreateTeamForm({
   const [name, setName] = useState("");
   const [tag, setTag] = useState("");
   const [gameId, setGameId] = useState(games[0]?.id ?? "");
+  const [color, setColor] = useState(DEFAULT_TEAM_COLOR);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,6 +48,7 @@ export function CreateTeamForm({
         name,
         tag,
         gameId,
+        color,
         timezone: browserTimezone(),
       });
       if (!result.ok) {
@@ -99,6 +106,10 @@ export function CreateTeamForm({
           />
         </label>
       ) : null}
+      <div className="ff-auth__field">
+        <span className="ff-auth__label">Team colour</span>
+        <TeamColorPicker value={color} onChange={setColor} disabled={pending} />
+      </div>
       <div className="ff-row__buttons">
         <button
           className="ff-btn"

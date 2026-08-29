@@ -8,6 +8,7 @@ import { ComingSoonIntegration } from "@/components/dashboard/accounts/ComingSoo
 import { DeleteAccount } from "@/components/dashboard/accounts/DeleteAccount";
 import { DensityRow } from "@/components/dashboard/accounts/DensityRow";
 import { IntegrationCard } from "@/components/dashboard/accounts/IntegrationCard";
+import { RecheckConnectionsButton } from "@/components/dashboard/accounts/RecheckConnectionsButton";
 import { OAuthPopupBridge } from "@/components/dashboard/accounts/OAuthPopupBridge";
 import {
   AvatarRow,
@@ -211,7 +212,7 @@ export default async function AccountPage({
           <DensityRow initial={density} />
         </Bubble>
 
-        <Bubble title="Integrations">
+        <Bubble title="Integrations" actions={<RecheckConnectionsButton />}>
           <div className="ff-integrations">
             <IntegrationCard
               provider="discord"

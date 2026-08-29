@@ -439,6 +439,10 @@ export const teams = sqliteTable(
     name: text("name").notNull(),
     tag: text("tag"),
     description: text("description"),
+    // Team accent colour (hex, "#RRGGBB"), chosen at creation and editable in
+    // settings — used as the card/hero accent (stripe, logo ring) instead of a
+    // full banner. NULL falls back to the brand blue (lib/teams-shared.ts).
+    color: text("color"),
     // LFG matching inputs, also shown on the team card.
     region: text("region"),
     timezone: text("timezone"), // IANA zone

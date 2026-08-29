@@ -75,7 +75,7 @@ export default async function TeamPage({
           tag={team.tag}
           role={role}
           logoUrl={team.logoUrl}
-          gameId={team.gameId}
+          color={team.color}
           gameName={team.gameName}
           gameLogoUrl={team.gameLogoUrl}
           collegeName={team.collegeName}
@@ -96,6 +96,7 @@ export default async function TeamPage({
             timezone={team.timezone}
             discordInviteUrl={team.discordInviteUrl}
             logoUrl={team.logoUrl}
+            color={team.color}
             gameId={team.gameId}
             gameName={team.gameName}
             games={games}

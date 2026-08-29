@@ -9,9 +9,14 @@ import {
   inviteUrl,
 } from "@/components/dashboard/teams/CopyInviteButton";
 import { GameSelect } from "@/components/dashboard/teams/GameSelect";
+import { TeamColorPicker } from "@/components/dashboard/teams/TeamColorPicker";
 import { browserTimezone } from "@/components/dashboard/teams/TimezoneRow";
 import type { GameOption } from "@/lib/games-shared";
-import { TEAM_NAME_MAX, TEAM_TAG_MAX } from "@/lib/teams-shared";
+import {
+  DEFAULT_TEAM_COLOR,
+  TEAM_NAME_MAX,
+  TEAM_TAG_MAX,
+} from "@/lib/teams-shared";
 
 /**
  * "Start a Team" as a two-step modal (native <dialog>, like AdminUnlockDialog —
@@ -46,6 +51,7 @@ export function StartTeamDialog({
   const [name, setName] = useState("");
   const [tag, setTag] = useState("");
   const [gameId, setGameId] = useState(games[0]?.id ?? "");
+  const [color, setColor] = useState(DEFAULT_TEAM_COLOR);
   const [created, setCreated] = useState<{ teamId: string; token: string } | null>(
     null,
   );
@@ -65,6 +71,7 @@ export function StartTeamDialog({
     setName("");
     setTag("");
     setGameId(games[0]?.id ?? "");
+    setColor(DEFAULT_TEAM_COLOR);
     setCreated(null);
     setPending(false);
   }, [open, games]);
@@ -78,6 +85,7 @@ export function StartTeamDialog({
       name,
       tag,
       gameId,
+      color,
       timezone: browserTimezone(),
     });
     setPending(false);
@@ -148,6 +156,14 @@ export function StartTeamDialog({
                   />
                 </label>
               ) : null}
+              <div className="ff-auth__field">
+                <span className="ff-auth__label">Team colour</span>
+                <TeamColorPicker
+                  value={color}
+                  onChange={setColor}
+                  disabled={pending}
+                />
+              </div>
               {error ? (
                 <div className="ff-auth__error" role="alert">
                   <p>{error}</p>

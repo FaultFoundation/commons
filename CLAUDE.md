@@ -267,7 +267,9 @@ same path the schedule sync uses), lazily past a 30-min TTL cached in
 call flags the account as private — the card then shows a "set your profile to
 public to sync" hint — so an outage/timeout/missing key stays `null` (no hint)
 and never cries wolf. Challonge is read via the member's own OAuth token, so it
-has no such check.
+has no such check. The Integrations bubble has a reload control
+(`recheckConnections` → `recheckConnectHealth`) that forces a fresh test past
+the TTL on demand.
 
 `/schedule` is the payoff: [lib/schedule.ts](lib/schedule.ts) pulls each
 connected member's matches/tournaments into `external_matches` and the page

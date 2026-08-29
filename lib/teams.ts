@@ -418,8 +418,9 @@ export type MyTeam = {
   tag: string | null;
   logoUrl: string | null;
   collegeName: string | null;
-  /** The game the team competes in — drives the card's corner mark + banner
-      colour. `gameId` for the gradient, name/logo for the mark. */
+  /** Team accent colour (hex) or null for the brand default. */
+  color: string | null;
+  /** The game the team competes in — drives the card's corner mark. */
   gameId: string | null;
   gameName: string | null;
   gameLogoUrl: string | null;
@@ -497,6 +498,7 @@ export async function listMyTeams(userId: string): Promise<MyTeam[]> {
       tag: teams.tag,
       logoUrl: teams.logoUrl,
       collegeName: colleges.name,
+      color: teams.color,
       gameId: teams.gameId,
       gameName: games.name,
       gameLogoUrl: games.logoUrl,
@@ -589,6 +591,7 @@ export async function listMyTeams(userId: string): Promise<MyTeam[]> {
       tag: team.tag,
       logoUrl: team.logoUrl,
       collegeName: team.collegeName,
+      color: team.color,
       gameId: team.gameId,
       gameName: team.gameName,
       gameLogoUrl: team.gameLogoUrl,
@@ -768,6 +771,7 @@ export type TeamDetail = {
   discordInviteUrl: string | null;
   logoUrl: string | null;
   collegeName: string | null;
+  color: string | null;
   programId: string;
   gameId: string | null;
   gameName: string | null;
@@ -808,6 +812,7 @@ export async function getTeamDetail(
       timezone: teams.timezone,
       discordInviteUrl: teams.discordInviteUrl,
       logoUrl: teams.logoUrl,
+      color: teams.color,
       programId: teams.programId,
       gameId: teams.gameId,
       gameName: games.name,

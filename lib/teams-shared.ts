@@ -97,3 +97,44 @@ export function assignableRoles(actor: TeamRole): readonly TeamRole[] {
 export const TEAM_NAME_MAX = 60;
 export const TEAM_TAG_MAX = 6;
 export const TEAM_DESCRIPTION_MAX = 500;
+
+// ---------------------------------------------------------------------------
+// Team accent colour. Chosen at sign-up (and editable in settings), stored on
+// teams.color, and used as the card/hero accent — a stripe + logo ring, not a
+// full banner. A curated swatch set the picker offers, plus any custom hex.
+// ---------------------------------------------------------------------------
+
+/** The house blue, used when a team hasn't picked a colour. */
+export const DEFAULT_TEAM_COLOR = "#0074a6";
+
+/** Preset swatches the colour picker offers (custom hex still allowed). */
+export const TEAM_COLORS: readonly string[] = [
+  "#0074a6", // brand blue
+  "#5b8def", // periwinkle
+  "#7c5cff", // violet
+  "#e0457b", // magenta
+  "#ff6363", // coral
+  "#f2994a", // orange
+  "#f2c94c", // gold
+  "#27ae60", // green
+  "#16b5a5", // teal
+  "#9aa7b4", // slate
+];
+
+/** Validate and normalize a hex colour to lowercase `#rrggbb`, or null. Accepts
+    3- or 6-digit hex (expanding shorthand); anything else is null so a forged or
+    empty value falls back to the default rather than injecting arbitrary CSS. */
+export function normalizeTeamColor(
+  input: string | null | undefined,
+): string | null {
+  if (!input) return null;
+  const raw = input.trim().toLowerCase();
+  const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(raw);
+  if (short) return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`;
+  return /^#[0-9a-f]{6}$/.test(raw) ? raw : null;
+}
+
+/** The colour to actually paint with — the team's, or the brand default. */
+export function teamColor(color: string | null | undefined): string {
+  return normalizeTeamColor(color) ?? DEFAULT_TEAM_COLOR;
+}

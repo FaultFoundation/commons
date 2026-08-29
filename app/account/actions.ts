@@ -12,6 +12,7 @@ import {
   DENSITY_COOKIE_MAX_AGE,
   asDensity,
 } from "@/lib/density";
+import { recheckConnectHealth } from "@/lib/integrations";
 import { ensureProfile } from "@/lib/registration";
 
 // ---------------------------------------------------------------------------
@@ -27,6 +28,21 @@ import { ensureProfile } from "@/lib/registration";
 export type ActionResult<T = object> =
   | ({ ok: true } & T)
   | { ok: false; error: string };
+
+/**
+ * Re-test whether the member's linked FACEIT/start.gg accounts are readable
+ * through the public API — the manual "re-check" control on the Integrations
+ * bubble. Forces past the reachability TTL, then revalidates so the cards show
+ * the fresh result. Never throws (the check is best-effort inside).
+ */
+export async function recheckConnections(): Promise<ActionResult> {
+  const session = await getAuth().api.getSession({ headers: await headers() });
+  if (!session) return { ok: false, error: "Sign in to do that." };
+
+  await recheckConnectHealth(session.user.id);
+  revalidatePath("/account/");
+  return { ok: true };
+}
 
 /**
  * Store the member's bubble density. Writes D1 (the source of truth) and the

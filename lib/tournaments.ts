@@ -357,6 +357,8 @@ export type ParticipantWithTeam = {
   seed: number | null;
   teamName: string | null;
   teamTag: string | null;
+  /** Average Overwatch SR across the team's active roster, or null. */
+  avgSr: number | null;
   createdAt: Date;
 };
 
@@ -372,7 +374,8 @@ export function entrantLabel(
 export async function listParticipantsWithTeams(
   tournamentId: string,
 ): Promise<ParticipantWithTeam[]> {
-  return getDb()
+  const db = getDb();
+  const rows = await db
     .select({
       id: tournamentParticipants.id,
       challongeParticipantId: tournamentParticipants.challongeParticipantId,
@@ -391,10 +394,37 @@ export async function listParticipantsWithTeams(
         isNull(tournamentParticipants.withdrawnAt),
       ),
     )
-    .orderBy(
-      tournamentParticipants.seed,
-      tournamentParticipants.createdAt,
-    ) as Promise<ParticipantWithTeam[]>;
+    .orderBy(tournamentParticipants.seed, tournamentParticipants.createdAt);
+
+  // Average SR per entered team, over active members who have one reported.
+  const teamIds = rows
+    .map((r) => r.teamId)
+    .filter((id): id is string => id != null);
+  const avgByTeam = new Map<string, number>();
+  if (teamIds.length) {
+    const srRows = await db
+      .select({
+        teamId: teamMembers.teamId,
+        avg: sql<number>`avg(${teamMembers.skillRating})`.as("avg"),
+      })
+      .from(teamMembers)
+      .where(
+        and(
+          inArray(teamMembers.teamId, teamIds),
+          eq(teamMembers.status, "active"),
+          sql`${teamMembers.skillRating} is not null`,
+        ),
+      )
+      .groupBy(teamMembers.teamId);
+    for (const r of srRows) {
+      if (r.avg != null) avgByTeam.set(r.teamId, Math.round(r.avg));
+    }
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    avgSr: r.teamId ? (avgByTeam.get(r.teamId) ?? null) : null,
+  }));
 }
 
 export async function getParticipantCount(

@@ -86,6 +86,7 @@ export default async function IntegrationsSetupPage() {
                 linked={c.linked}
                 handle={c.handle}
                 enabled={c.enabled}
+                reachable={c.reachable}
                 linkLabel={c.linkLabel}
                 callbackURL="/account/setup/integrations/"
               />

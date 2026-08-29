@@ -6,8 +6,10 @@ import { removeTeamLogo, setTeamLogo, updateTeamSettings } from "@/app/teams/act
 import { AvatarUploadRow } from "@/components/dashboard/accounts/AvatarUploadRow";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { FieldRow } from "@/components/dashboard/bubbles/FieldRow";
+import { GameSelect } from "@/components/dashboard/teams/GameSelect";
 import { RegionRow } from "@/components/dashboard/teams/RegionRow";
 import { TimezoneRow } from "@/components/dashboard/teams/TimezoneRow";
+import type { GameOption } from "@/lib/games-shared";
 import {
   TEAM_DESCRIPTION_MAX,
   TEAM_NAME_MAX,
@@ -31,6 +33,9 @@ export function TeamSettingsRows({
   timezone,
   discordInviteUrl,
   logoUrl,
+  gameId,
+  gameName,
+  games,
   countries,
   editable,
 }: {
@@ -43,6 +48,10 @@ export function TeamSettingsRows({
   timezone: string | null;
   discordInviteUrl: string | null;
   logoUrl: string | null;
+  gameId: string | null;
+  gameName: string | null;
+  /** Selectable games; empty for read-only viewers (never fetched for them). */
+  games: GameOption[];
   /** Directory countries for the region picker; empty for read-only viewers. */
   countries: string[];
   editable: boolean;
@@ -124,6 +133,25 @@ export function TeamSettingsRows({
           {description ? <BubbleRow label="About" value={description} /> : null}
         </>
       )}
+
+      {editable && games.length ? (
+        <BubbleRow
+          label="Game"
+          note="The mark and colour shown on the team's card."
+          field={
+            <GameSelect
+              id={`game-${teamId}`}
+              value={gameId ?? games[0].id}
+              games={games}
+              onChange={(next) => {
+                void save("gameId")(next);
+              }}
+            />
+          }
+        />
+      ) : gameName ? (
+        <BubbleRow label="Game" value={gameName} />
+      ) : null}
 
       <BubbleRow
         label="School"

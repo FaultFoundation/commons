@@ -17,6 +17,7 @@ import {
   tournamentParticipants,
   tournaments,
 } from "@/db/schema";
+import { isValidGameId } from "@/lib/games";
 import { GAME_OVERWATCH_ID, PROGRAM_COLLEGIATE_ID } from "@/lib/programs";
 import { getRegistrationState } from "@/lib/registration";
 import {
@@ -47,6 +48,7 @@ import {
   TEAM_DESCRIPTION_MAX,
   asTeamRole,
   assignableRoles,
+  can,
   outranks,
   type TeamRole,
 } from "@/lib/teams-shared";
@@ -90,6 +92,10 @@ function revalidateTeams(teamId?: string) {
 export async function createTeam(input: {
   name: string;
   tag?: string;
+  /** Which game the team competes in — a games registry id, shown as the card's
+      corner mark and banner colour. Falls back to Overwatch (the program's game)
+      when unset or forged. */
+  gameId?: string;
   /** The browser's own IANA zone — the only reliable read on where the
       creator actually plays. Validated here like any other input. */
   timezone?: string;
@@ -109,6 +115,13 @@ export async function createTeam(input: {
     return { ok: false, error: "A team with that name already exists." };
   }
 
+  // A forged/unknown game id falls back to the program's game rather than
+  // failing the creation — the game is a cosmetic tag, not a gate.
+  const gameId =
+    input.gameId && (await isValidGameId(input.gameId))
+      ? input.gameId
+      : GAME_OVERWATCH_ID;
+
   const db = getDb();
   const now = new Date();
   const teamId = crypto.randomUUID();
@@ -123,7 +136,7 @@ export async function createTeam(input: {
     db.insert(teams).values({
       id: teamId,
       programId: PROGRAM_COLLEGIATE_ID,
-      gameId: GAME_OVERWATCH_ID,
+      gameId,
       collegeId: reg?.collegeId ?? null,
       name,
       tag: cleanTag(input.tag ?? ""),
@@ -170,6 +183,7 @@ export async function updateTeamSettings(
     region?: string;
     timezone?: string;
     discordInviteUrl?: string;
+    gameId?: string;
   },
 ): Promise<ActionResult> {
   const userId = await requireUserId();
@@ -179,6 +193,13 @@ export async function updateTeamSettings(
   if (!check.ok) return check;
 
   const fields: Record<string, string | null> = {};
+
+  if (patch.gameId !== undefined) {
+    if (!(await isValidGameId(patch.gameId))) {
+      return { ok: false, error: "Pick a game from the list." };
+    }
+    fields.gameId = patch.gameId;
+  }
 
   if (patch.name !== undefined) {
     const name = cleanName(patch.name);
@@ -572,6 +593,59 @@ export async function removeMember(
   await getDb()
     .update(teamMembers)
     .set({ status: "inactive", leftAt: new Date() })
+    .where(eq(teamMembers.id, membershipId));
+
+  revalidateTeams(teamId);
+  return { ok: true };
+}
+
+/**
+ * Set (or clear, with an empty value) a roster member's Overwatch SR. A player
+ * may report their own; anyone with `manageRoster` may report for the whole
+ * team. `skillRatingBy` records the reporter's user id so the roster can label a
+ * value "self-reported" vs "reported by a manager" (compared against the member's
+ * own id — never a role name inline).
+ */
+export async function setMemberSkillRating(
+  teamId: string,
+  membershipId: string,
+  value: string,
+): Promise<ActionResult> {
+  const userId = await requireUserId();
+  if (!userId) return { ok: false, error: "You need to be signed in." };
+
+  const membership = await getTeamMembership(userId, teamId);
+  if (!membership) return { ok: false, error: "You're not on this team." };
+
+  const target = await getMembership(teamId, membershipId);
+  if (!target || target.status !== "active") {
+    return { ok: false, error: "That member isn't on the team." };
+  }
+
+  const isSelf = target.userId === userId;
+  if (!isSelf && !can(membership.role, "manageRoster")) {
+    return { ok: false, error: "You don't have permission to do that." };
+  }
+
+  const raw = value.trim();
+  let sr: number | null;
+  if (raw === "") {
+    sr = null;
+  } else {
+    const n = Number.parseInt(raw, 10);
+    if (!Number.isFinite(n) || n < 0 || n > 5000) {
+      return { ok: false, error: "Enter an SR between 0 and 5000." };
+    }
+    sr = n;
+  }
+
+  await getDb()
+    .update(teamMembers)
+    .set({
+      skillRating: sr,
+      skillRatingBy: sr == null ? null : userId,
+      skillRatingAt: sr == null ? null : new Date(),
+    })
     .where(eq(teamMembers.id, membershipId));
 
   revalidateTeams(teamId);

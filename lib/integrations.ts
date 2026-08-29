@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
-import { account } from "@/db/schema";
+import { account, platformIdentities } from "@/db/schema";
 import { getAccountLinksCached } from "@/lib/account-links";
 import {
   challongeAuthEnabled,
@@ -276,6 +276,15 @@ export type ConnectIntegration = {
   handle: string | null;
   /** This provider's OAuth secrets are configured. */
   enabled: boolean;
+  /**
+   * Whether the member's account is queryable through the provider's public
+   * API — the thing our schedule sync actually needs. `true` = we read it back
+   * fine; `false` = a definitive "nothing there" (usually a private profile),
+   * which the card turns into a "set your account to public" hint; `null` =
+   * unknown (Challonge, no server key, or the check couldn't run) → no hint,
+   * so we never cry wolf.
+   */
+  reachable: boolean | null;
 };
 
 const CONNECT_ENABLED: Record<ConnectProviderId, () => boolean> = {
@@ -284,25 +293,191 @@ const CONNECT_ENABLED: Record<ConnectProviderId, () => boolean> = {
   challonge: challongeAuthEnabled,
 };
 
+// ---------------------------------------------------------------------------
+// Public-account reachability. FACEIT and start.gg are read server-side by the
+// member's external id (the same path the schedule sync uses), which only works
+// if the profile is public — so linking then failing a read is the signal that
+// their account is private. Lazy-on-read past a TTL, cached in the identity's
+// metadata blob, and strictly best-effort: only a definitive negative from a
+// *successful* API call flags "private"; anything else is `null` (no warning).
+// ---------------------------------------------------------------------------
+
+const CONNECT_HEALTH_TTL_MS = 30 * 60 * 1000;
+const CONNECT_TIMEOUT_MS = 4000;
+const FACEIT_DATA = "https://open.faceit.com/data/v4";
+const STARTGG_GQL = "https://api.start.gg/gql/alpha";
+
+type ConnectHealth = { checkedAt: number | null; reachable: boolean | null };
+
+function readConnectHealth(metadata: string | null): ConnectHealth {
+  if (!metadata) return { checkedAt: null, reachable: null };
+  try {
+    const parsed = JSON.parse(metadata) as {
+      connectCheckedAt?: unknown;
+      connectReachable?: unknown;
+    };
+    return {
+      checkedAt:
+        typeof parsed.connectCheckedAt === "number"
+          ? parsed.connectCheckedAt
+          : null,
+      reachable:
+        typeof parsed.connectReachable === "boolean"
+          ? parsed.connectReachable
+          : null,
+    };
+  } catch {
+    return { checkedAt: null, reachable: null };
+  }
+}
+
+/** Stamp the reachability result onto the identity's metadata, preserving any
+    other keys (e.g. the schedule sync's scheduleSyncedAt). */
+async function writeConnectHealth(
+  identityId: string,
+  metadata: string | null,
+  reachable: boolean,
+): Promise<void> {
+  let merged: Record<string, unknown> = {};
+  if (metadata) {
+    try {
+      merged = JSON.parse(metadata) as Record<string, unknown>;
+    } catch {
+      merged = {};
+    }
+  }
+  merged.connectCheckedAt = Date.now();
+  merged.connectReachable = reachable;
+  await getDb()
+    .update(platformIdentities)
+    .set({ metadata: JSON.stringify(merged), updatedAt: new Date() })
+    .where(eq(platformIdentities.id, identityId));
+}
+
+/** Is a FACEIT player public? 404 = no (private/removed); other errors unknown. */
+async function faceitPlayerPublic(
+  apiKey: string,
+  playerId: string,
+): Promise<boolean | null> {
+  try {
+    const res = await fetch(
+      `${FACEIT_DATA}/players/${encodeURIComponent(playerId)}`,
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(CONNECT_TIMEOUT_MS),
+      },
+    );
+    if (res.status === 404) return false;
+    if (!res.ok) return null;
+    const body = (await res.json()) as { player_id?: string };
+    return body?.player_id ? true : false;
+  } catch {
+    return null;
+  }
+}
+
+/** Is a start.gg user resolvable by id? A successful query with a null user
+    means the profile isn't publicly readable. */
+async function startggUserPublic(
+  apiKey: string,
+  userId: string,
+): Promise<boolean | null> {
+  try {
+    const res = await fetch(STARTGG_GQL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        query: "query($id:ID!){user(id:$id){id}}",
+        variables: { id: userId },
+      }),
+      signal: AbortSignal.timeout(CONNECT_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as {
+      data?: { user?: { id?: number } | null };
+    };
+    return body?.data?.user?.id != null;
+  } catch {
+    return null;
+  }
+}
+
+/** Reachability for one connected identity, TTL-cached in its metadata. */
+async function connectReachability(
+  identity: { id: string; externalId: string | null; metadata: string | null },
+  provider: ConnectProviderId,
+  env: CloudflareEnv,
+): Promise<boolean | null> {
+  try {
+    const cached = readConnectHealth(identity.metadata);
+    if (
+      cached.checkedAt != null &&
+      Date.now() - cached.checkedAt < CONNECT_HEALTH_TTL_MS
+    ) {
+      return cached.reachable;
+    }
+    if (!identity.externalId) return null;
+
+    let reachable: boolean | null = null;
+    if (provider === "faceit") {
+      if (!env.FACEIT_API_KEY) return null;
+      reachable = await faceitPlayerPublic(env.FACEIT_API_KEY, identity.externalId);
+    } else if (provider === "startgg") {
+      if (!env.STARTGG_API_KEY) return null;
+      reachable = await startggUserPublic(env.STARTGG_API_KEY, identity.externalId);
+    } else {
+      // Challonge is read via the member's own OAuth token — no public concern.
+      return null;
+    }
+
+    // Only cache a definitive answer; leave "unknown" un-stamped so a transient
+    // failure is retried next render rather than parked for a full TTL.
+    if (reachable !== null) {
+      await writeConnectHealth(identity.id, identity.metadata, reachable);
+    }
+    return reachable;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * State for every esports-connect card in one shot — one identities read plus
  * one account read, shared by the account page and the setup step. Never throws
  * on a per-provider basis: a provider with no secrets simply comes back
- * disabled.
+ * disabled. For linked FACEIT/start.gg accounts it also tests public API
+ * reachability (best-effort, TTL-cached) so the card can flag a private account.
  */
 export async function loadConnectIntegrations(
   userId: string,
 ): Promise<ConnectIntegration[]> {
+  const { env } = getCloudflareContext();
   const [identities, linkedRows] = await Promise.all([
     getPlatformIdentitiesCached(userId),
     getAccountLinksCached(userId),
   ]);
   const linked = new Set(linkedRows.map((r) => r.providerId));
-  const handleByProvider = new Map(identities.map((i) => [i.provider, i.handle]));
-  return CONNECT_PROVIDERS.map((p) => ({
-    ...p,
-    linked: linked.has(p.id),
-    handle: handleByProvider.get(p.id) ?? null,
-    enabled: CONNECT_ENABLED[p.id](),
-  }));
+  const identityByProvider = new Map(identities.map((i) => [i.provider, i]));
+
+  return Promise.all(
+    CONNECT_PROVIDERS.map(async (p) => {
+      const enabled = CONNECT_ENABLED[p.id]();
+      const identity = identityByProvider.get(p.id) ?? null;
+      const isLinked = linked.has(p.id);
+      const reachable =
+        isLinked && enabled && identity
+          ? await connectReachability(identity, p.id, env)
+          : null;
+      return {
+        ...p,
+        linked: isLinked,
+        handle: identity?.handle ?? null,
+        enabled,
+        reachable,
+      };
+    }),
+  );
 }

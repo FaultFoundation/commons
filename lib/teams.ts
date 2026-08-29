@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import {
   collegiateRegistrations,
   colleges,
+  games,
   programMemberships,
   programs,
   teamDeleteRequests,
@@ -417,10 +418,18 @@ export type MyTeam = {
   tag: string | null;
   logoUrl: string | null;
   collegeName: string | null;
+  /** The game the team competes in — drives the card's corner mark + banner
+      colour. `gameId` for the gradient, name/logo for the mark. */
+  gameId: string | null;
+  gameName: string | null;
+  gameLogoUrl: string | null;
   /** Distinct schools across the ACTIVE roster — a team can span several. */
   schools: string[];
   role: TeamRole;
   memberCount: number;
+  /** Average Overwatch SR across active members who have one reported, rounded;
+      null when nobody on the roster has an SR yet. */
+  avgSr: number | null;
   tournaments: string[];
   /** Only populated for roles that may hand out invites. */
   inviteToken: string | null;
@@ -488,11 +497,15 @@ export async function listMyTeams(userId: string): Promise<MyTeam[]> {
       tag: teams.tag,
       logoUrl: teams.logoUrl,
       collegeName: colleges.name,
+      gameId: teams.gameId,
+      gameName: games.name,
+      gameLogoUrl: games.logoUrl,
       role: teamMembers.role,
     })
     .from(teamMembers)
     .innerJoin(teams, eq(teams.id, teamMembers.teamId))
     .leftJoin(colleges, eq(colleges.id, teams.collegeId))
+    .leftJoin(games, eq(games.id, teams.gameId))
     .where(and(activeMember(userId), isNull(teams.disbandedAt)))
     .orderBy(
       sql`${teamMembers.sortOrder} is null`,
@@ -503,7 +516,7 @@ export async function listMyTeams(userId: string): Promise<MyTeam[]> {
   if (!mine.length) return [];
   const ids = mine.map((t) => t.id);
 
-  const [counts, entries, invites, schoolsByTeam] = await Promise.all([
+  const [counts, srRows, entries, invites, schoolsByTeam] = await Promise.all([
     db
       .select({
         teamId: teamMembers.teamId,
@@ -512,6 +525,21 @@ export async function listMyTeams(userId: string): Promise<MyTeam[]> {
       .from(teamMembers)
       .where(
         and(inArray(teamMembers.teamId, ids), eq(teamMembers.status, "active")),
+      )
+      .groupBy(teamMembers.teamId),
+    // Average SR per team over active members who have one reported.
+    db
+      .select({
+        teamId: teamMembers.teamId,
+        avg: sql<number>`avg(${teamMembers.skillRating})`.as("avg"),
+      })
+      .from(teamMembers)
+      .where(
+        and(
+          inArray(teamMembers.teamId, ids),
+          eq(teamMembers.status, "active"),
+          sql`${teamMembers.skillRating} is not null`,
+        ),
       )
       .groupBy(teamMembers.teamId),
     db
@@ -554,15 +582,20 @@ export async function listMyTeams(userId: string): Promise<MyTeam[]> {
 
   return mine.map((team) => {
     const role = asTeamRole(team.role);
+    const avgRaw = srRows.find((r) => r.teamId === team.id)?.avg;
     return {
       id: team.id,
       name: team.name,
       tag: team.tag,
       logoUrl: team.logoUrl,
       collegeName: team.collegeName,
+      gameId: team.gameId,
+      gameName: team.gameName,
+      gameLogoUrl: team.gameLogoUrl,
       schools: schoolsByTeam.get(team.id) ?? [],
       role,
       memberCount: counts.find((c) => c.teamId === team.id)?.count ?? 0,
+      avgSr: avgRaw != null ? Math.round(avgRaw) : null,
       tournaments: entries
         .filter((e) => e.teamId === team.id)
         .map((e) => e.name),
@@ -688,6 +721,11 @@ export type RosterMember = {
   role: TeamRole;
   position: string | null;
   discordHandle: string | null;
+  /** Overwatch SR, null when unreported. `skillRatingBy` is the reporter's user
+      id (compare to this member's userId for self- vs manager-reported). */
+  skillRating: number | null;
+  skillRatingBy: string | null;
+  skillRatingAt: number | null;
   joinedAt: number;
 };
 
@@ -732,11 +770,15 @@ export type TeamDetail = {
   collegeName: string | null;
   programId: string;
   gameId: string | null;
+  gameName: string | null;
+  gameLogoUrl: string | null;
   /** null for a live team; a timestamp for a disbanded one (only reachable
       with `includeDisbanded`, which the admin panel passes). */
   disbandedAt: number | null;
   /** Distinct schools across the active roster (members can be from several). */
   schools: string[];
+  /** Average SR across active members with a reported one; null when none do. */
+  avgSr: number | null;
   roster: RosterMember[];
   invites: TeamInviteView[];
   inviteLinkToken: string | null;
@@ -768,11 +810,14 @@ export async function getTeamDetail(
       logoUrl: teams.logoUrl,
       programId: teams.programId,
       gameId: teams.gameId,
+      gameName: games.name,
+      gameLogoUrl: games.logoUrl,
       disbandedAt: teams.disbandedAt,
       collegeName: colleges.name,
     })
     .from(teams)
     .leftJoin(colleges, eq(colleges.id, teams.collegeId))
+    .leftJoin(games, eq(games.id, teams.gameId))
     .where(
       options?.includeDisbanded
         ? eq(teams.id, teamId)
@@ -792,6 +837,9 @@ export async function getTeamDetail(
           image: user.image,
           role: teamMembers.role,
           position: teamMembers.position,
+          skillRating: teamMembers.skillRating,
+          skillRatingBy: teamMembers.skillRatingBy,
+          skillRatingAt: teamMembers.skillRatingAt,
           joinedAt: teamMembers.joinedAt,
           discordHandle: platformIdentities.handle,
         })
@@ -872,6 +920,9 @@ export async function getTeamDetail(
       role: asTeamRole(r.role),
       position: r.position,
       discordHandle: r.discordHandle,
+      skillRating: r.skillRating,
+      skillRatingBy: r.skillRatingBy,
+      skillRatingAt: r.skillRatingAt?.getTime() ?? null,
       joinedAt: r.joinedAt.getTime(),
     }))
     // Most privileged first, then alphabetical — cheaper and clearer than a
@@ -917,10 +968,18 @@ export async function getTeamDetail(
     };
   }
 
+  const srValues = roster
+    .map((m) => m.skillRating)
+    .filter((v): v is number => v != null);
+  const avgSr = srValues.length
+    ? Math.round(srValues.reduce((a, b) => a + b, 0) / srValues.length)
+    : null;
+
   return {
     ...team,
     disbandedAt: team.disbandedAt?.getTime() ?? null,
     schools: schoolsMap.get(teamId) ?? [],
+    avgSr,
     roster,
     invites: usableInvites.map((i) => ({
       id: i.id,

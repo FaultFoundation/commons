@@ -275,7 +275,7 @@ site-initiated work out of `bot_outbox`.
 
 | App concept | Table | Key mappings |
 |---|---|---|
-| Cross-program person record | `profiles` | 1:1 with `user`; `country`, `age_range`, `dm_preference`, and `density` (`compact` \| `cozy` \| `comfortable` — the dashboard spacing preset; source of truth, cached in the `ff-density` cookie) |
+| Cross-program person record | `profiles` | 1:1 with `user`; `country`, `age_range`, `dm_preference`, `density` (`compact` \| `cozy` \| `comfortable` — the dashboard spacing preset; source of truth, cached in the `ff-density` cookie), and `home_layout` (JSON array of Home-tab widget ids — the member's customizable dashboard arrangement; NULL = the default set. See `lib/home-shared.ts`) |
 | Connected accounts | `platform_identities` | one row per `provider`, mirrored from the Better-Auth account-created hook via `mirrorPlatformIdentity`: `discord` → `external_id` = Discord id + `handle` = display name; `battlenet` → `external_id` = Blizzard account id + `handle` = BattleTag; `steam` → `handle` = friend code; the esports connects (`faceit` / `startgg` / `challonge`) → `external_id` = provider user id + `handle` = gamertag, connect-only generic-OAuth links whose optional profile extras (avatar, country, rank) ride the JSON `metadata` column. `refreshed_at` records the last provider re-read (see `loadDiscordIntegration`) — Blizzard is never re-read, since it issues no refresh token. `UNIQUE(user_id, provider)` and `UNIQUE(provider, external_id)`. **This is the join key to the Discord bot**: `getUserIdByDiscordId` resolves a Discord id to a site account here |
 
 ### Collegiate registration, verification & minors
@@ -301,7 +301,7 @@ site-initiated work out of `bot_outbox`.
 | App concept | Table | Key mappings |
 |---|---|---|
 | Roster unit | `teams` | college-affiliated (`college_id`) or ad-hoc; `region`/`timezone` prefilled at creation from the creator's verified college and browser zone; `logo_url` is the `/api/avatars/…` path rather than an absolute URL, so it survives the domain cutover; `disbanded_at` is a **soft delete** — every team query filters `disbanded_at IS NULL`, which also frees the name (hence no unique index on `name`) |
-| Membership + permissions | `team_members` | `role` ∈ `manager` \| `captain` \| `coach` \| `player` — the capability tiers in `lib/teams-shared.ts`, distinct from `position` (the in-game role). Leaving flips `status` to `inactive` rather than deleting, so `UNIQUE(team_id, user_id)` turns a rejoin into a reactivation. `sort_order` is that member's own ordering of their teams |
+| Membership + permissions | `team_members` | `role` ∈ `manager` \| `captain` \| `coach` \| `player` — the capability tiers in `lib/teams-shared.ts`, distinct from `position` (the in-game role). Leaving flips `status` to `inactive` rather than deleting, so `UNIQUE(team_id, user_id)` turns a rejoin into a reactivation. `sort_order` is that member's own ordering of their teams. `skill_rating` is the member's Overwatch SR (shown on the roster, averaged on the team card); `skill_rating_by` is the reporter's user id (plain text, no FK — compared against this row's `user_id` for self- vs manager-reported, so a player can report their own SR and a manager can report for the team), `skill_rating_at` timestamps the last report |
 | Join links | `team_invites` | one reusable `kind = 'link'` per team (its newest non-revoked row is *the* link; rotating revokes and re-inserts) plus single-use `kind = 'targeted'` invites carrying a role; `token` unique, `max_uses` NULL = unlimited |
 | Multi-manager deletion | `team_delete_requests` + `team_delete_votes` | a sole manager disbands outright; with several, every *current* manager must approve and one decline cancels — so promoting someone mid-vote correctly re-blocks it. `UNIQUE(request_id, user_id)` = one vote each |
 
@@ -357,7 +357,8 @@ GAMES(           *id, slug UNIQUE, name, logo_url? )
 PROGRAMS(        *id, slug UNIQUE, name, description?, game_id→GAMES?, active )
 
 -- Tier 2 — person + cross-cutting satellites (all hang off USER)
-PROFILES(        *id, user_id→USER UNIQUE, country?, age_range?, dm_preference?, density )
+PROFILES(        *id, user_id→USER UNIQUE, country?, age_range?, dm_preference?, density,
+                 home_layout? )
 PLATFORM_IDENTITIES( *id, user_id→USER, provider, external_id?, handle?, verified,
                  connected_at?, refreshed_at?,
                  UNIQUE(user_id, provider), UNIQUE(provider, external_id) )
@@ -381,7 +382,7 @@ TEAMS(           *id, program_id→PROGRAMS, game_id→GAMES?, college_id→COLL
                  name, tag?, description?, region?, timezone?, discord_invite_url?,
                  logo_url?, created_by_user_id→USER?, disbanded_at? )
 TEAM_MEMBERS(    *id, team_id→TEAMS, user_id→USER, role, position?, status, sort_order?,
-                 joined_at, left_at?,
+                 skill_rating?, skill_rating_by?, skill_rating_at?, joined_at, left_at?,
                  UNIQUE(team_id, user_id) )
 TEAM_INVITES(    *id, team_id→TEAMS, token UNIQUE, kind, role, note?,
                  created_by_user_id→USER?, max_uses?, use_count, expires_at?, revoked_at? )
@@ -651,7 +652,7 @@ A member's record — everything fans out from one `user` row:
 
 ```
 User  (Better Auth: + session, account, verification, two_factor)
-├─ Profile             country, age range, dm pref, density                1:1
+├─ Profile             country, age range, dm pref, density, home layout    1:1
 ├─ Platform Identity   discord / battlenet / faceit / startgg / challonge / steam  0..n
 ├─ Staff Role          owner / admin / moderator / tournament_admin        0..n
 ├─ Program Membership  status (per program)                                0..n
@@ -701,7 +702,7 @@ Support Ticket   number, status, priority, assignee, discord_channel_id
 | Cross-site schedule & calendar | `external_matches`, `tournament_participants` | The connect OAuth (FACEIT / start.gg / Challonge) is live; the lazy sync (`lib/schedule.ts`) pulls each connected member's matches/tournaments into `external_matches` on read, and `/schedule` renders them. Live-verified for Challonge; FACEIT/start.gg adapters are code-complete against documented shapes, pending live tokens |
 | Matchmaking (LFG/LFM) | `lfg_profiles`, `team_listings`, `lfg_connections` | Schema-ready — `team_listings` is written by the team actions; `lfg_profiles` / `lfg_connections` have no code yet and the browse/apply UI is WIP |
 | Support tickets | `support_tickets`, `support_ticket_messages`, `support_ticket_notes`, `bot_outbox` | **Live** — staff queue, two-way Discord mirror, outbox bridge |
-| Reference data | `games`, `programs` | Seeded via `db/seed/bootstrap.sql` (`overwatch`, `collegiate-overwatch`); `games.logo_url` points at `/brand/games/overwatch.svg`. `logo_url` is optional brand art for the tournament tiles' bottom-right game mark: a `/public` path (drop the file at `public/brand/games/<slug>.svg`) or absolute URL; no game beyond Overwatch is seeded today, since tournament creation is hardcoded to Overwatch (`GAME_OVERWATCH_ID` in `app/admin/tournaments/actions.ts`). External (cen-sql-scraped) tournaments have no `games` row at all, so `components/brand/GameLogo` also matches their free-text game name against a `KNOWN_GAME_LOGOS` table (normalized, so "CS2" / "Counter-Strike 2" resolve alike) before falling back to a name monogram; `public/brand/games/` has ready-to-use art for `cs2`, `valorant`, `league-of-legends` and `rocket-league` this way even though only Overwatch has a D1 row. Source/platform marks (top-left) are inline in `components/brand/SourceLogo`, sharing real art with `components/brand/ProviderMark` for challonge/faceit/startgg; the Commons mark is real org art at `public/brand/sources/commons.svg` |
+| Reference data | `games`, `programs` | Seeded via `db/seed/bootstrap.sql`: the program `collegiate-overwatch`, and **five games** — `overwatch`, `valorant`, `cs2`, `league-of-legends`, `rocket-league` — each with `logo_url` pointing at its `public/brand/games/<slug>.svg`. `logo_url` is the brand art for the game mark: a `/public` path (drop the file at `public/brand/games/<slug>.svg`) or absolute URL. The games list is read by `lib/games.ts` (`listGames`) to populate the **team game dropdown** ("what are you competing in", on team creation and settings — `teams.game_id`), whose colour + mark come from `lib/games-shared.ts` (`gameGradient` + `components/brand/GameLogo`). Tournament creation is still hardcoded to Overwatch (`GAME_OVERWATCH_ID` in `app/admin/tournaments/actions.ts`); add a game by adding a row here plus its SVG. External (cen-sql-scraped) tournaments have no `games` row at all, so `components/brand/GameLogo` also matches their free-text game name against a `KNOWN_GAME_LOGOS` table (normalized, so "CS2" / "Counter-Strike 2" resolve alike) before falling back to a name monogram; `public/brand/games/` has ready-to-use art for `cs2`, `valorant`, `league-of-legends` and `rocket-league` this way even though only Overwatch has a D1 row. Source/platform marks (top-left) are inline in `components/brand/SourceLogo`, sharing real art with `components/brand/ProviderMark` for challonge/faceit/startgg; the Commons mark is real org art at `public/brand/sources/commons.svg` |
 
 Schema source of truth: [`db/schema.ts`](schema.ts). Migrations:
 [`drizzle/`](../drizzle). Full rebuild: [`db/reset/drop-all.sql`](reset/drop-all.sql)

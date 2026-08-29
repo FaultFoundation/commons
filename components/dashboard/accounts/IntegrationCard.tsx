@@ -23,6 +23,7 @@ export function IntegrationCard({
   linked,
   handle,
   enabled,
+  reachable = null,
   note,
   linkLabel,
   callbackURL = "/account/",
@@ -35,6 +36,9 @@ export function IntegrationCard({
   handle: string | null;
   /** Server-decided: this provider's OAuth secrets are configured. */
   enabled: boolean;
+  /** Public-API reachability (FACEIT/start.gg): false = private account, which
+      we flag; true/null = fine, no message. */
+  reachable?: boolean | null;
   /** Extra fine print — e.g. the Discord server-membership hint. */
   note?: string;
   /** Text on the connect button, e.g. "Link Discord". */
@@ -79,6 +83,14 @@ export function IntegrationCard({
 
       <p className="ff-integration__status">{status}</p>
       {note ? <p className="ff-integration__note">{note}</p> : null}
+
+      {linked && reachable === false ? (
+        <p className="ff-integration__warn" role="status">
+          We couldn&rsquo;t read this account through {label}&rsquo;s API. Set your
+          {" "}
+          {label} profile to public so it can sync with the Commons Project.
+        </p>
+      ) : null}
 
       {error ? (
         <div className="ff-auth__error" role="alert">

@@ -4,7 +4,9 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 
 import { createTeam } from "@/app/teams/actions";
+import { GameSelect } from "@/components/dashboard/teams/GameSelect";
 import { browserTimezone } from "@/components/dashboard/teams/TimezoneRow";
+import type { GameOption } from "@/lib/games-shared";
 import { TEAM_NAME_MAX, TEAM_TAG_MAX } from "@/lib/teams-shared";
 
 /**
@@ -17,19 +19,31 @@ import { TEAM_NAME_MAX, TEAM_TAG_MAX } from "@/lib/teams-shared";
  *
  * Used on both the Teams tab and setup step 3.
  */
-export function CreateTeamForm({ compact }: { compact?: boolean }) {
+export function CreateTeamForm({
+  compact,
+  games,
+}: {
+  compact?: boolean;
+  games: GameOption[];
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [tag, setTag] = useState("");
+  const [gameId, setGameId] = useState(games[0]?.id ?? "");
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending) return;
     setError(null);
     startTransition(async () => {
-      const result = await createTeam({ name, tag, timezone: browserTimezone() });
+      const result = await createTeam({
+        name,
+        tag,
+        gameId,
+        timezone: browserTimezone(),
+      });
       if (!result.ok) {
         setError(result.error);
         return;
@@ -74,6 +88,17 @@ export function CreateTeamForm({ compact }: { compact?: boolean }) {
           onChange={(event) => setTag(event.target.value)}
         />
       </label>
+      {games.length ? (
+        <label className="ff-auth__field">
+          <span className="ff-auth__label">Game</span>
+          <GameSelect
+            value={gameId}
+            games={games}
+            disabled={pending}
+            onChange={setGameId}
+          />
+        </label>
+      ) : null}
       <div className="ff-row__buttons">
         <button
           className="ff-btn"

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { StartTeamDialog } from "@/components/dashboard/teams/StartTeamDialog";
+import type { GameOption } from "@/lib/games-shared";
 
 type Panel = "lft" | "lfm";
 
@@ -16,7 +17,13 @@ type Panel = "lft" | "lfm";
  * (lfg_profiles, team_listings, lfg_connections) shipped, the screens haven't,
  * so for now they say so instead of pretending to be missing.
  */
-export function TeamsActions({ verified }: { verified: boolean }) {
+export function TeamsActions({
+  verified,
+  games,
+}: {
+  verified: boolean;
+  games: GameOption[];
+}) {
   const [open, setOpen] = useState<Panel | null>(null);
   const [startOpen, setStartOpen] = useState(false);
 
@@ -53,6 +60,7 @@ export function TeamsActions({ verified }: { verified: boolean }) {
       <StartTeamDialog
         open={startOpen}
         verified={verified}
+        games={games}
         onClose={() => setStartOpen(false)}
       />
 

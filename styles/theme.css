@@ -1530,7 +1530,12 @@ button.ff-dash__link:hover {
 }
 .ff-bubble__body {
   display: grid;
+  /* An explicit min-0 column (not the implicit `auto`) so a wide child — a deep
+     bracket, a wide table — is held to the bubble's width and scrolls inside
+     its own overflow container instead of stretching the whole card. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--ff-bubble-body-gap);
+  min-width: 0;
 }
 .ff-bubble__wip {
   display: grid;
@@ -1695,6 +1700,17 @@ button.ff-dash__link:hover {
 .ff-integration__note {
   margin: 0;
   color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-xs);
+}
+/* "Set your account to public" hint when a linked FACEIT/start.gg profile can't
+   be read through the provider's public API. */
+.ff-integration__warn {
+  margin: 0;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 196, 83, 0.4);
+  border-radius: var(--ff-radius-md);
+  background: rgba(255, 196, 83, 0.12);
+  color: var(--ff-warn);
   font-size: var(--ff-dash-text-xs);
 }
 /* Pin the button to the bottom so buttons line up across cards of differing
@@ -2142,13 +2158,11 @@ button.ff-dash__link:hover {
 
 /* Reorderable team cards (/teams/). Pointer drag is the fast path; the
    Move up / Move down buttons in each card's header are the keyboard and
-   screen-reader path, and they drive the same reorder. */
-.ff-bubble--draggable {
-  cursor: grab;
-}
-.ff-bubble--draggable:active {
-  cursor: grabbing;
-}
+   screen-reader path, and they drive the same reorder.
+
+   The grab cursor lives on the .ff-drag-grip alone — a card only ever drags
+   from that 9-dot grip, so putting `cursor: grab` on the whole card was a lie:
+   it invited a drag anywhere the pointer landed, links and buttons included. */
 .ff-bubble--dragging {
   opacity: 0.45;
 }
@@ -2213,6 +2227,8 @@ button.ff-dash__link:hover {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .ff-roster__select {
   width: auto;
@@ -2341,6 +2357,266 @@ button.ff-dash__link:hover {
    bottom margin under the alternates above it. */
 .ff-dialog--unlock .ff-auth__alts {
   margin-bottom: 0;
+}
+
+/* Getting Started onboarding — a big modal (covers most of the screen) that
+   walks a new member through the setup checklist. */
+.ff-dialog--getstarted {
+  width: min(720px, calc(100% - 24px));
+  padding: 28px;
+  max-height: min(88vh, 760px);
+  overflow-y: auto;
+}
+.ff-getstarted__eyebrow {
+  display: inline-block;
+  font-size: var(--ff-dash-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ff-accent);
+  font-weight: 700;
+}
+.ff-getstarted__title {
+  margin-top: 6px;
+  font-size: var(--ff-dash-text-xl);
+}
+.ff-getstarted__lede {
+  margin-bottom: 14px;
+}
+.ff-getstarted__progress {
+  height: 8px;
+  border-radius: var(--ff-radius-pill);
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.ff-getstarted__progress-bar {
+  display: block;
+  height: 100%;
+  background: var(--ff-ok);
+  transition: width var(--ff-transition);
+}
+.ff-getstarted__count {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-getstarted__steps {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ff-getstarted__step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-surface-2);
+}
+.ff-getstarted__step--done {
+  opacity: 0.72;
+}
+.ff-getstarted__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: var(--ff-radius-pill);
+  border: 1px solid var(--ff-border);
+  color: var(--ff-navy-900);
+}
+.ff-getstarted__step--done .ff-getstarted__check {
+  background: var(--ff-ok);
+  border-color: var(--ff-ok);
+}
+.ff-getstarted__step-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.ff-getstarted__step-label {
+  font-weight: 700;
+}
+.ff-getstarted__step-desc {
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+}
+.ff-getstarted__done-tag {
+  flex: none;
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  color: var(--ff-ok);
+}
+.ff-getstarted__actions {
+  margin-top: 20px;
+}
+
+/* ===========================================================================
+   Home board — the customizable widget dashboard (/home/). A toolbar with the
+   "+" customize control over a grid of draggable widget bubbles; each widget is
+   a condensed list that links into the tab it mirrors.
+   =========================================================================== */
+.ff-home-board__toolbar {
+  justify-content: flex-end;
+}
+.ff-home-board__toolbar .ff-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Overview widget: two side-by-side columns that collapse when narrow. */
+.ff-hw-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+}
+.ff-hw-col__label {
+  margin: 0 0 8px;
+  font-size: var(--ff-dash-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ff-text-dim);
+  font-weight: 700;
+}
+
+.ff-hw-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ff-hw-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: var(--ff-row-pad-y) var(--ff-row-pad-x);
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-surface-2);
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color var(--ff-transition),
+    background var(--ff-transition);
+}
+.ff-hw-row:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.03);
+}
+.ff-hw-row--static:hover {
+  border-color: var(--ff-border);
+  background: var(--ff-surface-2);
+}
+.ff-hw-row__mark {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+.ff-hw-row__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.ff-hw-row__title {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ff-hw-row__sub {
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ff-hw-row__meta {
+  flex: none;
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+  white-space: nowrap;
+}
+.ff-hw-tag {
+  flex: none;
+  padding: 2px 9px;
+  border-radius: var(--ff-radius-pill);
+  border: 1px solid var(--ff-border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ff-hw-tag--live {
+  border-color: rgba(95, 208, 138, 0.5);
+  background: rgba(95, 208, 138, 0.16);
+  color: var(--ff-ok);
+}
+.ff-hw-empty {
+  margin: 0;
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+}
+.ff-hw-more {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+  color: var(--ff-text);
+  text-decoration: none;
+}
+.ff-hw-more:hover {
+  text-decoration: underline;
+}
+
+/* Customize Home popup — a checklist of available widgets. */
+.ff-dialog--customize {
+  width: min(460px, calc(100% - 32px));
+}
+.ff-customize__list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ff-customize__item {
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-surface-2);
+}
+.ff-customize__label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+.ff-customize__label input {
+  margin-top: 3px;
+}
+.ff-customize__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ff-customize__name {
+  font-weight: 700;
+}
+.ff-customize__desc {
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
 }
 
 /* Crop popup (react-avatar-editor inside the ConfirmDialog shell). */
@@ -2849,6 +3125,9 @@ button.ff-dash__link:hover {
 .ff-bracket {
   display: grid;
   gap: var(--ff-space-section, 28px);
+  /* Let the scroll containers below shrink to the bubble instead of forcing
+     their intrinsic (max-content) width onto the card. */
+  min-width: 0;
 }
 .ff-bracket__source {
   margin: 0;
@@ -2866,6 +3145,9 @@ button.ff-dash__link:hover {
   gap: 20px;
   overflow-x: auto;
   padding-bottom: 8px;
+  /* A grid item defaults to min-width:auto, which would let this row grow to
+     its content width and blow past the bubble; 0 lets overflow-x do its job. */
+  min-width: 0;
 }
 .ff-bracket__round {
   display: flex;
@@ -3069,8 +3351,10 @@ button.ff-dash__link:hover {
   font-weight: 700;
   white-space: nowrap;
 }
+/* "Registration Open" and "Active" read as go-states, so they're green rather
+   than the yellow accent (which we reserve for the current-view/selected UI). */
 .ff-tcard__status--live {
-  background: var(--ff-accent);
+  background: var(--ff-ok);
   color: var(--ff-navy-900);
 }
 .ff-tcard__body {
@@ -3342,7 +3626,7 @@ button.ff-dash__link:hover {
   letter-spacing: 0.05em;
 }
 .ff-thero__status--live {
-  background: var(--ff-accent);
+  background: var(--ff-ok);
   color: var(--ff-navy-900);
 }
 .ff-thero__title {
@@ -3387,6 +3671,194 @@ button.ff-dash__link:hover {
 }
 .ff-stat__value--hi {
   color: var(--ff-accent);
+}
+
+/* ===========================================================================
+   Team cards (/teams/) — the tournament menu's colour + graphics applied to a
+   team: a game-tinted banner (logo, name, role, game mark) over a stat row.
+   Reorderable, so they layer the ff-bubble--draggable state classes on top.
+   =========================================================================== */
+.ff-team-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-lg);
+  background: var(--ff-surface-2);
+  overflow: hidden;
+  box-shadow: var(--ff-shadow-card);
+  transition:
+    border-color var(--ff-transition),
+    box-shadow var(--ff-transition),
+    opacity var(--ff-transition);
+}
+.ff-team-card:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.ff-team-card--feature {
+  grid-column: 1 / -1;
+}
+.ff-team-card__banner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 116px;
+  padding: 14px 16px;
+  /* background is set inline per game (lib/games-shared.ts gameGradient). */
+}
+/* Legibility scrim under the name, over any banner colour. */
+.ff-team-card__banner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 10, 25, 0) 35%,
+    rgba(0, 10, 25, 0.5) 100%
+  );
+  pointer-events: none;
+}
+.ff-team-card--feature .ff-team-card__banner {
+  min-height: 140px;
+}
+.ff-team-card__top,
+.ff-team-card__identity {
+  position: relative;
+  z-index: 1;
+}
+.ff-team-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+/* Role badge over a bright banner: dark backdrop for legibility, role colour
+   kept only as the border hint. */
+.ff-team-card__top .ff-badge {
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+}
+.ff-team-card__name {
+  margin: 0;
+  font-size: var(--ff-dash-text-lg);
+  font-weight: 800;
+  line-height: 1.2;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+.ff-team-card--feature .ff-team-card__name {
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+}
+.ff-team-card__sub {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--ff-dash-text-sm);
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.ff-team-card__game {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  z-index: 1;
+}
+.ff-team-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.ff-team-card__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 26px;
+}
+.ff-team-card__events {
+  margin: 0;
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ff-team-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ff-team-card__actions,
+.ff-team-card__handle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The single-team page header — the same card, blown up. */
+.ff-team-hero__banner {
+  min-height: 152px;
+}
+.ff-team-hero .ff-team-card__name {
+  font-size: clamp(1.35rem, 3.5vw, 2rem);
+}
+
+/* Roster SR: the value plus a "who reported it" tag, and the inline editor. */
+.ff-roster__value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.ff-sr {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--ff-dash-text-xs);
+}
+.ff-sr--empty {
+  color: var(--ff-text-dim);
+  opacity: 0.7;
+}
+.ff-sr__val {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ff-sr__by {
+  padding: 1px 7px;
+  border-radius: var(--ff-radius-pill);
+  border: 1px solid var(--ff-border);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ff-text-dim);
+}
+.ff-sr__by--self {
+  border-color: rgba(95, 208, 138, 0.5);
+  background: rgba(95, 208, 138, 0.14);
+  color: var(--ff-ok);
+}
+.ff-sr__by--manager {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.06);
+}
+.ff-sr-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ff-sr-editor__input {
+  width: 8em;
+  margin: 0;
+}
+.ff-sr-editor__hint {
+  flex-basis: 100%;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
 }
 
 /* Small banner preview on the admin Banner row. */
@@ -3946,7 +4418,9 @@ button.ff-dash__link:hover {
 }
 .ff-bracket__connectors path {
   fill: none;
-  stroke: var(--ff-border);
+  /* Whiter than the game-box borders so the feed lines read as their own layer
+     rather than blending into the cards they connect. */
+  stroke: rgba(255, 255, 255, 0.55);
   stroke-width: 2;
 }
 /* Match cards sit above the connector lines, so an elbow tucks under the card. */

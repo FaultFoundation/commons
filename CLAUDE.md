@@ -259,6 +259,16 @@ Each card degrades to disabled when its OAuth secrets are unset. This member
 `CHALLONGE_CLIENT_*` OAuth is distinct from the org `CHALLONGE_API_V1_KEY` that
 runs the tournament backend (above).
 
+For a linked FACEIT/start.gg account, `loadConnectIntegrations`
+([lib/integrations.ts](lib/integrations.ts)) also **tests public reachability**:
+it reads the member back through the server key by their stored external id (the
+same path the schedule sync uses), lazily past a 30-min TTL cached in
+`platform_identities.metadata`. Only a *definitive* negative from a successful
+call flags the account as private — the card then shows a "set your profile to
+public to sync" hint — so an outage/timeout/missing key stays `null` (no hint)
+and never cries wolf. Challonge is read via the member's own OAuth token, so it
+has no such check.
+
 `/schedule` is the payoff: [lib/schedule.ts](lib/schedule.ts) pulls each
 connected member's matches/tournaments into `external_matches` and the page
 renders them as one calendar. Same Workers-shaped constraints as everything

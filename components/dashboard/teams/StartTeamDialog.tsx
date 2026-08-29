@@ -8,7 +8,9 @@ import {
   CopyInviteButton,
   inviteUrl,
 } from "@/components/dashboard/teams/CopyInviteButton";
+import { GameSelect } from "@/components/dashboard/teams/GameSelect";
 import { browserTimezone } from "@/components/dashboard/teams/TimezoneRow";
+import type { GameOption } from "@/lib/games-shared";
 import { TEAM_NAME_MAX, TEAM_TAG_MAX } from "@/lib/teams-shared";
 
 /**
@@ -28,10 +30,12 @@ import { TEAM_NAME_MAX, TEAM_TAG_MAX } from "@/lib/teams-shared";
 export function StartTeamDialog({
   open,
   verified,
+  games,
   onClose,
 }: {
   open: boolean;
   verified: boolean;
+  games: GameOption[];
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -41,6 +45,7 @@ export function StartTeamDialog({
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [tag, setTag] = useState("");
+  const [gameId, setGameId] = useState(games[0]?.id ?? "");
   const [created, setCreated] = useState<{ teamId: string; token: string } | null>(
     null,
   );
@@ -59,16 +64,22 @@ export function StartTeamDialog({
     setError(null);
     setName("");
     setTag("");
+    setGameId(games[0]?.id ?? "");
     setCreated(null);
     setPending(false);
-  }, [open]);
+  }, [open, games]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending) return;
     setError(null);
     setPending(true);
-    const result = await createTeam({ name, tag, timezone: browserTimezone() });
+    const result = await createTeam({
+      name,
+      tag,
+      gameId,
+      timezone: browserTimezone(),
+    });
     setPending(false);
     if (!result.ok) {
       setError(result.error);
@@ -126,6 +137,17 @@ export function StartTeamDialog({
                   onChange={(event) => setTag(event.target.value)}
                 />
               </label>
+              {games.length ? (
+                <label className="ff-auth__field">
+                  <span className="ff-auth__label">Game</span>
+                  <GameSelect
+                    value={gameId}
+                    games={games}
+                    disabled={pending}
+                    onChange={setGameId}
+                  />
+                </label>
+              ) : null}
               {error ? (
                 <div className="ff-auth__error" role="alert">
                   <p>{error}</p>

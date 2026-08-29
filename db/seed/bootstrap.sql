@@ -3,8 +3,16 @@
 --   wrangler d1 execute website-sql --local  --file=db/seed/bootstrap.sql
 --   wrangler d1 execute website-sql --remote --file=db/seed/bootstrap.sql
 
+-- Games a team can pick from (the "what are you competing in" dropdown on team
+-- creation) — each needs matching art under public/brand/games/. Overwatch is
+-- still the program's game; the rest are here so teams and tournaments can be
+-- tagged with the right mark. Add a game by adding a row here plus its SVG.
 INSERT INTO games (id, slug, name, logo_url) VALUES
-  ('overwatch', 'overwatch', 'Overwatch 2', '/brand/games/overwatch.svg')
+  ('overwatch', 'overwatch', 'Overwatch 2', '/brand/games/overwatch.svg'),
+  ('valorant', 'valorant', 'Valorant', '/brand/games/valorant.svg'),
+  ('cs2', 'cs2', 'Counter-Strike 2', '/brand/games/cs2.svg'),
+  ('league-of-legends', 'league-of-legends', 'League of Legends', '/brand/games/league-of-legends.svg'),
+  ('rocket-league', 'rocket-league', 'Rocket League', '/brand/games/rocket-league.svg')
 ON CONFLICT(id) DO UPDATE SET
   slug = excluded.slug,
   name = excluded.name,

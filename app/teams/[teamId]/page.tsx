@@ -1,19 +1,20 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { Avatar } from "@/components/dashboard/Avatar";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { DangerZonePanel } from "@/components/dashboard/teams/DangerZonePanel";
 import { InvitePanel } from "@/components/dashboard/teams/InvitePanel";
 import { RosterPanel } from "@/components/dashboard/teams/RosterPanel";
+import { TeamHero } from "@/components/dashboard/teams/TeamHero";
 import { TeamSettingsRows } from "@/components/dashboard/teams/TeamSettingsRows";
 import { TournamentPanel } from "@/components/dashboard/teams/TournamentPanel";
+import { listGames } from "@/lib/games";
 import { getSessionCached } from "@/lib/session";
 import { listSchoolCountries } from "@/lib/registration";
 import { getTeamDetail, getTeamMembership } from "@/lib/teams";
-import { TEAM_ROLE_LABELS, can } from "@/lib/teams-shared";
+import { can } from "@/lib/teams-shared";
 
 // Session-gated: always rendered per request.
 export const dynamic = "force-dynamic";
@@ -55,46 +56,36 @@ export default async function TeamPage({
 
   const role = membership.role;
   const editsSettings = can(role, "editSettings");
-  // Only the region picker needs the school directory — don't pay for it
-  // otherwise. Scores are entered staff-side now (Challonge), so there's no
-  // per-team reporting fetch here anymore.
-  const countries = editsSettings ? await listSchoolCountries() : [];
+  // Only editors need the school directory (region picker) and the game list —
+  // don't pay for either otherwise. Scores are entered staff-side now
+  // (Challonge), so there's no per-team reporting fetch here anymore.
+  const [countries, games] = editsSettings
+    ? await Promise.all([listSchoolCountries(), listGames()])
+    : [[], []];
   const managerCount = team.roster.filter((m) => m.role === "manager").length;
 
   return (
     <DashboardShell active="teams" setupUserId={session.user.id}>
       <h1 className="screen-reader-text">{team.name}</h1>
       <div className="ff-bubble-grid ff-bubble-grid--single">
-        <Bubble
-          title={team.tag ? `${team.name} [${team.tag}]` : team.name}
-          /* Everyone sees the logo; only members who may edit settings also
-             get the upload row below. */
-          media={
-            <Avatar src={team.logoUrl} name={team.name} shape="team" size="md" />
-          }
-          actions={
-            <span className={`ff-badge ff-badge--${role}`}>
-              {TEAM_ROLE_LABELS[role]}
-            </span>
-          }
-        >
-          {/* Navigation first: trailing it after the settings list buries it
-              under the invite block. */}
-          <div className="ff-row__buttons ff-bubble__nav">
-            <a className="ff-btn ff-btn--outline ff-btn--sm" href="/teams/">
-              All Teams
-            </a>
-            {team.discordInviteUrl ? (
-              <a
-                className="ff-btn ff-btn--sm"
-                href={team.discordInviteUrl}
-                target="_blank"
-                rel="noreferrer noopener"
-              >
-                Team Discord
-              </a>
-            ) : null}
-          </div>
+        {/* Identity + stats + quick links, with the game's colour and mark —
+            the "boring, spread-apart" header replaced by a hero. */}
+        <TeamHero
+          name={team.name}
+          tag={team.tag}
+          role={role}
+          logoUrl={team.logoUrl}
+          gameId={team.gameId}
+          gameName={team.gameName}
+          gameLogoUrl={team.gameLogoUrl}
+          collegeName={team.collegeName}
+          memberCount={team.roster.length}
+          avgSr={team.avgSr}
+          tournamentCount={team.entries.length}
+          discordInviteUrl={team.discordInviteUrl}
+        />
+
+        <Bubble title="Team Settings">
           <TeamSettingsRows
             teamId={team.id}
             name={team.name}
@@ -105,6 +96,9 @@ export default async function TeamPage({
             timezone={team.timezone}
             discordInviteUrl={team.discordInviteUrl}
             logoUrl={team.logoUrl}
+            gameId={team.gameId}
+            gameName={team.gameName}
+            games={games}
             countries={countries}
             editable={editsSettings}
           />

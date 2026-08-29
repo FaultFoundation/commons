@@ -5,6 +5,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { TeamCardGrid } from "@/components/dashboard/teams/TeamCardGrid";
 import { TeamsActions } from "@/components/dashboard/teams/TeamsActions";
+import { listGames } from "@/lib/games";
 import { getRegistrationStateCached } from "@/lib/registration";
 import { getSessionCached } from "@/lib/session";
 import { listMyTeams } from "@/lib/teams";
@@ -23,9 +24,10 @@ export default async function TeamsPage() {
     redirect("/login/");
   }
 
-  const [myTeams, registration] = await Promise.all([
+  const [myTeams, registration, games] = await Promise.all([
     listMyTeams(session.user.id),
     getRegistrationStateCached(session.user.id),
+    listGames(),
   ]);
   const verified = registration?.status === "VERIFIED";
 
@@ -35,7 +37,7 @@ export default async function TeamsPage() {
 
       {/* Starting, finding and recruiting are actions, not cards — the tab
           itself is the member's teams. */}
-      <TeamsActions verified={verified} />
+      <TeamsActions verified={verified} games={games} />
 
       {/* The cards are rearrangeable, so the order lives client-side — the
           reads all still happen here. */}

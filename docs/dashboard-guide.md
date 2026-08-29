@@ -432,8 +432,47 @@ shell.
    `authClient` (or a server action for domain logic), then
    `router.refresh()` so the server tree re-renders.
 4. Keep the bubble self-contained: it must not care where in the grid it
-   lives. That's what makes the future Home widget view possible —
+   lives. That's what makes the Home widget board work (below) —
    condensed variants of these same bubbles.
+
+## The Home board (customizable widgets)
+
+`/home/` is not a fixed page — it's a **board of draggable widgets** the member
+arranges themselves. Each widget is a *condensed view of another tab*: At a
+Glance (active tournaments + next matches), Tournaments, Upcoming Matches, and My
+Teams. The member reorders them by dragging (the same
+`useReorderableGrid` + `DragGrip` template the Teams cards use — first widget
+spans the grid, per the top-bubble rule) and adds/removes them from the **+
+Customize Home** popup.
+
+- **The registry is the single source of truth.** `lib/home-shared.ts`
+  (`HOME_WIDGETS`, `DEFAULT_HOME_LAYOUT`, `asHomeLayout`) lists every widget a
+  member can pin. `components/dashboard/home/HomeBoard.tsx` renders each id's
+  condensed content; `app/home/page.tsx` fetches **all** widget data once
+  (regardless of what's enabled) so toggling a widget is instant.
+- **Persistence** is `profiles.home_layout` (a JSON array of widget ids) via
+  `setHomeLayout` (`app/home/actions.ts`) — purely presentational, like
+  `density`, so there's no capability to check and a tampered payload can at
+  worst reorder/hide the caller's own widgets (`asHomeLayout` drops unknown
+  ids). `[]` is a valid empty board.
+- **THE RULE — keep Home in sync.** Every widget reads the *same data source*
+  as the tab it mirrors (`listMyTeams`, `listTournaments`, `loadSchedule`), so a
+  change to a tab's bubbles shows up on Home automatically — never fork the read.
+  **When you add a new tab or a standalone bubble a member should be able to pin,
+  add a widget entry to `HOME_WIDGETS` and render it in `HomeBoard`.** That is
+  what keeps "any new bubble is reachable from Home" true; a new surface that
+  isn't reachable from Home is an incomplete change.
+
+## Getting Started onboarding
+
+`SetupBanner` (shell-owned) also mounts `GettingStartedDialog` — a large modal
+(the 2FA-style native `<dialog>`, sized up to cover most of the screen) that
+**auto-opens once a session** while any setup step is outstanding, so a fresh
+sign-up lands in a guided checklist rather than a bare dashboard. It runs off the
+**same single D1 read** the amber banner already does (academic verified /
+Discord linked / on a team / entered a tournament), dismissal is a
+`sessionStorage` flag, and the banner remains the persistent nudge afterward.
+It's presentation only — every step's real gate is still server-side.
 
 ## Team roles
 
@@ -484,15 +523,31 @@ mean nothing to a signed-out visitor — so it falls back to the auth pages'
 container inside a plain `ff-dash` wrapper (`.ff-join`).
 
 Team layout: `/teams/` is an action row (`TeamsActions`) over the member's team
-cards; `/teams/<id>/` is a **single-column** `ff-bubble-grid--single` in
-priority order — header (identity + settings + the Invite Players disclosure),
-Roster, Tournaments, Danger Zone. There is no separate Team Settings bubble;
-`TeamSettingsRows` is the header's row set, and a team's region/timezone are
-prefilled at creation from the creator's verified college (`getCollegeRegion`)
-and their browser zone, then edited through dropdowns (`RegionRow` uses the same
-`schools` country list the registration form does). The Tournaments bubble is
-the entry control — a manager/captain enters or withdraws the team, which
-adds/removes it as a Challonge participant.
+cards (`TeamCardGrid`); `/teams/<id>/` leads with a **hero** (`TeamHero`) then a
+**single-column** `ff-bubble-grid--single` in priority order — Team Settings
+(identity settings + the Invite Players disclosure), Roster, Tournaments, Danger
+Zone. A team's region/timezone are prefilled at creation from the creator's
+verified college (`getCollegeRegion`) and their browser zone, then edited through
+dropdowns (`RegionRow` uses the same `schools` country list the registration form
+does). The Tournaments bubble is the entry control — a manager/captain enters or
+withdraws the team, which adds/removes it as a Challonge participant.
+
+**Team cards + hero carry the tournament menu's colour and graphics.** Both the
+`.ff-team-card` grid tiles and the `TeamHero` header render a **game-tinted
+banner** (`gameGradient(gameId)` from `lib/games-shared.ts`) with the team logo,
+name, role badge and the game's mark (`components/brand/GameLogo`) in the corner,
+over a stat strip (roster · avg SR · tournaments). The game is chosen from a
+dropdown (`GameSelect`, options from `lib/games.ts` `listGames`) at creation and
+in Team Settings — `teams.game_id`. Cards stay draggable: `cursor: grab` lives on
+the `.ff-drag-grip` alone, never the whole card, so a card only drags from its
+9-dot grip.
+
+**Roster SR.** Each roster row shows the member's Overwatch SR with a tag saying
+who reported it — **self-reported** vs **reported by a manager** — derived from
+`team_members.skill_rating_by` compared to the member's own id, never a role name
+inline. `setMemberSkillRating` gates on "self, or `manageRoster`", so a player
+may report their own and a manager may report for the team; the team card and
+hero show the roster's average.
 
 ## Tournaments (Challonge-backed)
 

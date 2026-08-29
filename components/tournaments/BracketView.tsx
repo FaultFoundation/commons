@@ -256,9 +256,14 @@ function RoundGrid({
           const from = rects.get(`${r}:${m}`);
           const to = rects.get(`${r + 1}:${Math.floor(m / 2)}`);
           if (!from || !to) continue;
-          const startX = from.x + from.w;
+          // Center-to-center: from the middle of one match to the middle of its
+          // successor. The match cards sit above the SVG (z-index), and their
+          // fill is opaque, so the portion of the line that runs inside a card
+          // is hidden — what shows is a clean curve spanning the gap, anchored
+          // on each card's centre rather than clipped to its edge.
+          const startX = from.x + from.w / 2;
           const startY = from.y + from.h / 2;
-          const endX = to.x;
+          const endX = to.x + to.w / 2;
           const endY = to.y + to.h / 2;
           // A smooth S-curve: a cubic Bézier whose control points sit at the
           // horizontal midpoint, so the line leaves the match horizontally,

@@ -240,6 +240,7 @@ export default async function AccountPage({
                 linked={c.linked}
                 handle={c.handle}
                 enabled={c.enabled}
+                reachable={c.reachable}
                 linkLabel={c.linkLabel}
                 callbackURL="/account/"
               />

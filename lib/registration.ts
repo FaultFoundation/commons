@@ -430,6 +430,8 @@ export async function ensureProfile(
     country?: string | null;
     /** compact | cozy | comfortable — see lib/density.ts. */
     density?: string;
+    /** JSON array of Home widget ids (lib/home-shared.ts), or null to reset. */
+    homeLayout?: string | null;
   },
 ): Promise<string> {
   const db = getDb();

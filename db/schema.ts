@@ -203,6 +203,11 @@ export const profiles = sqliteTable("profiles", {
   // rows (lib/density.ts). Source of truth; the ff-density cookie caches it so
   // the shell doesn't read D1 on every render.
   density: text("density").notNull().default("cozy"),
+  // The member's Home tab arrangement: an ordered JSON array of widget ids the
+  // client renders as draggable bubbles (see lib/home-shared.ts). NULL = the
+  // default set. Source of truth; purely presentational, like `density` — no
+  // capability gates it because it only affects what the member sees.
+  homeLayout: text("home_layout"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -477,6 +482,14 @@ export const teamMembers = sqliteTable(
     // lib/teams-shared.ts. Distinct from `position`, which is the in-game role.
     role: text("role").notNull().default("player"),
     position: text("position"), // e.g. tank | damage | support
+    // Overwatch skill rating (SR), shown on the roster and averaged on a team's
+    // tournament entry. `skillRatingBy` holds the reporter's user id (plain text,
+    // no FK — it only ever feeds a self-vs-manager comparison against this row's
+    // userId, and must survive that reporter's account deletion); `skillRatingAt`
+    // timestamps the last report. All nullable — a team may never track SR.
+    skillRating: integer("skill_rating"),
+    skillRatingBy: text("skill_rating_by"),
+    skillRatingAt: integer("skill_rating_at", { mode: "timestamp_ms" }),
     // Leaving flips this to inactive rather than deleting the row, so the
     // team/user unique index turns a rejoin into a reactivation.
     status: text("status").notNull().default("active"), // active | inactive

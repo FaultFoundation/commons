@@ -8,6 +8,7 @@ import { SetupShell } from "@/components/dashboard/setup/SetupShell";
 import { CopyInviteButton } from "@/components/dashboard/teams/CopyInviteButton";
 import { CreateTeamForm } from "@/components/dashboard/teams/CreateTeamForm";
 import { JoinByLinkForm } from "@/components/dashboard/teams/JoinByLinkForm";
+import { listGames } from "@/lib/games";
 import { getRegistrationStateCached } from "@/lib/registration";
 import { getSessionCached } from "@/lib/session";
 import { listMyTeams } from "@/lib/teams";
@@ -26,9 +27,10 @@ export default async function TeamSetupPage() {
     redirect("/login/");
   }
 
-  const [myTeams, reg] = await Promise.all([
+  const [myTeams, reg, games] = await Promise.all([
     listMyTeams(session.user.id),
     getRegistrationStateCached(session.user.id),
+    listGames(),
   ]);
   const status = reg?.status ?? null;
   const verified = status === "VERIFIED";
@@ -71,7 +73,7 @@ export default async function TeamSetupPage() {
                 label="Looking for Players"
                 note="Create a team and invite people with a link."
               >
-                <CreateTeamForm compact />
+                <CreateTeamForm compact games={games} />
               </Disclosure>
               <Disclosure
                 label="Looking for a Team"

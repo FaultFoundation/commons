@@ -255,7 +255,8 @@ export default async function TournamentPage({
                     {entrantLabel(p.teamName, p.teamTag)}
                   </div>
                   <div className="ff-pcard__sr">
-                    Avg SR <span className="ff-pcard__sr-val">—</span>
+                    Avg SR{" "}
+                    <span className="ff-pcard__sr-val">{p.avgSr ?? "—"}</span>
                   </div>
                 </div>
               ))}

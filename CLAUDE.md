@@ -314,16 +314,26 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   [app/tournaments/[id]/page.tsx](app/tournaments/[id]/page.tsx) `safeDecode`s
   the param and branches: `isTournamentId` (6-digit) → internal; otherwise
   `getExternalTournament` → [ExternalTournamentView](components/dashboard/tournaments/ExternalTournamentView.tsx),
-  which reuses the internal hero template plus final standings and keeps a
-  "View on start.gg/FACEIT" out-link. The bracket is
-  [ExternalBracket](components/dashboard/tournaments/ExternalBracket.tsx): it
-  reuses the internal bracket's `ff-bracket__*` card/column CSS but is driven by
-  the scraped matches, so the round headers are the provider's own names
-  ("Winners Round 1", "Grand Final", "Losers Semi-Final") — grouped by round,
-  split into Winners/Losers sections. There are no feed-forward connectors: the
-  projection has no match-to-match structure to draw them from (unlike the
-  Challonge snapshot's signed rounds), so the columns + real round names carry
-  the shape.
+  which reuses the internal hero template plus an "About" bubble (the provider
+  blurb) and final standings, and keeps a "View on start.gg/FACEIT" out-link.
+  The bracket is
+  [ExternalBracket](components/dashboard/tournaments/ExternalBracket.tsx) (a
+  client component): it reuses the internal `BracketView`'s `ff-bracket__*`
+  card/column **and connector** CSS and is driven by the scraped matches — the
+  round headers are the provider's own names ("Winners Round 1", "Grand Final",
+  "Losers Semi-Final"; FACEIT's numeric rounds are dressed as "Round N"), each
+  side shows its score with the winner highlighted, and every card deep-links to
+  the provider's own match/result page (start.gg set URLs are built from the
+  event slug; FACEIT uses the match room URL). Columns are ordered by
+  `round_order` (signed: +winners/−losers) and matches within a column by
+  `order_key` (start.gg's set identifier), both now carried in the projection.
+  Feed-forward connectors are the same measured elbow overlay the internal
+  bracket draws (round-r match m → round-(r+1) match ⌊m/2⌋) but are drawn **only
+  between two adjacent columns that actually merge 2:1** (next has ⌈cur/2⌉
+  matches). Real brackets are messy (play-ins, byes, grand-final resets,
+  losers-bracket zig-zags) and FACEIT championships are usually swiss, so the
+  guard means a clean single/double-elim gets its tree while everything else
+  renders as honest plain columns rather than wrong lines.
 - **The dashboard shell for the whole tab lives in
   [app/tournaments/layout.tsx](app/tournaments/layout.tsx)**, not the pages, so
   `loading.tsx` skeletons and `[id]/error.tsx` render inside the content area

@@ -27,7 +27,7 @@ by the sibling `cen-news-notifications` scraper. The Commons never writes it.
 |---|---|---|
 | External tournament catalog | `ext_tournaments` | Source id, name/game, start/end window, location, native URL, `banner_url` (cover art) + `description` (blurb) for the branded tile/detail hero |
 | Provider bracket/event | `ext_events` | Tournament parent, provider event id/state, entrant count |
-| Public match calendar | `ext_matches` | Event parent, provider match id, optional schedule/state/round, two entrant labels, native URL |
+| Public match calendar + bracket | `ext_matches` | Event parent, provider match id, optional schedule/state/round, `round_order` (signed: +winners/−losers, for column order) + `order_key` (within-round bracket position), two entrant labels + `entrant_1_score`/`entrant_2_score`, `winner` (1/2/null), native match-page URL |
 | Final results | `ext_standings` | Event parent, entrant label/type and placement |
 
 `ext_matches.scheduled_at` is nullable by design: start.gg often leaves a
@@ -39,9 +39,13 @@ than inventing a time. `banner_url` comes from FACEIT (the championship
 `cover_image`, else the **organizer's** cover/avatar — most championships leave
 their own image empty even when the site shows the organizer's banner) or
 start.gg's banner image; `description` comes from the FACEIT championship blurb
-or start.gg's `rules` field (the organizer's about/details text). All ids are
-deterministic strings from provider lineage, so projection imports upsert the
-same logical rows.
+or start.gg's `rules` field (the organizer's about/details text). The branded
+bracket view reads `round_order`/`order_key` to lay matches out in columns
+top-to-bottom (and to draw feed-forward connectors where a column merges 2:1),
+`entrant_*_score` + `winner` to show scores beside each name with the winner
+highlighted, and `url` as a deep link to that match's own result page (a
+start.gg set URL / a FACEIT match room). All ids are deterministic strings from
+provider lineage, so projection imports upsert the same logical rows.
 
 Relational form:
 
@@ -52,7 +56,8 @@ EXT_TOURNAMENTS(*id, source, source_tournament_id, name, slug, game,
 EXT_EVENTS(*id, tournament_id→EXT_TOURNAMENTS, source_event_id, name?, state?,
            num_entrants?)
 EXT_MATCHES(*id, event_id→EXT_EVENTS, source_match_id, scheduled_at?, state?,
-            round?, entrant_1_name?, entrant_2_name?, url?)
+            round?, round_order?, order_key?, entrant_1_name?, entrant_2_name?,
+            entrant_1_score?, entrant_2_score?, winner?, url?)
 EXT_STANDINGS(*id, event_id→EXT_EVENTS, entrant_name, is_team, placement?)
 ```
 

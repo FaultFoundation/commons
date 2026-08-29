@@ -1,30 +1,42 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+
 import type {
   ExternalTournamentDetail,
   ExternalTournamentMatch,
 } from "@/lib/external-tournaments";
 
 // The branded bracket for an external (start.gg / FACEIT) tournament. It reuses
-// the internal bracket's card/column styling (the ff-bracket__* classes) but is
-// driven by the scraped matches, so the ROUND NAMES are the provider's own
-// ("Winners Round 1", "Grand Final", "Losers Semi-Final", …) rather than the
-// generic labels the Challonge-backed BracketView derives. Rounds are laid out
-// as columns; there are no feed-forward connectors because the projection has
-// no match-to-match structure to draw them from — the columns + real round
-// names give the bracket its shape.
+// the internal BracketView's column + connector styling (the ff-bracket__*
+// classes), but is driven by the scraped matches: the ROUND NAMES are the
+// provider's own ("Winners Round 1", "Grand Final", "Round 3"), each side shows
+// its score, the winner is highlighted, and every card deep-links to the
+// provider's own match/result page.
+//
+// Feed-forward connectors are the same elbow overlay the internal bracket draws
+// — round-r match m feeds round-(r+1) match floor(m/2) — but here they are drawn
+// only between two adjacent columns that ACTUALLY merge 2:1 (next has
+// ceil(cur/2) matches). Real brackets are messy (play-ins, byes, grand-final
+// resets, losers-bracket zig-zags), so this guard means a clean single/double
+// elim gets its tree while swiss/league (and the odd non-merging column) render
+// as honest plain columns rather than wrong lines.
 
-type BracketRound = {
-  label: string;
-  timeLabel: string;
-  matches: ExternalTournamentMatch[];
-};
-
-// A round belongs to the losers bracket when its provider name says so. Kept
-// deliberately loose to catch start.gg / FACEIT spellings ("Losers", "Loser's",
-// "Lower", "LB").
 const LOSERS_RE = /los(?:er|ers|ing)?|lower|\blb\b/i;
 
-function isLosersRound(name: string | null): boolean {
-  return name != null && LOSERS_RE.test(name);
+function isLosers(m: ExternalTournamentMatch): boolean {
+  if (m.roundOrder != null) return m.roundOrder < 0;
+  return LOSERS_RE.test(m.round ?? "");
+}
+
+/** Natural order for start.gg set identifiers ("A".."Z".."AA".."AB"): shorter
+    first, then lexical, so "B" sorts before "AA". Null keys sort last. */
+function compareOrderKeys(a: string | null, b: string | null): number {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  if (a.length !== b.length) return a.length - b.length;
+  return a.localeCompare(b);
 }
 
 function roundTimeLabel(matches: ExternalTournamentMatch[]): string {
@@ -40,41 +52,92 @@ function roundTimeLabel(matches: ExternalTournamentMatch[]): string {
   });
 }
 
-/** Group matches into rounds by their provider round name, preserving the order
-    matches arrive in (getExternalTournament sorts them soonest-scheduled first,
-    so rounds fall out roughly chronologically). */
-function groupRounds(matches: ExternalTournamentMatch[]): BracketRound[] {
-  const order: string[] = [];
-  const byName = new Map<string, ExternalTournamentMatch[]>();
-  for (const match of matches) {
-    const label = match.round?.trim() || "Bracket";
-    let list = byName.get(label);
-    if (!list) {
-      list = [];
-      byName.set(label, list);
-      order.push(label);
-    }
-    list.push(match);
-  }
-  return order.map((label) => {
-    const list = byName.get(label) ?? [];
-    return { label, matches: list, timeLabel: roundTimeLabel(list) };
-  });
+function scoreText(s: number | null): string {
+  if (s == null) return "";
+  if (s < 0) return "–"; // forfeit / DQ side
+  return String(s);
 }
 
-function ExternalMatchCard({ match }: { match: ExternalTournamentMatch }) {
+type BracketColumn = {
+  key: string;
+  label: string;
+  timeLabel: string;
+  matches: ExternalTournamentMatch[];
+};
+
+/** Group one section's matches into columns by |roundOrder| (falling back to the
+    round name / first-seen order), each column ordered top-to-bottom. */
+function buildColumns(matches: ExternalTournamentMatch[]): BracketColumn[] {
+  const groups = new Map<string, { order: number; matches: ExternalTournamentMatch[] }>();
+  matches.forEach((m, index) => {
+    const hasOrder = m.roundOrder != null;
+    const order = hasOrder ? Math.abs(m.roundOrder as number) : 1000 + index;
+    const key = hasOrder ? `o${order}` : `n${m.round ?? index}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = { order, matches: [] };
+      groups.set(key, group);
+    }
+    group.matches.push(m);
+  });
+  return [...groups.values()]
+    .sort((a, b) => a.order - b.order)
+    .map((group) => {
+      const list = [...group.matches].sort((a, b) =>
+        compareOrderKeys(a.orderKey, b.orderKey),
+      );
+      return {
+        key: `col-${group.order}`,
+        label: list[0]?.round?.trim() || "Bracket",
+        timeLabel: roundTimeLabel(list),
+        matches: list,
+      };
+    });
+}
+
+function Slot({
+  name,
+  score,
+  winner,
+}: {
+  name: string | null;
+  score: number | null;
+  winner: boolean;
+}) {
+  return (
+    <div className={`ff-bracket__slot${winner ? " ff-bracket__slot--winner" : ""}`}>
+      <span className="ff-bracket__slot-name">{name ?? "TBD"}</span>
+      <span className="ff-bracket__slot-score">{scoreText(score)}</span>
+    </div>
+  );
+}
+
+function MatchCard({
+  match,
+  roundIndex,
+  matchIndex,
+}: {
+  match: ExternalTournamentMatch;
+  roundIndex: number;
+  matchIndex: number;
+}) {
   const card = (
-    <div className="ff-bracket__match" data-state={match.state ?? undefined}>
-      <div className="ff-bracket__slot">
-        <span className="ff-bracket__slot-name">
-          {match.entrant1Name ?? "TBD"}
-        </span>
-      </div>
-      <div className="ff-bracket__slot">
-        <span className="ff-bracket__slot-name">
-          {match.entrant2Name ?? "TBD"}
-        </span>
-      </div>
+    <div
+      className="ff-bracket__match"
+      data-state={match.state ?? undefined}
+      data-r={roundIndex}
+      data-m={matchIndex}
+    >
+      <Slot
+        name={match.entrant1Name}
+        score={match.entrant1Score}
+        winner={match.winner === 1}
+      />
+      <Slot
+        name={match.entrant2Name}
+        score={match.entrant2Score}
+        winner={match.winner === 2}
+      />
     </div>
   );
   return match.url ? (
@@ -91,27 +154,118 @@ function ExternalMatchCard({ match }: { match: ExternalTournamentMatch }) {
   );
 }
 
+/**
+ * One bracket section (winners or losers) as scrollable round columns, with the
+ * measured elbow-connector overlay. Mirrors the internal RoundGrid: the SVG is
+ * sized to the scroll area and each match card carries data-r/data-m so the
+ * connectors can be measured from the rendered layout.
+ */
 function BracketSection({
-  rounds,
+  columns,
   title,
 }: {
-  rounds: BracketRound[];
+  columns: BracketColumn[];
   title: string | null;
 }) {
-  if (!rounds.length) return null;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [connectors, setConnectors] = useState<{
+    width: number;
+    height: number;
+    paths: string[];
+  }>({ width: 0, height: 0, paths: [] });
+
+  useEffect(() => {
+    if (columns.length < 2) {
+      setConnectors({ width: 0, height: 0, paths: [] });
+      return;
+    }
+    const container = scrollRef.current;
+    if (!container) return;
+
+    function compute() {
+      const cont = scrollRef.current;
+      if (!cont) return;
+      const base = cont.getBoundingClientRect();
+      const rects = new Map<string, { x: number; y: number; w: number; h: number }>();
+      cont
+        .querySelectorAll<HTMLElement>(".ff-bracket__match[data-r]")
+        .forEach((el) => {
+          const rect = el.getBoundingClientRect();
+          rects.set(`${el.dataset.r}:${el.dataset.m}`, {
+            x: rect.left - base.left + cont.scrollLeft,
+            y: rect.top - base.top + cont.scrollTop,
+            w: rect.width,
+            h: rect.height,
+          });
+        });
+
+      const paths: string[] = [];
+      for (let r = 0; r < columns.length - 1; r += 1) {
+        const cur = columns[r].matches.length;
+        const next = columns[r + 1].matches.length;
+        // Only draw where the next column is exactly this one halved — i.e. a
+        // real 2:1 merge. Anything else (play-in, bye, reset, losers zig-zag)
+        // stays as plain columns instead of a misleading line.
+        if (next !== Math.ceil(cur / 2)) continue;
+        for (let m = 0; m < cur; m += 1) {
+          const from = rects.get(`${r}:${m}`);
+          const to = rects.get(`${r + 1}:${Math.floor(m / 2)}`);
+          if (!from || !to) continue;
+          const startX = from.x + from.w;
+          const startY = from.y + from.h / 2;
+          const endX = to.x;
+          const endY = to.y + to.h / 2;
+          const midX = (startX + endX) / 2;
+          paths.push(
+            `M ${startX} ${startY} C ${midX} ${startY} ${midX} ${endY} ${endX} ${endY}`,
+          );
+        }
+      }
+      setConnectors({ width: cont.scrollWidth, height: cont.scrollHeight, paths });
+    }
+
+    compute();
+    const observer = new ResizeObserver(compute);
+    observer.observe(container);
+    window.addEventListener("resize", compute);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", compute);
+    };
+  }, [columns]);
+
+  if (!columns.length) return null;
+
   return (
     <section className="ff-bracket__section">
       {title ? <h3 className="ff-bracket__section-title">{title}</h3> : null}
-      <div className="ff-bracket__rounds">
-        {rounds.map((round) => (
-          <div className="ff-bracket__round" key={round.label}>
+      <div className="ff-bracket__rounds" ref={scrollRef}>
+        {connectors.paths.length ? (
+          <svg
+            className="ff-bracket__connectors"
+            width={connectors.width}
+            height={connectors.height}
+            aria-hidden="true"
+          >
+            {connectors.paths.map((d, i) => (
+              <path key={i} d={d} />
+            ))}
+          </svg>
+        ) : null}
+        {columns.map((column, roundIndex) => (
+          <div className="ff-bracket__round" key={column.key}>
             <div className="ff-bracket__round-label">
-              {round.label}
-              <span className="ff-bracket__round-time">{round.timeLabel}</span>
+              {column.label}
+              <span className="ff-bracket__round-time">{column.timeLabel}</span>
             </div>
             <div className="ff-bracket__round-matches">
-              {round.matches.map((match) => (
-                <ExternalMatchCard key={match.id} match={match} />
+              {column.matches.map((match, matchIndex) => (
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  roundIndex={roundIndex}
+                  matchIndex={matchIndex}
+                />
               ))}
             </div>
           </div>
@@ -126,19 +280,27 @@ export function ExternalBracket({
 }: {
   events: ExternalTournamentDetail["events"];
 }) {
-  const allMatches = events.flatMap((event) => event.matches);
+  const allMatches = useMemo(
+    () => events.flatMap((event) => event.matches),
+    [events],
+  );
+  const { winners, losers } = useMemo(() => {
+    const w = allMatches.filter((m) => !isLosers(m));
+    const l = allMatches.filter((m) => isLosers(m));
+    return { winners: buildColumns(w), losers: buildColumns(l) };
+  }, [allMatches]);
+
   if (allMatches.length === 0) {
     return <p className="ff-ticket-empty">No bracket data collected yet.</p>;
   }
-  const winners = groupRounds(allMatches.filter((m) => !isLosersRound(m.round)));
-  const losers = groupRounds(allMatches.filter((m) => isLosersRound(m.round)));
+
   return (
     <div className="ff-bracket">
       <BracketSection
-        rounds={winners}
+        columns={winners}
         title={losers.length ? "Winners Bracket" : null}
       />
-      <BracketSection rounds={losers} title="Losers Bracket" />
+      <BracketSection columns={losers} title="Losers Bracket" />
     </div>
   );
 }

@@ -189,9 +189,18 @@ export type ExternalTournamentMatch = {
   id: string;
   scheduledAt: Date | null;
   state: string | null;
+  /** Display round name ("Winners Round 1", "Grand Final", "Round 3"). */
   round: string | null;
+  /** Signed round number: +winners / −losers; |value| is the column position. */
+  roundOrder: number | null;
+  /** Bracket position within the round (top-to-bottom), for column + connectors. */
+  orderKey: string | null;
   entrant1Name: string | null;
   entrant2Name: string | null;
+  entrant1Score: number | null;
+  entrant2Score: number | null;
+  /** 1 = entrant1 won, 2 = entrant2 won, null = undecided. */
+  winner: 1 | 2 | null;
   url: string | null;
 };
 
@@ -385,6 +394,33 @@ function externalMatchStatus(state: string | null): ScheduleEntry["status"] {
   }
 }
 
+/** Natural order for start.gg set identifiers ("A".."Z".."AA".."AB"): shorter
+    first, then lexical, so "B" sorts before "AA". */
+function compareOrderKeys(a: string | null, b: string | null): number {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  if (a.length !== b.length) return a.length - b.length;
+  return a.localeCompare(b);
+}
+
+/** Deterministic bracket order: column (|roundOrder|), then top-to-bottom
+    position (orderKey), then scheduled time and id as tie-breakers. */
+function compareMatches(
+  a: ExternalTournamentMatch,
+  b: ExternalTournamentMatch,
+): number {
+  const ao = a.roundOrder == null ? Infinity : Math.abs(a.roundOrder);
+  const bo = b.roundOrder == null ? Infinity : Math.abs(b.roundOrder);
+  if (ao !== bo) return ao - bo;
+  const byKey = compareOrderKeys(a.orderKey, b.orderKey);
+  if (byKey !== 0) return byKey;
+  const at = a.scheduledAt?.getTime() ?? Infinity;
+  const bt = b.scheduledAt?.getTime() ?? Infinity;
+  if (at !== bt) return at - bt;
+  return a.id.localeCompare(b.id);
+}
+
 /**
  * One external tournament with its events and final standings — the data the
  * branded external tournament view renders (results, not a live bracket, since
@@ -439,8 +475,11 @@ export async function getExternalTournament(
       list.sort((a, b) => (a.placement ?? 9999) - (b.placement ?? 9999));
     }
 
-    // The bracket/sets, grouped per event, soonest-scheduled first (undated
-    // last). This is what the branded detail view renders as progression.
+    // The bracket/sets, grouped per event. Ordered by column (|roundOrder|) then
+    // top-to-bottom bracket position (orderKey), so the branded view lays out
+    // proper columns and can draw feed-forward connectors; scheduledAt/id break
+    // ties for providers that give no ordering keys. D1 returns rows unordered,
+    // so this base sort must be deterministic.
     const matchesByEvent = new Map<string, ExternalTournamentMatch[]>();
     for (const m of matches) {
       const list = matchesByEvent.get(m.eventId) ?? [];
@@ -449,19 +488,18 @@ export async function getExternalTournament(
         scheduledAt: m.scheduledAt,
         state: m.state,
         round: m.round,
+        roundOrder: m.roundOrder,
+        orderKey: m.orderKey,
         entrant1Name: m.entrant1Name,
         entrant2Name: m.entrant2Name,
+        entrant1Score: m.entrant1Score,
+        entrant2Score: m.entrant2Score,
+        winner: (m.winner === 1 || m.winner === 2 ? m.winner : null),
         url: m.url,
       });
       matchesByEvent.set(m.eventId, list);
     }
-    for (const list of matchesByEvent.values()) {
-      list.sort(
-        (a, b) =>
-          (a.scheduledAt?.getTime() ?? Infinity) -
-          (b.scheduledAt?.getTime() ?? Infinity),
-      );
-    }
+    for (const list of matchesByEvent.values()) list.sort(compareMatches);
 
     return {
       id: t.id,

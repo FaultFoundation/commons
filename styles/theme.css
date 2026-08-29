@@ -3637,6 +3637,18 @@ button.ff-dash__link:hover {
   font-weight: 800;
   color: var(--ff-text-dim);
 }
+/* The provider-authored blurb in the "About" bubble. Preserves the source's own
+   line breaks and keeps a readable measure; long unbroken URLs wrap instead of
+   forcing the card to scroll sideways. */
+.ff-ext-about {
+  margin: 0;
+  max-width: 68ch;
+  font-size: var(--ff-dash-text-sm);
+  line-height: 1.6;
+  color: var(--ff-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 /* The on-demand "Updating…" hint in the external hero actions: quiet, sits
    beside the "View on …" button while the top-up refresh runs. */
 .ff-ext-refresh {

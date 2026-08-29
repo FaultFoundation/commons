@@ -74,9 +74,6 @@ export function ExternalTournamentView({
           </div>
         </div>
         <div className="ff-thero__body">
-          {tournament.description ? (
-            <p className="ff-thero__desc">{tournament.description}</p>
-          ) : null}
           <div className="ff-thero__stats">
             {tournament.game ? (
               <div className="ff-stat">
@@ -116,6 +113,12 @@ export function ExternalTournamentView({
           </div>
         </div>
       </section>
+
+      {tournament.description ? (
+        <Bubble title="About" span="full" className="ff-bubble--divided">
+          <p className="ff-ext-about">{tournament.description}</p>
+        </Bubble>
+      ) : null}
 
       <Bubble title="Bracket" span="full" className="ff-bubble--divided">
         <ExternalBracket events={tournament.events} />

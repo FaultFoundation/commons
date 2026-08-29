@@ -85,9 +85,22 @@ export const extMatches = sqliteTable(
     sourceMatchId: text("source_match_id").notNull(),
     scheduledAt: integer("scheduled_at", { mode: "timestamp_ms" }),
     state: text("state"),
+    // Display round name ("Winners Round 1", "Grand Final", "Round 3").
     round: text("round"),
+    // Signed round number for bracket column ordering + winners/losers split
+    // (start.gg's `round`: +winners/−losers; FACEIT's numeric round). Column
+    // position = |roundOrder|.
+    roundOrder: integer("round_order"),
+    // Bracket position within a round, top-to-bottom (start.gg set identifier);
+    // drives column layout and feed-forward connectors. Null when unavailable.
+    orderKey: text("order_key"),
     entrant1Name: text("entrant_1_name"),
     entrant2Name: text("entrant_2_name"),
+    // Per-side score; negative = forfeit/DQ side, null = not played.
+    entrant1Score: integer("entrant_1_score"),
+    entrant2Score: integer("entrant_2_score"),
+    // Winning side: 1 = entrant1, 2 = entrant2, null = undecided.
+    winner: integer("winner"),
     url: text("url"),
   },
   (t) => [

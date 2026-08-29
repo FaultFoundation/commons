@@ -2880,6 +2880,25 @@ button.ff-dash__link:hover {
   letter-spacing: 0.04em;
   color: var(--ff-text-dim);
 }
+/* External bracket: the provider round name gets a scheduled-time subtitle
+   under it (mirrors start.gg's "Winners Round 1 / <time>" column headers). */
+.ff-bracket__round-time {
+  display: block;
+  margin-top: 2px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ff-text-dim);
+  opacity: 0.75;
+}
+/* A whole match card that deep-links to the provider match page. */
+.ff-bracket__match-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+.ff-bracket__match-link:hover .ff-bracket__match {
+  border-color: rgba(255, 255, 255, 0.28);
+}
 
 .ff-bracket__match {
   border: 1px solid var(--ff-border);
@@ -3653,12 +3672,8 @@ button.ff-dash__link:hover {
    Route-segment loading.tsx fallbacks render these while a page's server
    component (and its D1 / cen-sql reads) resolve — a real loading screen on
    navigation and while the projection is being reloaded. Self-contained (the
-   shell isn't mounted during the fallback), so they carry their own frame. */
-.ff-skel-page {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 24px 20px 48px;
-}
+   shell stays mounted via app/tournaments/layout.tsx), so they render inside
+   the content area (.ff-dash__content) and inherit its width + padding. */
 .ff-skel {
   position: relative;
   overflow: hidden;
@@ -4007,7 +4022,11 @@ button.ff-dash__link:hover {
   border-right: 1px solid var(--ff-border);
 }
 .ff-calendar__day {
-  min-height: 112px;
+  /* Fixed height, not min-height: every cell stays the same size (a neat grid)
+     and overflow collapses into a "+N more" chip + popup instead of growing or
+     scrolling the cell. */
+  height: 124px;
+  overflow: hidden;
   padding: 7px;
   border-right: 1px solid var(--ff-border);
   border-bottom: 1px solid var(--ff-border);
@@ -4034,32 +4053,172 @@ button.ff-dash__link:hover {
   gap: 5px;
 }
 .ff-calendar__event {
-  display: grid;
-  gap: 2px;
+  /* Single compact line (title + a small time/count) so day cells stay a
+     uniform square; the full per-match detail lives in the day popup. */
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   min-width: 0;
-  padding: 6px 7px;
+  padding: 4px 7px;
   border-left: 3px solid var(--ff-accent);
   border-radius: var(--ff-radius-sm);
   background: rgba(0, 147, 196, 0.16);
   color: inherit;
   text-decoration: none;
+  /* Chips are also used as <button> (multi-match groups open the popup): strip
+     the UA button chrome and left-align like the link variant. */
+  width: 100%;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 .ff-calendar__event:hover {
   background: rgba(0, 147, 196, 0.26);
 }
-.ff-calendar__event-title,
-.ff-calendar__event-meta {
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* The "+N more" affordance — quieter than an event chip. */
+.ff-calendar__more {
+  width: 100%;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: var(--ff-radius-sm);
+  background: transparent;
+  color: var(--ff-text-dim);
+  font: inherit;
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.ff-calendar__more:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+.ff-calendar__undated-head {
+  display: block;
+  margin-bottom: 6px;
+}
+.ff-calendar__undated-chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+/* Day detail popup — the overflow / combined-tournament expansion. */
+.ff-daypop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 8, 20, 0.62);
+}
+.ff-daypop__panel {
+  width: min(520px, 100%);
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-lg);
+  background: var(--ff-navy-900);
+  box-shadow: var(--ff-shadow-card);
+}
+.ff-daypop__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--ff-border);
+}
+.ff-daypop__title {
+  margin: 0;
+  font-size: var(--ff-dash-text-lg);
+  font-weight: 800;
+}
+.ff-daypop__close {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: var(--ff-radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ff-daypop__close:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.ff-daypop__body {
+  overflow-y: auto;
+  padding: 14px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ff-daypop__group-title {
+  margin: 0 0 8px;
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 800;
+}
+.ff-daypop__matches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ff-daypop__match {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: var(--ff-radius-sm);
+  background: var(--ff-surface-2);
+  color: inherit;
+  text-decoration: none;
+}
+.ff-daypop__match--link:hover {
+  background: rgba(0, 147, 196, 0.2);
+}
+.ff-daypop__match-time {
+  flex: none;
+  min-width: 66px;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-daypop__match-title {
+  flex: 1;
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-daypop__match-state {
+  flex: none;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-accent);
 }
 .ff-calendar__event-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--ff-dash-text-xs);
   font-weight: 800;
-  line-height: 1.25;
+  line-height: 1.35;
 }
 .ff-calendar__event-meta {
+  flex: none;
   color: var(--ff-text-dim);
   font-size: var(--ff-dash-text-xs);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .ff-calendar__undated {

@@ -314,6 +314,11 @@ export async function listUpcomingExternalScheduleEntries(): Promise<
                 scheduledAt: row.scheduledAt?.getTime() ?? null,
                 url: row.matchUrl ?? row.tournamentUrl,
                 href: null,
+                // Collapse every match of one tournament into a single calendar
+                // chip (a bracket day otherwise floods the cell); the popup
+                // expands them. Key on the tournament, not the match.
+                groupKey: `${row.source}:${row.tournamentName}`,
+                groupTitle: row.tournamentName,
               },
             ];
           })

@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 
-import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { TournamentList } from "@/components/dashboard/tournaments/TournamentList";
-import { getSessionCached } from "@/lib/session";
 import { listExternalTournaments } from "@/lib/external-tournaments";
 import { listTournaments } from "@/lib/tournaments";
 import {
@@ -22,12 +19,8 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
+// Auth + the dashboard shell are handled by app/tournaments/layout.tsx.
 export default async function TournamentsPage() {
-  const session = await getSessionCached();
-  if (!session) {
-    redirect("/login/");
-  }
-
   // Internal (Challonge-backed) + external (cen-sql projection) tournaments,
   // merged into one unified list. External reads degrade to [] when cen-sql
   // isn't there, so the tab still renders the internal ones.
@@ -75,7 +68,7 @@ export default async function TournamentsPage() {
   );
 
   return (
-    <DashboardShell active="tournaments" setupUserId={session.user.id}>
+    <>
       <h1 className="screen-reader-text">Tournaments</h1>
       <div className="ff-bubble-grid">
         <Bubble title="Tournaments" span="full">
@@ -85,6 +78,6 @@ export default async function TournamentsPage() {
           />
         </Bubble>
       </div>
-    </DashboardShell>
+    </>
   );
 }

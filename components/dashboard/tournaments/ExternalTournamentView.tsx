@@ -1,11 +1,9 @@
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { sourceKey } from "@/components/brand/SourceLogo";
+import { ExternalBracket } from "@/components/dashboard/tournaments/ExternalBracket";
 import { ExternalTournamentRefresh } from "@/components/dashboard/tournaments/ExternalTournamentRefresh";
 import { TOURNAMENT_STATUS_LABELS } from "@/lib/tournaments-shared";
-import type {
-  ExternalTournamentDetail,
-  ExternalTournamentMatch,
-} from "@/lib/external-tournaments";
+import type { ExternalTournamentDetail } from "@/lib/external-tournaments";
 
 // The branded Commons view for an external (start.gg / FACEIT) tournament,
 // rendered entirely from the cen-sql projection — the same hero template the
@@ -38,22 +36,6 @@ function formatDate(date: Date | null): string | null {
     : null;
 }
 
-function formatMatchTime(date: Date | null): string {
-  return date
-    ? date.toLocaleString(undefined, {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      })
-    : "TBD";
-}
-
-function matchup(match: ExternalTournamentMatch): string {
-  const names = [match.entrant1Name, match.entrant2Name].filter(Boolean);
-  return names.length ? names.join(" vs ") : "—";
-}
-
 export function ExternalTournamentView({
   tournament,
 }: {
@@ -66,10 +48,6 @@ export function ExternalTournamentView({
   const startDate = formatDate(tournament.startAt);
   const multiEvent = tournament.events.length > 1;
 
-  const totalMatches = tournament.events.reduce(
-    (sum, event) => sum + event.matches.length,
-    0,
-  );
   const totalStandings = tournament.events.reduce(
     (sum, event) => sum + event.standings.length,
     0,
@@ -140,56 +118,7 @@ export function ExternalTournamentView({
       </section>
 
       <Bubble title="Bracket" span="full" className="ff-bubble--divided">
-        {totalMatches === 0 ? (
-          <p className="ff-ticket-empty">No bracket data collected yet.</p>
-        ) : (
-          tournament.events.map((event) =>
-            event.matches.length === 0 ? null : (
-              <div key={event.id} className="ff-ext-section">
-                {multiEvent && event.name ? (
-                  <h4 className="ff-ext-section__head">{event.name}</h4>
-                ) : null}
-                <div className="ff-ticket-table-wrap">
-                  <table className="ff-ticket-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">Round</th>
-                        <th scope="col">Match</th>
-                        <th scope="col">Scheduled</th>
-                        <th scope="col">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {event.matches.map((match) => (
-                        <tr key={match.id}>
-                          <td>{match.round ?? "—"}</td>
-                          <td>
-                            {match.url ? (
-                              <a
-                                className="ff-ticket-subject"
-                                href={match.url}
-                                target="_blank"
-                                rel="noreferrer noopener"
-                              >
-                                {matchup(match)}
-                              </a>
-                            ) : (
-                              matchup(match)
-                            )}
-                          </td>
-                          <td>{formatMatchTime(match.scheduledAt)}</td>
-                          <td>
-                            <span className="ff-badge">{match.state ?? "—"}</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ),
-          )
-        )}
+        <ExternalBracket events={tournament.events} />
       </Bubble>
 
       <Bubble title="Final standings" span="full">

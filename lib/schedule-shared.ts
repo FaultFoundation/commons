@@ -67,6 +67,11 @@ export type ScheduleEntry = {
   /** Internal Commons tournament view (e.g. /tournaments/<id>/). When set, the
       row clicks into our branded view instead of linking out. */
   href: string | null;
+  /** Stable key that groups many matches of the SAME tournament into one
+      calendar chip (a busy tournament otherwise clogs a day). Unset → the entry
+      stands on its own. `groupTitle` is the combined chip's label. */
+  groupKey?: string | null;
+  groupTitle?: string | null;
 };
 
 /** Narrow an arbitrary string to a ScheduleProvider (adapter/read guard). */

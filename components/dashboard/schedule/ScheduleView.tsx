@@ -94,6 +94,58 @@ function dateKey(ms: number): string {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
+// How many chips a day cell shows before collapsing the rest into "+N more".
+// Keeps every cell the same height (a neat square) — the overflow lives in the
+// day popup, not a scrolling cell.
+const MAX_DAY_CHIPS = 3;
+
+/** One calendar chip: a single entry, or many matches of the same tournament
+    collapsed together (a busy bracket otherwise floods a day). */
+type DayGroup = {
+  key: string;
+  title: string;
+  entries: ScheduleEntry[];
+  earliestAt: number | null;
+  /** A single-entry group links straight through; multi-match groups open the
+      day popup instead. */
+  href: string | null;
+  external: boolean;
+};
+
+function buildGroups(entries: ScheduleEntry[]): DayGroup[] {
+  const order: string[] = [];
+  const map = new Map<string, ScheduleEntry[]>();
+  for (const entry of entries) {
+    const key = entry.groupKey ?? entry.id;
+    let list = map.get(key);
+    if (!list) {
+      list = [];
+      map.set(key, list);
+      order.push(key);
+    }
+    list.push(entry);
+  }
+  return order
+    .map((key): DayGroup => {
+      const list = (map.get(key) ?? [])
+        .slice()
+        .sort(
+          (a, b) => (a.scheduledAt ?? Infinity) - (b.scheduledAt ?? Infinity),
+        );
+      const first = list[0];
+      const single = list.length === 1;
+      return {
+        key,
+        title: first.groupTitle ?? first.title,
+        entries: list,
+        earliestAt: list.find((e) => e.scheduledAt != null)?.scheduledAt ?? null,
+        href: single ? (first.href ?? first.url ?? null) : null,
+        external: single ? !first.href && Boolean(first.url) : false,
+      };
+    })
+    .sort((a, b) => (a.earliestAt ?? Infinity) - (b.earliestAt ?? Infinity));
+}
+
 function MonthCalendar({
   entries,
   scope,
@@ -121,7 +173,11 @@ function MonthCalendar({
     if (!hasVisibleEntry) setMonth(monthStartFor(entries));
   }, [entries, month, scope]);
 
-  const { weeks, entriesByDay, label } = useMemo(() => {
+  // The day whose full detail popup is open (a dateKey, or "undated"); null when
+  // closed.
+  const [openKey, setOpenKey] = useState<string | null>(null);
+
+  const { weeks, groupsByDay, label } = useMemo(() => {
     const start = new Date(month);
     const year = start.getFullYear();
     const monthIndex = start.getMonth();
@@ -136,17 +192,20 @@ function MonthCalendar({
       { length: calendarCells.length / 7 },
       (_, index) => calendarCells.slice(index * 7, index * 7 + 7),
     );
-    const grouped = new Map<string, ScheduleEntry[]>();
+    const byDay = new Map<string, ScheduleEntry[]>();
     for (const entry of entries) {
       if (entry.scheduledAt == null) continue;
       const key = dateKey(entry.scheduledAt);
-      const list = grouped.get(key) ?? [];
+      const list = byDay.get(key) ?? [];
       list.push(entry);
-      grouped.set(key, list);
+      byDay.set(key, list);
     }
+    // Collapse each day's entries into tournament groups once, up front.
+    const grouped = new Map<string, DayGroup[]>();
+    for (const [key, list] of byDay) grouped.set(key, buildGroups(list));
     return {
       weeks: calendarWeeks,
-      entriesByDay: grouped,
+      groupsByDay: grouped,
       label: start.toLocaleDateString(undefined, {
         month: "long",
         year: "numeric",
@@ -154,8 +213,23 @@ function MonthCalendar({
     };
   }, [entries, month]);
 
-  const undated = entries.filter((entry) => entry.scheduledAt == null);
+  const undatedGroups = useMemo(
+    () => buildGroups(entries.filter((entry) => entry.scheduledAt == null)),
+    [entries],
+  );
   const today = dateKey(Date.now());
+
+  const openGroups =
+    openKey === "undated" ? undatedGroups : openKey ? (groupsByDay.get(openKey) ?? []) : [];
+  const openTitle =
+    openKey === "undated"
+      ? "Date TBD"
+      : openKey
+        ? new Date(openGroups[0]?.earliestAt ?? Date.now()).toLocaleDateString(
+            undefined,
+            { weekday: "long", month: "long", day: "numeric" },
+          )
+        : "";
 
   function moveMonth(offset: number) {
     const current = new Date(month);
@@ -215,7 +289,14 @@ function MonthCalendar({
                     );
                   }
                   const key = dateKey(date.getTime());
-                  const dayEntries = entriesByDay.get(key) ?? [];
+                  const dayGroups = groupsByDay.get(key) ?? [];
+                  // Show up to MAX chips; when there are more, keep room for the
+                  // "+N more" affordance so the cell height never changes.
+                  const shown =
+                    dayGroups.length > MAX_DAY_CHIPS
+                      ? dayGroups.slice(0, MAX_DAY_CHIPS - 1)
+                      : dayGroups;
+                  const hidden = dayGroups.length - shown.length;
                   return (
                     <div
                       key={key}
@@ -227,9 +308,22 @@ function MonthCalendar({
                         {date.getDate()}
                       </time>
                       <div className="ff-calendar__events">
-                        {dayEntries.map((entry) => (
-                          <CalendarEntry key={entry.id} entry={entry} />
+                        {shown.map((group) => (
+                          <DayChip
+                            key={group.key}
+                            group={group}
+                            onOpen={() => setOpenKey(key)}
+                          />
                         ))}
+                        {hidden > 0 ? (
+                          <button
+                            className="ff-calendar__more"
+                            type="button"
+                            onClick={() => setOpenKey(key)}
+                          >
+                            +{hidden} more
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                   );
@@ -240,45 +334,168 @@ function MonthCalendar({
         </div>
       )}
 
-      {undated.length > 0 ? (
+      {undatedGroups.length > 0 ? (
         <div className="ff-calendar__undated">
-          <strong>Date TBD</strong>
-          {undated.map((entry) => (
-            <CalendarEntry key={entry.id} entry={entry} />
-          ))}
+          <strong className="ff-calendar__undated-head">Date TBD</strong>
+          <div className="ff-calendar__undated-chips">
+            {undatedGroups.map((group) => (
+              <DayChip
+                key={group.key}
+                group={group}
+                onOpen={() => setOpenKey("undated")}
+              />
+            ))}
+          </div>
         </div>
+      ) : null}
+
+      {openKey ? (
+        <DayPopup
+          title={openTitle}
+          groups={openGroups}
+          onClose={() => setOpenKey(null)}
+        />
       ) : null}
     </>
   );
 }
 
-function CalendarEntry({ entry }: { entry: ScheduleEntry }) {
-  const external = !entry.href && Boolean(entry.url);
-  const href = entry.href ?? entry.url;
+/** One calendar chip. A single-match group is a direct link; a tournament with
+    several matches is a button that opens the day popup where they expand. */
+function DayChip({
+  group,
+  onOpen,
+}: {
+  group: DayGroup;
+  onOpen: () => void;
+}) {
+  // Compact single-line meta so cells stay a uniform square: a match count for
+  // a combined tournament, otherwise the start time.
+  const meta =
+    group.entries.length > 1
+      ? `${group.entries.length}×`
+      : group.earliestAt != null
+        ? formatTime(group.earliestAt)
+        : "TBD";
   const content = (
     <>
-      <span className="ff-calendar__event-title">{entry.title}</span>
-      <span className="ff-calendar__event-meta">
-        {entry.scheduledAt ? formatTime(entry.scheduledAt) : "Time TBD"} ·{" "}
-        {SCHEDULE_PROVIDER_LABELS[entry.provider]}
-      </span>
+      <span className="ff-calendar__event-title">{group.title}</span>
+      <span className="ff-calendar__event-meta">{meta}</span>
     </>
   );
 
-  if (!href) return <span className="ff-calendar__event">{content}</span>;
-  return external ? (
+  if (group.entries.length > 1 || !group.href) {
+    return (
+      <button className="ff-calendar__event" type="button" onClick={onOpen}>
+        {content}
+      </button>
+    );
+  }
+  return group.external ? (
     <a
       className="ff-calendar__event"
-      href={href}
+      href={group.href}
       target="_blank"
       rel="noreferrer noopener"
     >
       {content}
     </a>
   ) : (
-    <Link className="ff-calendar__event" href={href} prefetch={false}>
+    <Link className="ff-calendar__event" href={group.href} prefetch={false}>
       {content}
     </Link>
+  );
+}
+
+/** The day detail popup: every tournament group for the day, each listing its
+    matches in chronological order. Opened from a "+N more" or a multi-match
+    chip; closes on backdrop click or Escape. */
+function DayPopup({
+  title,
+  groups,
+  onClose,
+}: {
+  title: string;
+  groups: DayGroup[];
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="ff-daypop"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={onClose}
+    >
+      <div className="ff-daypop__panel" onClick={(e) => e.stopPropagation()}>
+        <div className="ff-daypop__head">
+          <h2 className="ff-daypop__title">{title}</h2>
+          <button
+            className="ff-daypop__close"
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+        <div className="ff-daypop__body">
+          {groups.map((group) => (
+            <section className="ff-daypop__group" key={group.key}>
+              <h3 className="ff-daypop__group-title">{group.title}</h3>
+              <ol className="ff-daypop__matches">
+                {group.entries.map((entry) => (
+                  <DayPopupMatch key={entry.id} entry={entry} />
+                ))}
+              </ol>
+            </section>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DayPopupMatch({ entry }: { entry: ScheduleEntry }) {
+  const external = !entry.href && Boolean(entry.url);
+  const href = entry.href ?? entry.url;
+  const time =
+    entry.scheduledAt != null ? formatTime(entry.scheduledAt) : "Time TBD";
+  const content = (
+    <>
+      <span className="ff-daypop__match-time">{time}</span>
+      <span className="ff-daypop__match-title">{entry.title}</span>
+      {entry.status !== "scheduled" ? (
+        <span className="ff-daypop__match-state">{STATUS_LABEL[entry.status]}</span>
+      ) : null}
+    </>
+  );
+  if (!href) return <li className="ff-daypop__match">{content}</li>;
+  return (
+    <li>
+      {external ? (
+        <a
+          className="ff-daypop__match ff-daypop__match--link"
+          href={href}
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          {content}
+        </a>
+      ) : (
+        <Link className="ff-daypop__match ff-daypop__match--link" href={href} prefetch={false}>
+          {content}
+        </Link>
+      )}
+    </li>
   );
 }
 

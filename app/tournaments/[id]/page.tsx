@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
-import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { ShareBar } from "@/components/dashboard/tournaments/ShareBar";
 import { TournamentRegister } from "@/components/dashboard/tournaments/TournamentRegister";
@@ -65,10 +64,10 @@ export default async function TournamentPage({
     const external = await getExternalTournament(id);
     if (!external) notFound();
     return (
-      <DashboardShell active="tournaments" setupUserId={session.user.id}>
+      <>
         <h1 className="screen-reader-text">{external.name}</h1>
         <ExternalTournamentView tournament={external} />
-      </DashboardShell>
+      </>
     );
   }
 
@@ -108,7 +107,7 @@ export default async function TournamentPage({
     : null;
 
   return (
-    <DashboardShell active="tournaments" setupUserId={session.user.id}>
+    <>
       <h1 className="screen-reader-text">{tournament.name}</h1>
       <div className="ff-bubble-grid">
         {/* Hero: banner (or branded gradient) with the name over it, then a
@@ -264,6 +263,6 @@ export default async function TournamentPage({
           )}
         </Bubble>
       </div>
-    </DashboardShell>
+    </>
   );
 }

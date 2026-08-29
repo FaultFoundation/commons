@@ -314,8 +314,22 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   [app/tournaments/[id]/page.tsx](app/tournaments/[id]/page.tsx) `safeDecode`s
   the param and branches: `isTournamentId` (6-digit) → internal; otherwise
   `getExternalTournament` → [ExternalTournamentView](components/dashboard/tournaments/ExternalTournamentView.tsx),
-  which reuses the internal hero template plus a bracket (scraped sets) + final
-  standings, and keeps a "View on start.gg/FACEIT" out-link.
+  which reuses the internal hero template plus final standings and keeps a
+  "View on start.gg/FACEIT" out-link. The bracket is
+  [ExternalBracket](components/dashboard/tournaments/ExternalBracket.tsx): it
+  reuses the internal bracket's `ff-bracket__*` card/column CSS but is driven by
+  the scraped matches, so the round headers are the provider's own names
+  ("Winners Round 1", "Grand Final", "Losers Semi-Final") — grouped by round,
+  split into Winners/Losers sections. There are no feed-forward connectors: the
+  projection has no match-to-match structure to draw them from (unlike the
+  Challonge snapshot's signed rounds), so the columns + real round names carry
+  the shape.
+- **The dashboard shell for the whole tab lives in
+  [app/tournaments/layout.tsx](app/tournaments/layout.tsx)**, not the pages, so
+  `loading.tsx` skeletons and `[id]/error.tsx` render inside the content area
+  beside the rail (the rail stays mounted across list↔detail and reloads)
+  instead of the whole page being replaced by a centered skeleton that then
+  jumps into place. New pages under `/tournaments` should return content only.
 - **On-demand top-up refresh.** The branded view renders from the cached
   projection first (never blank), then [ExternalTournamentRefresh](components/dashboard/tournaments/ExternalTournamentRefresh.tsx)
   (client) POSTs `app/api/tournaments/external/[id]/refresh` on open;
@@ -347,6 +361,13 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   set begins, so those rows deliberately render under Date TBD. Until a new
   scraper run and projection import populate `ext_matches`, the calendar falls
   back to tournament start windows rather than rendering empty.
+- The calendar ([ScheduleView](components/dashboard/schedule/ScheduleView.tsx))
+  keeps every day cell a fixed-height square. A tournament's many matches
+  collapse into ONE chip (via `ScheduleEntry.groupKey`/`groupTitle`, set to the
+  tournament in `listUpcomingExternalScheduleEntries`); a day shows at most
+  `MAX_DAY_CHIPS`, then a "+N more". A multi-match chip or "+N more" opens a
+  per-day popup that expands every tournament's matches in chronological order.
+  Cells never scroll — overflow lives in the popup.
 
 ### Styling
 

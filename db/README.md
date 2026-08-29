@@ -35,11 +35,13 @@ pending set's `startedAt` empty. FACEIT rarely stamps an individual match, but
 the scraper backfills each match from its championship's per-round `schedule`
 (round → date), so most FACEIT matches carry an approximate round-level time
 instead of none; genuinely-undated rows still render under **Date TBD** rather
-than inventing a time. `banner_url` comes from FACEIT `cover_image` /
-start.gg's banner image, and `description` from the FACEIT championship blurb
-(start.gg exposes none, so it stays null there). All ids are deterministic
-strings from provider lineage, so projection imports upsert the same logical
-rows.
+than inventing a time. `banner_url` comes from FACEIT (the championship
+`cover_image`, else the **organizer's** cover/avatar — most championships leave
+their own image empty even when the site shows the organizer's banner) or
+start.gg's banner image; `description` comes from the FACEIT championship blurb
+or start.gg's `rules` field (the organizer's about/details text). All ids are
+deterministic strings from provider lineage, so projection imports upsert the
+same logical rows.
 
 Relational form:
 

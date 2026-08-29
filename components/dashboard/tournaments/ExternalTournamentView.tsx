@@ -1,6 +1,7 @@
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { sourceKey } from "@/components/brand/SourceLogo";
 import { ExternalBracket } from "@/components/dashboard/tournaments/ExternalBracket";
+import { Markdown } from "@/components/dashboard/tournaments/Markdown";
 import { ExternalTournamentRefresh } from "@/components/dashboard/tournaments/ExternalTournamentRefresh";
 import { TOURNAMENT_STATUS_LABELS } from "@/lib/tournaments-shared";
 import type { ExternalTournamentDetail } from "@/lib/external-tournaments";
@@ -56,14 +57,20 @@ export function ExternalTournamentView({
   return (
     <div className="ff-bubble-grid">
       <section className="ff-thero">
-        <div
-          className="ff-thero__banner"
-          style={
-            tournament.bannerUrl
-              ? { backgroundImage: `url(${tournament.bannerUrl})` }
-              : undefined
-          }
-        >
+        <div className="ff-thero__banner">
+          {tournament.bannerUrl ? (
+            // A real <img> (like the list cards) rather than a CSS background,
+            // so a valid URL always paints and there's no inline-style URL
+            // escaping to get wrong. Falls back to the branded gradient (from
+            // .ff-thero__banner) when there's no banner.
+            <img
+              className="ff-thero__banner-img"
+              src={tournament.bannerUrl}
+              alt=""
+              loading="eager"
+              decoding="async"
+            />
+          ) : null}
           <div className="ff-thero__head">
             <span
               className={`ff-thero__status${live ? " ff-thero__status--live" : ""}`}
@@ -116,7 +123,9 @@ export function ExternalTournamentView({
 
       {tournament.description ? (
         <Bubble title="About" span="full" className="ff-bubble--divided">
-          <p className="ff-ext-about">{tournament.description}</p>
+          <div className="ff-ext-about">
+            <Markdown source={tournament.description} />
+          </div>
         </Bubble>
       ) : null}
 

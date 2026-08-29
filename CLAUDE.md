@@ -314,8 +314,12 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   [app/tournaments/[id]/page.tsx](app/tournaments/[id]/page.tsx) `safeDecode`s
   the param and branches: `isTournamentId` (6-digit) → internal; otherwise
   `getExternalTournament` → [ExternalTournamentView](components/dashboard/tournaments/ExternalTournamentView.tsx),
-  which reuses the internal hero template plus an "About" bubble (the provider
-  blurb) and final standings, and keeps a "View on start.gg/FACEIT" out-link.
+  which reuses the internal hero template plus an "About" bubble that renders the
+  provider blurb as markdown ([Markdown](components/dashboard/tournaments/Markdown.tsx)
+  — a dependency-free, XSS-safe subset that builds React nodes, never
+  `dangerouslySetInnerHTML`) and final standings, and keeps a "View on
+  start.gg/FACEIT" out-link. The hero banner is a real `<img>` layer (like the
+  list cards), not a CSS background, so a valid URL always paints.
   The bracket is
   [ExternalBracket](components/dashboard/tournaments/ExternalBracket.tsx) (a
   client component): it reuses the internal `BracketView`'s `ff-bracket__*`
@@ -327,6 +331,15 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   event slug; FACEIT uses the match room URL). Columns are ordered by
   `round_order` (signed: +winners/−losers) and matches within a column by
   `order_key` (start.gg's set identifier), both now carried in the projection.
+  [getExternalTournament](lib/external-tournaments.ts) funnels every numeric
+  match field (`round_order`, scores, `winner`) through a `toNum` coercion,
+  because the projection can be (re)loaded by tools other than the scraper — a
+  CSV/export round-trip can leave a numeric column holding a string, or even the
+  column NAME from a header row, and reading those verbatim used to leak
+  "entrant_1_score" into a slot and collapse every match into one column
+  (`Math.abs("round_order")` is NaN). Junk now degrades to null. The bracket
+  groups columns by round NAME (robust when `round_order` is absent), and a
+  missing/forfeit score renders as a dash, never a blank cell.
   Feed-forward connectors are the same measured elbow overlay the internal
   bracket draws (round-r match m → round-(r+1) match ⌊m/2⌋) but are drawn **only
   between two adjacent columns that actually merge 2:1** (next has ⌈cur/2⌉

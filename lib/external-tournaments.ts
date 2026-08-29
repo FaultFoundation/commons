@@ -394,6 +394,22 @@ function externalMatchStatus(state: string | null): ScheduleEntry["status"] {
   }
 }
 
+/** Coerce a projection value that *should* be a number to one, or null. D1
+    columns are dynamically typed and the projection can be (re)loaded by tools
+    other than the scraper — a CSV/export round-trip can leave a numeric column
+    holding a string, or even the column NAME from a header row. Reading those
+    verbatim leaked "entrant_1_score" into the bracket and broke round grouping
+    (`Math.abs("round_order")` → NaN), so every numeric field is funneled through
+    here: real ints pass, numeric strings parse, anything else becomes null. */
+function toNum(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 /** Natural order for start.gg set identifiers ("A".."Z".."AA".."AB"): shorter
     first, then lexical, so "B" sorts before "AA". */
 function compareOrderKeys(a: string | null, b: string | null): number {
@@ -488,13 +504,13 @@ export async function getExternalTournament(
         scheduledAt: m.scheduledAt,
         state: m.state,
         round: m.round,
-        roundOrder: m.roundOrder,
+        roundOrder: toNum(m.roundOrder),
         orderKey: m.orderKey,
         entrant1Name: m.entrant1Name,
         entrant2Name: m.entrant2Name,
-        entrant1Score: m.entrant1Score,
-        entrant2Score: m.entrant2Score,
-        winner: (m.winner === 1 || m.winner === 2 ? m.winner : null),
+        entrant1Score: toNum(m.entrant1Score),
+        entrant2Score: toNum(m.entrant2Score),
+        winner: (toNum(m.winner) === 1 ? 1 : toNum(m.winner) === 2 ? 2 : null),
         url: m.url,
       });
       matchesByEvent.set(m.eventId, list);

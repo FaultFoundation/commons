@@ -53,8 +53,9 @@ function roundTimeLabel(matches: ExternalTournamentMatch[]): string {
 }
 
 function scoreText(s: number | null): string {
-  if (s == null) return "";
-  if (s < 0) return "–"; // forfeit / DQ side
+  // Default to a dash whenever there's no real score to show — unplayed, TBD,
+  // or a forfeit/DQ side (negative) — never a blank cell.
+  if (s == null || !Number.isFinite(s) || s < 0) return "–";
   return String(s);
 }
 
@@ -65,34 +66,52 @@ type BracketColumn = {
   matches: ExternalTournamentMatch[];
 };
 
-/** Group one section's matches into columns by |roundOrder| (falling back to the
-    round name / first-seen order), each column ordered top-to-bottom. */
+/** A column's display label and sort position. One column per distinct round
+    NAME (the display unit): that's equivalent to grouping by round for clean
+    data but far more robust when `round_order` is missing or junk. Columns sort
+    by |roundOrder| when it's a real number, else by any number in the name
+    ("Winners Round 2" → 2), else first-seen. */
+function columnMeta(m: ExternalTournamentMatch, index: number): {
+  label: string;
+  order: number;
+} {
+  const finite =
+    typeof m.roundOrder === "number" && Number.isFinite(m.roundOrder)
+      ? Math.abs(m.roundOrder)
+      : null;
+  const name = m.round?.trim();
+  const label = name || (finite != null ? `Round ${finite}` : "Bracket");
+  const fromName = name ? Number.parseInt(name.replace(/[^\d]/g, ""), 10) : NaN;
+  const order = finite ?? (Number.isFinite(fromName) ? fromName : 1000 + index);
+  return { label, order };
+}
+
+/** Group one section's matches into columns (by round label), each column
+    ordered top-to-bottom by orderKey. */
 function buildColumns(matches: ExternalTournamentMatch[]): BracketColumn[] {
-  const groups = new Map<string, { order: number; matches: ExternalTournamentMatch[] }>();
+  const groups = new Map<
+    string,
+    { order: number; label: string; matches: ExternalTournamentMatch[] }
+  >();
   matches.forEach((m, index) => {
-    const hasOrder = m.roundOrder != null;
-    const order = hasOrder ? Math.abs(m.roundOrder as number) : 1000 + index;
-    const key = hasOrder ? `o${order}` : `n${m.round ?? index}`;
-    let group = groups.get(key);
+    const { label, order } = columnMeta(m, index);
+    let group = groups.get(label);
     if (!group) {
-      group = { order, matches: [] };
-      groups.set(key, group);
+      group = { order, label, matches: [] };
+      groups.set(label, group);
     }
     group.matches.push(m);
   });
   return [...groups.values()]
     .sort((a, b) => a.order - b.order)
-    .map((group) => {
-      const list = [...group.matches].sort((a, b) =>
+    .map((group, columnIndex) => ({
+      key: `col-${columnIndex}-${group.label}`,
+      label: group.label,
+      timeLabel: roundTimeLabel(group.matches),
+      matches: [...group.matches].sort((a, b) =>
         compareOrderKeys(a.orderKey, b.orderKey),
-      );
-      return {
-        key: `col-${group.order}`,
-        label: list[0]?.round?.trim() || "Bracket",
-        timeLabel: roundTimeLabel(list),
-        matches: list,
-      };
-    });
+      ),
+    }));
 }
 
 function Slot({

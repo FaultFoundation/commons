@@ -3302,6 +3302,14 @@ button.ff-dash__link:hover {
   min-height: 200px;
   background: var(--ff-grad-brand) center / cover no-repeat;
 }
+/* Banner art as a real image layer (under the scrim + head). */
+.ff-thero__banner-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 /* Legibility scrim so the title reads over any banner. */
 .ff-thero__banner::after {
   content: "";
@@ -3637,17 +3645,57 @@ button.ff-dash__link:hover {
   font-weight: 800;
   color: var(--ff-text-dim);
 }
-/* The provider-authored blurb in the "About" bubble. Preserves the source's own
-   line breaks and keeps a readable measure; long unbroken URLs wrap instead of
-   forcing the card to scroll sideways. */
+/* The provider-authored blurb in the "About" bubble, rendered from markdown
+   (see components/dashboard/tournaments/Markdown.tsx). A prose container: a
+   readable measure, comfortable spacing between block elements, and long
+   unbroken URLs wrap instead of forcing the card to scroll sideways. */
 .ff-ext-about {
-  margin: 0;
   max-width: 68ch;
   font-size: var(--ff-dash-text-sm);
   line-height: 1.6;
   color: var(--ff-text);
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.ff-ext-about > :first-child {
+  margin-top: 0;
+}
+.ff-ext-about > :last-child {
+  margin-bottom: 0;
+}
+.ff-ext-about p {
+  margin: 0 0 12px;
+}
+.ff-ext-about h4,
+.ff-ext-about h5,
+.ff-ext-about h6 {
+  margin: 18px 0 8px;
+  font-weight: 800;
+}
+.ff-ext-about ul,
+.ff-ext-about ol {
+  margin: 0 0 12px;
+  padding-left: 1.4em;
+}
+.ff-ext-about li {
+  margin: 2px 0;
+}
+.ff-ext-about a {
+  color: var(--ff-accent);
+  text-decoration: underline;
+}
+.ff-ext-about blockquote {
+  margin: 0 0 12px;
+  padding-left: 12px;
+  border-left: 2px solid var(--ff-border);
+  color: var(--ff-text-dim);
+}
+.ff-md__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--ff-surface-2);
+  border: 1px solid var(--ff-border);
 }
 /* The on-demand "Updating…" hint in the external hero actions: quiet, sits
    beside the "View on …" button while the top-up refresh runs. */

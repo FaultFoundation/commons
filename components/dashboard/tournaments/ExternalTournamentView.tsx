@@ -130,7 +130,7 @@ export function ExternalTournamentView({
       ) : null}
 
       <Bubble title="Bracket" span="full" className="ff-bubble--divided">
-        <ExternalBracket events={tournament.events} />
+        <ExternalBracket events={tournament.events} source={tournament.source} />
       </Bubble>
 
       <Bubble title="Final standings" span="full">

@@ -598,7 +598,11 @@ lazy TTL). Portal conventions specific to this surface:
   the page resets on any view/filter/size change and clamps so a shrinking list
   never strands the viewer on an empty page. The featured hero sits above the
   paged grid; Active card-view keeps older still-running events in a separate
-  "Past tournaments" toggle.
+  "Past tournaments" toggle. Cards show the **date + start time** (`startsAt`
+  carries the full timestamp; midnight — i.e. date-only data — hides the time),
+  and the list sorts by that full timestamp. External tournaments use the
+  earliest scheduled match (`firstMatchAt` from the projection) as their start
+  when the projection has match times, falling back to the tournament start.
 
 ## Backend notes
 

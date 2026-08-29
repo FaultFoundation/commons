@@ -731,16 +731,21 @@ export async function transitionStatus(
 // than wiped, and an uncached failure yields an empty (but renderable) bracket.
 // ---------------------------------------------------------------------------
 
-// TTLs are deliberately conservative because each refresh is two Challonge GETs
-// and Challonge meters API usage (free tier ~500 calls/month). The primary
-// freshness path is not this TTL but admin mutations, which call buildSnapshot
-// directly — so a live bracket updates the instant staff enter a result, and
-// this TTL is only the safety net for changes made straight on Challonge.
+// TTLs balance freshness against Challonge's metered API (free tier ~500
+// calls/month, two GETs per refresh). The primary freshness path is admin
+// mutations, which call buildSnapshot directly — a live bracket updates the
+// instant staff enter a result. This TTL is the safety net for results entered
+// straight on Challonge: opening an active tournament rebuilds when the cache is
+// older than the TTL, so a member clicking in during play sees a recent bracket
+// rather than one up to 12h stale. It's a shared single cached row, so the cost
+// is one refresh per window regardless of how many people are watching.
+const SNAPSHOT_TTL_ACTIVE_MS = 10 * 60 * 1000; // seeding/active — matches move
+const SNAPSHOT_TTL_REGISTRATION_MS = 30 * 60 * 1000; // only participants change
 const SNAPSHOT_TTL_MS: Record<TournamentStatus, number> = {
   draft: SNAPSHOT_SYNC_OPEN_MS,
-  registration: SNAPSHOT_SYNC_OPEN_MS,
-  seeding: SNAPSHOT_SYNC_OPEN_MS,
-  active: SNAPSHOT_SYNC_OPEN_MS,
+  registration: SNAPSHOT_TTL_REGISTRATION_MS,
+  seeding: SNAPSHOT_TTL_ACTIVE_MS,
+  active: SNAPSHOT_TTL_ACTIVE_MS,
   completed: PROVIDER_SYNC_ARCHIVE_MS,
   cancelled: PROVIDER_SYNC_ARCHIVE_MS,
 };

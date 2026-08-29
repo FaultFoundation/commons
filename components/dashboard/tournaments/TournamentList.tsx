@@ -464,14 +464,40 @@ function metaFor(t: TournamentListEntry): string {
   return format ? `${format} · ${teams}` : teams;
 }
 
+/** Whether a timestamp carries a meaningful time-of-day (not local midnight,
+    which is how a date-only value lands). */
+function hasTime(d: Date): boolean {
+  return d.getHours() !== 0 || d.getMinutes() !== 0;
+}
+
 function formatDate(ms: number | null): string {
-  return ms
-    ? new Date(ms).toLocaleDateString(undefined, {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "Date TBD";
+  if (!ms) return "Date TBD";
+  const d = new Date(ms);
+  const date = d.toLocaleDateString(undefined, {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  if (!hasTime(d)) return date;
+  return `${date} · ${d.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  })}`;
+}
+
+/** Compact "Starts" cell: date, plus the time when the data has one. */
+function formatDateShort(ms: number | null): string {
+  if (!ms) return "—";
+  const d = new Date(ms);
+  const date = d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+  if (!hasTime(d)) return date;
+  return `${date}, ${d.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  })}`;
 }
 
 /** The banner overlay shared by the hero and the regular card: the source
@@ -595,14 +621,7 @@ function CompactTable({
                   {t.entrantCount}
                   {!external && t.maxParticipants ? ` / ${t.maxParticipants}` : ""}
                 </td>
-                <td>
-                  {t.startsAt
-                    ? new Date(t.startsAt).toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                      })
-                    : "—"}
-                </td>
+                <td>{formatDateShort(t.startsAt)}</td>
                 <td>
                   {t.status === "registration" || t.status === "active" ? (
                     <span className="ff-ticket-status ff-ticket-status--open">

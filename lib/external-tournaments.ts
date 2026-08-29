@@ -7,6 +7,7 @@ import {
   inArray,
   isNull,
   max,
+  min,
   or,
   sql,
 } from "drizzle-orm";
@@ -41,6 +42,9 @@ export type ExternalTournamentListItem = {
   status: string;
   startAt: Date | null;
   endAt: Date | null;
+  /** Earliest scheduled match (round 1), when the projection has match times —
+      a more precise "starts" than the tournament-level startAt. Null otherwise. */
+  firstMatchAt: Date | null;
   numAttendees: number | null;
   /** Deep link to the tournament on its native site. */
   url: string | null;
@@ -149,28 +153,29 @@ export async function listExternalTournaments(): Promise<
       statesByTournament.set(event.tournamentId, states);
     }
     const latestMatchByTournament = new Map<string, Date | null>();
+    const firstMatchByTournament = new Map<string, Date | null>();
     try {
       const matchRows = rows.length
         ? await db
             .select({
               tournamentId: extEvents.tournamentId,
               latestMatchAt: max(extMatches.scheduledAt),
+              firstMatchAt: min(extMatches.scheduledAt),
             })
             .from(extMatches)
             .innerJoin(extEvents, eq(extEvents.id, extMatches.eventId))
             .groupBy(extEvents.tournamentId)
         : [];
       for (const match of matchRows) {
-        latestMatchByTournament.set(
-          match.tournamentId,
-          match.latestMatchAt,
-        );
+        latestMatchByTournament.set(match.tournamentId, match.latestMatchAt);
+        firstMatchByTournament.set(match.tournamentId, match.firstMatchAt);
       }
     } catch {
       // Older cen-sql schema: start/end and event-state derivation still works.
     }
     return rows.map(({ updatedAt, ...r }) => ({
       ...r,
+      firstMatchAt: firstMatchByTournament.get(r.id) ?? null,
       status: deriveStatus(
         r.startAt,
         r.endAt,

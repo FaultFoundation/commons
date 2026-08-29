@@ -222,10 +222,16 @@ shape.)
   in `tournament_brackets`. `BracketView` and the poll route
   (`app/api/tournaments/[id]/bracket`) consume that shape and never touch
   Challonge — the cache decouples viewer count from Challonge's metered API. It
-  refreshes **lazily on read** after 12 hours for an open tournament (30 days
-  for an archive; Workers has no cron) and
+  refreshes **lazily on read** past a status-scaled TTL (`SNAPSHOT_TTL_MS`):
+  **10 min while seeding/active** so opening a live bracket shows a recent state
+  even for results entered straight on Challonge, 30 min during registration,
+  12 h for a draft, 30 days for an archive (Workers has no cron). It also rebuilds
   **immediately** after any admin mutation (which bumps `tournaments.version`;
-  `getOrRefreshSnapshot` rebuilds when the cache is behind that version).
+  `getOrRefreshSnapshot` rebuilds when the cache is behind that version). Because
+  it's one shared cached row, the active TTL is at most one refresh per window no
+  matter how many people watch. The poll route short-circuits unchanged polls on
+  the ETag, so the only paths that actually re-hit Challonge are a page open past
+  the TTL and an admin write.
 - **Provider metadata reconciles once daily on list access.** One paginated org
   tournament read refreshes names, formats, descriptions, start times, URLs and
   lifecycle states for every linked D1 row. `provider_synced_at` is the global
@@ -352,19 +358,24 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   (`Math.abs("round_order")` is NaN). Junk now degrades to null. The bracket
   groups columns by round NAME (robust when `round_order` is absent), and a
   missing/forfeit score renders as a dash, never a blank cell.
-  Feed-forward connectors are drawn from the **true feed graph**, not guessed
+  Feed-forward connectors prefer the **true feed graph**, not guessed
   geometry: every set stores the source-set id feeding each slot
   (`prereq_1_id`/`prereq_2_id`, from start.gg's `prereqId` where
   `prereqType = "set"`), and the view draws a measured elbow from a feeder's
-  right edge to the target slot's left edge — **only when the feeder is in the
-  same section** (winners or losers). That single rule reproduces exactly what
-  start.gg itself draws: within a bracket you only advance by winning, while a
-  loser always drops to the OTHER bracket, so the cross-bracket loser-drops and
-  the Losers-Final→Grand-Final feed are intentionally omitted (they'd clutter
-  the tree). This captures the shapes ⌊m/2⌋ geometry can't — play-ins, byes,
-  losers-bracket cross-feeds, grand-final resets. FACEIT ships no feed graph
-  (its championships are usually swiss), so `prereq_*` are null and it renders as
-  plain columns.
+  right-edge **centre** to the target's left-edge **centre** — so both feeders of
+  a match converge on the box's single mid-point (never a slot) — **only when the
+  feeder is in the same section** (winners or losers). That single rule reproduces
+  exactly what start.gg itself draws: within a bracket you only advance by
+  winning, while a loser always drops to the OTHER bracket, so the cross-bracket
+  loser-drops and the Losers-Final→Grand-Final feed are intentionally omitted
+  (they'd clutter the tree). This captures the shapes ⌊m/2⌋ geometry can't —
+  play-ins, byes, losers-bracket cross-feeds, grand-final resets. When a
+  **start.gg** section carries no feed graph yet (an active event whose sets don't
+  have prereqs captured), it falls back to geometric column adjacency (column c
+  match i → column c+1 match ⌊i/2⌋) so an in-progress bracket still shows lines.
+  That fallback is **gated to start.gg** (`source` prop): FACEIT ships no feed
+  graph and its championships are usually swiss, where a team recurs across
+  "rounds" and tree connectors would be a lie — so FACEIT stays plain columns.
 - **The dashboard shell for the whole tab lives in
   [app/tournaments/layout.tsx](app/tournaments/layout.tsx)**, not the pages, so
   `loading.tsx` skeletons and `[id]/error.tsx` render inside the content area

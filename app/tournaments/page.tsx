@@ -50,7 +50,10 @@ export default async function TournamentsPage() {
     status: t.status,
     entrantCount: t.numAttendees ?? 0,
     maxParticipants: null,
-    startsAt: t.startAt ? t.startAt.getTime() : null,
+    // Prefer the first round's scheduled time when the projection has match
+    // times; fall back to the tournament-level start. Drives both the displayed
+    // date+time and the list sort.
+    startsAt: (t.firstMatchAt ?? t.startAt)?.getTime() ?? null,
     bannerUrl: t.bannerUrl,
     featured: false,
     source: t.source,

@@ -14,15 +14,17 @@ import type {
 // its score, the winner is highlighted, and every card deep-links to the
 // provider's own match/result page.
 //
-// Connectors are drawn from the TRUE feed graph, not guessed geometry: each set
-// carries the source-set id feeding each slot (start.gg prereqId). We draw an
-// edge feeder → slot only when the feeder is in the SAME section (winners or
-// losers) — which is exactly start.gg's own rendering: within a bracket you only
-// advance by winning, while a loser always drops to the OTHER bracket, so the
-// cross-bracket feeds are intentionally not drawn (they'd clutter the tree). The
-// Grand Final therefore shows its one line from the Winners Final; its Losers
-// Final feed is cross-section and correctly omitted. FACEIT has no feed graph,
-// so it renders as plain columns.
+// Connectors prefer the TRUE feed graph: each set carries the source-set id
+// feeding each slot (start.gg prereqId), and we draw feeder → target only when
+// the feeder is in the SAME section (winners or losers) — exactly start.gg's own
+// rendering, where you advance within a bracket by winning and a loser drops to
+// the OTHER bracket, so cross-bracket feeds are intentionally omitted (they'd
+// clutter the tree). Every line attaches to the box's vertical centre, so both
+// feeders converge on one point. When there's NO feed graph — FACEIT (swiss), or
+// a start.gg bracket scraped before its sets carry prereqs (an active event
+// whose results aren't in yet) — it falls back to geometric column adjacency
+// (column c match i → column c+1 match ⌊i/2⌋), so an in-progress bracket still
+// shows connectors instead of bare columns.
 
 const LOSERS_RE = /los(?:er|ers|ing)?|lower|\blb\b/i;
 
@@ -176,9 +178,13 @@ function MatchCard({ match }: { match: ExternalTournamentMatch }) {
 function BracketSection({
   columns,
   title,
+  geometricFallback,
 }: {
   columns: BracketColumn[];
   title: string | null;
+  /** Draw geometric column-adjacency connectors when there's no feed graph.
+      start.gg only — FACEIT is usually swiss, where tree connectors would lie. */
+  geometricFallback: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [connectors, setConnectors] = useState<{
@@ -200,11 +206,11 @@ function BracketSection({
       const cont = scrollRef.current;
       if (!cont) return;
       const base = cont.getBoundingClientRect();
-      // Measure each card by its source id: left/right edges + the vertical
-      // centre of the card and of each of its two slots (in scroll space).
+      // Measure each card by its source id: left/right edges + its vertical
+      // centre (in scroll space).
       const cards = new Map<
         string,
-        { left: number; right: number; cy: number; slotCy: [number, number] }
+        { left: number; right: number; cy: number }
       >();
       cont
         .querySelectorAll<HTMLElement>(".ff-bracket__match[data-set]")
@@ -212,42 +218,56 @@ function BracketSection({
           const id = el.dataset.set;
           if (!id) return;
           const r = el.getBoundingClientRect();
-          const slots = el.querySelectorAll<HTMLElement>(".ff-bracket__slot");
-          const slotCy = (i: number): number => {
-            const s = slots[i]?.getBoundingClientRect();
-            const rect = s ?? r;
-            return rect.top - base.top + cont.scrollTop + rect.height / 2;
-          };
           cards.set(id, {
             left: r.left - base.left + cont.scrollLeft,
             right: r.right - base.left + cont.scrollLeft,
             cy: r.top - base.top + cont.scrollTop + r.height / 2,
-            slotCy: [slotCy(0), slotCy(1)],
           });
         });
 
       const paths: string[] = [];
-      const edge = (
-        feederId: string | null,
-        target: { left: number; slotCy: [number, number] },
-        slotIndex: 0 | 1,
-      ) => {
-        if (!feederId) return;
-        const feeder = cards.get(feederId); // same-section only (map is scoped)
-        if (!feeder) return;
-        const sx = feeder.right;
-        const sy = feeder.cy;
-        const ex = target.left;
-        const ey = target.slotCy[slotIndex];
+      type Rect = { left: number; right: number; cy: number };
+      // Feeder's right-edge-centre → target's left-edge-centre, so both feeders
+      // of a match converge on the box's single mid-point (the classic look).
+      const draw = (from: Rect, to: Rect) => {
+        const sx = from.right;
+        const sy = from.cy;
+        const ex = to.left;
+        const ey = to.cy;
         const midX = (sx + ex) / 2;
         paths.push(`M ${sx} ${sy} C ${midX} ${sy} ${midX} ${ey} ${ex} ${ey}`);
       };
+
+      // Primary: the true feed graph (start.gg prereqs), same-section only.
       for (const m of matches) {
         const target = cards.get(m.sourceMatchId);
         if (!target) continue;
-        edge(m.prereq1Id, target, 0);
-        edge(m.prereq2Id, target, 1);
+        for (const feederId of [m.prereq1Id, m.prereq2Id]) {
+          if (!feederId) continue;
+          const feeder = cards.get(feederId); // same-section only (map is scoped)
+          if (feeder) draw(feeder, target);
+        }
       }
+
+      // Fallback when a start.gg bracket carries no feed graph yet (an active
+      // event whose sets don't have prereqs captured). Geometric column
+      // adjacency, like the internal bracket: column c's match i feeds column
+      // c+1's match ⌊i/2⌋. Gated to start.gg — FACEIT is usually swiss, where a
+      // team recurs across "rounds" and tree connectors would be a lie.
+      if (paths.length === 0 && geometricFallback) {
+        for (let c = 0; c < columns.length - 1; c += 1) {
+          const cur = columns[c].matches;
+          const next = columns[c + 1].matches;
+          for (let i = 0; i < cur.length; i += 1) {
+            const target = next[Math.floor(i / 2)];
+            if (!target) continue;
+            const from = cards.get(cur[i].sourceMatchId);
+            const to = cards.get(target.sourceMatchId);
+            if (from && to) draw(from, to);
+          }
+        }
+      }
+
       setConnectors({ width: cont.scrollWidth, height: cont.scrollHeight, paths });
     }
 
@@ -259,7 +279,7 @@ function BracketSection({
       observer.disconnect();
       window.removeEventListener("resize", compute);
     };
-  }, [matches]);
+  }, [columns, matches]);
 
   if (!columns.length) return null;
 
@@ -299,9 +319,14 @@ function BracketSection({
 
 export function ExternalBracket({
   events,
+  source,
 }: {
   events: ExternalTournamentDetail["events"];
+  /** Raw provider ("startgg" | "faceit"). Gates the geometric connector
+      fallback to start.gg, whose events are always bracket trees. */
+  source: string;
 }) {
+  const geometricFallback = source === "startgg";
   const allMatches = useMemo(
     () => events.flatMap((event) => event.matches),
     [events],
@@ -321,8 +346,13 @@ export function ExternalBracket({
       <BracketSection
         columns={winners}
         title={losers.length ? "Winners Bracket" : null}
+        geometricFallback={geometricFallback}
       />
-      <BracketSection columns={losers} title="Losers Bracket" />
+      <BracketSection
+        columns={losers}
+        title="Losers Bracket"
+        geometricFallback={geometricFallback}
+      />
     </div>
   );
 }

@@ -340,13 +340,19 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   (`Math.abs("round_order")` is NaN). Junk now degrades to null. The bracket
   groups columns by round NAME (robust when `round_order` is absent), and a
   missing/forfeit score renders as a dash, never a blank cell.
-  Feed-forward connectors are the same measured elbow overlay the internal
-  bracket draws (round-r match m → round-(r+1) match ⌊m/2⌋) but are drawn **only
-  between two adjacent columns that actually merge 2:1** (next has ⌈cur/2⌉
-  matches). Real brackets are messy (play-ins, byes, grand-final resets,
-  losers-bracket zig-zags) and FACEIT championships are usually swiss, so the
-  guard means a clean single/double-elim gets its tree while everything else
-  renders as honest plain columns rather than wrong lines.
+  Feed-forward connectors are drawn from the **true feed graph**, not guessed
+  geometry: every set stores the source-set id feeding each slot
+  (`prereq_1_id`/`prereq_2_id`, from start.gg's `prereqId` where
+  `prereqType = "set"`), and the view draws a measured elbow from a feeder's
+  right edge to the target slot's left edge — **only when the feeder is in the
+  same section** (winners or losers). That single rule reproduces exactly what
+  start.gg itself draws: within a bracket you only advance by winning, while a
+  loser always drops to the OTHER bracket, so the cross-bracket loser-drops and
+  the Losers-Final→Grand-Final feed are intentionally omitted (they'd clutter
+  the tree). This captures the shapes ⌊m/2⌋ geometry can't — play-ins, byes,
+  losers-bracket cross-feeds, grand-final resets. FACEIT ships no feed graph
+  (its championships are usually swiss), so `prereq_*` are null and it renders as
+  plain columns.
 - **The dashboard shell for the whole tab lives in
   [app/tournaments/layout.tsx](app/tournaments/layout.tsx)**, not the pages, so
   `loading.tsx` skeletons and `[id]/error.tsx` render inside the content area

@@ -14,13 +14,15 @@ import type {
 // its score, the winner is highlighted, and every card deep-links to the
 // provider's own match/result page.
 //
-// Feed-forward connectors are the same elbow overlay the internal bracket draws
-// — round-r match m feeds round-(r+1) match floor(m/2) — but here they are drawn
-// only between two adjacent columns that ACTUALLY merge 2:1 (next has
-// ceil(cur/2) matches). Real brackets are messy (play-ins, byes, grand-final
-// resets, losers-bracket zig-zags), so this guard means a clean single/double
-// elim gets its tree while swiss/league (and the odd non-merging column) render
-// as honest plain columns rather than wrong lines.
+// Connectors are drawn from the TRUE feed graph, not guessed geometry: each set
+// carries the source-set id feeding each slot (start.gg prereqId). We draw an
+// edge feeder → slot only when the feeder is in the SAME section (winners or
+// losers) — which is exactly start.gg's own rendering: within a bracket you only
+// advance by winning, while a loser always drops to the OTHER bracket, so the
+// cross-bracket feeds are intentionally not drawn (they'd clutter the tree). The
+// Grand Final therefore shows its one line from the Winners Final; its Losers
+// Final feed is cross-section and correctly omitted. FACEIT has no feed graph,
+// so it renders as plain columns.
 
 const LOSERS_RE = /los(?:er|ers|ing)?|lower|\blb\b/i;
 
@@ -67,10 +69,10 @@ type BracketColumn = {
 };
 
 /** A column's display label and sort position. One column per distinct round
-    NAME (the display unit): that's equivalent to grouping by round for clean
-    data but far more robust when `round_order` is missing or junk. Columns sort
-    by |roundOrder| when it's a real number, else by any number in the name
-    ("Winners Round 2" → 2), else first-seen. */
+    NAME (the display unit): equivalent to grouping by round for clean data, but
+    robust when `round_order` is missing or junk. Columns sort by |roundOrder|
+    when it's a real number, else by any number in the name ("Winners Round 2" →
+    2), else first-seen. */
 function columnMeta(m: ExternalTournamentMatch, index: number): {
   label: string;
   order: number;
@@ -131,21 +133,12 @@ function Slot({
   );
 }
 
-function MatchCard({
-  match,
-  roundIndex,
-  matchIndex,
-}: {
-  match: ExternalTournamentMatch;
-  roundIndex: number;
-  matchIndex: number;
-}) {
+function MatchCard({ match }: { match: ExternalTournamentMatch }) {
   const card = (
     <div
       className="ff-bracket__match"
       data-state={match.state ?? undefined}
-      data-r={roundIndex}
-      data-m={matchIndex}
+      data-set={match.sourceMatchId}
     >
       <Slot
         name={match.entrant1Name}
@@ -175,9 +168,10 @@ function MatchCard({
 
 /**
  * One bracket section (winners or losers) as scrollable round columns, with the
- * measured elbow-connector overlay. Mirrors the internal RoundGrid: the SVG is
- * sized to the scroll area and each match card carries data-r/data-m so the
- * connectors can be measured from the rendered layout.
+ * feed-graph connector overlay. Each match card carries data-set={sourceMatchId};
+ * we measure the cards and draw an SVG elbow from a feeder's right edge to the
+ * target slot's left edge — but only when the feeder is one of THIS section's
+ * cards (the same-section rule that keeps the tree clean).
  */
 function BracketSection({
   columns,
@@ -193,11 +187,12 @@ function BracketSection({
     paths: string[];
   }>({ width: 0, height: 0, paths: [] });
 
+  const matches = useMemo(
+    () => columns.flatMap((column) => column.matches),
+    [columns],
+  );
+
   useEffect(() => {
-    if (columns.length < 2) {
-      setConnectors({ width: 0, height: 0, paths: [] });
-      return;
-    }
     const container = scrollRef.current;
     if (!container) return;
 
@@ -205,40 +200,53 @@ function BracketSection({
       const cont = scrollRef.current;
       if (!cont) return;
       const base = cont.getBoundingClientRect();
-      const rects = new Map<string, { x: number; y: number; w: number; h: number }>();
+      // Measure each card by its source id: left/right edges + the vertical
+      // centre of the card and of each of its two slots (in scroll space).
+      const cards = new Map<
+        string,
+        { left: number; right: number; cy: number; slotCy: [number, number] }
+      >();
       cont
-        .querySelectorAll<HTMLElement>(".ff-bracket__match[data-r]")
+        .querySelectorAll<HTMLElement>(".ff-bracket__match[data-set]")
         .forEach((el) => {
-          const rect = el.getBoundingClientRect();
-          rects.set(`${el.dataset.r}:${el.dataset.m}`, {
-            x: rect.left - base.left + cont.scrollLeft,
-            y: rect.top - base.top + cont.scrollTop,
-            w: rect.width,
-            h: rect.height,
+          const id = el.dataset.set;
+          if (!id) return;
+          const r = el.getBoundingClientRect();
+          const slots = el.querySelectorAll<HTMLElement>(".ff-bracket__slot");
+          const slotCy = (i: number): number => {
+            const s = slots[i]?.getBoundingClientRect();
+            const rect = s ?? r;
+            return rect.top - base.top + cont.scrollTop + rect.height / 2;
+          };
+          cards.set(id, {
+            left: r.left - base.left + cont.scrollLeft,
+            right: r.right - base.left + cont.scrollLeft,
+            cy: r.top - base.top + cont.scrollTop + r.height / 2,
+            slotCy: [slotCy(0), slotCy(1)],
           });
         });
 
       const paths: string[] = [];
-      for (let r = 0; r < columns.length - 1; r += 1) {
-        const cur = columns[r].matches.length;
-        const next = columns[r + 1].matches.length;
-        // Only draw where the next column is exactly this one halved — i.e. a
-        // real 2:1 merge. Anything else (play-in, bye, reset, losers zig-zag)
-        // stays as plain columns instead of a misleading line.
-        if (next !== Math.ceil(cur / 2)) continue;
-        for (let m = 0; m < cur; m += 1) {
-          const from = rects.get(`${r}:${m}`);
-          const to = rects.get(`${r + 1}:${Math.floor(m / 2)}`);
-          if (!from || !to) continue;
-          const startX = from.x + from.w;
-          const startY = from.y + from.h / 2;
-          const endX = to.x;
-          const endY = to.y + to.h / 2;
-          const midX = (startX + endX) / 2;
-          paths.push(
-            `M ${startX} ${startY} C ${midX} ${startY} ${midX} ${endY} ${endX} ${endY}`,
-          );
-        }
+      const edge = (
+        feederId: string | null,
+        target: { left: number; slotCy: [number, number] },
+        slotIndex: 0 | 1,
+      ) => {
+        if (!feederId) return;
+        const feeder = cards.get(feederId); // same-section only (map is scoped)
+        if (!feeder) return;
+        const sx = feeder.right;
+        const sy = feeder.cy;
+        const ex = target.left;
+        const ey = target.slotCy[slotIndex];
+        const midX = (sx + ex) / 2;
+        paths.push(`M ${sx} ${sy} C ${midX} ${sy} ${midX} ${ey} ${ex} ${ey}`);
+      };
+      for (const m of matches) {
+        const target = cards.get(m.sourceMatchId);
+        if (!target) continue;
+        edge(m.prereq1Id, target, 0);
+        edge(m.prereq2Id, target, 1);
       }
       setConnectors({ width: cont.scrollWidth, height: cont.scrollHeight, paths });
     }
@@ -251,7 +259,7 @@ function BracketSection({
       observer.disconnect();
       window.removeEventListener("resize", compute);
     };
-  }, [columns]);
+  }, [matches]);
 
   if (!columns.length) return null;
 
@@ -271,20 +279,15 @@ function BracketSection({
             ))}
           </svg>
         ) : null}
-        {columns.map((column, roundIndex) => (
+        {columns.map((column) => (
           <div className="ff-bracket__round" key={column.key}>
             <div className="ff-bracket__round-label">
               {column.label}
               <span className="ff-bracket__round-time">{column.timeLabel}</span>
             </div>
             <div className="ff-bracket__round-matches">
-              {column.matches.map((match, matchIndex) => (
-                <MatchCard
-                  key={match.id}
-                  match={match}
-                  roundIndex={roundIndex}
-                  matchIndex={matchIndex}
-                />
+              {column.matches.map((match) => (
+                <MatchCard key={match.id} match={match} />
               ))}
             </div>
           </div>

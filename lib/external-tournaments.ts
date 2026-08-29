@@ -187,6 +187,8 @@ export async function listExternalTournaments(): Promise<
 
 export type ExternalTournamentMatch = {
   id: string;
+  /** The provider's own match/set id — the node the feed graph references. */
+  sourceMatchId: string;
   scheduledAt: Date | null;
   state: string | null;
   /** Display round name ("Winners Round 1", "Grand Final", "Round 3"). */
@@ -201,6 +203,10 @@ export type ExternalTournamentMatch = {
   entrant2Score: number | null;
   /** 1 = entrant1 won, 2 = entrant2 won, null = undecided. */
   winner: 1 | 2 | null;
+  /** sourceMatchId of the set feeding each slot — the true feed graph the view
+      draws connectors from. Null for a seeded slot / a provider without one. */
+  prereq1Id: string | null;
+  prereq2Id: string | null;
   url: string | null;
 };
 
@@ -501,6 +507,7 @@ export async function getExternalTournament(
       const list = matchesByEvent.get(m.eventId) ?? [];
       list.push({
         id: m.id,
+        sourceMatchId: m.sourceMatchId,
         scheduledAt: m.scheduledAt,
         state: m.state,
         round: m.round,
@@ -511,6 +518,8 @@ export async function getExternalTournament(
         entrant1Score: toNum(m.entrant1Score),
         entrant2Score: toNum(m.entrant2Score),
         winner: (toNum(m.winner) === 1 ? 1 : toNum(m.winner) === 2 ? 2 : null),
+        prereq1Id: m.prereq1Id,
+        prereq2Id: m.prereq2Id,
         url: m.url,
       });
       matchesByEvent.set(m.eventId, list);

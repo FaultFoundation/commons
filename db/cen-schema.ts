@@ -101,6 +101,11 @@ export const extMatches = sqliteTable(
     entrant2Score: integer("entrant_2_score"),
     // Winning side: 1 = entrant1, 2 = entrant2, null = undecided.
     winner: integer("winner"),
+    // The source match id feeding each slot (the true feed graph, from start.gg
+    // prereqId) — the branded bracket draws exact connectors from these. Null
+    // for a seeded slot or a provider without feed structure (FACEIT).
+    prereq1Id: text("prereq_1_id"),
+    prereq2Id: text("prereq_2_id"),
     url: text("url"),
   },
   (t) => [

@@ -356,8 +356,12 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   column NAME from a header row, and reading those verbatim used to leak
   "entrant_1_score" into a slot and collapse every match into one column
   (`Math.abs("round_order")` is NaN). Junk now degrades to null. The bracket
-  groups columns by round NAME (robust when `round_order` is absent), and a
-  missing/forfeit score renders as a dash, never a blank cell.
+  first groups matches by **phase** (`phase_id`/`phase_name`/`phase_order`) — a
+  start.gg event can hold several independent brackets ("Round 1 Bracket" +
+  "Round 2 Bracket"), and each renders as its own titled tree; without this their
+  rounds mashed into one jumbled column set with nonsense connectors. Within a
+  phase it groups columns by round NAME (robust when `round_order` is absent),
+  and a missing/forfeit score renders as a dash, never a blank cell.
   Feed-forward connectors prefer the **true feed graph**, not guessed
   geometry: every set stores the source-set id feeding each slot
   (`prereq_1_id`/`prereq_2_id`, from start.gg's `prereqId` where

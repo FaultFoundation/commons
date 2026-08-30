@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   ExternalTournamentDetail,
@@ -317,6 +317,37 @@ function BracketSection({
   );
 }
 
+/** Group matches into phases (independent brackets). A start.gg event can hold
+    several ("Round 1 Bracket" + "Round 2 Bracket"); each must render as its own
+    bracket or they mash into one jumbled column set. Ordered by `phaseOrder`,
+    then first-seen. Matches with no phase collapse to one implicit phase. */
+function groupByPhase(matches: ExternalTournamentMatch[]): {
+  key: string;
+  name: string | null;
+  matches: ExternalTournamentMatch[];
+}[] {
+  const groups = new Map<
+    string,
+    { order: number; name: string | null; matches: ExternalTournamentMatch[] }
+  >();
+  matches.forEach((m, index) => {
+    const key = m.phaseId ?? "__single__";
+    let g = groups.get(key);
+    if (!g) {
+      g = {
+        order: m.phaseOrder ?? 1000 + index,
+        name: m.phaseName ?? null,
+        matches: [],
+      };
+      groups.set(key, g);
+    }
+    g.matches.push(m);
+  });
+  return [...groups.entries()]
+    .sort((a, b) => a[1].order - b[1].order)
+    .map(([key, g]) => ({ key, name: g.name, matches: g.matches }));
+}
+
 export function ExternalBracket({
   events,
   source,
@@ -331,28 +362,56 @@ export function ExternalBracket({
     () => events.flatMap((event) => event.matches),
     [events],
   );
-  const { winners, losers } = useMemo(() => {
-    const w = allMatches.filter((m) => !isLosers(m));
-    const l = allMatches.filter((m) => isLosers(m));
-    return { winners: buildColumns(w), losers: buildColumns(l) };
-  }, [allMatches]);
+  // One entry per phase, each pre-split into winners/losers columns. Memoized so
+  // the column references stay stable and BracketSection's measuring effect
+  // doesn't re-run every render.
+  const phases = useMemo(
+    () =>
+      groupByPhase(allMatches).map((phase) => ({
+        key: phase.key,
+        name: phase.name,
+        winners: buildColumns(phase.matches.filter((m) => !isLosers(m))),
+        losers: buildColumns(phase.matches.filter(isLosers)),
+      })),
+    [allMatches],
+  );
 
   if (allMatches.length === 0) {
     return <p className="ff-ticket-empty">No bracket data collected yet.</p>;
   }
 
+  const multiPhase = phases.length > 1;
+
   return (
     <div className="ff-bracket">
-      <BracketSection
-        columns={winners}
-        title={losers.length ? "Winners Bracket" : null}
-        geometricFallback={geometricFallback}
-      />
-      <BracketSection
-        columns={losers}
-        title="Losers Bracket"
-        geometricFallback={geometricFallback}
-      />
+      {phases.map((phase) => {
+        const sections = (
+          <>
+            <BracketSection
+              columns={phase.winners}
+              title={phase.losers.length ? "Winners Bracket" : null}
+              geometricFallback={geometricFallback}
+            />
+            <BracketSection
+              columns={phase.losers}
+              title="Losers Bracket"
+              geometricFallback={geometricFallback}
+            />
+          </>
+        );
+        // Single phase: render sections directly (the common case, unchanged).
+        // Multiple: wrap each in a titled group so the brackets read as separate.
+        return multiPhase ? (
+          <section className="ff-bracket__phase" key={phase.key}>
+            {phase.name ? (
+              <h2 className="ff-bracket__phase-title">{phase.name}</h2>
+            ) : null}
+            {sections}
+          </section>
+        ) : (
+          <Fragment key={phase.key}>{sections}</Fragment>
+        );
+      })}
     </div>
   );
 }

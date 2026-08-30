@@ -3179,6 +3179,23 @@ button.ff-dash__link:hover {
 .ff-bracket__section {
   min-width: 0;
 }
+/* A phase = one independent bracket within a multi-phase event (start.gg). Each
+   is a titled group of winners/losers sections, separated by a rule. */
+.ff-bracket__phase {
+  display: grid;
+  gap: var(--ff-space-section, 28px);
+  min-width: 0;
+}
+.ff-bracket__phase + .ff-bracket__phase {
+  margin-top: 8px;
+  padding-top: 24px;
+  border-top: 1px solid var(--ff-border);
+}
+.ff-bracket__phase-title {
+  margin: 0;
+  font-size: var(--ff-dash-text-lg);
+  font-weight: 800;
+}
 .ff-bracket__source {
   margin: 0;
 }

@@ -212,6 +212,12 @@ export type ExternalTournamentMatch = {
       draws connectors from. Null for a seeded slot / a provider without one. */
   prereq1Id: string | null;
   prereq2Id: string | null;
+  /** The phase (independent bracket) this match belongs to. A start.gg event can
+      hold several — the view groups by `phaseId` (ordered by `phaseOrder`, titled
+      `phaseName`) so each renders as its own bracket. Null → one bracket. */
+  phaseId: string | null;
+  phaseName: string | null;
+  phaseOrder: number | null;
   url: string | null;
 };
 
@@ -525,6 +531,9 @@ export async function getExternalTournament(
         winner: (toNum(m.winner) === 1 ? 1 : toNum(m.winner) === 2 ? 2 : null),
         prereq1Id: m.prereq1Id,
         prereq2Id: m.prereq2Id,
+        phaseId: m.phaseId,
+        phaseName: m.phaseName,
+        phaseOrder: toNum(m.phaseOrder),
         url: m.url,
       });
       matchesByEvent.set(m.eventId, list);

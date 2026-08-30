@@ -106,6 +106,15 @@ export const extMatches = sqliteTable(
     // for a seeded slot or a provider without feed structure (FACEIT).
     prereq1Id: text("prereq_1_id"),
     prereq2Id: text("prereq_2_id"),
+    // The phase this match belongs to (start.gg phaseGroup.phase). A start.gg
+    // event can hold SEVERAL independent brackets/phases ("Round 1 Bracket" +
+    // "Round 2 Bracket"); without this the branded view mashed them into one
+    // jumbled column set. The view groups matches by `phaseId` (ordered by
+    // `phaseOrder`, titled `phaseName`) and lays each out as its own bracket.
+    // Null for single-phase events and FACEIT (no phases) → renders as one.
+    phaseId: text("phase_id"),
+    phaseName: text("phase_name"),
+    phaseOrder: integer("phase_order"),
     url: text("url"),
   },
   (t) => [

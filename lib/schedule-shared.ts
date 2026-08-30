@@ -60,8 +60,15 @@ export type ScheduleEntry = {
   /** Round label (e.g. "Quarterfinal"), when known. */
   round: string | null;
   status: ScheduleStatus;
-  /** Epoch ms, or null when the provider gives no time. */
+  /** Epoch ms of the match's actual start, or null when the provider gives no
+      time (a bracket set with no scheduled time). This is what the row DISPLAYS
+      as the time ("Time TBD" when null). */
   scheduledAt: number | null;
+  /** Epoch ms of the day to PLACE this on the calendar grid — distinct from
+      `scheduledAt` so an untimed bracket match can still land on a day (its
+      tournament's start) instead of only "Date TBD". Defaults to `scheduledAt`
+      when unset. */
+  dayAt?: number | null;
   /** Deep link to the match/tournament on the provider's native site. */
   url: string | null;
   /** Internal Commons tournament view (e.g. /tournaments/<id>/). When set, the

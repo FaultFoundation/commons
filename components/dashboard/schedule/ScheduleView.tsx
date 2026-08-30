@@ -83,8 +83,15 @@ export function ScheduleView({
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+/** Which day an entry sits on in the grid: its explicit placement day when set
+    (an untimed bracket match placed on its tournament's start), else its actual
+    time. Distinct from the DISPLAYED time, which always uses `scheduledAt`. */
+function placeAt(entry: ScheduleEntry): number | null {
+  return entry.dayAt ?? entry.scheduledAt;
+}
+
 function monthStartFor(entries: ScheduleEntry[]): number {
-  const dated = entries.find((entry) => entry.scheduledAt != null)?.scheduledAt;
+  const dated = entries.map(placeAt).find((value) => value != null);
   const date = new Date(dated ?? Date.now());
   return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
 }
@@ -129,16 +136,15 @@ function buildGroups(entries: ScheduleEntry[]): DayGroup[] {
     .map((key): DayGroup => {
       const list = (map.get(key) ?? [])
         .slice()
-        .sort(
-          (a, b) => (a.scheduledAt ?? Infinity) - (b.scheduledAt ?? Infinity),
-        );
+        .sort((a, b) => (placeAt(a) ?? Infinity) - (placeAt(b) ?? Infinity));
       const first = list[0];
       const single = list.length === 1;
       return {
         key,
         title: first.groupTitle ?? first.title,
         entries: list,
-        earliestAt: list.find((e) => e.scheduledAt != null)?.scheduledAt ?? null,
+        // Placement day for sorting the day's chips + the popup title.
+        earliestAt: list.map(placeAt).find((v) => v != null) ?? null,
         href: single ? (first.href ?? first.url ?? null) : null,
         external: single ? !first.href && Boolean(first.url) : false,
       };
@@ -163,8 +169,9 @@ function MonthCalendar({
     previousScope.current = scope;
     const visible = new Date(month);
     const hasVisibleEntry = entries.some((entry) => {
-      if (entry.scheduledAt == null) return false;
-      const date = new Date(entry.scheduledAt);
+      const at = placeAt(entry);
+      if (at == null) return false;
+      const date = new Date(at);
       return (
         date.getFullYear() === visible.getFullYear() &&
         date.getMonth() === visible.getMonth()
@@ -194,8 +201,9 @@ function MonthCalendar({
     );
     const byDay = new Map<string, ScheduleEntry[]>();
     for (const entry of entries) {
-      if (entry.scheduledAt == null) continue;
-      const key = dateKey(entry.scheduledAt);
+      const at = placeAt(entry);
+      if (at == null) continue;
+      const key = dateKey(at);
       const list = byDay.get(key) ?? [];
       list.push(entry);
       byDay.set(key, list);
@@ -214,7 +222,7 @@ function MonthCalendar({
   }, [entries, month]);
 
   const undatedGroups = useMemo(
-    () => buildGroups(entries.filter((entry) => entry.scheduledAt == null)),
+    () => buildGroups(entries.filter((entry) => placeAt(entry) == null)),
     [entries],
   );
   const today = dateKey(Date.now());
@@ -370,12 +378,13 @@ function DayChip({
   onOpen: () => void;
 }) {
   // Compact single-line meta so cells stay a uniform square: a match count for
-  // a combined tournament, otherwise the start time.
+  // a combined tournament, otherwise the single match's real start time (its
+  // own `scheduledAt`, not the placement day) — "TBD" when it has none.
   const meta =
     group.entries.length > 1
       ? `${group.entries.length}×`
-      : group.earliestAt != null
-        ? formatTime(group.earliestAt)
+      : group.entries[0].scheduledAt != null
+        ? formatTime(group.entries[0].scheduledAt)
         : "TBD";
   const content = (
     <>

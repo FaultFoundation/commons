@@ -254,20 +254,32 @@ export type ExternalTournamentDetail = {
 };
 
 /**
- * Upcoming public events for the schedule's All Matches calendar. A populated
- * ext_matches projection is authoritative; an empty projection means an older
- * scraper seed is still deployed, so tournament start windows bridge the
- * rollout without inventing individual match times.
+ * Upcoming public events for the schedule's All Matches calendar.
+ *
+ * Two layers, MERGED (not either/or): the granular scheduled matches from
+ * `ext_matches`, PLUS a single start-date entry for every upcoming tournament
+ * that has no dated upcoming match yet. Without the second layer, a future
+ * tournament (its bracket not generated, or its match times not set) vanished
+ * from the calendar entirely the moment any *other* tournament had matches —
+ * which is why the Tournaments tab could list events the Schedule never showed.
+ * A tournament with dated matches shows those; one without shows on its start
+ * date, so nothing on the Tournaments tab is missing here.
  */
 export async function listUpcomingExternalScheduleEntries(): Promise<
   ScheduleEntry[]
 > {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const staleCutoff = new Date(Date.now() - STALE_TOURNAMENT_MS);
+
+  const matchEntries: ScheduleEntry[] = [];
+  // Tournaments that already have a match on the calendar — they don't also get a
+  // start-date window entry (that would double them).
+  const tournamentsWithMatch = new Set<string>();
+
   const db = getCenDb();
   if (db) {
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const staleCutoff = new Date(Date.now() - STALE_TOURNAMENT_MS);
       const rows = await db
         .select({
           id: extMatches.id,
@@ -279,7 +291,9 @@ export async function listUpcomingExternalScheduleEntries(): Promise<
           matchUrl: extMatches.url,
           eventName: extEvents.name,
           source: extTournaments.source,
+          tournamentId: extTournaments.id,
           tournamentName: extTournaments.name,
+          tournamentStartAt: extTournaments.startAt,
           tournamentUrl: extTournaments.url,
         })
         .from(extMatches)
@@ -315,80 +329,77 @@ export async function listUpcomingExternalScheduleEntries(): Promise<
         )
         .limit(1000);
 
-      // A populated match projection is authoritative even when every row is
-      // already terminal. An empty table means the old scraper seed is still
-      // deployed, so retain the tournament-window fallback below.
-      if (rows.length > 0) {
-        return rows
-          .flatMap((row): ScheduleEntry[] => {
-            if (!isScheduleProvider(row.source)) return [];
-            const state = externalMatchStatus(row.state);
-            if (state === "finished" || state === "cancelled") return [];
-            const matchup = [row.entrant1Name, row.entrant2Name]
-              .filter(Boolean)
-              .join(" vs ");
-            return [
-              {
-                id: `public:${row.id}`,
-                provider: row.source,
-                title: matchup || row.tournamentName,
-                opponent: null,
-                round: [row.tournamentName, row.eventName, row.round]
-                  .filter(Boolean)
-                  .join(" · "),
-                status: state,
-                scheduledAt: row.scheduledAt?.getTime() ?? null,
-                url: row.matchUrl ?? row.tournamentUrl,
-                href: null,
-                // Collapse every match of one tournament into a single calendar
-                // chip (a bracket day otherwise floods the cell); the popup
-                // expands them. Key on the tournament, not the match.
-                groupKey: `${row.source}:${row.tournamentName}`,
-                groupTitle: row.tournamentName,
-              },
-            ];
-          })
-          .sort(
-            (a, b) =>
-              (a.scheduledAt ?? Infinity) - (b.scheduledAt ?? Infinity),
-          );
+      for (const row of rows) {
+        if (!isScheduleProvider(row.source)) continue;
+        const state = externalMatchStatus(row.state);
+        if (state === "finished" || state === "cancelled") continue;
+        const matchup = [row.entrant1Name, row.entrant2Name]
+          .filter(Boolean)
+          .join(" vs ");
+        const matchTime = row.scheduledAt?.getTime() ?? null;
+        // Every match lands on the calendar: on its own time when it has one,
+        // otherwise on its tournament's start day (a bracket set with no
+        // scheduled time). `scheduledAt` still displays "Time TBD" for the
+        // latter — only the calendar POSITION falls back.
+        const dayAt = matchTime ?? row.tournamentStartAt?.getTime() ?? null;
+        matchEntries.push({
+          id: `public:${row.id}`,
+          provider: row.source,
+          title: matchup || row.tournamentName,
+          opponent: null,
+          round: [row.tournamentName, row.eventName, row.round]
+            .filter(Boolean)
+            .join(" · "),
+          status: state,
+          scheduledAt: matchTime,
+          dayAt,
+          url: row.matchUrl ?? row.tournamentUrl,
+          href: null,
+          // Collapse every match of one tournament into a single calendar chip
+          // (a bracket day otherwise floods the cell); the popup expands them.
+          groupKey: `${row.source}:${row.tournamentName}`,
+          groupTitle: row.tournamentName,
+        });
+        tournamentsWithMatch.add(row.tournamentId);
       }
-
-      const projectionExists = await db
-        .select({ id: extMatches.id })
-        .from(extMatches)
-        .limit(1);
-      if (projectionExists.length > 0) return [];
     } catch (error) {
       console.error("listUpcomingExternalScheduleEntries matches failed:", error);
     }
   }
 
+  // Start-date entry ONLY for upcoming tournaments that have no match at all yet
+  // (bracket not generated / not scraped), so the calendar still mirrors the
+  // Tournaments tab. Tournaments with matches show those matches instead.
   const tournaments = await listExternalTournaments();
-  return tournaments
-    .flatMap((tournament): ScheduleEntry[] => {
-      if (
-        !isScheduleProvider(tournament.source) ||
-        tournament.status === "completed" ||
-        !tournament.startAt
-      ) {
-        return [];
-      }
-      return [
-        {
-          id: `public:${tournament.id}`,
-          provider: tournament.source,
-          title: tournament.name,
-          opponent: null,
-          round: tournament.game,
-          status: tournament.status === "active" ? "live" : "scheduled",
-          scheduledAt: tournament.startAt.getTime(),
-          url: tournament.url,
-          href: null,
-        },
-      ];
-    })
-    .sort((a, b) => (a.scheduledAt ?? Infinity) - (b.scheduledAt ?? Infinity));
+  const windowEntries = tournaments.flatMap((tournament): ScheduleEntry[] => {
+    if (!isScheduleProvider(tournament.source)) return [];
+    if (tournament.status === "completed") return [];
+    if (tournamentsWithMatch.has(tournament.id)) return [];
+    const start = tournament.firstMatchAt ?? tournament.startAt;
+    if (!start || start.getTime() < today.getTime()) return [];
+    return [
+      {
+        id: `public:${tournament.id}`,
+        provider: tournament.source,
+        title: tournament.name,
+        opponent: null,
+        round: tournament.game,
+        status: tournament.status === "active" ? "live" : "scheduled",
+        scheduledAt: start.getTime(),
+        dayAt: start.getTime(),
+        url: tournament.url,
+        href: null,
+        groupKey: `${tournament.source}:${tournament.name}`,
+        groupTitle: tournament.name,
+      },
+    ];
+  });
+
+  return [...matchEntries, ...windowEntries].sort(
+    (a, b) =>
+      (a.dayAt ?? a.scheduledAt ?? Infinity) -
+      (b.dayAt ?? b.scheduledAt ?? Infinity),
+  );
 }
 
 function externalMatchStatus(state: string | null): ScheduleEntry["status"] {

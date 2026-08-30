@@ -419,9 +419,17 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   come from a championship-matches request the scraper already makes for roster
   data; start.gg set page 1 rides the existing deep query and only additional
   pages cost extra calls. start.gg frequently leaves `startedAt` null before a
-  set begins, so those rows deliberately render under Date TBD. Until a new
-  scraper run and projection import populate `ext_matches`, the calendar falls
-  back to tournament start windows rather than rendering empty.
+  set begins, so those rows deliberately render under Date TBD.
+  `listUpcomingExternalScheduleEntries` **merges two layers**: the matches from
+  `ext_matches`, PLUS a single start-date entry for every upcoming tournament
+  that has *no matches at all* yet (deduped by tournament id). Every match that
+  exists is placed on the grid: a timed match on its own day, an **untimed
+  bracket set on its tournament's start day** — via `ScheduleEntry.dayAt` (the
+  calendar POSITION), which is separate from `scheduledAt` (the DISPLAYED time,
+  still "Time TBD" when null). So untimed sets no longer disappear into "Date
+  TBD"; a tournament shows one grouped chip on its start day that expands to all
+  its matches. This is what keeps the calendar in step with the Tournaments tab —
+  it uses the existing projection, never a re-scrape.
 - The calendar ([ScheduleView](components/dashboard/schedule/ScheduleView.tsx))
   keeps every day cell a fixed-height square. A tournament's many matches
   collapse into ONE chip (via `ScheduleEntry.groupKey`/`groupTitle`, set to the

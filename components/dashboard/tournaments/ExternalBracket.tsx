@@ -20,11 +20,13 @@ import type {
 // rendering, where you advance within a bracket by winning and a loser drops to
 // the OTHER bracket, so cross-bracket feeds are intentionally omitted (they'd
 // clutter the tree). Every line attaches to the box's vertical centre, so both
-// feeders converge on one point. When there's NO feed graph — FACEIT (swiss), or
-// a start.gg bracket scraped before its sets carry prereqs (an active event
-// whose results aren't in yet) — it falls back to geometric column adjacency
-// (column c match i → column c+1 match ⌊i/2⌋), so an in-progress bracket still
-// shows connectors instead of bare columns.
+// feeders converge on one point. When there's NO feed graph — a start.gg bracket
+// scraped before its sets carry prereqs (an active event), or FACEIT (which
+// ships none) — it falls back to geometric column adjacency (column c match i →
+// column c+1 match ⌊i/2⌋). That fallback runs for start.gg and for any event
+// with a losers bracket (double-elim, incl. FACEIT — its `group` field splits
+// winners/losers upstream); a FACEIT swiss/league event has no losers, so it
+// stays plain columns where tree connectors would lie.
 
 const LOSERS_RE = /los(?:er|ers|ing)?|lower|\blb\b/i;
 
@@ -357,11 +359,16 @@ export function ExternalBracket({
       fallback to start.gg, whose events are always bracket trees. */
   source: string;
 }) {
-  const geometricFallback = source === "startgg";
   const allMatches = useMemo(
     () => events.flatMap((event) => event.matches),
     [events],
   );
+  // Draw geometric connectors for start.gg (always bracket trees) and for any
+  // tournament with a losers bracket (double-elim — e.g. FACEIT, which ships no
+  // feed graph). A swiss/league FACEIT event has no losers, so it stays plain
+  // columns where tree connectors would lie.
+  const geometricFallback =
+    source === "startgg" || allMatches.some(isLosers);
   // One entry per phase, each pre-split into winners/losers columns. Memoized so
   // the column references stay stable and BracketSection's measuring effect
   // doesn't re-run every render.

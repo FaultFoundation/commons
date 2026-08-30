@@ -343,7 +343,8 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   client component): it reuses the internal `BracketView`'s `ff-bracket__*`
   card/column **and connector** CSS and is driven by the scraped matches — the
   round headers are the provider's own names ("Winners Round 1", "Grand Final",
-  "Losers Semi-Final"; FACEIT's numeric rounds are dressed as "Round N"), each
+  "Losers Semi-Final"; a FACEIT double-elim splits on its `group` field into
+  "Winners/Losers Round N", other FACEIT formats stay "Round N"), each
   side shows its score with the winner highlighted, and every card deep-links to
   the provider's own match/result page (start.gg set URLs are built from the
   event slug; FACEIT uses the match room URL). Columns are ordered by
@@ -376,12 +377,14 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   loser-drops and the Losers-Final→Grand-Final feed are intentionally omitted
   (they'd clutter the tree). This captures the shapes ⌊m/2⌋ geometry can't —
   play-ins, byes, losers-bracket cross-feeds, grand-final resets. When a
-  **start.gg** section carries no feed graph yet (an active event whose sets don't
-  have prereqs captured), it falls back to geometric column adjacency (column c
-  match i → column c+1 match ⌊i/2⌋) so an in-progress bracket still shows lines.
-  That fallback is **gated to start.gg** (`source` prop): FACEIT ships no feed
-  graph and its championships are usually swiss, where a team recurs across
-  "rounds" and tree connectors would be a lie — so FACEIT stays plain columns.
+  section carries no feed graph (a start.gg event scraped before its sets have
+  prereqs, or FACEIT which ships none), it falls back to geometric column
+  adjacency (column c match i → column c+1 match ⌊i/2⌋) so the bracket still shows
+  lines. That fallback runs for **start.gg** and for **any event with a losers
+  bracket** (double-elim — incl. FACEIT, whose `group` field is split into
+  winners/losers upstream in the scraper). A FACEIT **swiss/league** event has no
+  losers, so it stays plain columns, where a team recurs across "rounds" and tree
+  connectors would be a lie.
 - **The dashboard shell for the whole tab lives in
   [app/tournaments/layout.tsx](app/tournaments/layout.tsx)**, not the pages, so
   `loading.tsx` skeletons and `[id]/error.tsx` render inside the content area

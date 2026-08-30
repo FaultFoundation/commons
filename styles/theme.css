@@ -3179,22 +3179,44 @@ button.ff-dash__link:hover {
 .ff-bracket__section {
   min-width: 0;
 }
-/* A phase = one independent bracket within a multi-phase event (start.gg). Each
-   is a titled group of winners/losers sections, separated by a rule. */
-.ff-bracket__phase {
-  display: grid;
-  gap: var(--ff-space-section, 28px);
-  min-width: 0;
+/* Multi-phase events (start.gg can hold several independent brackets) render as
+   browser-style tabs — each a box open at the bottom, the active one filled and
+   connecting into the bracket below. One phase shows at a time. */
+.ff-bracket__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--ff-border);
 }
-.ff-bracket__phase + .ff-bracket__phase {
-  margin-top: 8px;
-  padding-top: 24px;
-  border-top: 1px solid var(--ff-border);
+.ff-bracket__tab {
+  padding: 8px 16px;
+  /* Box with no bottom border — the browser-tab look. */
+  border: 1px solid var(--ff-border);
+  border-bottom: none;
+  border-radius: var(--ff-radius-md) var(--ff-radius-md) 0 0;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  /* Sit on the strip's bottom line so the active tab can break it. */
+  margin-bottom: -1px;
+  transition:
+    color var(--ff-transition),
+    background var(--ff-transition),
+    border-color var(--ff-transition);
 }
-.ff-bracket__phase-title {
-  margin: 0;
-  font-size: var(--ff-dash-text-lg);
-  font-weight: 800;
+.ff-bracket__tab:hover {
+  color: #fff;
+}
+.ff-bracket__tab--active {
+  background: var(--ff-surface-2);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.28);
+  /* Cover the strip line under the active tab so it merges with the bracket. */
+  border-bottom: 1px solid var(--ff-surface-2);
 }
 .ff-bracket__source {
   margin: 0;

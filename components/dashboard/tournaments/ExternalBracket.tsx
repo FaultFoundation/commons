@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   ExternalTournamentDetail,
@@ -367,51 +367,63 @@ export function ExternalBracket({
   // doesn't re-run every render.
   const phases = useMemo(
     () =>
-      groupByPhase(allMatches).map((phase) => ({
+      groupByPhase(allMatches).map((phase, index) => ({
         key: phase.key,
-        name: phase.name,
+        name: phase.name ?? `Bracket ${index + 1}`,
         winners: buildColumns(phase.matches.filter((m) => !isLosers(m))),
         losers: buildColumns(phase.matches.filter(isLosers)),
       })),
     [allMatches],
   );
+  const [activePhase, setActivePhase] = useState(0);
 
   if (allMatches.length === 0) {
     return <p className="ff-ticket-empty">No bracket data collected yet.</p>;
   }
 
-  const multiPhase = phases.length > 1;
+  const sectionsFor = (phase: (typeof phases)[number]) => (
+    <>
+      <BracketSection
+        columns={phase.winners}
+        title={phase.losers.length ? "Winners Bracket" : null}
+        geometricFallback={geometricFallback}
+      />
+      <BracketSection
+        columns={phase.losers}
+        title="Losers Bracket"
+        geometricFallback={geometricFallback}
+      />
+    </>
+  );
 
+  // Single phase (or FACEIT): render directly, no tabs.
+  if (phases.length <= 1) {
+    return <div className="ff-bracket">{sectionsFor(phases[0])}</div>;
+  }
+
+  // Multiple independent brackets in one event → browser-style tabs next to the
+  // bracket name, one phase visible at a time (rather than stacked vertically).
+  const activeIndex = Math.min(activePhase, phases.length - 1);
   return (
     <div className="ff-bracket">
-      {phases.map((phase) => {
-        const sections = (
-          <>
-            <BracketSection
-              columns={phase.winners}
-              title={phase.losers.length ? "Winners Bracket" : null}
-              geometricFallback={geometricFallback}
-            />
-            <BracketSection
-              columns={phase.losers}
-              title="Losers Bracket"
-              geometricFallback={geometricFallback}
-            />
-          </>
-        );
-        // Single phase: render sections directly (the common case, unchanged).
-        // Multiple: wrap each in a titled group so the brackets read as separate.
-        return multiPhase ? (
-          <section className="ff-bracket__phase" key={phase.key}>
-            {phase.name ? (
-              <h2 className="ff-bracket__phase-title">{phase.name}</h2>
-            ) : null}
-            {sections}
-          </section>
-        ) : (
-          <Fragment key={phase.key}>{sections}</Fragment>
-        );
-      })}
+      <div className="ff-bracket__tabs" role="tablist" aria-label="Brackets">
+        {phases.map((phase, index) => (
+          <button
+            key={phase.key}
+            type="button"
+            role="tab"
+            id={`bracket-tab-${index}`}
+            aria-selected={index === activeIndex}
+            className={`ff-bracket__tab${index === activeIndex ? " ff-bracket__tab--active" : ""}`}
+            onClick={() => setActivePhase(index)}
+          >
+            {phase.name}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" aria-labelledby={`bracket-tab-${activeIndex}`}>
+        {sectionsFor(phases[activeIndex])}
+      </div>
     </div>
   );
 }

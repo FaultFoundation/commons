@@ -104,8 +104,10 @@ BETTER_AUTH_URL=http://localhost:3999
 # Optional — on-demand external-tournament refresh. When a member opens an
 # external (start.gg / FACEIT) tournament, the Commons asks the cen-scraper
 # Worker to re-pull just that one so the bracket is near-live. CEN_SCRAPER_URL
-# is the scraper Worker's base URL (e.g. http://localhost:8787 for a local
-# `wrangler dev`, or https://cen-scraper.<subdomain>.workers.dev in prod);
+# is the scraper Worker's base URL — INCLUDE THE SCHEME (https://…). A bare
+# hostname is tolerated (the code prepends https://), but store the full URL:
+# e.g. http://localhost:8787 for a local `wrangler dev`, or
+# https://data.fault.foundation / https://cen-scraper.<subdomain>.workers.dev in prod;
 # CEN_REFRESH_SECRET must match the same secret set on the scraper Worker.
 # Leave unset and the tab still works — it just renders the cached projection
 # without the live top-up.

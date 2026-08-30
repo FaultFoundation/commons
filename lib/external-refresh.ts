@@ -14,17 +14,25 @@ export async function requestExternalRefresh(
   id: string,
 ): Promise<RefreshOutcome> {
   const { env } = getCloudflareContext();
-  const base = env.CEN_SCRAPER_URL?.trim();
+  const rawBase = env.CEN_SCRAPER_URL?.trim();
   const secret = env.CEN_REFRESH_SECRET?.trim();
   // Unconfigured (or not an external id) → no-op, render the cached projection.
-  if (!base || !secret || !id.includes(":")) {
+  if (!rawBase || !secret || !id.includes(":")) {
     return { refreshed: false, skipped: "not_configured" };
   }
+
+  // Tolerate a scheme-less value (e.g. "data.fault.foundation"): without this,
+  // fetch() throws "Invalid URL", which the catch below swallowed as a silent
+  // {refreshed:false} — so a bare-hostname CEN_SCRAPER_URL made every on-demand
+  // refresh a no-op and left active brackets perpetually stale.
+  const base = (
+    /^https?:\/\//i.test(rawBase) ? rawBase : `https://${rawBase}`
+  ).replace(/\/$/, "");
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
   try {
-    const res = await fetch(`${base.replace(/\/$/, "")}/refresh`, {
+    const res = await fetch(`${base}/refresh`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${secret}`,

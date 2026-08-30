@@ -70,9 +70,11 @@ interface CloudflareEnv {
   // On-demand external-tournament refresh (lib/external-refresh.ts): when a
   // member opens an external tournament, the Commons asks the cen-scraper
   // Worker to re-pull just that one so the bracket is near-live. CEN_SCRAPER_URL
-  // is the scraper Worker's base URL; CEN_REFRESH_SECRET is the bearer it
-  // checks (must match the scraper's own CEN_REFRESH_SECRET). Both unset → the
-  // Commons skips the top-up and renders the cached cen-sql projection.
+  // is the scraper Worker's base URL — ideally with the https:// scheme, though
+  // lib/external-refresh.ts prepends it if absent (a bare hostname used to make
+  // fetch() throw and silently no-op the refresh). CEN_REFRESH_SECRET is the
+  // bearer it checks (must match the scraper's own CEN_REFRESH_SECRET). Both
+  // unset → the Commons skips the top-up and renders the cached projection.
   CEN_SCRAPER_URL?: string;
   CEN_REFRESH_SECRET?: string;
 }

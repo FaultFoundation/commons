@@ -5481,15 +5481,19 @@ button.ff-dash__link:hover {
   }
 }
 
+
 /* ===========================================================================
-   Overwatch Statistics (/statistics/player/) — identity header, headline stat
-   tiles, single-series progress charts (brand-yellow accent line, one axis,
-   hover crosshair + tooltip), and a role/hero breakdown table. All marks are
-   inline SVG — no chart library, matching the no-framework / self-contained
-   norm. Sizes/spacing come from the dash tokens, never hardcoded.
+   Overwatch Statistics (/statistics/) — a career-profile-style dashboard in our
+   bubbles. Top-level tab (no rail slide-out); the Player/Match switch is
+   browser-style tabs under a shared profile header. A three-column layout
+   (Time Played · Most Played Heroes + competitive ranks · Hero Comparison)
+   modeled on Blizzard's own career screen, then our Progress-Over-Time charts
+   (single-series inline SVG). Hero art is OverFast /heroes portraits. Sizes and
+   spacing come from the dash tokens; the role palette (tank/damage/support) is
+   the only literal colour, matched to Blizzard's role hues.
    =========================================================================== */
 
-/* Shared bubble copy helpers (also used by the not-linked / private states). */
+/* Shared bubble copy helpers (also the not-linked / private / error states). */
 .ff-bubble__lede {
   margin: 0;
   font-size: var(--ff-dash-text-md);
@@ -5504,17 +5508,8 @@ button.ff-dash__link:hover {
 .ff-bubble__cta {
   margin-top: 4px;
 }
-
-/* Identity header. */
-.ff-owhero__avatar {
-  width: var(--ff-avatar-lg);
-  height: var(--ff-avatar-lg);
-  border-radius: var(--ff-radius-md);
-  object-fit: cover;
-  background: var(--ff-surface-2);
-}
 .ff-owbadge {
-  padding: 4px 10px;
+  padding: 3px 9px;
   border-radius: var(--ff-radius-pill);
   background: var(--ff-surface-2);
   color: var(--ff-text-dim);
@@ -5527,54 +5522,371 @@ button.ff-dash__link:hover {
   font-size: var(--ff-dash-text-sm);
   color: var(--ff-warn);
 }
-.ff-owranks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.ff-owrank {
+
+/* Page stack: profile header, tabs, panel. */
+.ff-owpage {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 96px;
-  padding: 8px 14px;
-  border-radius: var(--ff-radius-md);
-  border-left: 3px solid var(--ff-border);
-  background: var(--ff-surface-2);
+  gap: 20px;
 }
-.ff-owrank[data-role="tank"] { border-left-color: #6aa9ff; }
-.ff-owrank[data-role="damage"] { border-left-color: #ff8f6b; }
-.ff-owrank[data-role="support"] { border-left-color: #74d3a0; }
-.ff-owrank[data-role="open"] { border-left-color: var(--ff-accent); }
-.ff-owrank__role {
+
+/* Browser-style tabs under the profile header (like the bracket phase tabs). */
+.ff-owtabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 4px;
+  border-bottom: 1px solid var(--ff-border);
+}
+.ff-owtab {
+  padding: 8px 18px;
+  border: 1px solid var(--ff-border);
+  border-bottom: none;
+  border-radius: var(--ff-radius-md) var(--ff-radius-md) 0 0;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition:
+    color var(--ff-transition),
+    background var(--ff-transition),
+    border-color var(--ff-transition);
+}
+.ff-owtab:hover {
+  color: #fff;
+}
+.ff-owtab--active {
+  background: var(--ff-surface-2);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.28);
+  border-bottom: 1px solid var(--ff-surface-2);
+}
+
+/* Profile header — a wide card fronted by the member's namecard art. */
+.ff-owprofile {
+  position: relative;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+}
+.ff-owprofile__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 29, 61, 0.94),
+    rgba(0, 29, 61, 0.74) 55%,
+    rgba(0, 29, 61, 0.5)
+  );
+}
+.ff-owprofile__body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.ff-owprofile__avatar {
+  width: 72px;
+  height: 72px;
+  flex: none;
+  border-radius: var(--ff-radius-md);
+  object-fit: cover;
+  background: var(--ff-surface-2);
+  border: 2px solid var(--ff-accent);
+}
+.ff-owprofile__avatar--empty {
+  border: 2px solid var(--ff-border);
+}
+.ff-owprofile__meta {
+  min-width: 0;
+}
+.ff-owprofile__name {
+  margin: 0;
+  font-size: var(--ff-dash-text-xl);
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+.ff-owprofile__sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+}
+.ff-owprofile__title {
+  color: var(--ff-accent);
+  font-weight: 700;
+}
+.ff-owskel {
+  animation: ff-owpulse 1.3s ease-in-out infinite;
+}
+@keyframes ff-owpulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.7; }
+}
+
+/* Three-column dashboard. */
+.ff-owcols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+/* Column 1 — Time Played. */
+.ff-owtime__total {
+  font-size: var(--ff-dash-text-xl);
+  font-weight: 800;
+  color: var(--ff-accent);
+  margin-bottom: 12px;
+}
+.ff-owtime {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ff-owtime__row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ff-owtime__head {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-owtime__label {
+  font-weight: 600;
+}
+.ff-owtime__value {
+  color: var(--ff-text-dim);
+}
+.ff-owtime__track {
+  height: 8px;
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-surface-2);
+  overflow: hidden;
+}
+.ff-owtime__bar {
+  height: 100%;
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-text-dim);
+}
+.ff-owtime__label[data-role="tank"],
+.ff-owcomp__role[data-role="tank"] { color: #6aa9ff; }
+.ff-owtime__label[data-role="damage"],
+.ff-owcomp__role[data-role="damage"] { color: #ff8f6b; }
+.ff-owtime__label[data-role="support"],
+.ff-owcomp__role[data-role="support"] { color: #74d3a0; }
+.ff-owtime__bar[data-role="tank"] { background: #6aa9ff; }
+.ff-owtime__bar[data-role="damage"] { background: #ff8f6b; }
+.ff-owtime__bar[data-role="support"] { background: #74d3a0; }
+.ff-owstrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ff-border);
+}
+
+/* Column 2 — Most played heroes + competitive ranks. */
+.ff-owheroes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ff-owhero-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ff-owportrait {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--ff-surface-2);
+  border: 2px solid var(--ff-border);
+}
+.ff-owportrait--sm {
+  width: 34px;
+  height: 34px;
+}
+.ff-owportrait[data-role="tank"] { border-color: #6aa9ff; }
+.ff-owportrait[data-role="damage"] { border-color: #ff8f6b; }
+.ff-owportrait[data-role="support"] { border-color: #74d3a0; }
+.ff-owhero-row__meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ff-owhero-row__name {
+  font-weight: 700;
+  font-size: var(--ff-dash-text-md);
+}
+.ff-owhero-row__sub {
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-owcomp {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ff-border);
+}
+.ff-owcomp__head,
+.ff-owcomp__row {
+  display: grid;
+  grid-template-columns: 1.2fr 1.5fr 0.7fr 0.8fr;
+  align-items: center;
+  gap: 8px;
+}
+.ff-owcomp__head {
   font-size: var(--ff-dash-text-xs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--ff-text-dim);
 }
-.ff-owrank__value {
-  font-size: var(--ff-dash-text-md);
+.ff-owcomp__head span:nth-child(n + 3) {
+  text-align: right;
+}
+.ff-owcomp__row {
+  font-size: var(--ff-dash-text-sm);
+  padding: 3px 0;
+}
+.ff-owcomp__role {
+  font-weight: 600;
+}
+.ff-owcomp__rank {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ff-owcomp__rankicon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex: none;
+}
+.ff-owcomp__num {
+  text-align: right;
+  color: var(--ff-text-dim);
+}
+
+/* Column 3 — Hero comparison. */
+.ff-owselect {
+  padding: 4px 8px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-surface-2);
+  color: #fff;
+  font-family: inherit;
+  font-size: var(--ff-dash-text-xs);
+  cursor: pointer;
+}
+.ff-owselect option {
+  background: var(--ff-navy-900);
+  color: #fff;
+}
+.ff-owcompare {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ff-owcompare__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ff-owcompare__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ff-owcompare__labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-owcompare__name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ff-owcompare__val {
+  color: var(--ff-text-dim);
+  white-space: nowrap;
+}
+.ff-owcompare__row--top .ff-owcompare__val {
+  color: var(--ff-accent);
   font-weight: 700;
 }
-.ff-owmeta {
+.ff-owcompare__track {
+  height: 8px;
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-surface-2);
+  overflow: hidden;
+}
+.ff-owcompare__bar {
+  height: 100%;
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-blue);
+}
+.ff-owcompare__bar--top {
+  background: linear-gradient(90deg, #ff9d4d, #ff7a00);
+}
+
+/* Loading bar (while the API collects from OverFast). */
+.ff-owload {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
+  flex-direction: column;
+  gap: 10px;
+}
+.ff-owload__label {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--ff-dash-text-md);
+}
+.ff-owload__track {
+  height: 10px;
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-surface-2);
+  overflow: hidden;
+}
+.ff-owload__bar {
+  height: 100%;
+  border-radius: var(--ff-radius-pill);
+  background: linear-gradient(90deg, var(--ff-blue), var(--ff-accent));
+  background-size: 200% 100%;
+  transition: width 0.2s ease;
+  animation: ff-owslide 2s linear infinite;
+}
+@keyframes ff-owslide {
+  0% { background-position: 0% 0; }
+  100% { background-position: 200% 0; }
+}
+.ff-owload__hint {
+  margin: 0;
   font-size: var(--ff-dash-text-sm);
   color: var(--ff-text-dim);
 }
-.ff-owmeta__item {
-  white-space: nowrap;
-}
 
-/* Headline stat tiles (reuses .ff-stat). */
-.ff-owstats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px 20px;
-}
-
-/* Progress charts — small multiples. */
+/* Progress-over-time charts (single-series, hover crosshair + tooltip). */
 .ff-owcharts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -5665,43 +5977,4 @@ button.ff-dash__link:hover {
   text-align: center;
   font-size: var(--ff-dash-text-sm);
   color: var(--ff-text-dim);
-}
-
-/* Role / hero breakdown table. */
-.ff-owtable-wrap {
-  overflow-x: auto;
-}
-.ff-owtable {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--ff-dash-text-sm);
-}
-.ff-owtable__caption {
-  padding-bottom: 6px;
-  text-align: left;
-  font-size: var(--ff-dash-text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ff-text-dim);
-}
-.ff-owtable th,
-.ff-owtable td {
-  padding: 6px 8px;
-  text-align: right;
-  white-space: nowrap;
-  border-bottom: 1px solid var(--ff-border);
-}
-.ff-owtable thead th {
-  font-size: var(--ff-dash-text-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ff-text-dim);
-}
-.ff-owtable th[scope="row"],
-.ff-owtable thead th:first-child {
-  text-align: left;
-}
-.ff-owtable tbody th[scope="row"] {
-  font-weight: 600;
 }

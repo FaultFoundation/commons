@@ -448,11 +448,13 @@ normalized model. Its migrations version independently in `drizzle-cen/`
 
 ### Overwatch player statistics — the third D1 (`ow-player-data`)
 
-The **Statistics** tab (`/statistics/`, a rail group with **Player Data** and a
-coming-soon **Match Data** child) shows a member's Overwatch career, sourced from
-the unofficial **OverFast API** (`https://overfast-api.tekrop.fr`, which scrapes a
-player's public Blizzard career page by BattleTag). "By game" is the intended
-shape; Overwatch is the only game today.
+The **Statistics** tab (`/statistics/`, a **plain top-level tab** — not a rail
+group) shows a member's Overwatch career, sourced from the unofficial **OverFast
+API** (`https://overfast-api.tekrop.fr`, which scrapes a player's public Blizzard
+career page by BattleTag). The **Player Data / Match Data** split is **browser-style
+tabs inside the page**, under a shared profile header (`.ff-owtab*`), deliberately
+not the admin-style rail slide-out. "By game" is the intended shape; Overwatch is
+the only game today; Match Data is a coming-soon placeholder.
 
 - **A THIRD D1, `ow-player-data`**, bound as **`OW`** ([db/ow-schema.ts](db/ow-schema.ts),
   migrations in `drizzle-ow/`, [lib/ow-db.ts](lib/ow-db.ts) `getOwDb()` degrades to
@@ -485,15 +487,29 @@ shape; Overwatch is the only game today.
   poller imports it unchanged. Best-effort like the schedule adapters: a timeout,
   never throws. `OVERFAST_API_URL` overrides the base (self-hosting); the poller's
   manual-run endpoint is gated by its own `OW_POLLER_SECRET` (not a Commons var).
-- **The view** ([components/dashboard/statistics/PlayerStatsView.tsx](components/dashboard/statistics/PlayerStatsView.tsx),
-  client): identity header + comp ranks, headline stat tiles, single-series
-  **inline-SVG** progress charts (no chart lib; brand-yellow line, one axis, hover
-  crosshair — meaningful only past 2 snapshots), and a role/hero breakdown from the
-  latest snapshot's `stats_json`. The headline scalars are denormalized columns so
-  the charts query without parsing a blob per point; the full per-hero detail lives
-  in the `summary_json`/`stats_json` blobs. Live-verified for the public path; the
-  private-profile branch is written against the observed shape and wants one
-  live-verify against a genuinely private account (like the FACEIT/start.gg adapters).
+- **Client-loaded behind a loading bar, not an SSR freeze.** `app/statistics/page.tsx`
+  renders the shell instantly (passing only `linked`/`enabled`/`battletag`);
+  [StatisticsView](components/dashboard/statistics/StatisticsView.tsx) (client) then
+  fetches [`GET /api/statistics/player`](app/api/statistics/player/route.ts) →
+  `getStatisticsData` (visibility + snapshot refresh + history + the OverFast
+  `/heroes` roster for portraits, in parallel). While that multi-second round-trip
+  runs, [StatLoading](components/dashboard/statistics/StatLoading.tsx) shows a
+  climbing progress bar — the OverFast API gives no real progress, so it eases toward
+  ~92 % and the parent unmounts it on arrival. **Never do the OverFast fetch in the
+  page's server render** — that's what froze the tab before.
+- **The dashboard** ([PlayerDashboard](components/dashboard/statistics/PlayerDashboard.tsx),
+  client) is modeled on Blizzard's own career screen, in our bubbles: a three-column
+  layout (`.ff-owcols`) — **Time Played** (total + per-role bars), **Most Played
+  Heroes** (top-3 with OverFast portraits) + a **competitive rank table** (per-role
+  rank + games won + win %), and **Hero Comparison** (a metric-select bar list,
+  leader in OW orange) — then our own **Progress Over Time** single-series inline-SVG
+  charts underneath (no chart lib; hover crosshair; meaningful only past 2 snapshots),
+  the payoff of the daily snapshots that OW's own profile doesn't show. Headline
+  scalars are denormalized columns so the charts query without parsing a blob per
+  point; the full per-hero/role detail comes from the `summary_json`/`stats_json`
+  blobs. Live-verified for the public path; the private-profile branch is written
+  against the observed shape and wants one live-verify against a genuinely private
+  account (like the FACEIT/start.gg adapters).
 
 ### Styling
 

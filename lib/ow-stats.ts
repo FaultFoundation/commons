@@ -7,6 +7,7 @@ import {
   DEFAULT_OVERFAST_BASE,
   battletagToPlayerId,
   checkOwVisibility,
+  fetchOwHeroes,
   fetchOwStatsSummary,
   fetchOwSummary,
   type OverfastRank,
@@ -14,12 +15,15 @@ import {
   type OverfastSummary,
   type OwVisibility,
 } from "@/lib/overfast";
+import { getPlatformIdentityCached } from "@/lib/platform-identities";
 import {
   MIN_SNAPSHOT_INTERVAL_MS,
   VISIBILITY_TTL_MS,
   chunkForUser,
+  type HeroMap,
   type PlayerSnapshot,
   type PlayerStatsData,
+  type PlayerStatsResponse,
   type RoleRank,
 } from "@/lib/ow-stats-shared";
 
@@ -449,4 +453,36 @@ export async function snapshotOnConnect(
   } catch (error) {
     console.error("ow snapshotOnConnect failed:", error);
   }
+}
+
+/**
+ * The whole Player Data payload, resolved server-side and returned to the client
+ * over /api/statistics/player — so the multi-second OverFast round-trips happen
+ * behind a fetch with a loading bar, not a frozen SSR render. Resolves the
+ * member's BattleTag, the public/private visibility, refreshes the snapshot when
+ * public, and loads the history + the hero roster (for portraits) in parallel.
+ * Never throws: any failure degrades to whatever is cached.
+ */
+export async function getStatisticsData(
+  userId: string,
+): Promise<PlayerStatsResponse> {
+  const identity = await getPlatformIdentityCached(userId, "battlenet");
+  const battletag = identity?.handle ?? null;
+  if (!battletag) {
+    return { visibility: "unlinked", battletag: null, data: null, heroes: {} };
+  }
+
+  const visibility = await getOwVisibility(userId, battletag);
+  if (visibility === "public") {
+    await captureSnapshot(userId, battletag);
+  }
+
+  const [data, heroesList] = await Promise.all([
+    loadPlayerStats(userId),
+    fetchOwHeroes(overfastBase()),
+  ]);
+  const heroes: HeroMap = {};
+  for (const hero of heroesList) heroes[hero.key] = hero;
+
+  return { visibility, battletag, data, heroes };
 }

@@ -6,9 +6,29 @@
 // convention (see CLAUDE.md).
 // ---------------------------------------------------------------------------
 
-import type { OverfastStatsSummary, OverfastSummary } from "@/lib/overfast";
+import type {
+  OverfastHero,
+  OverfastStatBlock,
+  OverfastStatsSummary,
+  OverfastSummary,
+  OwVisibility,
+} from "@/lib/overfast";
 
-export type { OwVisibility } from "@/lib/overfast";
+export type { OwVisibility, OverfastStatBlock } from "@/lib/overfast";
+
+/** Hero metadata (portrait/name/role) keyed by hero key, for the hero grids. */
+export type HeroMap = Record<string, OverfastHero>;
+
+/** Page visibility, plus the "no Battle.net linked" case the page resolves first. */
+export type StatVisibility = OwVisibility | "unlinked";
+
+/** The one payload the Player Data view fetches (via /api/statistics/player). */
+export type PlayerStatsResponse = {
+  visibility: StatVisibility;
+  battletag: string | null;
+  data: PlayerStatsData | null;
+  heroes: HeroMap;
+};
 
 /** How many hourly buckets the poller spreads players across (one per UTC hour). */
 export const POLL_CHUNKS = 24;
@@ -153,4 +173,84 @@ export function formatCompact(n: number | null | undefined): string {
   if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (Math.abs(n) >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return String(n);
+}
+
+/** "wrecking-ball" → "Wrecking Ball" (fallback when the hero map lacks a name). */
+export function prettyHeroKey(key: string): string {
+  return key
+    .split(/[-_]/)
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+// --- Hero comparison (the right-hand "Hero Comparison" panel) ---------------
+
+export type CompareMetric =
+  | "time_played"
+  | "games_played"
+  | "games_won"
+  | "winrate"
+  | "kda";
+
+export const COMPARE_METRICS: { key: CompareMetric; label: string }[] = [
+  { key: "time_played", label: "Time Played" },
+  { key: "games_played", label: "Games Played" },
+  { key: "games_won", label: "Games Won" },
+  { key: "winrate", label: "Win Rate" },
+  { key: "kda", label: "K/D/A" },
+];
+
+/** Pull one comparison metric out of a stat block, or null when absent. */
+export function heroMetricValue(
+  block: OverfastStatBlock,
+  metric: CompareMetric,
+): number | null {
+  const v = block[metric];
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/** Format a comparison value for its metric (time as h/m, winrate as %, …). */
+export function formatMetric(metric: CompareMetric, value: number | null): string {
+  if (value == null) return "—";
+  if (metric === "time_played") return formatTimePlayed(value);
+  if (metric === "winrate") return formatWinrate(value);
+  if (metric === "kda") return value.toFixed(2);
+  return value.toLocaleString();
+}
+
+export type HeroCompareRow = {
+  key: string;
+  name: string;
+  portrait: string | null;
+  role: string | null;
+  value: number;
+};
+
+/**
+ * The sorted rows for the Hero Comparison panel: every hero with a non-null,
+ * positive value for `metric`, highest first, each resolved against the hero map
+ * for its portrait/name. Caps at `limit` so a deep roster stays scannable.
+ */
+export function buildHeroComparison(
+  heroes: Record<string, OverfastStatBlock> | null | undefined,
+  heroMap: HeroMap,
+  metric: CompareMetric,
+  limit = 10,
+): HeroCompareRow[] {
+  if (!heroes) return [];
+  const rows: HeroCompareRow[] = [];
+  for (const [key, block] of Object.entries(heroes)) {
+    const value = heroMetricValue(block, metric);
+    if (value == null || value <= 0) continue;
+    const meta = heroMap[key];
+    rows.push({
+      key,
+      name: meta?.name ?? prettyHeroKey(key),
+      portrait: meta?.portrait ?? null,
+      role: meta?.role ?? null,
+      value,
+    });
+  }
+  rows.sort((a, b) => b.value - a.value);
+  return rows.slice(0, limit);
 }

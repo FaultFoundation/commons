@@ -127,6 +127,35 @@ export async function fetchOwStatsSummary(
   return result.body as OverfastStatsSummary;
 }
 
+/** Hero metadata (portrait + display name + role), keyed by the same hero key
+    the stats/summary heroes map uses ("wrecking-ball", "soldier-76", …). */
+export type OverfastHero = {
+  key: string;
+  name: string;
+  portrait: string | null;
+  role: string | null;
+};
+
+/** GET /heroes — the roster with portrait URLs, for the hero grids. [] on trouble. */
+export async function fetchOwHeroes(
+  base: string | null | undefined,
+): Promise<OverfastHero[]> {
+  const result = await getJson(`${normalizeBase(base)}/heroes`);
+  if (!result || !Array.isArray(result.body)) return [];
+  return (result.body as Array<Record<string, unknown>>).flatMap((h) => {
+    const key = typeof h.key === "string" ? h.key : null;
+    if (!key) return [];
+    return [
+      {
+        key,
+        name: typeof h.name === "string" ? h.name : key,
+        portrait: typeof h.portrait === "string" ? h.portrait : null,
+        role: typeof h.role === "string" ? h.role : null,
+      },
+    ];
+  });
+}
+
 /**
  * Whether a career profile is publicly readable, via /stats/summary:
  *   - 404              → 'not_found' (bad BattleTag / no such player)

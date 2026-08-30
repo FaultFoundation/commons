@@ -113,3 +113,9 @@ BETTER_AUTH_URL=http://localhost:3999
 # without the live top-up.
 # CEN_SCRAPER_URL=http://localhost:8787
 # CEN_REFRESH_SECRET=replace-with-a-long-random-string
+
+# Optional — OverFast API base URL for the Overwatch Statistics tab. Leave unset
+# to use the public instance (https://overfast-api.tekrop.fr). Point it at a
+# self-hosted OverFast (Docker) if the public one rate-limits you. Not a secret.
+# The daily poller (the separate ow-stats-poller repo) reads its own copy of this.
+# OVERFAST_API_URL=https://overfast-api.tekrop.fr

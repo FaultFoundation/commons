@@ -77,4 +77,11 @@ interface CloudflareEnv {
   // unset → the Commons skips the top-up and renders the cached projection.
   CEN_SCRAPER_URL?: string;
   CEN_REFRESH_SECRET?: string;
+  // OverFast API base URL (the Overwatch player-statistics source, lib/overfast.ts).
+  // Optional: unset, the Commons uses the public instance
+  // https://overfast-api.tekrop.fr. Override it to point at a self-hosted OverFast
+  // (the project ships a Docker image) if the public one gets rate-limited. Not a
+  // secret — OverFast needs no auth to read a public career profile. The separate
+  // ow-stats-poller Worker reads the same var from its own config.
+  OVERFAST_API_URL?: string;
 }

@@ -5480,3 +5480,228 @@ button.ff-dash__link:hover {
     flex: 1 1 auto;
   }
 }
+
+/* ===========================================================================
+   Overwatch Statistics (/statistics/player/) — identity header, headline stat
+   tiles, single-series progress charts (brand-yellow accent line, one axis,
+   hover crosshair + tooltip), and a role/hero breakdown table. All marks are
+   inline SVG — no chart library, matching the no-framework / self-contained
+   norm. Sizes/spacing come from the dash tokens, never hardcoded.
+   =========================================================================== */
+
+/* Shared bubble copy helpers (also used by the not-linked / private states). */
+.ff-bubble__lede {
+  margin: 0;
+  font-size: var(--ff-dash-text-md);
+  line-height: var(--ff-dash-leading);
+}
+.ff-bubble__note {
+  margin: 0;
+  font-size: var(--ff-dash-text-sm);
+  line-height: var(--ff-dash-leading);
+  color: var(--ff-text-dim);
+}
+.ff-bubble__cta {
+  margin-top: 4px;
+}
+
+/* Identity header. */
+.ff-owhero__avatar {
+  width: var(--ff-avatar-lg);
+  height: var(--ff-avatar-lg);
+  border-radius: var(--ff-radius-md);
+  object-fit: cover;
+  background: var(--ff-surface-2);
+}
+.ff-owbadge {
+  padding: 4px 10px;
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-surface-2);
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ff-owstale {
+  margin: 0;
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-warn);
+}
+.ff-owranks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.ff-owrank {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 96px;
+  padding: 8px 14px;
+  border-radius: var(--ff-radius-md);
+  border-left: 3px solid var(--ff-border);
+  background: var(--ff-surface-2);
+}
+.ff-owrank[data-role="tank"] { border-left-color: #6aa9ff; }
+.ff-owrank[data-role="damage"] { border-left-color: #ff8f6b; }
+.ff-owrank[data-role="support"] { border-left-color: #74d3a0; }
+.ff-owrank[data-role="open"] { border-left-color: var(--ff-accent); }
+.ff-owrank__role {
+  font-size: var(--ff-dash-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ff-text-dim);
+}
+.ff-owrank__value {
+  font-size: var(--ff-dash-text-md);
+  font-weight: 700;
+}
+.ff-owmeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+}
+.ff-owmeta__item {
+  white-space: nowrap;
+}
+
+/* Headline stat tiles (reuses .ff-stat). */
+.ff-owstats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px 20px;
+}
+
+/* Progress charts — small multiples. */
+.ff-owcharts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+}
+.ff-owchart {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ff-owchart__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+}
+.ff-owchart__last {
+  font-size: var(--ff-dash-text-md);
+  font-weight: 800;
+  color: var(--ff-accent);
+}
+.ff-owchart__plot {
+  position: relative;
+  width: 100%;
+}
+.ff-owchart__svg {
+  display: block;
+  width: 100%;
+  height: 120px;
+  overflow: visible;
+}
+.ff-owchart__area {
+  fill: rgba(255, 238, 88, 0.1);
+  stroke: none;
+}
+.ff-owchart__line {
+  fill: none;
+  stroke: var(--ff-accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.ff-owchart__crosshair {
+  stroke: var(--ff-border);
+  stroke-width: 1;
+}
+.ff-owchart__dot {
+  fill: var(--ff-accent);
+  stroke: var(--ff-bg);
+  stroke-width: 2;
+}
+.ff-owchart__tip {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 8px;
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-navy-900);
+  border: 1px solid var(--ff-border);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
+.ff-owchart__tip-value {
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+}
+.ff-owchart__tip-date {
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-owchart__axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-owchart__empty {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+}
+
+/* Role / hero breakdown table. */
+.ff-owtable-wrap {
+  overflow-x: auto;
+}
+.ff-owtable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-owtable__caption {
+  padding-bottom: 6px;
+  text-align: left;
+  font-size: var(--ff-dash-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ff-text-dim);
+}
+.ff-owtable th,
+.ff-owtable td {
+  padding: 6px 8px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--ff-border);
+}
+.ff-owtable thead th {
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ff-text-dim);
+}
+.ff-owtable th[scope="row"],
+.ff-owtable thead th:first-child {
+  text-align: left;
+}
+.ff-owtable tbody th[scope="row"] {
+  font-weight: 600;
+}

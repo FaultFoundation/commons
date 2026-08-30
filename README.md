@@ -31,7 +31,7 @@ Ships to `commons.fault.foundation`. The public marketing site is a
 |---|---|
 | `app/page.tsx` | The Commons landing page (blank for now — tabs land here) |
 | `app/{login,signup}/` | Auth pages (honor `?next=` after signing in) |
-| `app/{home,schedule,tournaments,teams,account}/` | Session-gated member portal tabs |
+| `app/{home,schedule,tournaments,statistics,teams,account}/` | Session-gated member portal tabs |
 | `app/teams/[teamId]/`, `app/join/[token]/` | Team management and the invite landing |
 | `app/api/auth/[...all]/` | Better Auth route handler |
 | `components/` | Site chrome (`SiteHeader`/`SiteFooter`/`MainNav`) + `auth/` + `dashboard/` |
@@ -39,10 +39,12 @@ Ships to `commons.fault.foundation`. The public marketing site is a
 | `lib/registration.ts` | Registration flow: school-email verification, Discord identity mirroring |
 | `lib/teams.ts`, `lib/teams-shared.ts` | Team reads + the role/capability model (managers, captains, coaches, players) |
 | `lib/tournaments.ts`, `lib/challonge.ts` | Cached tournament snapshots and the sole Challonge API client |
+| `lib/ow-stats.ts`, `lib/overfast.ts` | Overwatch player statistics: snapshot writer/reader + the sole OverFast API client |
 | `lib/lfg-shared.ts` | Shapes for the matchmaking (LFG/LFM) JSON columns |
 | `db/schema.ts` | Drizzle schema: Better Auth tables + `profiles` |
 | `drizzle/` | Generated SQL migrations (`npm run db:generate`), applied with `npm run db:migrate:*` |
 | `db/cen-schema.ts`, `drizzle-cen/` | Read-only external-tournament projection + its independent migrations |
+| `db/ow-schema.ts`, `drizzle-ow/` | Append-only Overwatch career snapshots (`ow-player-data`) + its independent migrations |
 | `scripts/migrate-legacy-bot-data.mjs` | Idempotent, local-only import of normalized legacy bot users and tickets |
 | `styles/theme.css` | The `ff-` design system (imported last) |
 | `styles/wp-globals.css` | Brand tokens (`--wp--preset--*`) + element base styles — **do not edit** |
@@ -62,8 +64,10 @@ npm run preview                  # real Workers runtime (workerd) on :3999
 ```
 
 Schema changes: edit `db/schema.ts` → `npm run db:generate` →
-`npm run db:migrate:local` (and `db:migrate:remote` when shipping). After
-editing `wrangler.jsonc` or `.dev.vars`, rerun `npm run cf-typegen`.
+`npm run db:migrate:local` (and `db:migrate:remote` when shipping). The two
+side databases version independently: `db/cen-schema.ts` via `npm run db:cen:*`,
+`db/ow-schema.ts` via `npm run db:ow:*`. After editing `wrangler.jsonc` or
+`.dev.vars`, rerun `npm run cf-typegen`.
 
 ### Legacy bot data
 
@@ -100,6 +104,12 @@ developer-portal walkthrough is in [docs/oauth-setup.md](docs/oauth-setup.md).
 External tournament collection and its Cloudflare Cron Worker live in the
 separate `cen-news-notifications` repository. This app only reads its `cen-sql`
 projection.
+
+Overwatch career polling runs in the separate **`ow-stats-poller`** Worker (its
+own repo, an hourly Cron Trigger) which writes daily snapshots into the
+`ow-player-data` D1 this app also reads/writes. Deploy order for that feature:
+`npm run db:ow:migrate:remote` here (the Commons owns the schema), then deploy the
+poller from its repo.
 
 ## Licensing / provenance
 

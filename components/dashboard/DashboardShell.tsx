@@ -25,6 +25,7 @@ export type DashboardNavKey =
   | "home"
   | "schedule"
   | "tournaments"
+  | "statistics"
   | "teams"
   | "account"
   | "admin";
@@ -34,6 +35,17 @@ const NAV_ITEMS: NavItem[] = [
   { key: "home", label: "Home", href: "/home/" },
   { key: "schedule", label: "Schedule", href: "/schedule/" },
   { key: "tournaments", label: "Tournaments", href: "/tournaments/" },
+  // A group like Admin: slides across to Player / Match sub-tabs. Player Data is
+  // live (Overwatch); Match Data is a coming-soon placeholder for now. Per-game
+  // stats will grow under here — Overwatch is the only game today.
+  {
+    key: "statistics",
+    label: "Statistics",
+    children: [
+      { key: "player", label: "Player Data", href: "/statistics/player/" },
+      { key: "match", label: "Match Data", href: "/statistics/match/" },
+    ],
+  },
   { key: "teams", label: "Teams", href: "/teams/" },
   // Route stays /account/ (many callbackURLs and OAuth redirects point at it);
   // only the label reads "Settings".

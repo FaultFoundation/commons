@@ -21,6 +21,7 @@ import {
   pushRoleConnection,
 } from "@/lib/platform-identities";
 import { ensureVerificationTicket } from "@/lib/verification-ticket";
+import { snapshotOnConnect } from "@/lib/ow-stats";
 
 // The tokens object passed to a generic-OAuth getUserInfo. Derived from the
 // plugin's own config type so the callbacks below (which live in a separate
@@ -427,6 +428,10 @@ export const getAuth = cache(function getAuth() {
                 account.accountId,
                 battleTag,
               );
+              // Seed the Overwatch statistics store the moment they connect:
+              // register them for the poller and take an initial career
+              // snapshot. Best-effort — never blocks or fails the link.
+              await snapshotOnConnect(account.userId, battleTag);
             } else if (account.providerId === "faceit") {
               const p = await fetchFaceitProfile(account.accessToken);
               await mirrorPlatformIdentity(

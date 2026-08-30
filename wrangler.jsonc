@@ -33,6 +33,18 @@
 			"database_name": "cen-sql",
 			"database_id": "3feadba0-76a5-4429-acdf-a6434eba8f49",
 			"migrations_dir": "drizzle-cen"
+		},
+		{
+			// ow-player-data — the Overwatch player-statistics store (db/ow-schema.ts).
+			// Unlike cen-sql this is read-WRITE from the Commons: it snapshots on
+			// Battle.net connect and lazily on Statistics-tab reads. The separate
+			// ow-stats-poller Worker (its own repo, like cen-scraper) also writes it
+			// on an hourly cron. Append-only snapshots make the two writers safe.
+			// The Commons owns the migrations (drizzle.ow.config.ts → drizzle-ow/).
+			"binding": "OW",
+			"database_name": "ow-player-data",
+			"database_id": "770f85f6-d90c-4d35-852b-8296f672b7f9",
+			"migrations_dir": "drizzle-ow"
 		}
 	],
 	// Profile pictures and team logos. Objects are content-addressed and served

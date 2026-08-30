@@ -75,6 +75,10 @@ npm run db:generate       # db/schema.ts change -> new SQL file in drizzle/
 npm run db:migrate:local  # apply to local D1 (.wrangler/state)
 npm run db:migrate:remote # apply to real D1 — run BEFORE npm run deploy
 npm run db:cen:generate   # db/cen-schema.ts -> migration in drizzle-cen/
+npm run db:ow:generate    # db/ow-schema.ts -> migration in drizzle-ow/ (also
+                          # db:ow:migrate:local / :remote). The Commons owns the
+                          # ow-player-data schema; the ow-stats-poller repo only
+                          # reads/writes rows.
 npm run db:import:legacy -- --input temp/legacy-bot-data.json [--apply]
                           # normalized legacy bot import; local only, backs up first
 npm run staff:seed        # bootstrap the first staff owner (--email / --discord, --remote)
@@ -88,8 +92,8 @@ the file to update in the same commit as any `db/generate` run (see above).
 
 ## Runtime model — the constraint behind most of the code
 
-Cloudflare bindings (`DB`, `CEN`, `AVATARS`) and secrets only exist on the **request**
-context. Nothing that touches them may be built at module scope:
+Cloudflare bindings (`DB`, `CEN`, `OW`, `AVATARS`) and secrets only exist on the
+**request** context. Nothing that touches them may be built at module scope:
 
 - `getDb()` ([lib/db.ts](lib/db.ts)) and `getAuth()` ([lib/auth.ts](lib/auth.ts))
   construct fresh per request, off `getCloudflareContext()`. Both use React
@@ -106,23 +110,27 @@ context. Nothing that touches them may be built at module scope:
   the shell's read. Better Auth's signed cookie cache keeps repeat validations
   off D1 for 60 seconds; that cache is only identity/session convenience, never
   a substitute for the D1-backed staff capability checks or admin unlock gate.
-- **CPU limits are the sharpest constraint, and we're on the Workers _Free_
-  plan.** Free hard-caps CPU at **10 ms/request** (network/DB waits don't count),
-  which a Next.js/OpenNext SSR render routinely exceeds — this is the source of
-  "Error 1102 — Worker exceeded resource limits" when clicking between tabs. Keep
-  per-request synchronous work minimal (memoize, don't rebuild auth, prefer
-  client-side work). `wrangler.jsonc` sets `limits.cpu_ms` for when the site moves
-  to **Workers Paid** ($5/mo, 30 s CPU) — the durable fix for real traffic, which
-  also removes Free's 100k-requests/day cap. Until then, 1102 can recur under load.
+- **CPU budget still matters, but we're on Workers _Paid_ now.** Paid raises the
+  CPU ceiling to **30 s/request** (from Free's 10 ms) and removes the
+  100k-requests/day cap, so the old "Error 1102 — Worker exceeded resource limits"
+  when clicking between tabs should no longer occur. The discipline that fixed it
+  stays worth keeping — memoize per-request work, don't rebuild auth, prefer
+  client-side work — because CPU is billed and a runaway render is now a cost, not
+  just a cap. Paid also unlocks Cron Triggers, but the Commons OpenNext Worker
+  still hosts no `scheduled` handler (see below); scheduled work lives in separate
+  Workers (`cen-scraper`, `ow-stats-poller`).
 - Session-gated pages set `export const dynamic = "force-dynamic"`.
 - **D1 has no interactive transactions.** Drizzle's `transaction()` emits `BEGIN`,
   which D1 rejects — use `db.batch([...])` for writes that must land together.
 - Wrangler D1 also rejects `CREATE TEMP TABLE` with `SQLITE_AUTH`. One-shot
   scripts that need a fail-closed guard must use a uniquely named normal table
   and drop it in the same file, as the legacy bot importer does.
-- There is no `scheduled` handler: OpenNext generates `.open-next/worker.js`, so
-  cron work has nowhere to hang without a wrapper or second Worker. Refresh-style
-  work is done lazily on read (see the TTL in [lib/integrations.ts](lib/integrations.ts)).
+- There is no `scheduled` handler in this Worker: OpenNext generates
+  `.open-next/worker.js`, so cron work has nowhere to hang without a wrapper.
+  Cron Triggers are available (we're on Paid), but the deliberate pattern is to
+  keep scheduled work in **separate** Workers (`cen-scraper`, `ow-stats-poller`)
+  and read what they write. In-Worker refresh is done lazily on read (see the TTL
+  in [lib/integrations.ts](lib/integrations.ts)).
 - Node built-ins are limited to `nodejs_compat`. SMTP is hand-rolled on
   `node:tls` ([lib/smtp.ts](lib/smtp.ts)) because esbuild can't resolve
   `cloudflare:sockets` during the OpenNext bundle.
@@ -437,6 +445,55 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   `MAX_DAY_CHIPS`, then a "+N more". A multi-match chip or "+N more" opens a
   per-day popup that expands every tournament's matches in chronological order.
   Cells never scroll — overflow lives in the popup.
+
+### Overwatch player statistics — the third D1 (`ow-player-data`)
+
+The **Statistics** tab (`/statistics/`, a rail group with **Player Data** and a
+coming-soon **Match Data** child) shows a member's Overwatch career, sourced from
+the unofficial **OverFast API** (`https://overfast-api.tekrop.fr`, which scrapes a
+player's public Blizzard career page by BattleTag). "By game" is the intended
+shape; Overwatch is the only game today.
+
+- **A THIRD D1, `ow-player-data`**, bound as **`OW`** ([db/ow-schema.ts](db/ow-schema.ts),
+  migrations in `drizzle-ow/`, [lib/ow-db.ts](lib/ow-db.ts) `getOwDb()` degrades to
+  null when unbound). Two tables: `ow_players` (a small mutable registry — battletag,
+  the OverFast `player_id`, the cached public/private `visibility`, and `poll_chunk`
+  0–23 = `chunkForUser`) and **`ow_snapshots` (APPEND-ONLY** — one career snapshot per
+  player per day, never overwritten, so members can see improvement over time). It's
+  joined to `website-sql` only in app code by `user_id` (D1 can't JOIN across
+  bindings), exactly like cen-sql.
+- **Two writers, unlike cen-sql** (which the Commons reads read-only). The Commons
+  ([lib/ow-stats.ts](lib/ow-stats.ts)) snapshots on **Battle.net connect** (the
+  account-created hook in [lib/auth.ts](lib/auth.ts) calls `snapshotOnConnect`) and
+  **lazily on a Statistics read** past a TTL; the separate **`ow-stats-poller`
+  Worker** (its own repo, like cen-scraper) snapshots a chunk of due players every
+  hour by cron. Both are safe together because snapshots are append-only and both
+  respect `MIN_SNAPSHOT_INTERVAL_MS` (~20 h), so a connect + a page open + a cron
+  tick in one day produce ONE row. The **Commons owns the schema/migrations**; the
+  poller keeps a **column-compatible copy** of `db/ow-schema.ts` + `lib/overfast.ts`
+  and only reads/writes rows.
+- **The public-profile gate.** OverFast only reads a career profile set to public.
+  `getOwVisibility` (TTL-cached in the registry, mirroring `connectReachability`)
+  classifies `public | private | not_found | unknown` from `/stats/summary`; the
+  Player Data page renders a clear error for private/not-found instead of empty
+  charts. OverFast caches player **career for 1 hour** (its *search* cache is 10 min —
+  a different thing), so the "already public?" copy says it can take **up to an
+  hour** to catch up. Only a definitive answer is trusted — an outage stays
+  `unknown` and never cries "private."
+- **[lib/overfast.ts](lib/overfast.ts) is the only module that talks to OverFast**,
+  and is **pure** (base-url arg + global `fetch`, no `getCloudflareContext`) so the
+  poller imports it unchanged. Best-effort like the schedule adapters: a timeout,
+  never throws. `OVERFAST_API_URL` overrides the base (self-hosting); the poller's
+  manual-run endpoint is gated by its own `OW_POLLER_SECRET` (not a Commons var).
+- **The view** ([components/dashboard/statistics/PlayerStatsView.tsx](components/dashboard/statistics/PlayerStatsView.tsx),
+  client): identity header + comp ranks, headline stat tiles, single-series
+  **inline-SVG** progress charts (no chart lib; brand-yellow line, one axis, hover
+  crosshair — meaningful only past 2 snapshots), and a role/hero breakdown from the
+  latest snapshot's `stats_json`. The headline scalars are denormalized columns so
+  the charts query without parsing a blob per point; the full per-hero detail lives
+  in the `summary_json`/`stats_json` blobs. Live-verified for the public path; the
+  private-profile branch is written against the observed shape and wants one
+  live-verify against a genuinely private account (like the FACEIT/start.gg adapters).
 
 ### Styling
 

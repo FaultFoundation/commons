@@ -91,7 +91,7 @@ A third D1 ([db/ow-schema.ts](ow-schema.ts), migrations in `drizzle-ow/`, bound
 as `OW`) holding an **append-only** time series of members' Overwatch careers,
 scraped from public Blizzard career pages via the OverFast API. Unlike `cen-sql`,
 the Commons **writes** this one (snapshot on Battle.net connect, lazy refresh on a
-Statistics read) — and so does the separate **`ow-stats-poller`** Worker (hourly
+Statistics read) — and so does the separate **`ow-data`** Worker (hourly
 cron). Two writers are safe because `ow_snapshots` is append-only and both respect
 a ~20 h min-interval guard. Joined to `website-sql` only in app code, by `user_id`.
 
@@ -120,7 +120,7 @@ OW_SNAPSHOTS(*id, user_id, captured_at, battletag?, player_id?, platform?,
 
 Its migrations live in [`drizzle-ow/`](../drizzle-ow); the `npm run db:ow:*`
 scripts generate/apply them. **The Commons owns these migrations**; the
-`ow-stats-poller` repo keeps a column-compatible copy of `db/ow-schema.ts` +
+`ow-data` repo keeps a column-compatible copy of `db/ow-schema.ts` +
 `lib/overfast.ts` and only reads/writes rows. See the root `CLAUDE.md`
 ("Overwatch player statistics — the third D1").
 

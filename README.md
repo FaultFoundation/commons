@@ -105,7 +105,7 @@ External tournament collection and its Cloudflare Cron Worker live in the
 separate `cen-news-notifications` repository. This app only reads its `cen-sql`
 projection.
 
-Overwatch career polling runs in the separate **`ow-stats-poller`** Worker (its
+Overwatch career polling runs in the separate **`ow-data`** Worker (its
 own repo, an hourly Cron Trigger) which writes daily snapshots into the
 `ow-player-data` D1 this app also reads/writes. Deploy order for that feature:
 `npm run db:ow:migrate:remote` here (the Commons owns the schema), then deploy the

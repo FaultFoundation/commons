@@ -77,7 +77,7 @@ npm run db:migrate:remote # apply to real D1 — run BEFORE npm run deploy
 npm run db:cen:generate   # db/cen-schema.ts -> migration in drizzle-cen/
 npm run db:ow:generate    # db/ow-schema.ts -> migration in drizzle-ow/ (also
                           # db:ow:migrate:local / :remote). The Commons owns the
-                          # ow-player-data schema; the ow-stats-poller repo only
+                          # ow-player-data schema; the ow-data repo only
                           # reads/writes rows.
 npm run db:import:legacy -- --input temp/legacy-bot-data.json [--apply]
                           # normalized legacy bot import; local only, backs up first
@@ -118,7 +118,7 @@ Cloudflare bindings (`DB`, `CEN`, `OW`, `AVATARS`) and secrets only exist on the
   client-side work — because CPU is billed and a runaway render is now a cost, not
   just a cap. Paid also unlocks Cron Triggers, but the Commons OpenNext Worker
   still hosts no `scheduled` handler (see below); scheduled work lives in separate
-  Workers (`cen-scraper`, `ow-stats-poller`).
+  Workers (`cen-scraper`, `ow-data`).
 - Session-gated pages set `export const dynamic = "force-dynamic"`.
 - **D1 has no interactive transactions.** Drizzle's `transaction()` emits `BEGIN`,
   which D1 rejects — use `db.batch([...])` for writes that must land together.
@@ -128,7 +128,7 @@ Cloudflare bindings (`DB`, `CEN`, `OW`, `AVATARS`) and secrets only exist on the
 - There is no `scheduled` handler in this Worker: OpenNext generates
   `.open-next/worker.js`, so cron work has nowhere to hang without a wrapper.
   Cron Triggers are available (we're on Paid), but the deliberate pattern is to
-  keep scheduled work in **separate** Workers (`cen-scraper`, `ow-stats-poller`)
+  keep scheduled work in **separate** Workers (`cen-scraper`, `ow-data`)
   and read what they write. In-Worker refresh is done lazily on read (see the TTL
   in [lib/integrations.ts](lib/integrations.ts)).
 - Node built-ins are limited to `nodejs_compat`. SMTP is hand-rolled on
@@ -465,7 +465,7 @@ shape; Overwatch is the only game today.
 - **Two writers, unlike cen-sql** (which the Commons reads read-only). The Commons
   ([lib/ow-stats.ts](lib/ow-stats.ts)) snapshots on **Battle.net connect** (the
   account-created hook in [lib/auth.ts](lib/auth.ts) calls `snapshotOnConnect`) and
-  **lazily on a Statistics read** past a TTL; the separate **`ow-stats-poller`
+  **lazily on a Statistics read** past a TTL; the separate **`ow-data`
   Worker** (its own repo, like cen-scraper) snapshots a chunk of due players every
   hour by cron. Both are safe together because snapshots are append-only and both
   respect `MIN_SNAPSHOT_INTERVAL_MS` (~20 h), so a connect + a page open + a cron

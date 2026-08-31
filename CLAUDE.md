@@ -497,19 +497,30 @@ the only game today; Match Data is a coming-soon placeholder.
   climbing progress bar — the OverFast API gives no real progress, so it eases toward
   ~92 % and the parent unmounts it on arrival. **Never do the OverFast fetch in the
   page's server render** — that's what froze the tab before.
+- **Accurate ranks, everything else gated.** Blizzard's public OW data has been
+  inaccurate since the OW2 launch (2023) — only the **competitive ranks** (division
+  + tier; there is **no SR number** in the public data) are trustworthy. So the
+  profile header ([StatisticsView](components/dashboard/statistics/StatisticsView.tsx)
+  `HeaderRanks`) surfaces the per-role ranks under the endorsement row as the
+  headline, and the whole stats **dashboard is wrapped in `LockedStats`** — a
+  **blur + warning overlay** (`.ff-owlocked*`) that explains the inaccuracy, links
+  to the Blizzard OW feedback forum (`BLIZZARD_FEEDBACK_URL` in
+  [PlayerDashboard](components/dashboard/statistics/PlayerDashboard.tsx)), and only
+  un-blurs on an explicit "View your inaccurate statistics" click. Don't present the
+  non-rank numbers as fact — they're kept (they become correct if Blizzard ever fixes
+  the dataset) but never shown un-gated.
 - **The dashboard** ([PlayerDashboard](components/dashboard/statistics/PlayerDashboard.tsx),
-  client) is modeled on Blizzard's own career screen, in our bubbles: a three-column
-  layout (`.ff-owcols`) — **Time Played** (total + per-role bars), **Most Played
-  Heroes** (top-3 with OverFast portraits) + a **competitive rank table** (per-role
-  rank + games won + win %), and **Hero Comparison** (a metric-select bar list,
+  client, behind the gate) is modeled on Blizzard's own career screen, in our
+  bubbles: a three-column layout (`.ff-owcols`) — **Time Played** (total + per-role
+  bars), **Most Played Heroes** (top-3 with OverFast portraits) + a per-role stats
+  table (games / won / win %), and **Hero Comparison** (a metric-select bar list,
   leader in OW orange) — then our own **Progress Over Time** single-series inline-SVG
-  charts underneath (no chart lib; hover crosshair; meaningful only past 2 snapshots),
-  the payoff of the daily snapshots that OW's own profile doesn't show. Headline
-  scalars are denormalized columns so the charts query without parsing a blob per
-  point; the full per-hero/role detail comes from the `summary_json`/`stats_json`
-  blobs. Live-verified for the public path; the private-profile branch is written
-  against the observed shape and wants one live-verify against a genuinely private
-  account (like the FACEIT/start.gg adapters).
+  charts underneath (no chart lib; hover crosshair; meaningful only past 2 snapshots).
+  Headline scalars are denormalized columns so the charts query without parsing a
+  blob per point; the full per-hero/role detail comes from the
+  `summary_json`/`stats_json` blobs. Live-verified for the public path; the
+  private-profile branch is written against the observed shape and wants one
+  live-verify against a genuinely private account (like the FACEIT/start.gg adapters).
 
 ### Styling
 

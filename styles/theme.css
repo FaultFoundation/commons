@@ -5747,7 +5747,7 @@ button.ff-dash__link:hover {
 .ff-owcomp__head,
 .ff-owcomp__row {
   display: grid;
-  grid-template-columns: 1.2fr 1.5fr 0.7fr 0.8fr;
+  grid-template-columns: 1.4fr 1fr 0.9fr 1fr;
   align-items: center;
   gap: 8px;
 }
@@ -5757,7 +5757,7 @@ button.ff-dash__link:hover {
   letter-spacing: 0.05em;
   color: var(--ff-text-dim);
 }
-.ff-owcomp__head span:nth-child(n + 3) {
+.ff-owcomp__head span:nth-child(n + 2) {
   text-align: right;
 }
 .ff-owcomp__row {
@@ -5766,18 +5766,6 @@ button.ff-dash__link:hover {
 }
 .ff-owcomp__role {
   font-weight: 600;
-}
-.ff-owcomp__rank {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.ff-owcomp__rankicon {
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
-  flex: none;
 }
 .ff-owcomp__num {
   text-align: right;
@@ -5977,4 +5965,110 @@ button.ff-dash__link:hover {
   text-align: center;
   font-size: var(--ff-dash-text-sm);
   color: var(--ff-text-dim);
+}
+
+/* Header competitive ranks — the accurate headline, under the endorsement row. */
+.ff-owprofile__ranks {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+.ff-owprofile__norank {
+  position: relative;
+  z-index: 1;
+  margin: 14px 0 0;
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+}
+.ff-owrankbadge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 10px;
+  border-radius: var(--ff-radius-md);
+  background: rgba(0, 0, 0, 0.28);
+  border-left: 3px solid var(--ff-border);
+}
+.ff-owrankbadge[data-role="tank"] { border-left-color: #6aa9ff; }
+.ff-owrankbadge[data-role="damage"] { border-left-color: #ff8f6b; }
+.ff-owrankbadge[data-role="support"] { border-left-color: #74d3a0; }
+.ff-owrankbadge__icon {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  object-fit: contain;
+}
+.ff-owrankbadge__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.ff-owrankbadge__role {
+  font-size: var(--ff-dash-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ff-text-dim);
+}
+.ff-owrankbadge__rank {
+  font-size: var(--ff-dash-text-md);
+  font-weight: 800;
+}
+
+/* The inaccuracy gate: blur + warning over the (unreliable) stats dashboard. */
+.ff-owlocked {
+  position: relative;
+}
+.ff-owlocked__content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.ff-owlocked:not(.ff-owlocked--revealed) .ff-owlocked__content {
+  filter: blur(7px);
+  pointer-events: none;
+  user-select: none;
+}
+.ff-owlocked__veil {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px;
+  border-radius: var(--ff-radius-lg);
+  background: rgba(0, 29, 61, 0.55);
+}
+.ff-owlocked__card {
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  border-radius: var(--ff-radius-lg);
+  background: var(--ff-navy-900);
+  border: 1px solid var(--ff-border);
+  box-shadow: var(--ff-shadow-card);
+}
+.ff-owlocked__title {
+  margin: 0;
+  font-size: var(--ff-dash-text-lg);
+  font-weight: 800;
+}
+.ff-owlocked__text {
+  margin: 0;
+  font-size: var(--ff-dash-text-sm);
+  line-height: var(--ff-dash-leading);
+  color: var(--ff-text-dim);
+}
+.ff-owlocked__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 4px;
 }

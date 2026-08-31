@@ -3,14 +3,13 @@
 import { useRef, useState } from "react";
 
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
-import type { OverfastRank, OverfastStatBlock } from "@/lib/overfast";
+import type { OverfastStatBlock } from "@/lib/overfast";
 import {
   COMPARE_METRICS,
   OW_ROLES,
   ROLE_LABELS,
   buildHeroComparison,
   formatMetric,
-  formatRank,
   formatTimePlayed,
   formatWinrate,
   prettyHeroKey,
@@ -19,6 +18,13 @@ import {
   type PlayerStatsData,
   type StatPoint,
 } from "@/lib/ow-stats-shared";
+
+// Blizzard's public Overwatch data has been inaccurate since the OW2 launch
+// (2023); the accurate numbers live only in their private database. So the whole
+// stats dashboard below is gated behind a warning + blur — accurate *ranks* are
+// surfaced separately in the profile header. Point this at the OW bug-report
+// category if you prefer; the forum root is the stable target.
+const BLIZZARD_FEEDBACK_URL = "https://us.forums.blizzard.com/en/overwatch/";
 
 // The Overwatch-career-profile-style dashboard, in our bubbles: a three-column
 // layout (Time Played · Most Played Heroes + competitive ranks · Hero
@@ -44,13 +50,62 @@ export function PlayerDashboard({
           service just now.
         </p>
       ) : null}
-      <div className="ff-owcols">
-        <TimePlayedCard data={data} />
-        <HeroesCard data={data} heroes={heroes} />
-        <ComparisonCard data={data} heroes={heroes} />
-      </div>
-      <ProgressCard series={data.series} count={data.snapshotCount} />
+      <LockedStats>
+        <div className="ff-owcols">
+          <TimePlayedCard data={data} />
+          <HeroesCard data={data} heroes={heroes} />
+          <ComparisonCard data={data} heroes={heroes} />
+        </div>
+        <ProgressCard series={data.series} count={data.snapshotCount} />
+      </LockedStats>
     </>
+  );
+}
+
+// --- The inaccuracy gate: blur + warning over everything but the ranks -------
+
+function LockedStats({ children }: { children: React.ReactNode }) {
+  const [revealed, setRevealed] = useState(false);
+  return (
+    <div className={`ff-owlocked${revealed ? " ff-owlocked--revealed" : ""}`}>
+      <div className="ff-owlocked__content" aria-hidden={!revealed}>
+        {children}
+      </div>
+      {revealed ? null : (
+        <div className="ff-owlocked__veil">
+          <div className="ff-owlocked__card">
+            <h3 className="ff-owlocked__title">
+              Blizzard&apos;s public stats are inaccurate
+            </h3>
+            <p className="ff-owlocked__text">
+              Blizzard&apos;s public Overwatch statistics database has been
+              inaccurate since 2023, when Overwatch 2 released. They promised a fix
+              within a few weeks, then kept the accurate data to their private
+              database. Please submit a ticket on Blizzard&apos;s website to
+              advocate for a fix — your ranks above are accurate, but everything
+              below is not.
+            </p>
+            <div className="ff-owlocked__actions">
+              <a
+                className="ff-btn ff-btn--outline"
+                href={BLIZZARD_FEEDBACK_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Submit a ticket on Blizzard
+              </a>
+              <button
+                type="button"
+                className="ff-btn ff-btn--outline"
+                onClick={() => setRevealed(true)}
+              >
+                View your inaccurate statistics
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -108,8 +163,6 @@ function HeroesCard({
   heroes: HeroMap;
 }) {
   const top = topHeroes(data.statsSummary?.heroes, 3);
-  const platform = data.latest.platform === "console" ? "console" : "pc";
-  const comp = data.summary?.competitive?.[platform] ?? null;
 
   return (
     <Bubble title="Most Played Heroes">
@@ -142,26 +195,18 @@ function HeroesCard({
       <div className="ff-owcomp">
         <div className="ff-owcomp__head">
           <span>Role</span>
-          <span>Rank</span>
+          <span>Games</span>
           <span>Won</span>
           <span>Win %</span>
         </div>
         {OW_ROLES.map((role) => {
-          const rank = data.latest.ranks[role];
           const roleBlock = data.statsSummary?.roles?.[role] ?? null;
-          const icon = compIcon(comp?.[role] ?? null);
           return (
             <div className="ff-owcomp__row" key={role}>
               <span className="ff-owcomp__role" data-role={role}>
                 {ROLE_LABELS[role]}
               </span>
-              <span className="ff-owcomp__rank">
-                {icon ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img className="ff-owcomp__rankicon" src={icon} alt="" />
-                ) : null}
-                {formatRank(rank)}
-              </span>
+              <span className="ff-owcomp__num">{numOrDash(roleBlock?.games_played)}</span>
               <span className="ff-owcomp__num">{numOrDash(roleBlock?.games_won)}</span>
               <span className="ff-owcomp__num">{formatWinrate(roleBlock?.winrate)}</span>
             </div>
@@ -314,11 +359,6 @@ function topHeroes(
     .filter((h) => (h.block.time_played ?? 0) > 0)
     .sort((a, b) => (b.block.time_played ?? 0) - (a.block.time_played ?? 0))
     .slice(0, n);
-}
-
-/** A role's rank/tier icon URL from the summary competitive block, if any. */
-function compIcon(rank: OverfastRank | null): string | null {
-  return rank?.rank_icon ?? rank?.tier_icon ?? null;
 }
 
 function numOrDash(n: number | null | undefined): string {

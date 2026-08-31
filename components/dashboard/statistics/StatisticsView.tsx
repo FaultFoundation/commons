@@ -6,7 +6,14 @@ import { useEffect, useState } from "react";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { PlayerDashboard } from "@/components/dashboard/statistics/PlayerDashboard";
 import { StatLoading } from "@/components/dashboard/statistics/StatLoading";
-import type { PlayerStatsResponse } from "@/lib/ow-stats-shared";
+import type { OverfastSummary } from "@/lib/overfast";
+import {
+  OW_ROLES,
+  ROLE_LABELS,
+  formatRank,
+  type PlayerSnapshot,
+  type PlayerStatsResponse,
+} from "@/lib/ow-stats-shared";
 
 // The whole Statistics surface. Replaces the old rail slide-out: Statistics is
 // now a plain top-level tab, and the Player Data / Match Data switch is
@@ -189,7 +196,52 @@ function ProfileHeader({
           </div>
         </div>
       </div>
+      {/* Competitive ranks — the one accurate thing Blizzard's public data still
+          reports — sit under the endorsement row as the header's headline. */}
+      {latest ? (
+        <HeaderRanks latest={latest} summary={resp?.data?.summary ?? null} />
+      ) : null}
     </section>
+  );
+}
+
+/** The per-role competitive rank badges shown in the profile header. */
+function HeaderRanks({
+  latest,
+  summary,
+}: {
+  latest: PlayerSnapshot;
+  summary: OverfastSummary | null;
+}) {
+  const platform = latest.platform === "console" ? "console" : "pc";
+  const comp = summary?.competitive?.[platform] ?? null;
+  const ranked = OW_ROLES.map((role) => ({
+    role,
+    rank: latest.ranks[role],
+    icon: comp?.[role]?.rank_icon ?? comp?.[role]?.tier_icon ?? null,
+  })).filter((r) => r.rank.division);
+
+  if (ranked.length === 0) {
+    return (
+      <p className="ff-owprofile__norank">No competitive rank this season.</p>
+    );
+  }
+
+  return (
+    <div className="ff-owprofile__ranks">
+      {ranked.map(({ role, rank, icon }) => (
+        <div className="ff-owrankbadge" data-role={role} key={role}>
+          {icon ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="ff-owrankbadge__icon" src={icon} alt="" />
+          ) : null}
+          <div className="ff-owrankbadge__text">
+            <span className="ff-owrankbadge__role">{ROLE_LABELS[role]}</span>
+            <span className="ff-owrankbadge__rank">{formatRank(rank)}</span>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 

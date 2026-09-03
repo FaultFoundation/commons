@@ -204,6 +204,8 @@ export type ExternalTournamentMatch = {
   orderKey: string | null;
   entrant1Name: string | null;
   entrant2Name: string | null;
+  entrant1LogoUrl: string | null;
+  entrant2LogoUrl: string | null;
   entrant1Score: number | null;
   entrant2Score: number | null;
   /** 1 = entrant1 won, 2 = entrant2 won, null = undecided. */
@@ -284,6 +286,7 @@ export type ExternalTournamentDetail = {
     numEntrants: number | null;
     standings: {
       entrantName: string;
+      entrantLogoUrl: string | null;
       isTeam: boolean;
       placement: number | null;
     }[];
@@ -477,6 +480,12 @@ function toNum(value: unknown): number | null {
   return null;
 }
 
+function safeImageUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const url = value.trim();
+  return /^https?:\/\//i.test(url) ? url : null;
+}
+
 /** Parse an `about_layout` column into `AboutRow[]`, tolerating null/junk. Each
     row keeps only well-formed content widgets with safe http(s) URLs; empty
     columns/rows are dropped. Returns [] on anything malformed. */
@@ -634,6 +643,7 @@ export async function getExternalTournament(
       const list = byEvent.get(s.eventId) ?? [];
       list.push({
         entrantName: s.entrantName,
+        entrantLogoUrl: safeImageUrl(s.entrantLogoUrl),
         isTeam: s.isTeam,
         placement: s.placement,
       });
@@ -662,6 +672,8 @@ export async function getExternalTournament(
         orderKey: m.orderKey,
         entrant1Name: m.entrant1Name,
         entrant2Name: m.entrant2Name,
+        entrant1LogoUrl: safeImageUrl(m.entrant1LogoUrl),
+        entrant2LogoUrl: safeImageUrl(m.entrant2LogoUrl),
         entrant1Score: toNum(m.entrant1Score),
         entrant2Score: toNum(m.entrant2Score),
         winner: (toNum(m.winner) === 1 ? 1 : toNum(m.winner) === 2 ? 2 : null),

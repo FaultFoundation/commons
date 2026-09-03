@@ -326,7 +326,19 @@ export function ExternalTournamentView({
                         <tr key={`${standing.entrantName}-${index}`}>
                           <td>{standing.placement ?? "—"}</td>
                           <td className="ff-ticket-subject">
-                            {standing.entrantName}
+                            <span className="ff-ext-entrant">
+                              {standing.entrantLogoUrl ? (
+                                <img
+                                  className="ff-ext-entrant__logo"
+                                  src={standing.entrantLogoUrl}
+                                  alt=""
+                                  loading="lazy"
+                                  decoding="async"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : null}
+                              <span>{standing.entrantName}</span>
+                            </span>
                           </td>
                         </tr>
                       ))}

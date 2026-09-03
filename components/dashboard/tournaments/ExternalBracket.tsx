@@ -133,16 +133,30 @@ function buildColumns(matches: ExternalTournamentMatch[]): BracketColumn[] {
 
 function Slot({
   name,
+  logoUrl,
   score,
   winner,
 }: {
   name: string | null;
+  logoUrl: string | null;
   score: number | null;
   winner: boolean;
 }) {
   return (
     <div className={`ff-bracket__slot${winner ? " ff-bracket__slot--winner" : ""}`}>
-      <span className="ff-bracket__slot-name">{name ?? "TBD"}</span>
+      <span className="ff-bracket__entrant">
+        {logoUrl ? (
+          <img
+            className="ff-bracket__entrant-logo"
+            src={logoUrl}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+          />
+        ) : null}
+        <span className="ff-bracket__slot-name">{name ?? "TBD"}</span>
+      </span>
       <span className="ff-bracket__slot-score">{scoreText(score)}</span>
     </div>
   );
@@ -157,11 +171,13 @@ function MatchCard({ match }: { match: ExternalTournamentMatch }) {
     >
       <Slot
         name={match.entrant1Name}
+        logoUrl={match.entrant1LogoUrl}
         score={match.entrant1Score}
         winner={match.winner === 1}
       />
       <Slot
         name={match.entrant2Name}
+        logoUrl={match.entrant2LogoUrl}
         score={match.entrant2Score}
         winner={match.winner === 2}
       />

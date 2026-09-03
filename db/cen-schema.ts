@@ -23,6 +23,19 @@ import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqli
 // JOIN across bindings), by external id, exactly like the bot's Sheets↔D1 split.
 // ===========================================================================
 
+/** Compact school-name lookup used by the scraper to replace provider defaults. */
+export const schoolFavicons = sqliteTable(
+  "school_favicons",
+  {
+    id: integer("id").primaryKey(),
+    name: text("name").notNull(),
+    normalizedName: text("normalized_name").notNull(),
+    domain: text("domain").notNull(),
+    faviconUrl: text("favicon_url").notNull(),
+  },
+  (t) => [index("school_favicons_normalized_name_idx").on(t.normalizedName)],
+);
+
 /** One external tournament (a start.gg tournament or a FACEIT championship). */
 export const extTournaments = sqliteTable(
   "ext_tournaments",
@@ -142,6 +155,8 @@ export const extMatches = sqliteTable(
     orderKey: text("order_key"),
     entrant1Name: text("entrant_1_name"),
     entrant2Name: text("entrant_2_name"),
+    entrant1LogoUrl: text("entrant_1_logo_url"),
+    entrant2LogoUrl: text("entrant_2_logo_url"),
     // Per-side score; negative = forfeit/DQ side, null = not played.
     entrant1Score: integer("entrant_1_score"),
     entrant2Score: integer("entrant_2_score"),
@@ -188,6 +203,7 @@ export const extStandings = sqliteTable(
     id: text("id").primaryKey(), // `${eventId}:${entrantId}`
     eventId: text("event_id").notNull(),
     entrantName: text("entrant_name").notNull(),
+    entrantLogoUrl: text("entrant_logo_url"),
     isTeam: integer("is_team", { mode: "boolean" }).notNull().default(true),
     placement: integer("placement"),
   },

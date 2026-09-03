@@ -71,6 +71,13 @@
       "when": 1788412971836,
       "tag": "0009_panoramic_ma_gnuci",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1788452972431,
+      "tag": "0010_perpetual_ironclad",
+      "breakpoints": true
     }
   ]
 }

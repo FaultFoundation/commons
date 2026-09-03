@@ -3291,6 +3291,27 @@ button.ff-dash__link:hover {
 .ff-bracket__slot + .ff-bracket__slot {
   border-top: 1px solid var(--ff-border);
 }
+.ff-bracket__entrant,
+.ff-ext-entrant {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+.ff-bracket__entrant-logo,
+.ff-ext-entrant__logo {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border-radius: 4px;
+  object-fit: contain;
+  background: #fff;
+}
+.ff-ext-entrant__logo {
+  width: 24px;
+  height: 24px;
+  flex-basis: 24px;
+}
 .ff-bracket__slot-name {
   overflow: hidden;
   text-overflow: ellipsis;

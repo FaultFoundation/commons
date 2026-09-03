@@ -27,7 +27,9 @@
     "schedule:probe": "node scripts/probe-providers.mjs",
     "db:seed:generate": "node scripts/gen-schools-seed.mjs",
     "db:seed:local": "wrangler d1 execute website-sql --local --file=db/seed/schools.sql",
-    "db:seed:remote": "wrangler d1 execute website-sql --remote --file=db/seed/schools.sql"
+    "db:seed:remote": "wrangler d1 execute website-sql --remote --file=db/seed/schools.sql",
+    "db:cen:seed:favicons:local": "wrangler d1 execute cen-sql --local --file=db/seed/school-favicons.sql",
+    "db:cen:seed:favicons:remote": "wrangler d1 execute cen-sql --remote --file=db/seed/school-favicons.sql"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.20.1",

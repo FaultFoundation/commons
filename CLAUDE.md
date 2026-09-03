@@ -75,6 +75,8 @@ npm run db:generate       # db/schema.ts change -> new SQL file in drizzle/
 npm run db:migrate:local  # apply to local D1 (.wrangler/state)
 npm run db:migrate:remote # apply to real D1 — run BEFORE npm run deploy
 npm run db:cen:generate   # db/cen-schema.ts -> migration in drizzle-cen/
+npm run db:cen:seed:favicons:local / :remote
+                          # load the Hipo-derived school favicon lookup into cen-sql
 npm run db:ow:generate    # db/ow-schema.ts -> migration in drizzle-ow/ (also
                           # db:ow:migrate:local / :remote). The Commons owns the
                           # ow-player-data schema; the ow-data repo only
@@ -442,6 +444,20 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   winners/losers upstream in the scraper). A FACEIT **swiss/league** event has no
   losers, so it stays plain columns, where a team recurs across "rounds" and tree
   connectors would be a lie.
+- **External team icons are resolved by the scraper, not at render time.**
+  start.gg's entrant `team.images` (the data behind `/attendees/teams`) and
+  FACEIT championship subscriptions/team records supply provider logos.
+  FACEIT's canonical participant page is
+  `/championship/<id>/<encoded name>/teams`; the stable Data API equivalent is
+  `/championships/<id>/subscriptions`, with a small bounded number of
+  `/teams/<id>` lookups for premade teams. When those provider objects omit an
+  icon (their default-avatar state), the scraper phrase-matches the longest
+  normalized `school_favicons` name, so `Michigan State University - Gold`
+  resolves Michigan State. Provider art always wins. The lookup is generated
+  from the same Hipo directory by `npm run db:seed:generate` and seeded into
+  `cen-sql` separately; the scraper stamps only the final safe URL into
+  `ext_matches.entrant_*_logo_url` and `ext_standings.entrant_logo_url`, keeping
+  Commons reads flat and cross-D1-free.
 - **The dashboard shell for the whole tab lives in
   [app/tournaments/layout.tsx](app/tournaments/layout.tsx)**, not the pages, so
   `loading.tsx` skeletons and `[id]/error.tsx` render inside the content area

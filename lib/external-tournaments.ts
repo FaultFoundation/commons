@@ -246,8 +246,26 @@ export type ExternalTournamentDetail = {
   url: string | null;
   /** Cover/banner artwork (FACEIT cover_image, start.gg banner); null if none. */
   bannerUrl: string | null;
-  /** Provider-authored blurb (FACEIT only); null for start.gg. */
+  /** Provider-authored blurb — start.gg's About widgets or FACEIT description. */
   description: string | null;
+  /** Organizer contact (a Discord/email/URL) + its type; null when unset. */
+  contact: string | null;
+  contactType: string | null;
+  /** A "watch" link when the tournament has a live stream; null otherwise. */
+  streamUrl: string | null;
+  /** When registration/check-in closes; null when the provider omits it. */
+  registrationClosesAt: Date | null;
+  /** Prize pool as a display string; null when there's no structured prize. */
+  prizePool: string | null;
+  /** A promo/VOD video link (distinct from a live stream); null when none. */
+  videoUrl: string | null;
+  /** The organizer's display name + a link to them; null when unavailable. */
+  organizer: string | null;
+  organizerUrl: string | null;
+  /** Social/external links (Facebook, Discord, org site…); empty when none. */
+  links: { label: string; url: string }[];
+  /** Extra graphics beyond the hero banner (schedules, sponsors); empty=none. */
+  images: { url: string; caption: string | null }[];
   events: {
     id: string;
     name: string | null;
@@ -448,6 +466,46 @@ function toNum(value: unknown): number | null {
   return null;
 }
 
+/** Parse a `links_json` column into `{label,url}[]`, tolerating null/junk (D1 is
+    dynamically typed and the projection can be reloaded by other tools). Only
+    entries with a safe http(s) URL and a label survive. */
+function parseLinkList(value: unknown): { label: string; url: string }[] {
+  if (typeof value !== "string" || value.trim() === "") return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((entry): { label: string; url: string }[] => {
+      const label = typeof entry?.label === "string" ? entry.label.trim() : "";
+      const url = typeof entry?.url === "string" ? entry.url.trim() : "";
+      if (!label || !/^https?:\/\//i.test(url)) return [];
+      return [{ label, url }];
+    });
+  } catch {
+    return [];
+  }
+}
+
+/** Parse an `images_json` column into `{url,caption}[]`, tolerating null/junk;
+    only entries with a safe http(s) image URL survive. */
+function parseImageList(value: unknown): { url: string; caption: string | null }[] {
+  if (typeof value !== "string" || value.trim() === "") return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((entry): { url: string; caption: string | null }[] => {
+      const url = typeof entry?.url === "string" ? entry.url.trim() : "";
+      if (!/^https?:\/\//i.test(url)) return [];
+      const caption =
+        typeof entry?.caption === "string" && entry.caption.trim()
+          ? entry.caption.trim()
+          : null;
+      return [{ url, caption }];
+    });
+  } catch {
+    return [];
+  }
+}
+
 /** Natural order for start.gg set identifiers ("A".."Z".."AA".."AB"): shorter
     first, then lexical, so "B" sorts before "AA". */
 function compareOrderKeys(a: string | null, b: string | null): number {
@@ -584,6 +642,16 @@ export async function getExternalTournament(
       url: t.url,
       bannerUrl: t.bannerUrl,
       description: t.description,
+      contact: t.contact,
+      contactType: t.contactType,
+      streamUrl: t.streamUrl,
+      registrationClosesAt: t.registrationClosesAt,
+      prizePool: t.prizePool,
+      videoUrl: t.videoUrl,
+      organizer: t.organizer,
+      organizerUrl: t.organizerUrl,
+      links: parseLinkList(t.links),
+      images: parseImageList(t.images),
       events: events.map((e) => ({
         id: e.id,
         name: e.name,

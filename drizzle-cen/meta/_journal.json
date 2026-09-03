@@ -50,6 +50,20 @@
       "when": 1788405236542,
       "tag": "0006_uneven_penance",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788409143781,
+      "tag": "0007_elite_hairball",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1788409788245,
+      "tag": "0008_pretty_bug",
+      "breakpoints": true
     }
   ]
 }

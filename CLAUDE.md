@@ -344,17 +344,40 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   provider blurb as markdown ([Markdown](components/dashboard/tournaments/Markdown.tsx)
   — a dependency-free, XSS-safe subset that builds React nodes, never
   `dangerouslySetInnerHTML`) and final standings, and keeps a "View on
-  start.gg/FACEIT" out-link. **The description is thin on start.gg by design**:
-  the API exposes no dedicated field — `rules` is the organizer's about blurb,
-  and organizers routinely drop just a bare rules URL in it. So the scraper's
-  `pickDescription` prefers real prose from the tournament `rules` **or** any
-  event's `rulesMarkdown`, falling back to a bare link only when that's all there
-  is; and the About bubble renders a lone-URL description as a **labelled link**
-  (`.ff-ext-about--link`) rather than a naked URL that reads as empty, while real
-  prose flows into **two columns split by a hairline** (`.ff-ext-about--cols`,
-  matching start.gg's own About layout and the `.ff-tcard__brandsep` logo
-  divider). The hero banner is a real `<img>` layer (like the
-  list cards), not a CSS background, so a valid URL always paints.
+  start.gg/FACEIT" out-link. **A start.gg tournament's real "About" lives in its
+  internal widget layout, not the public API.** On `gql/alpha` the tournament
+  `rules`/`customMarkdown`/`details` are a bare link or empty; the rich content
+  (the Welcome / Format / Schedule / Prizes markdown widgets on the Details tab)
+  is served only by the undocumented `profileWidgetPageLayout(profileType,
+  profileId, page:"details")` query on `www.start.gg/api/-/gql` (no auth, just a
+  `client-version` header). The scraper (`fetchWidgetMarkdown` in its
+  `startgg.ts`) pulls that best-effort, concatenates every `MarkdownWidget`'s
+  markdown in reading order, and `pickDescription` prefers it over the tournament
+  `rules` / event `rulesMarkdown` (a bare link is the last resort). It degrades to
+  `rules` if the endpoint/version ever changes. Rendering: real prose flows into
+  **two columns split by a hairline** (`.ff-ext-about--cols`), and beneath it a
+  **two-column details list** (`.ff-ext-details`) of structured facts — game,
+  location, start/end, entrants, plus the extras the provider page shows and the
+  projection now collects: **registration close** (start.gg `registrationClosesAt`
+  / FACEIT `subscription_end`, shown only while still ahead), a **stream** watch
+  link (start.gg's first `streams` entry → `twitch.tv/<name>`, or FACEIT's active
+  `stream`), an organizer **contact** (start.gg `primaryContact` + type → a Discord/
+  email/site link), a **prize pool** (FACEIT `total_prizes` "N FACEIT Points" /
+  start.gg cash `payoutTotal`), a **video** (start.gg Details-tab VideoWidget), the
+  **organizer** (start.gg `owner` / FACEIT organizer, name → profile link),
+  **social links** (start.gg `links` / FACEIT organizer socials, JSON `links_json`),
+  and a "Rules" link when the description is only a bare URL — divided by the same
+  hairline as the `.ff-tcard__brandsep` logo divider. Below the facts, an **image
+  gallery** (`.ff-ext-gallery`) renders start.gg's Details-tab ImageWidgets (JSON
+  `images_json`). The start.gg extras come from two places: the public API deep
+  query (`owner`/`links`/`streams`/`primaryContact`/event `prizingInfo`) and the
+  same internal widget-layout fetch that gets the About (`fetchWidgetContent` now
+  also returns the VideoWidget url + ImageWidgets). `links_json`/`images_json` are
+  parsed defensively on read (`parseLinkList`/`parseImageList`, http(s)-only). The
+  `Markdown` renderer normalizes ATX headings onto their own block,
+  because start.gg's widget markdown writes `# Title\nbody` with no blank line.
+  The hero banner is a real `<img>` layer (like the list cards), not a CSS
+  background, so a valid URL always paints.
   The bracket is
   [ExternalBracket](components/dashboard/tournaments/ExternalBracket.tsx) (a
   client component): it reuses the internal `BracketView`'s `ff-bracket__*`

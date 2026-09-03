@@ -4332,20 +4332,79 @@ button.ff-dash__link:hover {
 .ff-ext-about--cols :is(h4, h5, h6, li, blockquote) {
   break-inside: avoid;
 }
-/* A bare rules link stands alone (no prose to column) — a single accent link. */
-.ff-ext-about--link {
-  margin: 0;
+.ff-ext-about > :first-child {
+  margin-top: 0;
 }
-.ff-ext-about--link a {
+/* The structured details panel — start.gg's own "About" is this two-column
+   key/value list, not prose (organizers rarely write one; the API exposes no
+   field beyond a rules link). Two columns split by a hairline (like the
+   .ff-tcard__brandsep logo divider), collapsing to one column when narrow; each
+   row stays intact across the divide. Sits under any real blurb (--after). */
+.ff-ext-details {
+  margin: 0;
+  columns: 2 16em;
+  column-gap: 40px;
+  column-rule: 1px solid rgba(255, 255, 255, 0.14);
+}
+.ff-ext-details--after {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--ff-border);
+}
+.ff-ext-details__item {
+  break-inside: avoid;
+  padding: 7px 0;
+}
+.ff-ext-details__item:first-child {
+  padding-top: 0;
+}
+.ff-ext-details__label {
+  margin: 0;
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.ff-ext-details__value {
+  margin: 3px 0 0;
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text);
+}
+.ff-ext-details__value a {
   color: var(--ff-accent);
   font-weight: 700;
   text-decoration: none;
 }
-.ff-ext-about--link a:hover {
+.ff-ext-details__value a:hover {
   text-decoration: underline;
 }
-.ff-ext-about > :first-child {
-  margin-top: 0;
+/* Organizer-added graphics (start.gg ImageWidgets): a responsive thumbnail strip
+   under the details, each tile linking out to the full image. Sits below the
+   facts with the same hairline separation the details panel uses after prose. */
+.ff-ext-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--ff-border);
+}
+.ff-ext-gallery__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 220px;
+}
+.ff-ext-gallery__item img {
+  width: 100%;
+  height: auto;
+  border-radius: var(--ff-radius-md);
+  border: 1px solid var(--ff-border);
+}
+.ff-ext-gallery__cap {
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
 }
 .ff-ext-about > :last-child {
   margin-bottom: 0;

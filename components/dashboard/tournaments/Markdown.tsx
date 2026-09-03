@@ -126,6 +126,13 @@ function renderBlock(block: string, key: number): ReactNode {
 }
 
 export function Markdown({ source }: { source: string }) {
-  const blocks = source.replace(/\r\n?/g, "\n").split(/\n{2,}/);
+  const blocks = source
+    .replace(/\r\n?/g, "\n")
+    // Force each ATX heading onto its own block by padding it with blank lines.
+    // Provider markdown (start.gg's About widgets especially) routinely writes
+    // "# Title\nbody text" with no blank line, which would otherwise render as
+    // one paragraph with a literal "# Title" line.
+    .replace(/^[ \t]*(#{1,6}[ \t]+.*)$/gm, "\n$1\n")
+    .split(/\n{2,}/);
   return <>{blocks.map((block, i) => renderBlock(block, i))}</>;
 }

@@ -46,9 +46,48 @@ export const extTournaments = sqliteTable(
     // Cover/banner artwork for the branded tile + detail hero (FACEIT
     // cover_image, start.gg banner image); null when the provider ships none.
     bannerUrl: text("banner_url"),
-    // Provider-authored blurb (FACEIT championship description). start.gg has
-    // no standard description field, so it stays null there.
+    // Provider-authored blurb. FACEIT: the championship description. start.gg:
+    // the concatenated Markdown widgets from the tournament's Details tab (its
+    // real "About" — pulled from the internal widget API, since the public API
+    // exposes no about field), else the `rules` link.
     description: text("description"),
+    // Organizer contact surfaced on the tournament page — start.gg's
+    // `primaryContact` (a Discord invite, email, Twitter, or URL) with its
+    // `primaryContactType` (`discord`/`email`/`twitter`/…). Null for FACEIT
+    // (no contact field) and when the organizer set none.
+    contact: text("contact"),
+    contactType: text("contact_type"),
+    // A "watch" link when the tournament has a live stream — start.gg's first
+    // `streams` entry (built from source+channel, e.g. twitch.tv/<name>); FACEIT's
+    // `stream.source` when its stream is active. Null when there's no stream.
+    streamUrl: text("stream_url"),
+    // When registration/check-in closes — start.gg `registrationClosesAt`,
+    // FACEIT `subscription_end`. Epoch ms. Null when the provider omits it.
+    registrationClosesAt: integer("registration_closes_at", {
+      mode: "timestamp_ms",
+    }),
+    // Prize pool as a display string — FACEIT `total_prizes` ("10,000 FACEIT
+    // Points"), start.gg's event `payoutTotal` + currency when cash prizing is
+    // enabled (start.gg usually keeps its prize breakdown in the About markdown,
+    // so this is often null there). Null when there's no structured prize.
+    prizePool: text("prize_pool"),
+    // A promo/VOD video link — start.gg's Details-tab VideoWidget (YouTube/Twitch/
+    // Drive). Distinct from `stream_url` (a live stream). Null when none.
+    videoUrl: text("video_url"),
+    // The organizer — start.gg tournament `owner` (name + a `/user/<slug>` link),
+    // FACEIT the championship's organizer (name + FACEIT organizer page). Shown as
+    // "Organized by". Null when unavailable.
+    organizer: text("organizer"),
+    organizerUrl: text("organizer_url"),
+    // Social / external links as a JSON array of `{label,url}` — start.gg
+    // tournament `links` (Facebook/Discord), FACEIT the organizer's
+    // website/twitter/youtube/twitch/facebook. "[]" / null when none; the reader
+    // parses it defensively.
+    links: text("links_json"),
+    // Extra graphics as a JSON array of `{url,caption}` — start.gg's Details-tab
+    // ImageWidgets (schedules, sponsor art). Separate from the hero `banner_url`.
+    // "[]" / null when none.
+    images: text("images_json"),
     // When this row was last written by the import/scraper.
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
   },

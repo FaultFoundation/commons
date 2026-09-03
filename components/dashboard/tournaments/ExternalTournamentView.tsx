@@ -1,3 +1,5 @@
+import { Fragment, type ReactNode } from "react";
+
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { sourceKey } from "@/components/brand/SourceLogo";
 import { ExternalBracket } from "@/components/dashboard/tournaments/ExternalBracket";
@@ -37,13 +39,50 @@ function formatDate(date: Date | null): string | null {
     : null;
 }
 
+function formatDateTime(date: Date | null): string | null {
+  return date
+    ? date.toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : null;
+}
+
 /** True when the whole blurb is just a single URL (no prose around it). start.gg
     organizers routinely drop a bare rules link into the `rules` field — the only
-    description field the API exposes — instead of writing an about. Rendered as a
-    naked autolink that reads as an empty "About"; we surface it as a labelled
-    link instead. */
+    description field the API exposes — instead of writing an about. We surface it
+    as a "Rules" row in the details panel rather than a naked autolink. */
 function isBareUrl(text: string): boolean {
   return /^https?:\/\/\S+$/i.test(text.trim());
+}
+
+/** Render an organizer contact by its type: an email as a mailto, a URL (Discord
+    invite, Twitter, site) as a labelled external link, anything else as plain
+    text. */
+function contactNode(contact: string, contactType: string | null): ReactNode {
+  const type = contactType?.trim().toLowerCase() ?? "";
+  if (type === "email" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) {
+    return <a href={`mailto:${contact}`}>{contact}</a>;
+  }
+  if (/^https?:\/\//i.test(contact)) {
+    const label =
+      type === "discord"
+        ? "Discord ↗"
+        : type === "twitter"
+          ? "Twitter / X ↗"
+          : type
+            ? `${type[0].toUpperCase()}${type.slice(1)} ↗`
+            : "Website ↗";
+    return (
+      <a href={contact} target="_blank" rel="noreferrer noopener">
+        {label}
+      </a>
+    );
+  }
+  return contact;
 }
 
 export function ExternalTournamentView({
@@ -63,8 +102,113 @@ export function ExternalTournamentView({
     0,
   );
 
+  // start.gg exposes no about prose beyond a (often bare) rules link, so the
+  // "About" bubble carries whatever real prose exists PLUS a start.gg-style
+  // details panel of the tournament's structured facts. `prose` is a genuine
+  // blurb (FACEIT, or a start.gg organizer who actually wrote one); a lone URL
+  // becomes the "Rules" row instead of a naked autolink.
   const description = tournament.description?.trim() ?? "";
-  const descriptionIsLink = description !== "" && isBareUrl(description);
+  const prose = description && !isBareUrl(description) ? description : "";
+  const rulesUrl = description && isBareUrl(description) ? description : null;
+
+  const location = [tournament.city, tournament.country]
+    .filter(Boolean)
+    .join(", ");
+  const details: { label: string; node: ReactNode }[] = [];
+  if (tournament.game) details.push({ label: "Game", node: tournament.game });
+  if (location) details.push({ label: "Location", node: location });
+  const startsAt = formatDateTime(tournament.startAt);
+  if (startsAt) details.push({ label: "Starts", node: startsAt });
+  const endsAt = formatDateTime(tournament.endAt);
+  if (endsAt) details.push({ label: "Ends", node: endsAt });
+  if (tournament.numAttendees != null) {
+    details.push({ label: "Entrants", node: String(tournament.numAttendees) });
+  }
+  // Only surface a registration deadline that's still ahead — a past one is noise
+  // on an active/finished event.
+  const closesAt = tournament.registrationClosesAt;
+  if (closesAt && closesAt.getTime() > Date.now()) {
+    const closesLabel = formatDateTime(closesAt);
+    if (closesLabel) {
+      details.push({ label: "Registration closes", node: closesLabel });
+    }
+  }
+  if (tournament.streamUrl) {
+    details.push({
+      label: "Stream",
+      node: (
+        <a
+          href={tournament.streamUrl}
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          Watch live ↗
+        </a>
+      ),
+    });
+  }
+  if (tournament.contact) {
+    details.push({
+      label: "Contact",
+      node: contactNode(tournament.contact, tournament.contactType),
+    });
+  }
+  if (tournament.prizePool) {
+    details.push({ label: "Prize pool", node: tournament.prizePool });
+  }
+  if (tournament.videoUrl) {
+    details.push({
+      label: "Video",
+      node: (
+        <a href={tournament.videoUrl} target="_blank" rel="noreferrer noopener">
+          Watch ↗
+        </a>
+      ),
+    });
+  }
+  if (tournament.organizer) {
+    details.push({
+      label: "Organized by",
+      node: tournament.organizerUrl ? (
+        <a
+          href={tournament.organizerUrl}
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          {tournament.organizer} ↗
+        </a>
+      ) : (
+        tournament.organizer
+      ),
+    });
+  }
+  if (tournament.links.length) {
+    details.push({
+      label: "Links",
+      node: (
+        <>
+          {tournament.links.map((link, index) => (
+            <Fragment key={link.url}>
+              {index > 0 ? " · " : ""}
+              <a href={link.url} target="_blank" rel="noreferrer noopener">
+                {link.label} ↗
+              </a>
+            </Fragment>
+          ))}
+        </>
+      ),
+    });
+  }
+  if (rulesUrl) {
+    details.push({
+      label: "Rules",
+      node: (
+        <a href={rulesUrl} target="_blank" rel="noreferrer noopener">
+          View ruleset ↗
+        </a>
+      ),
+    });
+  }
 
   return (
     <div className="ff-bubble-grid">
@@ -133,23 +277,47 @@ export function ExternalTournamentView({
         </div>
       </section>
 
-      {description ? (
+      {prose || details.length || tournament.images.length ? (
         <Bubble title="About" span="full" className="ff-bubble--divided">
-          {descriptionIsLink ? (
-            // Just a rules link, not prose — render it as a clear labelled link
-            // rather than a naked URL that reads as an empty About.
-            <p className="ff-ext-about ff-ext-about--link">
-              <a href={description} target="_blank" rel="noreferrer noopener">
-                Tournament rules &amp; information ↗
-              </a>
-            </p>
-          ) : (
+          {prose ? (
             // Real prose flows into two columns divided by a hairline (like
             // start.gg's own About layout), collapsing to one column when narrow.
             <div className="ff-ext-about ff-ext-about--cols">
-              <Markdown source={description} />
+              <Markdown source={prose} />
             </div>
-          )}
+          ) : null}
+          {details.length ? (
+            // The structured facts, two columns split by a hairline — start.gg's
+            // own "About" is this panel, not prose. Sits under the blurb when both.
+            <dl className={`ff-ext-details${prose ? " ff-ext-details--after" : ""}`}>
+              {details.map((detail) => (
+                <div className="ff-ext-details__item" key={detail.label}>
+                  <dt className="ff-ext-details__label">{detail.label}</dt>
+                  <dd className="ff-ext-details__value">{detail.node}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+          {tournament.images.length ? (
+            // Extra graphics the organizer added (schedules, sponsor art) — a
+            // thumbnail strip, each linking out to the full image.
+            <div className="ff-ext-gallery">
+              {tournament.images.map((image) => (
+                <a
+                  key={image.url}
+                  className="ff-ext-gallery__item"
+                  href={image.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  <img src={image.url} alt={image.caption ?? ""} loading="lazy" />
+                  {image.caption ? (
+                    <span className="ff-ext-gallery__cap">{image.caption}</span>
+                  ) : null}
+                </a>
+              ))}
+            </div>
+          ) : null}
         </Bubble>
       ) : null}
 

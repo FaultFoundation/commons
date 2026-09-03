@@ -37,6 +37,15 @@ function formatDate(date: Date | null): string | null {
     : null;
 }
 
+/** True when the whole blurb is just a single URL (no prose around it). start.gg
+    organizers routinely drop a bare rules link into the `rules` field — the only
+    description field the API exposes — instead of writing an about. Rendered as a
+    naked autolink that reads as an empty "About"; we surface it as a labelled
+    link instead. */
+function isBareUrl(text: string): boolean {
+  return /^https?:\/\/\S+$/i.test(text.trim());
+}
+
 export function ExternalTournamentView({
   tournament,
 }: {
@@ -53,6 +62,9 @@ export function ExternalTournamentView({
     (sum, event) => sum + event.standings.length,
     0,
   );
+
+  const description = tournament.description?.trim() ?? "";
+  const descriptionIsLink = description !== "" && isBareUrl(description);
 
   return (
     <div className="ff-bubble-grid">
@@ -121,11 +133,23 @@ export function ExternalTournamentView({
         </div>
       </section>
 
-      {tournament.description ? (
+      {description ? (
         <Bubble title="About" span="full" className="ff-bubble--divided">
-          <div className="ff-ext-about">
-            <Markdown source={tournament.description} />
-          </div>
+          {descriptionIsLink ? (
+            // Just a rules link, not prose — render it as a clear labelled link
+            // rather than a naked URL that reads as an empty About.
+            <p className="ff-ext-about ff-ext-about--link">
+              <a href={description} target="_blank" rel="noreferrer noopener">
+                Tournament rules &amp; information ↗
+              </a>
+            </p>
+          ) : (
+            // Real prose flows into two columns divided by a hairline (like
+            // start.gg's own About layout), collapsing to one column when narrow.
+            <div className="ff-ext-about ff-ext-about--cols">
+              <Markdown source={description} />
+            </div>
+          )}
         </Bubble>
       ) : null}
 

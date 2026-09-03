@@ -27,6 +27,17 @@ import type {
 // with a losers bracket (double-elim, incl. FACEIT — its `group` field splits
 // winners/losers upstream); a FACEIT swiss/league event has no losers, so it
 // stays plain columns where tree connectors would lie.
+//
+// One tab per SUB-BRACKET. An event splits two levels deep: first into PHASES
+// (start.gg's independent brackets — "Round 1 Bracket" + "Round 2 Bracket"),
+// then each phase into POOLS (phase groups — "A1".."A4", several disjoint
+// brackets that share one phaseId and identical round names). Without splitting
+// pools apart, their rounds mash into shared columns and the connectors cross
+// between unrelated brackets (the "ugly" bracket). We prefer the explicit
+// phase-group id the projection carries (which also names the pool); when it's
+// absent — older data, or a provider without phase groups — we infer the pools
+// as the weakly-connected components of the feed graph, since disjoint pools
+// share no prereq edges. A plain single bracket is one component → one tab.
 
 const LOSERS_RE = /los(?:er|ers|ing)?|lower|\blb\b/i;
 
@@ -350,6 +361,116 @@ function groupByPhase(matches: ExternalTournamentMatch[]): {
     .map(([key, g]) => ({ key, name: g.name, matches: g.matches }));
 }
 
+/** Weakly-connected components of the feed graph over `matches`: two sets share a
+    component when one lists the other as a prereq feeder (either direction). An
+    event that runs several independent pool brackets under ONE phase (sharing a
+    phaseId and identical round names) has no cross-pool feed edges, so each pool
+    falls out as its own component — the shape we need to render them apart even
+    when the projection carries no explicit phase-group id. Within a pool the
+    winners and losers sub-brackets stay in one component via the loser-drop
+    prereqs, and a plain single bracket is one component (→ one tab). */
+function connectedComponents(
+  matches: ExternalTournamentMatch[],
+): ExternalTournamentMatch[][] {
+  const indexById = new Map<string, number>();
+  matches.forEach((m, i) => indexById.set(m.sourceMatchId, i));
+  const parent = matches.map((_, i) => i);
+  const find = (x: number): number => {
+    let root = x;
+    while (parent[root] !== root) root = parent[root];
+    while (parent[x] !== root) {
+      const next = parent[x];
+      parent[x] = root;
+      x = next;
+    }
+    return root;
+  };
+  const union = (a: number, b: number) => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent[ra] = rb;
+  };
+  matches.forEach((m, i) => {
+    for (const feeder of [m.prereq1Id, m.prereq2Id]) {
+      if (!feeder) continue;
+      const j = indexById.get(feeder);
+      if (j != null) union(i, j);
+    }
+  });
+  const byRoot = new Map<number, ExternalTournamentMatch[]>();
+  matches.forEach((m, i) => {
+    const root = find(i);
+    const list = byRoot.get(root) ?? [];
+    list.push(m);
+    byRoot.set(root, list);
+  });
+  return [...byRoot.values()];
+}
+
+/** Smallest bracket-position key across a set of matches — orders inferred pools
+    left→right in seed order. Null keys sort last (see compareOrderKeys). */
+function minOrderKey(matches: ExternalTournamentMatch[]): string | null {
+  let best: string | null = null;
+  let seen = false;
+  for (const m of matches) {
+    if (!seen) {
+      best = m.orderKey;
+      seen = true;
+    } else if (compareOrderKeys(m.orderKey, best) < 0) {
+      best = m.orderKey;
+    }
+  }
+  return best;
+}
+
+type Pool = {
+  id: string;
+  /** Provider pool label ("A1"); null when inferred from the feed graph. */
+  name: string | null;
+  matches: ExternalTournamentMatch[];
+};
+
+/** Split one phase's matches into pools (independent sub-brackets). Prefer the
+    explicit phase-group id the projection carries — it also names the pool;
+    otherwise infer pools from the feed graph. One pool (or no signal) → the
+    phase renders as a single bracket, unchanged. */
+function splitPools(matches: ExternalTournamentMatch[]): Pool[] {
+  if (matches.some((m) => m.phaseGroupId != null)) {
+    const groups = new Map<
+      string,
+      { order: number; name: string | null; matches: ExternalTournamentMatch[] }
+    >();
+    matches.forEach((m, index) => {
+      const id = m.phaseGroupId ?? "__ungrouped__";
+      let g = groups.get(id);
+      if (!g) {
+        g = {
+          order: m.phaseGroupOrder ?? 1000 + index,
+          name: m.phaseGroupName ?? null,
+          matches: [],
+        };
+        groups.set(id, g);
+      }
+      g.matches.push(m);
+    });
+    return [...groups.entries()]
+      .sort((a, b) => a[1].order - b[1].order)
+      .map(([id, g]) => ({ id, name: g.name, matches: g.matches }));
+  }
+  const components = connectedComponents(matches);
+  if (components.length <= 1) {
+    return [{ id: "__single__", name: null, matches }];
+  }
+  return components
+    .map((comp) => ({ comp, key: minOrderKey(comp) }))
+    .sort((a, b) => compareOrderKeys(a.key, b.key))
+    .map(({ comp }, index) => ({
+      id: `pool-${index}`,
+      name: null,
+      matches: comp,
+    }));
+}
+
 export function ExternalBracket({
   events,
   source,
@@ -369,67 +490,84 @@ export function ExternalBracket({
   // columns where tree connectors would lie.
   const geometricFallback =
     source === "startgg" || allMatches.some(isLosers);
-  // One entry per phase, each pre-split into winners/losers columns. Memoized so
-  // the column references stay stable and BracketSection's measuring effect
-  // doesn't re-run every render.
-  const phases = useMemo(
-    () =>
-      groupByPhase(allMatches).map((phase, index) => ({
-        key: phase.key,
-        name: phase.name ?? `Bracket ${index + 1}`,
-        winners: buildColumns(phase.matches.filter((m) => !isLosers(m))),
-        losers: buildColumns(phase.matches.filter(isLosers)),
-      })),
-    [allMatches],
-  );
-  const [activePhase, setActivePhase] = useState(0);
+  // One entry per SUB-BRACKET — each phase split into its pools — pre-built into
+  // winners/losers columns. A plain event is one sub-bracket (no tabs); a pool
+  // stage under one phase is one per pool; a multi-phase event is one per phase
+  // (× pool). Memoized so the column references stay stable and BracketSection's
+  // measuring effect doesn't re-run every render.
+  const subBrackets = useMemo(() => {
+    const phases = groupByPhase(allMatches);
+    const multiPhase = phases.length > 1;
+    return phases.flatMap((phase, phaseIndex) => {
+      const pools = splitPools(phase.matches);
+      const multiPool = pools.length > 1;
+      const phaseLabel = phase.name ?? `Bracket ${phaseIndex + 1}`;
+      return pools.map((pool, poolIndex) => {
+        const poolLabel = pool.name
+          ? `Pool ${pool.name}`
+          : multiPool
+            ? `Pool ${poolIndex + 1}`
+            : phaseLabel;
+        const label =
+          multiPhase && multiPool ? `${phaseLabel} · ${poolLabel}` : poolLabel;
+        return {
+          key: `${phase.key}-${pool.id}`,
+          label,
+          winners: buildColumns(pool.matches.filter((m) => !isLosers(m))),
+          losers: buildColumns(pool.matches.filter(isLosers)),
+        };
+      });
+    });
+  }, [allMatches]);
+  const [activeTab, setActiveTab] = useState(0);
 
   if (allMatches.length === 0) {
     return <p className="ff-ticket-empty">No bracket data collected yet.</p>;
   }
 
-  const sectionsFor = (phase: (typeof phases)[number]) => (
+  const sectionsFor = (sub: (typeof subBrackets)[number]) => (
     <>
       <BracketSection
-        columns={phase.winners}
-        title={phase.losers.length ? "Winners Bracket" : null}
+        columns={sub.winners}
+        title={sub.losers.length ? "Winners Bracket" : null}
         geometricFallback={geometricFallback}
       />
       <BracketSection
-        columns={phase.losers}
+        columns={sub.losers}
         title="Losers Bracket"
         geometricFallback={geometricFallback}
       />
     </>
   );
 
-  // Single phase (or FACEIT): render directly, no tabs.
-  if (phases.length <= 1) {
-    return <div className="ff-bracket">{sectionsFor(phases[0])}</div>;
+  // A single sub-bracket (a plain event / FACEIT): render directly, no tabs.
+  if (subBrackets.length <= 1) {
+    return <div className="ff-bracket">{sectionsFor(subBrackets[0])}</div>;
   }
 
-  // Multiple independent brackets in one event → browser-style tabs next to the
-  // bracket name, one phase visible at a time (rather than stacked vertically).
-  const activeIndex = Math.min(activePhase, phases.length - 1);
+  // Several independent sub-brackets (phases and/or pools) → browser-style tabs,
+  // one visible at a time, rather than stacked (which mashed their columns and
+  // crossed connectors between unrelated brackets).
+  const activeIndex = Math.min(activeTab, subBrackets.length - 1);
   return (
     <div className="ff-bracket">
       <div className="ff-bracket__tabs" role="tablist" aria-label="Brackets">
-        {phases.map((phase, index) => (
+        {subBrackets.map((sub, index) => (
           <button
-            key={phase.key}
+            key={sub.key}
             type="button"
             role="tab"
             id={`bracket-tab-${index}`}
             aria-selected={index === activeIndex}
             className={`ff-bracket__tab${index === activeIndex ? " ff-bracket__tab--active" : ""}`}
-            onClick={() => setActivePhase(index)}
+            onClick={() => setActiveTab(index)}
           >
-            {phase.name}
+            {sub.label}
           </button>
         ))}
       </div>
       <div role="tabpanel" aria-labelledby={`bracket-tab-${activeIndex}`}>
-        {sectionsFor(phases[activeIndex])}
+        {sectionsFor(subBrackets[activeIndex])}
       </div>
     </div>
   );

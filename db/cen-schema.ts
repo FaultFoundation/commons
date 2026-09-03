@@ -115,6 +115,18 @@ export const extMatches = sqliteTable(
     phaseId: text("phase_id"),
     phaseName: text("phase_name"),
     phaseOrder: integer("phase_order"),
+    // The phase GROUP (pool) this match belongs to (start.gg phaseGroup) — one
+    // level below the phase. A single phase can run SEVERAL independent pool
+    // brackets ("A1".."A4"): they share one `phaseId` and identical round names,
+    // so without this the branded view stacked all four pools into shared
+    // columns and drew connectors crossing between unrelated brackets. The view
+    // splits a phase into pools by `phaseGroupId` (labelled `phaseGroupName` —
+    // the provider's "A1"; ordered by `phaseGroupOrder`), each its own tabbed
+    // sub-bracket. Null for a single-pool phase and FACEIT → the view then infers
+    // pools from the feed graph (prereq components), so old rows still split.
+    phaseGroupId: text("phase_group_id"),
+    phaseGroupName: text("phase_group_name"),
+    phaseGroupOrder: integer("phase_group_order"),
     url: text("url"),
   },
   (t) => [

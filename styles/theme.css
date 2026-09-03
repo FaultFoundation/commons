@@ -4318,6 +4318,32 @@ button.ff-dash__link:hover {
   color: var(--ff-text);
   overflow-wrap: anywhere;
 }
+/* Real prose flows into two columns split by a hairline — matching start.gg's
+   own About layout and the 1px logo divider (.ff-tcard__brandsep). Multicol only
+   makes a second column when there's room for two ~22em columns, so a short
+   blurb or a narrow viewport stays one column (and shows no rule). Headings and
+   list items never break across the divide. */
+.ff-ext-about--cols {
+  max-width: none;
+  columns: 22em 2;
+  column-gap: 40px;
+  column-rule: 1px solid rgba(255, 255, 255, 0.14);
+}
+.ff-ext-about--cols :is(h4, h5, h6, li, blockquote) {
+  break-inside: avoid;
+}
+/* A bare rules link stands alone (no prose to column) — a single accent link. */
+.ff-ext-about--link {
+  margin: 0;
+}
+.ff-ext-about--link a {
+  color: var(--ff-accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+.ff-ext-about--link a:hover {
+  text-decoration: underline;
+}
 .ff-ext-about > :first-child {
   margin-top: 0;
 }

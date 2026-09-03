@@ -218,6 +218,16 @@ export type ExternalTournamentMatch = {
   phaseId: string | null;
   phaseName: string | null;
   phaseOrder: number | null;
+  /** The phase GROUP (pool) this match belongs to, one level below the phase. A
+      single phase can hold several independent pool brackets (e.g. "A1".."A4"),
+      all sharing one `phaseId` and identical round names; the view splits them
+      into separate sub-brackets by `phaseGroupId` (labelled `phaseGroupName`,
+      ordered by `phaseGroupOrder`) so their rounds don't mash into shared
+      columns. Null for a single-pool phase and for FACEIT — the view then infers
+      pools from the feed graph. */
+  phaseGroupId: string | null;
+  phaseGroupName: string | null;
+  phaseGroupOrder: number | null;
   url: string | null;
 };
 
@@ -545,6 +555,9 @@ export async function getExternalTournament(
         phaseId: m.phaseId,
         phaseName: m.phaseName,
         phaseOrder: toNum(m.phaseOrder),
+        phaseGroupId: m.phaseGroupId,
+        phaseGroupName: m.phaseGroupName,
+        phaseGroupOrder: toNum(m.phaseGroupOrder),
         url: m.url,
       });
       matchesByEvent.set(m.eventId, list);

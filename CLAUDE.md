@@ -344,7 +344,16 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   provider blurb as markdown ([Markdown](components/dashboard/tournaments/Markdown.tsx)
   — a dependency-free, XSS-safe subset that builds React nodes, never
   `dangerouslySetInnerHTML`) and final standings, and keeps a "View on
-  start.gg/FACEIT" out-link. The hero banner is a real `<img>` layer (like the
+  start.gg/FACEIT" out-link. **The description is thin on start.gg by design**:
+  the API exposes no dedicated field — `rules` is the organizer's about blurb,
+  and organizers routinely drop just a bare rules URL in it. So the scraper's
+  `pickDescription` prefers real prose from the tournament `rules` **or** any
+  event's `rulesMarkdown`, falling back to a bare link only when that's all there
+  is; and the About bubble renders a lone-URL description as a **labelled link**
+  (`.ff-ext-about--link`) rather than a naked URL that reads as empty, while real
+  prose flows into **two columns split by a hairline** (`.ff-ext-about--cols`,
+  matching start.gg's own About layout and the `.ff-tcard__brandsep` logo
+  divider). The hero banner is a real `<img>` layer (like the
   list cards), not a CSS background, so a valid URL always paints.
   The bracket is
   [ExternalBracket](components/dashboard/tournaments/ExternalBracket.tsx) (a
@@ -365,13 +374,23 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   column NAME from a header row, and reading those verbatim used to leak
   "entrant_1_score" into a slot and collapse every match into one column
   (`Math.abs("round_order")` is NaN). Junk now degrades to null. The bracket
-  first groups matches by **phase** (`phase_id`/`phase_name`/`phase_order`) — a
-  start.gg event can hold several independent brackets ("Round 1 Bracket" +
-  "Round 2 Bracket"); with more than one they render as **browser-style tabs**
-  (`.ff-bracket__tab*`, one phase visible at a time) rather than stacked, since
-  stacking mashed their rounds into one jumbled column set with nonsense
-  connectors. Within a phase it groups columns by round NAME (robust when
-  `round_order` is absent),
+  splits matches into **sub-brackets** two levels deep, each its own
+  **browser-style tab** (`.ff-bracket__tab*`, one visible at a time) — stacking
+  them mashed unrelated rounds into one column set with connectors crossing
+  between brackets. First by **phase** (`phase_id`/`phase_name`/`phase_order`) —
+  a start.gg event can hold several independent brackets ("Round 1 Bracket" +
+  "Round 2 Bracket"). Then each phase splits into **pools** (phase groups): a
+  single phase can run several disjoint pool brackets ("A1".."A4") that share one
+  `phase_id` **and identical round names**, so without splitting them the four
+  pools stacked into shared columns (the "ugly" bracket). The view prefers the
+  explicit `phase_group_id`/`phase_group_name`/`phase_group_order` the projection
+  carries (labels the tab "Pool A1"); when that's absent — data scraped before
+  the phase-group columns existed, or a provider without pools — it **infers
+  pools as the weakly-connected components of the feed graph**, since disjoint
+  pools share no prereq edges (a single bracket, winners+losers joined by
+  loser-drop prereqs, is one component → one tab, unchanged). Tabs are labelled
+  by pool, by phase, or `phase · Pool` when both split. Within a sub-bracket it
+  groups columns by round NAME (robust when `round_order` is absent),
   and a missing/forfeit score renders as a dash, never a blank cell.
   Feed-forward connectors prefer the **true feed graph**, not guessed
   geometry: every set stores the source-set id feeding each slot

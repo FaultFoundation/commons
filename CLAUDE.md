@@ -264,6 +264,55 @@ The public bracket is at `/t/<id>/<name>/` (not `/tournaments/[…]` — `robots
 disallows that prefix); the id is the whole lookup and the name segment is
 cosmetic, re-derived from `name` so a rename never orphans a link.
 
+### The tabbed tournament view (both internal and external)
+
+The internal `/tournaments/[id]` page and the external
+[ExternalTournamentView](components/dashboard/tournaments/ExternalTournamentView.tsx)
+render through **one shared client shell**,
+[TournamentChrome](components/dashboard/tournaments/TournamentChrome.tsx), so a
+Challonge-backed and a scraped tournament look identical. A hero header (banner
+behind the **title only**, stopping below it — the deliberate brand treatment,
+not a full-height hero) stays visible; under it, browser-style in-page tabs
+**Overview / Bracket / Standings / Rules** show one panel at a time. Only the
+active panel is mounted, so the polling `BracketView` and the measured
+`ExternalBracket` do no work while hidden. A small React context
+(`useTournamentTabs`) lets a control deep in a panel switch tabs — that's how
+"Full standings →" on the Overview jumps to the Standings tab. Tabs honour a
+`?tab=` deep link on mount but keep no server state; `BracketView` takes
+`showBracket`/`showStandings` so the Bracket and Standings tabs each mount it
+with one half (shared snapshot, one instance live at a time).
+
+- **Overview** leads with a **Top Finishers** row —
+  [TopFinishers](components/dashboard/tournaments/TopFinishers.tsx) with
+  gold/silver/bronze [TrophyIcon](components/dashboard/tournaments/TrophyIcon.tsx)
+  marks (inline SVG, no image assets) — then About + a Details facts panel
+  (external) or the Participants grid (internal).
+- **Bracket** pairs a **Recent Results** sidebar
+  ([RecentResults](components/dashboard/tournaments/RecentResults.tsx), latest
+  decided matches, finals first) with the bracket.
+- The header's icon row
+  ([TournamentLinks](components/dashboard/tournaments/TournamentLinks.tsx)) shows
+  **only the tournament's own known links** — video/stream/Discord/organizer/
+  socials for external, rules/Challonge for internal — never a generic set; it
+  renders nothing when there are none.
+- **Small entrant marks everywhere.** 18–22px favicons/logos sit beside team
+  names in the bracket slots, standings, top finishers and recent results.
+  External favicons come from cen-sql (`ext_matches.entrant_{1,2}_logo_url`,
+  `ext_standings.entrant_logo_url` — Google s2 favicons the scraper resolves via
+  `school_favicons`); internal marks are the team `logoUrl`, now carried through
+  the bracket snapshot (`SnapshotParticipant.logoUrl`, joined by
+  `challonge_participant_id` in `getOrRefreshSnapshot`; snapshots cached before
+  this field read as null). The shared shapes/components live in
+  [tournament-view-shared.ts](components/dashboard/tournaments/tournament-view-shared.ts).
+
+**Liquipedia portability (structure only).**
+[lib/liquipedia.ts](lib/liquipedia.ts) maps a tournament onto Liquipedia's
+`{{Infobox league}}` parameter names and records every param we **can't** fill
+(`LIQUIPEDIA_UNMAPPED` + a per-tournament `missing[]`) — the "note any missing
+fields" checklist for a future porting project. It is pure and **unwired**: no
+page, endpoint, or export UI imports it yet. The wikitext emitter and its
+surface get built on top of this later.
+
 ### Esports connects and the personal schedule
 
 Members link **FACEIT / start.gg / Challonge** as connect-only OAuth (never a
@@ -371,10 +420,11 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   (`htmlToMarkdown`: `<a>`→link, `<img>`→image, `<br>`/`<hr>`, `<b>`/`<i>`) and
   strips the rest with their inline CSS, so nothing renders as literal `<div…>`
   text. When there's no layout (FACEIT, or a start.gg tournament with none), the
-  `description` renders as single-column markdown instead. Beneath the About
-  content sits a **two-column details list** (`.ff-ext-details`, hairline divider
-  like `.ff-tcard__brandsep`) of our structured facts — game, location, start/end,
-  entrants, plus extras the projection collects: **registration close** (start.gg
+  `description` renders as single-column markdown instead. Beside the About
+  bubble, the Overview tab carries a **Details** panel (`.ff-tfacts`, a
+  single-column key/value list) of our structured facts — game, location,
+  start/end, entrants, plus extras the projection collects: **registration
+  close** (start.gg
   `registrationClosesAt` / FACEIT `subscription_end`, shown only while ahead), a
   **stream** link (start.gg's first `streams` → `twitch.tv/<name>`, or FACEIT's
   active `stream`), **contact** (start.gg `primaryContact` + type), **prize pool**

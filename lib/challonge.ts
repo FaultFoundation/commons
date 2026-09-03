@@ -476,6 +476,9 @@ export async function fetchChallongeState(
     return {
       id: String(r.id),
       name: asString(a.name) ?? "Entrant",
+      // Challonge carries no logo for us; the snapshot build joins our team
+      // logo in by challonge_participant_id (see getOrRefreshSnapshot).
+      logoUrl: null,
       seed: asNumber(a.seed),
       finalRank: asNumber(a.final_rank ?? a.final_ranking),
       active: states?.active ?? true,

@@ -357,6 +357,9 @@ export type ParticipantWithTeam = {
   seed: number | null;
   teamName: string | null;
   teamTag: string | null;
+  /** The team's logo (an /api/avatars/… path), for the entrant's small mark in
+      the bracket/results; null when the team has none. */
+  teamLogoUrl: string | null;
   /** Average Overwatch SR across the team's active roster, or null. */
   avgSr: number | null;
   createdAt: Date;
@@ -384,6 +387,7 @@ export async function listParticipantsWithTeams(
       seed: tournamentParticipants.seed,
       teamName: teams.name,
       teamTag: teams.tag,
+      teamLogoUrl: teams.logoUrl,
       createdAt: tournamentParticipants.createdAt,
     })
     .from(tournamentParticipants)
@@ -820,18 +824,23 @@ export async function buildSnapshot(
   // the stored challonge_participant_id. Falls back to the Challonge name.
   const ours = await listParticipantsWithTeams(tournamentId);
   const labelByChallongeId = new Map<string, string>();
+  const logoByChallongeId = new Map<string, string>();
   for (const p of ours) {
     if (p.challongeParticipantId) {
       labelByChallongeId.set(
         p.challongeParticipantId,
         entrantLabel(p.teamName, p.teamTag),
       );
+      if (p.teamLogoUrl) {
+        logoByChallongeId.set(p.challongeParticipantId, p.teamLogoUrl);
+      }
     }
   }
 
   const participants: SnapshotParticipant[] = state.data.participants.map((p) => ({
     ...p,
     name: labelByChallongeId.get(p.id) ?? p.name,
+    logoUrl: logoByChallongeId.get(p.id) ?? p.logoUrl,
   }));
 
   const payload: SnapshotPayload = {

@@ -287,6 +287,11 @@ export type SnapshotParticipant = {
   /** Display label — our team name/tag, enriched from D1, falling back to the
       name we registered on Challonge. */
   name: string;
+  /** The entrant's small logo/favicon for the bracket, results and podium — our
+      team `logoUrl` for internal entrants, joined in during the snapshot build.
+      Null when the team has no logo or the label came straight from Challonge.
+      (Older cached snapshots predate this field and simply read as null.) */
+  logoUrl: string | null;
   seed: number | null;
   /** Final placement once the tournament completes. */
   finalRank: number | null;

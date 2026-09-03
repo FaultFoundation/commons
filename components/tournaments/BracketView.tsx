@@ -28,9 +28,21 @@ const ELIMINATION: ReadonlySet<TournamentFormat> = new Set([
 export function BracketView({
   tournamentId,
   initial,
+  showBracket = true,
+  showStandings = true,
+  standingsHeading = "Results",
 }: {
   tournamentId: string;
   initial: BracketSnapshot;
+  /** The tabbed tournament view renders the bracket and the results table in
+      separate tabs, so it mounts BracketView twice with one part each; both
+      still share the same polling snapshot. Defaults keep the standalone
+      (single-scroll) use unchanged. */
+  showBracket?: boolean;
+  showStandings?: boolean;
+  /** Heading over the results table. Null omits it — the Standings tab already
+      titles its own bubble, so the inner "Results" heading would double up. */
+  standingsHeading?: string | null;
 }) {
   const [snapshot, setSnapshot] = useState<BracketSnapshot>(initial);
   const etagRef = useRef<string>(`"v${initial.version}"`);
@@ -78,21 +90,26 @@ export function BracketView({
 
   return (
     <div className="ff-bracket">
-      {snapshot.matches.length === 0 ? (
-        <p className="ff-ticket-empty">
-          The bracket isn&apos;t live yet — check back once play begins.
-        </p>
-      ) : isElim ? (
-        <EliminationBracket matches={snapshot.matches} nameById={nameById} />
-      ) : (
-        <RoundList matches={snapshot.matches} nameById={nameById} />
-      )}
+      {showBracket ? (
+        snapshot.matches.length === 0 ? (
+          <p className="ff-ticket-empty">
+            The bracket isn&apos;t live yet — check back once play begins.
+          </p>
+        ) : isElim ? (
+          <EliminationBracket matches={snapshot.matches} nameById={nameById} />
+        ) : (
+          <RoundList matches={snapshot.matches} nameById={nameById} />
+        )
+      ) : null}
 
-      <Standings
-        participants={snapshot.participants}
-        matches={snapshot.matches}
-        completed={snapshot.tournament.status === "completed"}
-      />
+      {showStandings ? (
+        <Standings
+          participants={snapshot.participants}
+          matches={snapshot.matches}
+          completed={snapshot.tournament.status === "completed"}
+          heading={standingsHeading}
+        />
+      ) : null}
     </div>
   );
 }
@@ -349,6 +366,8 @@ function MatchCard({
   matchIndex?: number;
 }) {
   const [a, b] = splitScores(match.scores);
+  const p1 = nameById.get(match.player1Id ?? "");
+  const p2 = nameById.get(match.player2Id ?? "");
   return (
     <div
       className="ff-bracket__match"
@@ -362,12 +381,14 @@ function MatchCard({
         </span>
       ) : null}
       <Slot
-        name={nameById.get(match.player1Id ?? "")?.name ?? "TBD"}
+        name={p1?.name ?? "TBD"}
+        logoUrl={p1?.logoUrl ?? null}
         score={a}
         winner={!!match.winnerId && match.winnerId === match.player1Id}
       />
       <Slot
-        name={nameById.get(match.player2Id ?? "")?.name ?? "TBD"}
+        name={p2?.name ?? "TBD"}
+        logoUrl={p2?.logoUrl ?? null}
         score={b}
         winner={!!match.winnerId && match.winnerId === match.player2Id}
       />
@@ -377,16 +398,30 @@ function MatchCard({
 
 function Slot({
   name,
+  logoUrl,
   score,
   winner,
 }: {
   name: string;
+  logoUrl: string | null;
   score: string;
   winner: boolean;
 }) {
   return (
     <div className={`ff-bracket__slot${winner ? " ff-bracket__slot--winner" : ""}`}>
-      <span className="ff-bracket__slot-name">{name}</span>
+      <span className="ff-bracket__entrant">
+        {logoUrl ? (
+          <img
+            className="ff-bracket__entrant-logo"
+            src={logoUrl}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+          />
+        ) : null}
+        <span className="ff-bracket__slot-name">{name}</span>
+      </span>
       <span className="ff-bracket__slot-score">{score}</span>
     </div>
   );
@@ -401,10 +436,12 @@ function Standings({
   participants,
   matches,
   completed,
+  heading = "Results",
 }: {
   participants: SnapshotParticipant[];
   matches: SnapshotMatch[];
   completed: boolean;
+  heading?: string | null;
 }) {
   if (!participants.length) return null;
 
@@ -439,7 +476,9 @@ function Standings({
 
   return (
     <section className="ff-bracket__section">
-      <h2 className="ff-bracket__section-title">Results</h2>
+      {heading ? (
+        <h2 className="ff-bracket__section-title">{heading}</h2>
+      ) : null}
       <div className="ff-ticket-table-wrap">
         <table className="ff-ticket-table">
           <thead>
@@ -456,7 +495,21 @@ function Standings({
                 <td>
                   {completed && p.finalRank != null ? p.finalRank : index + 1}
                 </td>
-                <td>{p.name}</td>
+                <td>
+                  <span className="ff-ext-entrant">
+                    {p.logoUrl ? (
+                      <img
+                        className="ff-ext-entrant__logo"
+                        src={p.logoUrl}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : null}
+                    <span>{p.name}</span>
+                  </span>
+                </td>
                 <td>{anyPlayed ? `${p.w}–${p.l}` : "—"}</td>
                 <td>{anyPlayed ? p.w : "—"}</td>
               </tr>

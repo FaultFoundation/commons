@@ -519,14 +519,16 @@ API** (`https://overfast-api.tekrop.fr`, which scrapes a player's public Blizzar
 career page by BattleTag). The **Player Data / Match Data** split is **browser-style
 tabs inside the page**, under a shared profile header (`.ff-owtab*`), deliberately
 not the admin-style rail slide-out. "By game" is the intended shape; Overwatch is
-the only game today; Match Data is a coming-soon placeholder.
+the only game today; Match Data is the cross-provider match history (next section).
 
 - **A THIRD D1, `ow-player-data`**, bound as **`OW`** ([db/ow-schema.ts](db/ow-schema.ts),
   migrations in `drizzle-ow/`, [lib/ow-db.ts](lib/ow-db.ts) `getOwDb()` degrades to
-  null when unbound). Two tables: `ow_players` (a small mutable registry — battletag,
+  null when unbound). The OW tables: `ow_players` (a small mutable registry — battletag,
   the OverFast `player_id`, the cached public/private `visibility`, and `poll_chunk`
   0–23 = `chunkForUser`) and **`ow_snapshots` (APPEND-ONLY** — one career snapshot per
-  player per day, never overwritten, so members can see improvement over time). It's
+  player per day, never overwritten, so members can see improvement over time). The
+  same database also carries the `pd_*` cross-provider player-data tables (next
+  section). It's
   joined to `website-sql` only in app code by `user_id` (D1 can't JOIN across
   bindings), exactly like cen-sql.
 - **Two writers, unlike cen-sql** (which the Commons reads read-only). The Commons
@@ -538,7 +540,7 @@ the only game today; Match Data is a coming-soon placeholder.
   respect `MIN_SNAPSHOT_INTERVAL_MS` (~20 h), so a connect + a page open + a cron
   tick in one day produce ONE row. The **Commons owns the schema/migrations**; the
   poller keeps a **column-compatible copy** of `db/ow-schema.ts` + `lib/overfast.ts`
-  and only reads/writes rows.
+  (+ the player-data mirrors, next section) and only reads/writes rows.
 - **The public-profile gate.** OverFast only reads a career profile set to public.
   `getOwVisibility` (TTL-cached in the registry, mirroring `connectReachability`)
   classifies `public | private | not_found | unknown` from `/stats/summary`; the
@@ -586,6 +588,77 @@ the only game today; Match Data is a coming-soon placeholder.
   `summary_json`/`stats_json` blobs. Live-verified for the public path; the
   private-profile branch is written against the observed shape and wants one
   live-verify against a genuinely private account (like the FACEIT/start.gg adapters).
+
+### Cross-provider player data — external teams + match history (`pd_*`)
+
+A member's **FACEIT / start.gg teams** and their **full match history across
+FACEIT / start.gg / Challonge**, pulled by the external ids captured at OAuth
+link time, shown in two places: external teams render **inline in the Teams tab**
+(provider glyph in the card corner, opening a branded `/teams/<provider:id>/`
+detail view with roster + that team's matches) and the member's matches fill the
+**Statistics → Match Data tab**. Lives in the **same third D1**
+(`ow-player-data`) as tables prefixed `pd_*` ([db/ow-schema.ts](db/ow-schema.ts),
+documented in [db/README.md](db/README.md)); the same `ow-data` Worker crons it.
+
+- **The split**: [lib/player-data-sync.ts](lib/player-data-sync.ts) is the
+  **pure sync core** (fetch + parse + apply against a passed-in Drizzle handle —
+  no cloudflare context, no Better Auth) and is **mirror-copied into the
+  `ow-data` repo** (like `overfast.ts`; only its two import paths differ).
+  [lib/player-data.ts](lib/player-data.ts) is the Commons wrapper: it mirrors
+  `platform_identities` into the `pd_sync` registry (so the poller never needs a
+  website-sql binding — the `ow_players` battletag rule again), runs the lazy
+  TTL-gated sync, and owns every page read.
+  [lib/player-data-shared.ts](lib/player-data-shared.ts) is the client-safe half.
+- **Sync cadence** (all writers respect `pd_sync.last_synced_at` + the shared
+  1 h TTL, so they never duplicate work): page open fires
+  `POST /api/player-data/refresh` after paint (the ExternalTournamentRefresh
+  pattern — `PlayerDataAutoRefresh`, only a `changed: true` re-renders); the
+  refresh icon sends `force: true`, which drops the gate to a 2 min floor; and
+  the `ow-data` cron syncs the `poll_chunk == UTC hour` bucket hourly (~once a
+  day per member) plus a stale catch-up. **Challonge rows are cron-exempt**: they
+  read via the member's OAuth token (`getAuth().api.getAccessToken`, the
+  lib/schedule.ts path), which only exists Commons-side.
+- **Unbounded backfill, bounded ticks.** Full history was the requirement, so
+  each tick advances `pd_sync.backfill_cursor` by a budgeted number of API calls
+  (FACEIT 4×100-match pages; start.gg 4×20-set pages; Challonge 2 tournaments)
+  until the provider is exhausted (`backfill_done`), after which ticks are one
+  cheap incremental page. Matches upsert on `(user, provider, external_match_id)`
+  so overlap is idempotent; a failed tick leaves the cursor unadvanced and
+  resumes. No raw payload blobs are stored — parsed columns only, because a
+  veteran account runs to thousands of matches.
+- **Provider reads** (server keys for FACEIT/start.gg, member token for
+  Challonge): FACEIT teams are the documented `/players/{id}/teams` +
+  `/teams/{id}` (history factions carry `players`, though docs say `roster` —
+  both parsed; pickup "teams" have the player's own guid as `team_id`, which is
+  why only ids present in `pd_teams` attribute to team pages). **start.gg
+  user→teams exists only on the internal endpoint** (`www.start.gg/api/-/gql`,
+  `client-version` header, no auth — the cen-scraper widget-layout precedent);
+  its `user.teams` nodes are **EventTeams**, normalized to their `globalTeam`
+  and deduped, which is also why `pd_matches.team_external_id` stores the
+  **GlobalTeam** id from the sets query's
+  `team { ... on EventTeam { globalTeam { id } } }`. start.gg sets come from the
+  documented `player(id){sets}` (player id resolved once from the stored user id
+  and cached in `pd_sync.meta`). Challonge shapes match the org-key reads in
+  [lib/challonge.ts](lib/challonge.ts) (same v2.1 API, member-token auth);
+  its cursor keeps a `seen` map of tournament→state so completed tournaments are
+  never re-pulled. Live-verified end-to-end for FACEIT + start.gg (cursor
+  resume and TTL dedupe included); the Challonge path is code-complete but
+  unverified against a member token, same status as the schedule adapters.
+- **Errors are a member-visible state, not silence**: `pd_sync.status`
+  (`ok`/`private`/`not_found`/`error`) surfaces on the Match Data tab per
+  provider (`PD_STATUS_MESSAGES`), with the connectReachability rule — only a
+  definitive provider answer sets `private`/`not_found`; outages stay `error`
+  ("usually temporary"). Every read degrades to empty when `OW` is unbound.
+- **UI**: [MatchPanel](components/dashboard/statistics/MatchPanel.tsx) (client)
+  reuses `StatLoading` and caches its last response in **sessionStorage**
+  (`ff-matchdata-v1`, stale-while-revalidate — paint cached instantly, refetch in
+  background) so tab-hopping never re-waits; `StatisticsView`'s Battle.net gates
+  were moved INTO the Player Data panel so Match Data stays reachable for members
+  without Battle.net. [MatchList](components/dashboard/statistics/MatchList.tsx)
+  is shared (no directive) between that tab and the server-rendered
+  [ExternalTeamView](components/dashboard/teams/ExternalTeamView.tsx). Opening an
+  external team requires a `pd_team_links` row — a team you're not linked to is
+  a 404, matching the internal-team rule.
 
 ### Styling
 

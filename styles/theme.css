@@ -6285,3 +6285,133 @@ button.ff-dash__link:hover {
   justify-content: center;
   margin-top: 4px;
 }
+
+/* =====================================================
+   Cross-provider player data (external teams + matches)
+   — the Teams tab's external cards, the external team
+   detail view, and the Statistics → Match Data tab.
+   ===================================================== */
+
+/* Refresh controls row (auto "Updating…" chip + the force icon). Sits between
+   sections on /teams/ and inside bubble headers elsewhere. */
+.ff-pd-toolbar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  width: 100%;
+}
+.ff-bubble__actions .ff-pd-toolbar {
+  width: auto;
+}
+
+/* Provider glyph in an external team card's corner — same sizing as the
+   tournament cards' source mark. */
+.ff-team-card__gamechip--provider,
+.ff-team-card__gamechip--provider svg,
+.ff-team-card__gamechip--provider img {
+  height: 22px;
+  width: auto;
+  color: #fff;
+}
+.ff-team-card--external {
+  --team-accent: var(--ff-border);
+}
+
+/* Match rows — platform mark · competition/sides · result/score/link. */
+.ff-pdmatches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ff-pdmatch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ff-border);
+}
+.ff-pdmatch:last-child {
+  border-bottom: 0;
+}
+.ff-pdmatch__mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  color: #fff;
+}
+.ff-pdmatch__mark svg,
+.ff-pdmatch__mark img {
+  height: 18px;
+  width: auto;
+}
+.ff-pdmatch__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ff-pdmatch__title {
+  font-weight: 700;
+  font-size: var(--ff-dash-text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ff-pdmatch__sides {
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ff-pdmatch__meta {
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-pdmatch__tail {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.ff-pdmatch__score {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  min-width: 3ch;
+  text-align: right;
+}
+.ff-pdmatch__result {
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--ff-border);
+}
+.ff-pdmatch__result--win {
+  color: #6ee7a0;
+  border-color: rgba(110, 231, 160, 0.4);
+}
+.ff-pdmatch__result--loss {
+  color: #f08a8a;
+  border-color: rgba(240, 138, 138, 0.4);
+}
+.ff-pdmatch__result--draw {
+  color: var(--ff-text-dim);
+}
+
+/* Per-provider sync problem strip on the Match Data tab. */
+.ff-pd-problem {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border: 1px solid rgba(240, 138, 138, 0.35);
+  border-radius: var(--ff-radius-md);
+  background: rgba(240, 138, 138, 0.08);
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text);
+}

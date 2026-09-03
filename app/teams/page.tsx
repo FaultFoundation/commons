@@ -5,7 +5,12 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { TeamCardGrid } from "@/components/dashboard/teams/TeamCardGrid";
 import { TeamsActions } from "@/components/dashboard/teams/TeamsActions";
+import {
+  PlayerDataAutoRefresh,
+  PlayerDataRefreshButton,
+} from "@/components/dashboard/teams/PlayerDataRefresh";
 import { listGames } from "@/lib/games";
+import { getExternalTeamsForUser } from "@/lib/player-data";
 import { getRegistrationStateCached } from "@/lib/registration";
 import { getSessionCached } from "@/lib/session";
 import { listMyTeams } from "@/lib/teams";
@@ -24,8 +29,11 @@ export default async function TeamsPage() {
     redirect("/login/");
   }
 
-  const [myTeams, registration, games] = await Promise.all([
+  const [myTeams, externalTeams, registration, games] = await Promise.all([
     listMyTeams(session.user.id),
+    // D1-only (no provider calls) — freshness comes from the client top-up
+    // below plus the ow-data cron, so this render stays fast.
+    getExternalTeamsForUser(session.user.id),
     getRegistrationStateCached(session.user.id),
     listGames(),
   ]);
@@ -39,10 +47,17 @@ export default async function TeamsPage() {
           itself is the member's teams. */}
       <TeamsActions verified={verified} games={games} />
 
+      {/* External teams sync lazily after paint; the icon forces a re-pull. */}
+      <div className="ff-pd-toolbar">
+        <PlayerDataAutoRefresh />
+        <PlayerDataRefreshButton />
+      </div>
+
       {/* The cards are rearrangeable, so the order lives client-side — the
-          reads all still happen here. */}
-      {myTeams.length ? (
-        <TeamCardGrid teams={myTeams} />
+          reads all still happen here. External (FACEIT/start.gg) teams render
+          inline after the member's internal cards. */}
+      {myTeams.length || externalTeams.length ? (
+        <TeamCardGrid teams={myTeams} external={externalTeams} />
       ) : (
         <div className="ff-bubble-grid">
           <Bubble title="No Teams Yet" span="full">

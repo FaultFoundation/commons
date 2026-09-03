@@ -5,12 +5,14 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { DangerZonePanel } from "@/components/dashboard/teams/DangerZonePanel";
+import { ExternalTeamView } from "@/components/dashboard/teams/ExternalTeamView";
 import { InvitePanel } from "@/components/dashboard/teams/InvitePanel";
 import { RosterPanel } from "@/components/dashboard/teams/RosterPanel";
 import { TeamHero } from "@/components/dashboard/teams/TeamHero";
 import { TeamSettingsRows } from "@/components/dashboard/teams/TeamSettingsRows";
 import { TournamentPanel } from "@/components/dashboard/teams/TournamentPanel";
 import { listGames } from "@/lib/games";
+import { getExternalTeamDetail } from "@/lib/player-data";
 import { getSessionCached } from "@/lib/session";
 import { listSchoolCountries } from "@/lib/registration";
 import { getTeamDetail, getTeamMembership } from "@/lib/teams";
@@ -24,12 +26,27 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
+/** Decode a route param, tolerating a malformed sequence rather than throwing. */
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 /**
  * One team, as a single column in priority order: who's on it, how to invite
  * more, then reporting a result. The header carries the team's identity and
  * settings; every control below the surface is gated on a capability from
  * lib/teams-shared.ts, so a coach sees the roster and schedule, a captain also
  * sees settings and scores, a manager also sees the danger zone.
+ *
+ * External teams (synced from FACEIT / start.gg) share this route: their ids
+ * carry a `provider:` prefix (percent-encoded by the card link, like the
+ * tournaments tab), and branch to the read-only ExternalTeamView. Authorization
+ * mirrors the internal rule — only a member linked to that external team can
+ * open it, and anything else is a 404.
  */
 export default async function TeamPage({
   params,
@@ -43,8 +60,21 @@ export default async function TeamPage({
     redirect("/login/");
   }
 
-  const { teamId } = await params;
+  const { teamId: rawTeamId } = await params;
   const { invited } = await searchParams;
+  const teamId = safeDecode(rawTeamId);
+
+  // External team ids carry a `provider:` prefix; internal ids never do.
+  if (teamId.includes(":")) {
+    const detail = await getExternalTeamDetail(session.user.id, teamId);
+    if (!detail) notFound();
+    return (
+      <DashboardShell active="teams" setupUserId={session.user.id}>
+        <h1 className="screen-reader-text">{detail.team.name}</h1>
+        <ExternalTeamView detail={detail} />
+      </DashboardShell>
+    );
+  }
 
   // Membership is the whole authorization story for this page: a team you're
   // not on is indistinguishable from one that doesn't exist.

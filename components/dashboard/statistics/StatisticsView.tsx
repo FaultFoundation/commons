@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
+import { MatchPanel } from "@/components/dashboard/statistics/MatchPanel";
 import { PlayerDashboard } from "@/components/dashboard/statistics/PlayerDashboard";
 import { StatLoading } from "@/components/dashboard/statistics/StatLoading";
 import type { OverfastSummary } from "@/lib/overfast";
@@ -62,42 +63,37 @@ export function StatisticsView({
     };
   }, [linked]);
 
-  // Battle.net not configured at all.
-  if (!enabled) {
-    return (
-      <div className="ff-owpage">
-        <Bubble title="Overwatch Statistics" span="full">
-          <p className="ff-bubble__lede">
-            Overwatch statistics are unavailable right now — Battle.net isn&apos;t
-            configured.
-          </p>
-        </Bubble>
+  // Battle.net gates only the PLAYER tab (it's the Overwatch data source);
+  // Match Data aggregates FACEIT / start.gg / Challonge and must stay reachable
+  // for a member who linked those but not Battle.net — so the unconfigured /
+  // unlinked states render as the Player Data panel body, never a page-level
+  // early return that would hide the tabs.
+  const playerGate = !enabled ? (
+    <Bubble title="Overwatch Statistics" span="full">
+      <p className="ff-bubble__lede">
+        Overwatch statistics are unavailable right now — Battle.net isn&apos;t
+        configured.
+      </p>
+    </Bubble>
+  ) : !linked ? (
+    <Bubble title="Overwatch Statistics" span="full">
+      <p className="ff-bubble__lede">
+        Connect your Battle.net account to see your Overwatch player statistics
+        here.
+      </p>
+      <div className="ff-bubble__cta">
+        <Link className="ff-btn ff-btn--outline" href="/account/">
+          Connect Battle.net
+        </Link>
       </div>
-    );
-  }
-
-  // Member hasn't linked Battle.net.
-  if (!linked) {
-    return (
-      <div className="ff-owpage">
-        <Bubble title="Overwatch Statistics" span="full">
-          <p className="ff-bubble__lede">
-            Connect your Battle.net account to see your Overwatch player statistics
-            here.
-          </p>
-          <div className="ff-bubble__cta">
-            <Link className="ff-btn ff-btn--outline" href="/account/">
-              Connect Battle.net
-            </Link>
-          </div>
-        </Bubble>
-      </div>
-    );
-  }
+    </Bubble>
+  ) : null;
 
   return (
     <div className="ff-owpage">
-      <ProfileHeader resp={resp} loading={loading} battletag={battletag} />
+      {linked ? (
+        <ProfileHeader resp={resp} loading={loading} battletag={battletag} />
+      ) : null}
 
       <div className="ff-owtabs" role="tablist" aria-label="Statistics views">
         <button
@@ -121,13 +117,13 @@ export function StatisticsView({
       </div>
 
       {tab === "player" ? (
-        <PlayerPanel resp={resp} loading={loading} failed={failed} />
+        (playerGate ?? (
+          <PlayerPanel resp={resp} loading={loading} failed={failed} />
+        ))
       ) : (
-        <Bubble title="Match Statistics" variant="wip" span="full">
-          <div className="ff-bubble__wip">
-            Per-match history, session tracking, and trends — coming soon.
-          </div>
-        </Bubble>
+        // Cross-platform match history (FACEIT / start.gg / Challonge) — not
+        // tied to Battle.net, so it renders regardless of the OW link state.
+        <MatchPanel />
       )}
     </div>
   );

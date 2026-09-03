@@ -16,7 +16,8 @@ now 308s via `middleware.ts`). `/` stays the public Commons landing page.
 | `/t/<id>/<name>/`              | —           | Public branded bracket (signed-out-safe) |
 | `/admin/tournaments/`          | Admin       | Create + manage (Challonge-backed) |
 | `/teams/`                      | Teams       | Your teams + create          |
-| `/teams/<teamId>/`             | Teams       | One team: roster, invites, settings, tournaments |
+| `/teams/<teamId>/`             | Teams       | One team: roster, invites, settings, tournaments. External (`provider:id`) ids render the read-only synced view |
+| `/statistics/`                 | Statistics  | Player Data (Overwatch) + Match Data (cross-provider) tabs |
 | `/join/<token>/`               | —           | Invite landing (join a team) |
 | `/account/`                    | Account     | Profile / integrations       |
 | `/account/setup/`              | —           | Resolver → current step      |
@@ -603,6 +604,47 @@ lazy TTL). Portal conventions specific to this surface:
   and the list sorts by that full timestamp. External tournaments use the
   earliest scheduled match (`firstMatchAt` from the projection) as their start
   when the projection has match times, falling back to the tournament start.
+
+## External player data (Teams + Statistics)
+
+A member's external FACEIT / start.gg teams and their cross-provider match
+history (FACEIT / start.gg / Challonge), synced into the `pd_*` tables of the
+`ow-player-data` D1. See CLAUDE.md "Cross-provider player data" for the
+architecture (the pure sync core, the poller mirror, the unbounded backfill);
+portal conventions specific to these surfaces:
+
+- **External team cards render inline** in `/teams/` after the member's
+  internal cards, in the same `ff-team-card` vocabulary — the provider's glyph
+  sits where an internal card shows the game mark
+  (`.ff-team-card__gamechip--provider`), and the card opens
+  `/teams/<percent-encoded provider:id>/` (the tournaments-tab id convention).
+  They are deliberately **not reorderable**: the member's drag order belongs to
+  internal teams (`reorderMyTeams` validates ids), and external order is the
+  provider's.
+- **The detail view** (`ExternalTeamView`) is read-only — identity bubble with
+  a "View on FACEIT/start.gg" out-link, the provider's roster (provider
+  handles, not Commons members), and the team's matches via the shared
+  `MatchList`. Opening it requires the viewer's own `pd_team_links` row — a
+  team you're not linked to is a 404, the internal-team rule.
+- **Refresh is the ExternalTournamentRefresh pattern**: pages render from D1
+  (never a provider call in a server render), then `PlayerDataAutoRefresh`
+  fires the TTL-gated sync after paint and only a `changed: true` triggers
+  `router.refresh()`. `PlayerDataRefreshButton` (the `ff-icon-btn` reload
+  glyph, same as the Integrations recheck) sends `force: true`, which the
+  server floors at 2 minutes.
+- **Match Data** (`/statistics/`, second tab) fetches
+  `/api/statistics/matches` behind the same `StatLoading` climbing bar as
+  Player Data, and caches its last response in sessionStorage
+  (stale-while-revalidate) so tab-hopping paints instantly. Per-provider sync
+  problems render as `.ff-pd-problem` strips ("set your profile to public…",
+  "usually temporary") — an inaccessible account is an explained state, never
+  silently-missing data. The Battle.net connect gate lives INSIDE the Player
+  Data panel so Match Data stays reachable without Battle.net.
+- **Match rows** (`.ff-pdmatch`) are the shared vocabulary for external
+  matches: provider mark · competition/sides/meta · result chip + score +
+  out-link. Result chips (`.ff-pdmatch__result--win/loss/draw`) only render
+  when the member's side is known; an unattributed match shows "A vs B" with
+  no chip rather than guessing.
 
 ## Backend notes
 

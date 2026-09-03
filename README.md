@@ -40,11 +40,12 @@ Ships to `commons.fault.foundation`. The public marketing site is a
 | `lib/teams.ts`, `lib/teams-shared.ts` | Team reads + the role/capability model (managers, captains, coaches, players) |
 | `lib/tournaments.ts`, `lib/challonge.ts` | Cached tournament snapshots and the sole Challonge API client |
 | `lib/ow-stats.ts`, `lib/overfast.ts` | Overwatch player statistics: snapshot writer/reader + the sole OverFast API client |
+| `lib/player-data.ts`, `lib/player-data-sync.ts` | Cross-provider player data: external FACEIT/start.gg teams + match history (sync core mirrored into the `ow-data` Worker) |
 | `lib/lfg-shared.ts` | Shapes for the matchmaking (LFG/LFM) JSON columns |
 | `db/schema.ts` | Drizzle schema: Better Auth tables + `profiles` |
 | `drizzle/` | Generated SQL migrations (`npm run db:generate`), applied with `npm run db:migrate:*` |
 | `db/cen-schema.ts`, `drizzle-cen/` | Read-only external-tournament projection + its independent migrations |
-| `db/ow-schema.ts`, `drizzle-ow/` | Append-only Overwatch career snapshots (`ow-player-data`) + its independent migrations |
+| `db/ow-schema.ts`, `drizzle-ow/` | Append-only Overwatch career snapshots + cross-provider player data (`ow-player-data`) + its independent migrations |
 | `scripts/migrate-legacy-bot-data.mjs` | Idempotent, local-only import of normalized legacy bot users and tickets |
 | `styles/theme.css` | The `ff-` design system (imported last) |
 | `styles/wp-globals.css` | Brand tokens (`--wp--preset--*`) + element base styles — **do not edit** |

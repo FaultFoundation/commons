@@ -5,10 +5,20 @@ import type { CSSProperties } from "react";
 
 import { reorderMyTeams } from "@/app/teams/actions";
 import { GameLogo } from "@/components/brand/GameLogo";
+import {
+  ChallongeMark,
+  FaceitMark,
+  StartggMark,
+} from "@/components/brand/ProviderMark";
 import { Avatar } from "@/components/dashboard/Avatar";
 import { DragGrip } from "@/components/dashboard/bubbles/DragGrip";
 import { useReorderableGrid } from "@/components/dashboard/bubbles/useReorderableGrid";
 import { CopyInviteButton } from "@/components/dashboard/teams/CopyInviteButton";
+import {
+  PD_PROVIDER_LABELS,
+  type ExternalTeamSummary,
+  type PdProvider,
+} from "@/lib/player-data-shared";
 import type { MyTeam } from "@/lib/teams";
 import { TEAM_ROLE_LABELS, teamColor } from "@/lib/teams-shared";
 
@@ -24,8 +34,19 @@ import { TEAM_ROLE_LABELS, teamColor } from "@/lib/teams-shared";
  * to the front" double as "feature this team". A drag starts only from the grip
  * in each card's bottom-right; the Move up / Move down buttons are the keyboard
  * and screen-reader path, and both drive the same reorder.
+ *
+ * External teams (synced from FACEIT / start.gg via lib/player-data.ts) render
+ * inline after the internal cards, marked with the provider's glyph where an
+ * internal card carries the game mark. They aren't reorderable — their order is
+ * the provider's — and they open the branded /teams/<source:id>/ detail view.
  */
-export function TeamCardGrid({ teams: initial }: { teams: MyTeam[] }) {
+export function TeamCardGrid({
+  teams: initial,
+  external = [],
+}: {
+  teams: MyTeam[];
+  external?: ExternalTeamSummary[];
+}) {
   const { order, error, reorder, bubbleProps, handleProps } =
     useReorderableGrid({
       items: initial,
@@ -156,8 +177,79 @@ export function TeamCardGrid({ teams: initial }: { teams: MyTeam[] }) {
             </article>
           );
         })}
+        {external.map((team) => (
+          <ExternalTeamCard key={team.id} team={team} />
+        ))}
       </div>
     </>
+  );
+}
+
+/** The provider's square glyph, sitting where internal cards show the game. */
+function ProviderChip({ provider }: { provider: PdProvider }) {
+  return (
+    <span
+      className="ff-team-card__gamechip ff-team-card__gamechip--provider"
+      title={PD_PROVIDER_LABELS[provider]}
+      aria-label={PD_PROVIDER_LABELS[provider]}
+    >
+      {provider === "faceit" ? (
+        <FaceitMark />
+      ) : provider === "startgg" ? (
+        <StartggMark />
+      ) : (
+        <ChallongeMark />
+      )}
+    </span>
+  );
+}
+
+function ExternalTeamCard({ team }: { team: ExternalTeamSummary }) {
+  return (
+    <article className="ff-team-card ff-team-card--external">
+      <ProviderChip provider={team.provider} />
+      <div className="ff-team-card__head">
+        <span className="ff-team-card__logo">
+          <Avatar src={team.logoUrl} name={team.name} shape="team" size="md" />
+        </span>
+        <div className="ff-team-card__identity">
+          <h3 className="ff-team-card__name">{team.name}</h3>
+          <div className="ff-team-card__badges">
+            <span className="ff-badge ff-badge--player">
+              {PD_PROVIDER_LABELS[team.provider]}
+            </span>
+            {team.game ? (
+              <span className="ff-team-card__sub">{team.game}</span>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      <div className="ff-team-card__stats">
+        <div className="ff-stat">
+          <span className="ff-stat__label">Roster</span>
+          <span className="ff-stat__value">{team.memberCount || "\u2014"}</span>
+        </div>
+        <div className="ff-stat">
+          <span className="ff-stat__label">Source</span>
+          <span className="ff-stat__value">
+            {PD_PROVIDER_LABELS[team.provider]}
+          </span>
+        </div>
+      </div>
+
+      <div className="ff-team-card__foot">
+        <span className="ff-team-card__actions">
+          <Link
+            className="ff-btn ff-btn--outline ff-btn--sm"
+            href={`/teams/${encodeURIComponent(team.id)}/`}
+            prefetch={false}
+          >
+            Open
+          </Link>
+        </span>
+      </div>
+    </article>
   );
 }
 

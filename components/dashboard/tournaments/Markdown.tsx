@@ -1,12 +1,18 @@
 import { Fragment, type ReactNode } from "react";
 
 // A tiny, dependency-free markdown renderer for provider-authored blurbs
-// (start.gg `rules`, FACEIT descriptions). It builds React nodes directly — no
-// dangerouslySetInnerHTML — so untrusted text can never inject markup, and link
-// hrefs are restricted to http(s)/mailto/relative. Deliberately a SUBSET:
-// headings, bold, italic, inline code, links, bare URLs, unordered/ordered
-// lists, blockquotes, paragraphs with soft line breaks. Anything fancier just
-// renders as its literal text, which is fine for tournament rules.
+// (start.gg widget markdown, FACEIT descriptions). It builds React nodes
+// directly — no dangerouslySetInnerHTML — so untrusted text can never inject
+// markup, and link/image URLs are restricted to http(s)/mailto/relative.
+// Deliberately a SUBSET: headings, bold, italic, inline code, links, images,
+// bare URLs, unordered/ordered lists, blockquotes, thematic breaks, paragraphs
+// with soft line breaks.
+//
+// start.gg's "MarkdownWidget" content is markdown MIXED with raw HTML — organizers
+// wrap text in <div style>, link with styled <a>, and embed <img>. A markdown
+// subset renders those tags as literal text, so we first fold the common HTML
+// into markdown (links, images, breaks, emphasis) and strip the rest (the styling
+// wrappers), keeping the structure while dropping the untrusted inline CSS.
 
 /** Only allow safe schemes; anything else renders as plain text (no link). */
 function safeHref(url: string): string | null {
@@ -15,10 +21,56 @@ function safeHref(url: string): string | null {
   return null;
 }
 
-// One regex, tried left-to-right at each position: **bold**, `code`,
+/** Decode the handful of HTML entities that show up in provider blurbs. */
+function decodeEntities(text: string): string {
+  return text
+    .replace(/ /g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0?39;|&apos;/gi, "'");
+}
+
+/** Fold the common inline HTML organizers embed in start.gg markdown into
+    markdown equivalents, then drop every remaining tag (the <div>/<span> styling
+    wrappers) while keeping their text. Order matters: images and links are
+    converted before the blanket tag strip. */
+function htmlToMarkdown(source: string): string {
+  let text = source;
+  // <img src alt> → ![alt](src) (attributes in any order).
+  text = text.replace(/<img\b[^>]*>/gi, (tag) => {
+    const src = /src\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1];
+    if (!src) return "";
+    const alt = /alt\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1] ?? "";
+    return `![${alt}](${src})`;
+  });
+  // <a href>INNER</a> → an image link collapses to just the image; otherwise a
+  // normal [text](href). Inner tags in the label are dropped by the later strip.
+  text = text.replace(
+    /<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
+    (_full, href: string, inner: string) => {
+      const trimmed = inner.trim();
+      if (/^!\[[^\]]*\]\([^)\s]+\)$/.test(trimmed)) return trimmed;
+      return `[${trimmed}](${href})`;
+    },
+  );
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+  text = text.replace(/<hr\s*\/?>/gi, "\n\n---\n\n");
+  text = text.replace(/<(strong|b)\b[^>]*>([\s\S]*?)<\/\1>/gi, "**$2**");
+  text = text.replace(/<(em|i)\b[^>]*>([\s\S]*?)<\/\1>/gi, "*$2*");
+  // Everything else (div/span/p wrappers, unclosed tags) — strip the tag, keep
+  // the text. A blank line after block wrappers keeps paragraphs from merging.
+  text = text.replace(/<\/(div|p|section|h[1-6])\s*>/gi, "\n\n");
+  text = text.replace(/<[^>]+>/g, "");
+  return decodeEntities(text);
+}
+
+// Tried left-to-right at each position: ![img](url), **bold**, `code`,
 // [text](url), *italic* / _italic_, then a bare http(s) URL.
 const INLINE =
-  /(\*\*([\s\S]+?)\*\*)|(`([^`]+?)`)|(\[([^\]]+?)\]\(([^)\s]+?)\))|((?:\*|_)([^*_\n]+?)(?:\*|_))|(https?:\/\/[^\s<)]+)/;
+  /(!\[([^\]]*?)\]\(([^)\s]+?)\))|(\*\*([\s\S]+?)\*\*)|(`([^`]+?)`)|(\[([^\]]+?)\]\(([^)\s]+?)\))|((?:\*|_)([^*_\n]+?)(?:\*|_))|(https?:\/\/[^\s<)]+)/;
 
 function inline(text: string): ReactNode[] {
   const out: ReactNode[] = [];
@@ -32,35 +84,45 @@ function inline(text: string): ReactNode[] {
     }
     if (m.index > 0) out.push(rest.slice(0, m.index));
     if (m[1]) {
-      out.push(<strong key={key++}>{inline(m[2])}</strong>);
-    } else if (m[3]) {
+      // Image: ![alt](url)
+      const src = safeHref(m[3]);
+      out.push(
+        src ? (
+          <img key={key++} className="ff-md__img" src={src} alt={m[2] ?? ""} loading="lazy" />
+        ) : (
+          m[0]
+        ),
+      );
+    } else if (m[4]) {
+      out.push(<strong key={key++}>{inline(m[5])}</strong>);
+    } else if (m[6]) {
       out.push(
         <code key={key++} className="ff-md__code">
-          {m[4]}
+          {m[7]}
         </code>,
       );
-    } else if (m[5]) {
-      const href = safeHref(m[7]);
+    } else if (m[8]) {
+      const href = safeHref(m[10]);
       out.push(
         href ? (
           <a key={key++} href={href} target="_blank" rel="noreferrer noopener">
-            {inline(m[6])}
+            {inline(m[9])}
           </a>
         ) : (
           m[0]
         ),
       );
-    } else if (m[8]) {
-      out.push(<em key={key++}>{inline(m[9])}</em>);
-    } else if (m[10]) {
-      const href = safeHref(m[10]);
+    } else if (m[11]) {
+      out.push(<em key={key++}>{inline(m[12])}</em>);
+    } else if (m[13]) {
+      const href = safeHref(m[13]);
       out.push(
         href ? (
           <a key={key++} href={href} target="_blank" rel="noreferrer noopener">
-            {m[10]}
+            {m[13]}
           </a>
         ) : (
-          m[10]
+          m[13]
         ),
       );
     }
@@ -87,6 +149,9 @@ function paragraph(block: string, key: number): ReactNode {
 function renderBlock(block: string, key: number): ReactNode {
   const trimmed = block.trim();
   if (!trimmed) return null;
+
+  // Thematic break (--- / *** / ___), possibly padded.
+  if (/^(?:-{3,}|_{3,}|\*{3,})$/.test(trimmed)) return <hr key={key} />;
 
   const heading = /^(#{1,6})\s+(.*)$/.exec(trimmed);
   if (heading && !trimmed.includes("\n")) {
@@ -126,7 +191,7 @@ function renderBlock(block: string, key: number): ReactNode {
 }
 
 export function Markdown({ source }: { source: string }) {
-  const blocks = source
+  const blocks = htmlToMarkdown(source)
     .replace(/\r\n?/g, "\n")
     // Force each ATX heading onto its own block by padding it with blank lines.
     // Provider markdown (start.gg's About widgets especially) routinely writes

@@ -4406,6 +4406,113 @@ button.ff-dash__link:hover {
   font-size: var(--ff-dash-text-xs);
   color: var(--ff-text-dim);
 }
+
+/* --- start.gg About-tab layout mirror --- */
+/* Rows of 1–3 columns (the source's own split), collapsing to one on narrow
+   screens; each column stacks its widgets (markdown / image / video). */
+.ff-about-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.ff-about-row {
+  display: grid;
+  grid-template-columns: repeat(var(--ff-about-cols, 1), minmax(0, 1fr));
+  gap: 28px;
+  align-items: start;
+}
+.ff-about-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+@media (max-width: 781.98px) {
+  .ff-about-row {
+    grid-template-columns: 1fr;
+  }
+}
+/* Markdown widget prose — the About prose look without the fixed measure. */
+.ff-about-md {
+  font-size: var(--ff-dash-text-sm);
+  line-height: 1.6;
+  color: var(--ff-text);
+  overflow-wrap: anywhere;
+}
+.ff-about-md > :first-child {
+  margin-top: 0;
+}
+.ff-about-md > :last-child {
+  margin-bottom: 0;
+}
+.ff-about-md p {
+  margin: 0 0 12px;
+}
+.ff-about-md h4,
+.ff-about-md h5,
+.ff-about-md h6 {
+  margin: 16px 0 8px;
+  font-weight: 800;
+}
+.ff-about-md ul,
+.ff-about-md ol {
+  margin: 0 0 12px;
+  padding-left: 1.4em;
+}
+.ff-about-md li {
+  margin: 2px 0;
+}
+.ff-about-md a {
+  color: var(--ff-accent);
+  text-decoration: underline;
+}
+.ff-about-md blockquote {
+  margin: 0 0 12px;
+  padding-left: 12px;
+  border-left: 2px solid var(--ff-border);
+  color: var(--ff-text-dim);
+}
+.ff-about-md hr {
+  border: none;
+  border-top: 1px solid var(--ff-border);
+  margin: 16px 0;
+}
+/* Inline images embedded in widget markdown (<img> folded to markdown). */
+.ff-md__img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--ff-radius-md);
+}
+/* An ImageWidget: a linked image with an optional caption. */
+.ff-about-img {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ff-about-img img {
+  width: 100%;
+  height: auto;
+  border-radius: var(--ff-radius-md);
+  border: 1px solid var(--ff-border);
+}
+.ff-about-img__cap {
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+/* A VideoWidget: a responsive 16:9 embed. */
+.ff-about-video {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+.ff-about-video iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: var(--ff-radius-md);
+}
 .ff-ext-about > :last-child {
   margin-bottom: 0;
 }

@@ -88,6 +88,13 @@ export const extTournaments = sqliteTable(
     // ImageWidgets (schedules, sponsor art). Separate from the hero `banner_url`.
     // "[]" / null when none.
     images: text("images_json"),
+    // The full start.gg About-tab layout, JSON `[{columns:[[widget,…],…]}]` — rows
+    // preserving the source's 1–3 column split, each widget `{type:"md",content}`
+    // / `{type:"img",url,caption}` / `{type:"vid",url}`. Lets the branded view
+    // mimic start.gg's own layout instead of flattening to one column; the
+    // markdown widgets carry inline HTML the renderer folds in. Null for FACEIT
+    // and start.gg tournaments with no widget content.
+    aboutLayout: text("about_layout"),
     // When this row was last written by the import/scraper.
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
   },

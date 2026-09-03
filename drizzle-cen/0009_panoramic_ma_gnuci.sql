@@ -1,0 +1,1 @@
+ALTER TABLE `ext_tournaments` ADD `about_layout` text;

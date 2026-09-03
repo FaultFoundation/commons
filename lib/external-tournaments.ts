@@ -231,6 +231,14 @@ export type ExternalTournamentMatch = {
   url: string | null;
 };
 
+/** One content widget in the start.gg About layout (mirrors the scraper). */
+export type AboutWidget =
+  | { type: "md"; content: string }
+  | { type: "img"; url: string; caption: string | null }
+  | { type: "vid"; url: string };
+/** One row of the About layout, preserving start.gg's column split. */
+export type AboutRow = { columns: AboutWidget[][] };
+
 export type ExternalTournamentDetail = {
   id: string;
   source: string;
@@ -266,6 +274,9 @@ export type ExternalTournamentDetail = {
   links: { label: string; url: string }[];
   /** Extra graphics beyond the hero banner (schedules, sponsors); empty=none. */
   images: { url: string; caption: string | null }[];
+  /** start.gg's About-tab layout (rows/columns of markdown+image+video widgets),
+      so the view mimics the source. Empty for FACEIT / no widget content. */
+  aboutLayout: AboutRow[];
   events: {
     id: string;
     name: string | null;
@@ -466,6 +477,52 @@ function toNum(value: unknown): number | null {
   return null;
 }
 
+/** Parse an `about_layout` column into `AboutRow[]`, tolerating null/junk. Each
+    row keeps only well-formed content widgets with safe http(s) URLs; empty
+    columns/rows are dropped. Returns [] on anything malformed. */
+function parseAboutLayout(value: unknown): AboutRow[] {
+  if (typeof value !== "string" || value.trim() === "") return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    const rows: AboutRow[] = [];
+    for (const row of parsed) {
+      const rawColumns = Array.isArray(row?.columns) ? row.columns : [];
+      const columns: AboutWidget[][] = [];
+      for (const rawCell of rawColumns) {
+        if (!Array.isArray(rawCell)) continue;
+        const cell: AboutWidget[] = [];
+        for (const w of rawCell) {
+          if (w?.type === "md" && typeof w.content === "string" && w.content) {
+            cell.push({ type: "md", content: w.content });
+          } else if (
+            w?.type === "img" &&
+            typeof w.url === "string" &&
+            /^https?:\/\//i.test(w.url)
+          ) {
+            cell.push({
+              type: "img",
+              url: w.url,
+              caption: typeof w.caption === "string" ? w.caption : null,
+            });
+          } else if (
+            w?.type === "vid" &&
+            typeof w.url === "string" &&
+            /^https?:\/\//i.test(w.url)
+          ) {
+            cell.push({ type: "vid", url: w.url });
+          }
+        }
+        if (cell.length) columns.push(cell);
+      }
+      if (columns.length) rows.push({ columns });
+    }
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
 /** Parse a `links_json` column into `{label,url}[]`, tolerating null/junk (D1 is
     dynamically typed and the projection can be reloaded by other tools). Only
     entries with a safe http(s) URL and a label survive. */
@@ -652,6 +709,7 @@ export async function getExternalTournament(
       organizerUrl: t.organizerUrl,
       links: parseLinkList(t.links),
       images: parseImageList(t.images),
+      aboutLayout: parseAboutLayout(t.aboutLayout),
       events: events.map((e) => ({
         id: e.id,
         name: e.name,

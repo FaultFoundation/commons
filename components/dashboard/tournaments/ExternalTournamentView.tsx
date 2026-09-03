@@ -2,6 +2,7 @@ import { Fragment, type ReactNode } from "react";
 
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { sourceKey } from "@/components/brand/SourceLogo";
+import { AboutLayout } from "@/components/dashboard/tournaments/AboutLayout";
 import { ExternalBracket } from "@/components/dashboard/tournaments/ExternalBracket";
 import { Markdown } from "@/components/dashboard/tournaments/Markdown";
 import { ExternalTournamentRefresh } from "@/components/dashboard/tournaments/ExternalTournamentRefresh";
@@ -107,6 +108,7 @@ export function ExternalTournamentView({
   // details panel of the tournament's structured facts. `prose` is a genuine
   // blurb (FACEIT, or a start.gg organizer who actually wrote one); a lone URL
   // becomes the "Rules" row instead of a naked autolink.
+  const hasLayout = tournament.aboutLayout.length > 0;
   const description = tournament.description?.trim() ?? "";
   const prose = description && !isBareUrl(description) ? description : "";
   const rulesUrl = description && isBareUrl(description) ? description : null;
@@ -155,16 +157,6 @@ export function ExternalTournamentView({
   }
   if (tournament.prizePool) {
     details.push({ label: "Prize pool", node: tournament.prizePool });
-  }
-  if (tournament.videoUrl) {
-    details.push({
-      label: "Video",
-      node: (
-        <a href={tournament.videoUrl} target="_blank" rel="noreferrer noopener">
-          Watch ↗
-        </a>
-      ),
-    });
   }
   if (tournament.organizer) {
     details.push({
@@ -277,19 +269,25 @@ export function ExternalTournamentView({
         </div>
       </section>
 
-      {prose || details.length || tournament.images.length ? (
+      {hasLayout || prose || details.length ? (
         <Bubble title="About" span="full" className="ff-bubble--divided">
-          {prose ? (
-            // Real prose flows into two columns divided by a hairline (like
-            // start.gg's own About layout), collapsing to one column when narrow.
-            <div className="ff-ext-about ff-ext-about--cols">
+          {hasLayout ? (
+            // start.gg's own About layout, mimicked — rows of 1–3 columns mixing
+            // markdown (with its inline HTML), images and video embeds.
+            <AboutLayout rows={tournament.aboutLayout} />
+          ) : prose ? (
+            // No widget layout (FACEIT, or a start.gg tournament with none): the
+            // description as single-column markdown.
+            <div className="ff-ext-about">
               <Markdown source={prose} />
             </div>
           ) : null}
           {details.length ? (
-            // The structured facts, two columns split by a hairline — start.gg's
-            // own "About" is this panel, not prose. Sits under the blurb when both.
-            <dl className={`ff-ext-details${prose ? " ff-ext-details--after" : ""}`}>
+            // Our structured facts, two columns split by a hairline — beneath the
+            // provider's own About content when there is any.
+            <dl
+              className={`ff-ext-details${hasLayout || prose ? " ff-ext-details--after" : ""}`}
+            >
               {details.map((detail) => (
                 <div className="ff-ext-details__item" key={detail.label}>
                   <dt className="ff-ext-details__label">{detail.label}</dt>
@@ -297,26 +295,6 @@ export function ExternalTournamentView({
                 </div>
               ))}
             </dl>
-          ) : null}
-          {tournament.images.length ? (
-            // Extra graphics the organizer added (schedules, sponsor art) — a
-            // thumbnail strip, each linking out to the full image.
-            <div className="ff-ext-gallery">
-              {tournament.images.map((image) => (
-                <a
-                  key={image.url}
-                  className="ff-ext-gallery__item"
-                  href={image.url}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                >
-                  <img src={image.url} alt={image.caption ?? ""} loading="lazy" />
-                  {image.caption ? (
-                    <span className="ff-ext-gallery__cap">{image.caption}</span>
-                  ) : null}
-                </a>
-              ))}
-            </div>
           ) : null}
         </Bubble>
       ) : null}

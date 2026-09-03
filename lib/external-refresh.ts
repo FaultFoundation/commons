@@ -6,7 +6,14 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 // Everything here is best-effort: any missing config, timeout, or error
 // degrades to { refreshed:false } and the caller just renders the cache.
 
-const REFRESH_TIMEOUT_MS = 4000;
+// A big tournament's deep re-pull (many set pages + the widget fetch) runs ~8s+
+// at the scraper's rate limit, so a short timeout aborted before it finished and
+// the freshly-opened page never re-rendered with the update. The scraper now
+// completes the write via waitUntil regardless, but wait long enough here that
+// the first open usually SEES the result and re-renders (a reload always shows it
+// either way). Still bounded — the page is already painted; this is a background
+// top-up behind an "Updating…" indicator, never a blocking load.
+const REFRESH_TIMEOUT_MS = 12000;
 
 export type RefreshOutcome = { refreshed: boolean; skipped?: string };
 

@@ -4185,15 +4185,18 @@ button.ff-dash__link:hover {
   min-height: 0;
   overflow-y: auto;
 }
-/* One scoreboard card — same surface + shadow as a tournament list card, so the
-   depth comes from the shadow rather than a darker fill. */
+/* One scoreboard card — same surface as a tournament list card, so the depth
+   comes from the shadow rather than a darker fill. Cards sit only 10px apart in
+   a scrolling stack, so they use a tight shadow (not --ff-shadow-card, whose
+   30px blur is meant for widely-spaced cards and bleeds into neighbours here,
+   reading as one shadow behind the whole list instead of one per card). */
 .ff-recent__row {
   display: block;
   flex: 0 0 auto;
   border: 1px solid var(--ff-border);
   border-radius: var(--ff-radius-md);
   background: var(--ff-surface-2);
-  box-shadow: var(--ff-shadow-card);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);
   overflow: hidden;
   text-decoration: none;
   color: inherit;
@@ -4350,8 +4353,8 @@ button.ff-dash__link:hover {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
+  gap: 14px;
+  padding: 18px;
   /* The accent as a top stripe (thicker) over the normal card border. */
   border: 1px solid var(--ff-border);
   border-top: 3px solid var(--team-accent);
@@ -4443,6 +4446,69 @@ button.ff-dash__link:hover {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+/* The team colour as a small square, sitting first in the action row. */
+.ff-team-card__swatch {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: var(--ff-radius-sm, 6px);
+  background: var(--team-accent);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+/* Collapsible "Active Teams" group header sitting over the card grid. The
+   Teams tab has no page title, so this both labels/counts the member's teams
+   and lets them fold the grid away; it's the seam a future "Archived" group
+   would hang off. */
+.ff-teams-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ff-teams-section__head {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  align-self: flex-start;
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--ff-text);
+  font: inherit;
+  cursor: pointer;
+}
+.ff-teams-section__head svg {
+  width: 13px;
+  height: 13px;
+  color: var(--ff-text-dim);
+  transition: color var(--ff-transition);
+}
+.ff-teams-section__head:hover svg {
+  color: var(--ff-text);
+}
+.ff-teams-section__title {
+  font-size: var(--ff-dash-text-lg);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+.ff-teams-section__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+}
+/* `[hidden]`'s UA display:none loses to the grid's own display:grid, so the
+   collapse toggle needs this explicit override to actually fold the grid. */
+.ff-bubble-grid[hidden] {
+  display: none;
 }
 
 /* The single-team page header — the same card, a little larger. */

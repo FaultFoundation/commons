@@ -46,8 +46,10 @@ export function TeamsActions({
   return (
     <div className="ff-actions">
       <div className="ff-actions__row">
+        {/* Blue = commits a change (creates a team); the other two only expand
+            an inline panel, so they stay outline. */}
         <button
-          className="ff-btn ff-btn--outline"
+          className="ff-btn"
           type="button"
           onClick={() => setStartOpen(true)}
         >

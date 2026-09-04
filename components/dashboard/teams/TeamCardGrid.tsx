@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import type { ComponentPropsWithoutRef, CSSProperties, ReactNode } from "react";
 
 import { reorderMyTeams } from "@/app/teams/actions";
@@ -53,6 +54,8 @@ export function TeamCardGrid({
       getId: (team) => team.id,
       onReorder: (ids) => reorderMyTeams(ids),
     });
+  const [collapsed, setCollapsed] = useState(false);
+  const total = order.length + external.length;
 
   return (
     <>
@@ -62,16 +65,31 @@ export function TeamCardGrid({
         </div>
       ) : null}
 
-      <div className="ff-bubble-grid">
-        {order.map((team, index) => {
-          const bp = bubbleProps(index);
-          return (
-            <TeamCard
-              key={team.id}
-              team={team}
-              feature={index === 0}
-              {...bp}
-              controls={
+      {/* A collapsible group header sits over the card grid — the tab has no
+          page title, so this labels and counts the member's teams and lets them
+          fold the grid away. One group today (every active team); the header is
+          the seam a future "Archived" group would hang off. */}
+      <section className="ff-teams-section">
+        <button
+          type="button"
+          className="ff-teams-section__head"
+          aria-expanded={!collapsed}
+          onClick={() => setCollapsed((c) => !c)}
+        >
+          <Chevron up={!collapsed} />
+          <span className="ff-teams-section__title">Active Teams</span>
+          <span className="ff-teams-section__count">{total}</span>
+        </button>
+
+        <div className="ff-bubble-grid" hidden={collapsed}>
+          {order.map((team, index) => {
+            const bp = bubbleProps(index);
+            return (
+              <TeamCard
+                key={team.id}
+                team={team}
+                {...bp}
+                controls={
                 <>
                   <span className="ff-reorder" role="group" aria-label="Reorder">
                     <button
@@ -105,10 +123,11 @@ export function TeamCardGrid({
             />
           );
         })}
-        {external.map((team) => (
-          <ExternalTeamCard key={team.id} team={team} />
-        ))}
-      </div>
+          {external.map((team) => (
+            <ExternalTeamCard key={team.id} team={team} />
+          ))}
+        </div>
+      </section>
     </>
   );
 }
@@ -167,18 +186,14 @@ export function TeamCard({
 
       <div className="ff-team-card__stats">
         <div className="ff-stat">
-          <span className="ff-stat__label">Roster</span>
-          <span className="ff-stat__value">{team.memberCount}</span>
-        </div>
-        <div className="ff-stat">
           <span className="ff-stat__label">Avg SR</span>
           <span className="ff-stat__value ff-stat__value--hi">
             {team.avgSr ?? "\u2014"}
           </span>
         </div>
         <div className="ff-stat">
-          <span className="ff-stat__label">Tournaments</span>
-          <span className="ff-stat__value">{team.tournaments.length}</span>
+          <span className="ff-stat__label">Roster</span>
+          <span className="ff-stat__value">{team.memberCount}</span>
         </div>
       </div>
 
@@ -188,6 +203,9 @@ export function TeamCard({
 
       <div className="ff-team-card__foot">
         <span className="ff-team-card__actions">
+          {/* The team colour as a small swatch beside the invite control —
+              echoing the logo ring, so the accent reads even at a glance. */}
+          <span className="ff-team-card__swatch" aria-hidden="true" />
           {team.inviteToken ? (
             <CopyInviteButton token={team.inviteToken} small />
           ) : null}

@@ -605,11 +605,25 @@ grid tiles and the `TeamHero` header are dark bubbles accented with the team's
 (set inline from `teams.color`; `teamColor()` falls back to the brand blue). The
 member picks it at sign-up and in Team Settings (`TeamColorPicker` — preset
 swatches + a custom hex), and the game's **mark** (`GameSelect` →
-`components/brand/GameLogo`) sits in the corner; both sit over a stat strip
-(roster · avg SR · tournaments). Colour is member-chosen, **not** game-derived —
-an earlier full game-tinted banner was dropped in favour of this lighter accent.
-Cards stay draggable: `cursor: grab` lives on the `.ff-drag-grip` alone, never
-the whole card, so a card only drags from its 9-dot grip.
+`components/brand/GameLogo`) sits in the corner. Colour is member-chosen,
+**not** game-derived — an earlier full game-tinted banner was dropped in favour
+of this lighter accent. Cards stay draggable: `cursor: grab` lives on the
+`.ff-drag-grip` alone, never the whole card, so a card only drags from its 9-dot
+grip.
+
+The **grid tile** (`TeamCard`) leads with two stacked stats — **Avg SR · Roster**
+(uppercase label over value; the Tournaments *count* was dropped, but a team's
+tournament names still list under the stats when it has any) — and repeats the
+accent as a small **swatch** (`.ff-team-card__swatch`) beside the Copy Invite /
+Manage row. The **hero** (single-team page) keeps the fuller strip (Roster · Avg
+SR · Tournaments · Game). The Teams tab has **no page title**; instead a
+collapsible **`.ff-teams-section` header** ("Active Teams" + a count badge)
+labels and folds the grid — one group today, but the seam a future "Archived"
+group hangs off. The grid is a uniform two-up `.ff-bubble-grid` (no full-width
+"feature" first tile on this tab); the `TeamCard` `feature` prop still exists for
+callers that want a spanning card. On the Teams tab the action row's **Start a
+Team** is the filled blue primary (it commits a new team, per the blue rule)
+while Find a Team / Looking for Players stay outline.
 
 **Roster SR.** Each roster row shows the member's Overwatch SR with a tag saying
 who reported it — **self-reported** vs **reported by a manager** — derived from

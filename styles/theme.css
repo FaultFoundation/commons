@@ -2620,9 +2620,34 @@ button.ff-dash__link:hover {
   text-decoration: underline;
 }
 
-/* Customize Home popup — a checklist of available widgets. */
+/* Customize Home popup — a checklist of every pinnable bubble on the site,
+   sectioned by the tab each one comes from. The list is long enough now to
+   need a scroll cap: the dialog holds its height and the checklist scrolls
+   inside it, so the Done button never walks off a short viewport. */
 .ff-dialog--customize {
   width: min(460px, calc(100% - 32px));
+  /* A column so the checklist can be the one part that scrolls. */
+  display: flex;
+  flex-direction: column;
+  max-height: min(720px, calc(100vh - 64px));
+}
+.ff-customize__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Room for the scrollbar so it doesn't sit on the item borders. */
+  padding-right: 4px;
+}
+.ff-customize__group + .ff-customize__group {
+  margin-top: 14px;
+}
+.ff-customize__grouptitle {
+  margin: 0;
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ff-text-dim);
 }
 .ff-customize__list {
   list-style: none;
@@ -4303,6 +4328,17 @@ button.ff-dash__link:hover {
    mark in the corner, and a stat row. Colour without a full banner. Reorderable,
    so they layer the ff-bubble--draggable state classes on top.
    =========================================================================== */
+/* Team cards laid out INSIDE a bubble — the Home board's pinned My Teams
+   panel. On the Teams tab the cards are direct children of the page's
+   .ff-bubble-grid; here the bubble is itself a single grid cell, so the cards
+   need a grid of their own. auto-fill keeps it right whether the row rhythm
+   put that bubble in a full-width or a half-width slot. */
+.ff-team-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+
 .ff-team-card {
   --team-accent: var(--ff-blue);
   position: relative;

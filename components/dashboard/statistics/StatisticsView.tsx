@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { MatchPanel } from "@/components/dashboard/statistics/MatchPanel";
 import { PlayerDashboard } from "@/components/dashboard/statistics/PlayerDashboard";
 import { StatLoading } from "@/components/dashboard/statistics/StatLoading";
+import { usePlayerStats } from "@/components/dashboard/statistics/usePlayerStats";
 import type { OverfastSummary } from "@/lib/overfast";
 import {
   OW_ROLES,
@@ -34,34 +35,7 @@ export function StatisticsView({
   battletag: string | null;
 }) {
   const [tab, setTab] = useState<Tab>("player");
-  const [resp, setResp] = useState<PlayerStatsResponse | null>(null);
-  const [loading, setLoading] = useState(linked);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    if (!linked) return;
-    let alive = true;
-    setLoading(true);
-    setFailed(false);
-    fetch("/api/statistics/player", { cache: "no-store" })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(String(r.status));
-        return (await r.json()) as PlayerStatsResponse;
-      })
-      .then((d) => {
-        if (!alive) return;
-        setResp(d);
-        setLoading(false);
-      })
-      .catch(() => {
-        if (!alive) return;
-        setFailed(true);
-        setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [linked]);
+  const { resp, loading, failed } = usePlayerStats(linked);
 
   // Battle.net gates only the PLAYER tab (it's the Overwatch data source);
   // Match Data aggregates FACEIT / start.gg / Challonge and must stay reachable
@@ -242,10 +216,25 @@ function HeaderRanks({
 }
 
 // ---------------------------------------------------------------------------
-// The Player Data tab body: loading bar → gate states → the dashboard.
+// The Player Data body: loading bar → gate states → the dashboard.
+//
+// Resolved as a STATE rather than rendered inline, because two hosts show it:
+// this tab (bare, under the profile header) and the Home board's pinned
+// "Overwatch Statistics" bubble. Keeping the copy here means the gate wording
+// can't drift between the two — see StatisticsPanels.tsx.
 // ---------------------------------------------------------------------------
 
-function PlayerPanel({
+export type PlayerPanelState =
+  | { kind: "loading" }
+  | { kind: "message"; title: string; body: ReactNode }
+  | {
+      kind: "dashboard";
+      data: NonNullable<PlayerStatsResponse["data"]>;
+      heroes: PlayerStatsResponse["heroes"];
+      stale: boolean;
+    };
+
+export function playerPanelState({
   resp,
   loading,
   failed,
@@ -253,81 +242,122 @@ function PlayerPanel({
   resp: PlayerStatsResponse | null;
   loading: boolean;
   failed: boolean;
-}) {
-  if (loading) return <StatLoading />;
+}): PlayerPanelState {
+  if (loading) return { kind: "loading" };
 
   if (failed || !resp) {
-    return (
-      <Bubble title="Overwatch Statistics" span="full">
-        <p className="ff-bubble__lede">
-          We couldn&apos;t load your statistics just now.
-        </p>
-        <p className="ff-bubble__note">This is usually temporary — reload the page in a moment.</p>
-      </Bubble>
-    );
+    return {
+      kind: "message",
+      title: "Overwatch Statistics",
+      body: (
+        <>
+          <p className="ff-bubble__lede">
+            We couldn&apos;t load your statistics just now.
+          </p>
+          <p className="ff-bubble__note">
+            This is usually temporary — reload the page in a moment.
+          </p>
+        </>
+      ),
+    };
   }
 
   if (resp.visibility === "not_found") {
-    return (
-      <Bubble title="Overwatch Statistics" span="full">
-        <p className="ff-bubble__lede">
-          We couldn&apos;t find an Overwatch profile for{" "}
-          <strong>{resp.battletag}</strong>.
-        </p>
-        <p className="ff-bubble__note">
-          Double-check the BattleTag on your account, and that you&apos;ve played
-          Overwatch on it. If you just linked Battle.net, it may take a little
-          while to appear.
-        </p>
-        <div className="ff-bubble__cta">
-          <Link className="ff-btn ff-btn--outline" href="/account/">
-            Check your Battle.net link
-          </Link>
-        </div>
-      </Bubble>
-    );
+    return {
+      kind: "message",
+      title: "Overwatch Statistics",
+      body: (
+        <>
+          <p className="ff-bubble__lede">
+            We couldn&apos;t find an Overwatch profile for{" "}
+            <strong>{resp.battletag}</strong>.
+          </p>
+          <p className="ff-bubble__note">
+            Double-check the BattleTag on your account, and that you&apos;ve
+            played Overwatch on it. If you just linked Battle.net, it may take a
+            little while to appear.
+          </p>
+          <div className="ff-bubble__cta">
+            <Link className="ff-btn ff-btn--outline" href="/account/">
+              Check your Battle.net link
+            </Link>
+          </div>
+        </>
+      ),
+    };
   }
 
   if (resp.visibility === "private") {
-    return (
-      <Bubble title="Your Overwatch Profile Is Private" span="full">
-        <p className="ff-bubble__lede">
-          To view your player statistics, set your Overwatch career profile to
-          public.
-        </p>
-        <p className="ff-bubble__note">
-          In Overwatch:{" "}
-          <strong>
-            Options → Social → Career Profile Visibility → Everyone
-          </strong>
-          . If you&apos;ve already made it public, it can take up to an hour for
-          the data source to catch up — check back a little later.
-        </p>
-      </Bubble>
-    );
+    return {
+      kind: "message",
+      title: "Your Overwatch Profile Is Private",
+      body: (
+        <>
+          <p className="ff-bubble__lede">
+            To view your player statistics, set your Overwatch career profile to
+            public.
+          </p>
+          <p className="ff-bubble__note">
+            In Overwatch:{" "}
+            <strong>
+              Options → Social → Career Profile Visibility → Everyone
+            </strong>
+            . If you&apos;ve already made it public, it can take up to an hour
+            for the data source to catch up — check back a little later.
+          </p>
+        </>
+      ),
+    };
   }
 
   if (!resp.data) {
+    return {
+      kind: "message",
+      title: "Overwatch Statistics",
+      body: (
+        <>
+          <p className="ff-bubble__lede">
+            {resp.visibility === "unknown"
+              ? "We couldn't reach the Overwatch statistics service just now."
+              : "We're collecting your first snapshot."}
+          </p>
+          <p className="ff-bubble__note">
+            Check back in a moment — your statistics will appear here, and
+            we&apos;ll keep a daily snapshot so you can track your progress over
+            time.
+          </p>
+        </>
+      ),
+    };
+  }
+
+  return {
+    kind: "dashboard",
+    data: resp.data,
+    heroes: resp.heroes,
+    stale: resp.visibility !== "public",
+  };
+}
+
+function PlayerPanel(props: {
+  resp: PlayerStatsResponse | null;
+  loading: boolean;
+  failed: boolean;
+}) {
+  const state = playerPanelState(props);
+  if (state.kind === "loading") return <StatLoading />;
+  if (state.kind === "message") {
     return (
-      <Bubble title="Overwatch Statistics" span="full">
-        <p className="ff-bubble__lede">
-          {resp.visibility === "unknown"
-            ? "We couldn't reach the Overwatch statistics service just now."
-            : "We're collecting your first snapshot."}
-        </p>
-        <p className="ff-bubble__note">
-          Check back in a moment — your statistics will appear here, and we&apos;ll
-          keep a daily snapshot so you can track your progress over time.
-        </p>
+      <Bubble title={state.title} span="full">
+        {state.body}
       </Bubble>
     );
   }
-
   return (
     <PlayerDashboard
-      data={resp.data}
-      heroes={resp.heroes}
-      stale={resp.visibility !== "public"}
+      data={state.data}
+      heroes={state.heroes}
+      stale={state.stale}
     />
   );
 }

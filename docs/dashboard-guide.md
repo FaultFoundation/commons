@@ -433,36 +433,102 @@ shell.
    `authClient` (or a server action for domain logic), then
    `router.refresh()` so the server tree re-renders.
 4. Keep the bubble self-contained: it must not care where in the grid it
-   lives. That's what makes the Home widget board work (below) —
-   condensed variants of these same bubbles.
+   lives. That's what lets the Home board mount it (below) — the board hands a
+   bubble its span, so a bubble that hardcodes its own placement can't be
+   pinned.
+5. If the bubble should be pinnable to Home, make it a **panel**: have it render
+   its own `Bubble` and accept a `chrome` prop, then register it. See "The Home
+   board" below for the contract and the checklist.
 
-## The Home board (customizable widgets)
+## The Home board (pinnable bubbles)
 
-`/home/` is not a fixed page — it's a **board of draggable widgets** the member
-arranges themselves. Each widget is a *condensed view of another tab*: At a
-Glance (active tournaments + next matches), Tournaments, Upcoming Matches, and My
-Teams. The member reorders them by dragging (the same
-`useReorderableGrid` + `DragGrip` template the Teams cards use — first widget
-spans the grid, per the top-bubble rule) and adds/removes them from the **+
-Customize Home** popup.
+`/home/` is not a fixed page — it's a **board of the portal's own bubbles**, and
+the member decides which ones are on it and in what order. A widget is **not** a
+condensed re-implementation of a tab's card: it *is* that card, the same
+component the tab mounts. That's the whole point of the panel contract below.
+
+### The row rhythm
+
+The board alternates a **full-width row** with a **two-column row**, repeating:
+
+```
+Row 1   [ ─────────── one full-width bubble ─────────── ]
+Row 2   [ half bubble ] [ half bubble ]
+Row 3   [ ─────────── one full-width bubble ─────────── ]
+Row 4   [ half bubble ] [ half bubble ]
+```
+
+`isFullWidthAt(index, total)` in `lib/home-shared.ts` owns it: position `i` is
+full when `i % 3 === 0`. **Position decides width, not the panel** — a member
+dragging a tile up is also choosing to give it the full row. The one exception
+is a trailing tile that would sit alone in a two-column row; it stretches
+instead, so the board never ends on a half-empty row.
+
+Because the rhythm is positional, order the default layout so genuinely *wide*
+bubbles (the calendar, the tournament list) land on full-width indices — see
+`DEFAULT_HOME_LAYOUT`.
+
+### The panel contract — what makes a bubble pinnable
+
+A **panel** is a bubble that renders its own `Bubble` (title, actions, body) and
+accepts a `chrome` prop of the host's bubble-level props
+(`components/dashboard/bubbles/PanelChrome.tsx`):
+
+```tsx
+// on its own tab — no chrome, the panel's own span/actions apply
+<ResultsPanel past={past} anyConnected={anyConnected} />
+
+// on the Home board — the board supplies span (from the rhythm), the drag
+// grip and the reorder buttons
+<ResultsPanel past={past} anyConnected={anyConnected} chrome={chrome} />
+```
+
+`mergeChrome(chrome, own)` merges the two: the host's `actions` render *before*
+the panel's own (so a panel's controls stay rightmost), classNames concatenate,
+and `span` is **overridden** by the host whenever chrome is present — on a tab
+the panel's preference wins, on Home the rhythm decides.
+
+Existing panels: `AccountPanels.tsx` (Profile / Security / Display /
+Integrations), `ScheduleView.tsx` (`CalendarPanel`, `ResultsPanel`),
+`TournamentsPanel`, `TeamsPanel`, `StatisticsPanels.tsx` (`OverwatchPanel`), and
+`MatchPanel` (which takes `chrome` directly).
 
 - **The registry is the single source of truth.** `lib/home-shared.ts`
-  (`HOME_WIDGETS`, `DEFAULT_HOME_LAYOUT`, `asHomeLayout`) lists every widget a
-  member can pin. `components/dashboard/home/HomeBoard.tsx` renders each id's
-  condensed content; `app/home/page.tsx` fetches **all** widget data once
-  (regardless of what's enabled) so toggling a widget is instant.
+  (`HOME_WIDGETS`, `DEFAULT_HOME_LAYOUT`, `asHomeLayout`) lists every bubble a
+  member can pin, each with the `group` that sections the Customize popup and
+  the `sources` it needs. `components/dashboard/home/HomeWidgets.tsx` maps a
+  widget id to the real panel.
+- **Only enabled widgets' data is fetched.** `app/home/page.tsx` →
+  `loadHomeData` (`lib/home.ts`) reads the union of the enabled widgets'
+  `sources` and nothing else. The board can now hold any bubble on the site, so
+  fetching every tab's data up front stopped being affordable — it would mean a
+  tournament list, a three-provider schedule sync and four Settings reads on
+  every visit, for cards the member may not have pinned. Sources are shared: At a
+  Glance + Calendar + Your Results all ride one `schedule` read. The trade-off is
+  that *enabling* a widget needs a round-trip, which the Customize dialog does by
+  reloading on close when the enabled set changed.
+- **Panels must be client-bundle-safe.** `HomeBoard` is a client component, so
+  everything a panel calls at runtime has to be free of db/cloudflare imports.
+  This is why `discordServerNote` lives in `lib/integrations-shared.ts` and not
+  in `lib/integrations.ts`. Types are fine (`import type` is erased); runtime
+  values are not.
 - **Persistence** is `profiles.home_layout` (a JSON array of widget ids) via
   `setHomeLayout` (`app/home/actions.ts`) — purely presentational, like
   `density`, so there's no capability to check and a tampered payload can at
   worst reorder/hide the caller's own widgets (`asHomeLayout` drops unknown
   ids). `[]` is a valid empty board.
-- **THE RULE — keep Home in sync.** Every widget reads the *same data source*
-  as the tab it mirrors (`listMyTeams`, `listTournaments`, `loadSchedule`), so a
-  change to a tab's bubbles shows up on Home automatically — never fork the read.
-  **When you add a new tab or a standalone bubble a member should be able to pin,
-  add a widget entry to `HOME_WIDGETS` and render it in `HomeBoard`.** That is
-  what keeps "any new bubble is reachable from Home" true; a new surface that
-  isn't reachable from Home is an incomplete change.
+- **Nested drag surfaces don't work.** The Teams *tab* is a grid of draggable
+  team cards; pinning that grid inside the draggable board would leave two drag
+  surfaces fighting for the pointer. `TeamsPanel` therefore renders the same
+  `TeamCard`s read-only. If a tab's content is itself reorderable, the panel
+  shows the result, not the controls.
+
+**THE RULE — keep Home in sync.** A widget is never a copy of a tab's bubble; it
+is the bubble. **When you add a bubble a member should be able to pin: extract
+its body into a panel (if it isn't one), add an entry to `HOME_WIDGETS` with its
+`group` + `sources`, load those in `lib/home.ts`, and render it in
+`HomeWidgets.tsx`.** A new surface that isn't reachable from Home is an
+incomplete change.
 
 ## Getting Started onboarding
 

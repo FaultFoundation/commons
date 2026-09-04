@@ -38,3 +38,15 @@ export const CONNECT_PROVIDERS: readonly ConnectProvider[] = [
   { id: "startgg", label: "start.gg", linkLabel: "Connect start.gg" },
   { id: "challonge", label: "Challonge", linkLabel: "Connect Challonge" },
 ];
+
+/**
+ * The Discord card's sub-note. Pure, and lives here rather than in
+ * lib/integrations.ts because the Integrations bubble is a pinnable panel: the
+ * Home board is a CLIENT component, so anything its panels call at runtime has
+ * to be free of the db/cloudflare imports that module carries.
+ */
+export function discordServerNote(inGuild: boolean | null): string | undefined {
+  if (inGuild === true) return "You're in the Discord server.";
+  if (inGuild === false) return "You haven't joined the Discord server yet.";
+  return undefined;
+}

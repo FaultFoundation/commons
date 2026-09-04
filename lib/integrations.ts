@@ -67,12 +67,6 @@ const NOT_LINKED: DiscordIntegration = {
  * guessing — an unknown answer shown as "not in the server" would send members
  * chasing a problem they don't have.
  */
-export function discordServerNote(inGuild: boolean | null): string | undefined {
-  if (inGuild === true) return "You're in the Discord server.";
-  if (inGuild === false) return "You haven't joined the Discord server yet.";
-  return undefined;
-}
-
 /** The linked Discord account row, or null. */
 async function getDiscordAccount(userId: string) {
   const rows = await getDb()

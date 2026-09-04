@@ -1,58 +1,46 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { setHomeLayout } from "@/app/home/actions";
-import { GameLogo } from "@/components/brand/GameLogo";
-import { Avatar } from "@/components/dashboard/Avatar";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { DragGrip } from "@/components/dashboard/bubbles/DragGrip";
 import { useReorderableGrid } from "@/components/dashboard/bubbles/useReorderableGrid";
+import { HomeWidget, type HomeData } from "@/components/dashboard/home/HomeWidgets";
 import {
   HOME_WIDGETS,
+  HOME_WIDGET_GROUPS,
+  homeWidgetMeta,
+  isFullWidthAt,
   type HomeWidgetId,
 } from "@/lib/home-shared";
-import type { MyTeam } from "@/lib/teams";
-import type { ScheduleEntry } from "@/lib/schedule-shared";
-import { TEAM_ROLE_LABELS } from "@/lib/teams-shared";
 
-// The Home tab: a customizable board of draggable widgets, each a condensed view
-// of another tab. The server fetches ALL widget data once and hands it down, so
-// toggling a widget on/off (the "+" customize popup) is instant and dragging
-// only reorders. Layout persists to profiles.home_layout via setHomeLayout.
+// The Home tab: a board of the portal's OWN bubbles, arranged by the member.
 //
-// Everything a widget shows reads the same source as the tab it mirrors, so the
-// board can never drift from the real data — see lib/home-shared.ts for the rule
-// that keeps new bubbles reachable from Home.
-
-export type HomeTournament = {
-  id: string;
-  name: string;
-  status: string;
-  statusLabel: string;
-  live: boolean;
-  startsAt: number | null;
-  gameName: string | null;
-  gameLogoUrl: string | null;
-};
-
-const META = new Map(HOME_WIDGETS.map((w) => [w.id, w]));
+// Two rules shape it:
+//
+// 1. ROW RHYTHM. The board alternates a full-width row with a two-column row
+//    (isFullWidthAt in lib/home-shared.ts), so it reads as a rhythm rather than
+//    a uniform wall of half-cards. Position decides width — a member reordering
+//    tiles is also choosing which of them get the full row.
+//
+// 2. REAL BUBBLES. Each tile is the same panel component its own tab renders,
+//    mounted through HomeWidgets.tsx with the board's drag chrome. Home doesn't
+//    keep condensed copies of other tabs' cards, so they can't drift.
+//
+// The server fetches the data for the ENABLED widgets only (see
+// app/home/page.tsx); toggling one on therefore needs a refresh to fill in a
+// source that wasn't loaded, which the customize dialog triggers on close.
 
 export function HomeBoard({
   initialLayout,
-  tournaments,
-  matches,
-  teams,
+  data,
 }: {
   initialLayout: HomeWidgetId[];
-  tournaments: HomeTournament[];
-  matches: ScheduleEntry[];
-  teams: MyTeam[];
+  data: HomeData;
 }) {
   // Local layout is the source of truth for what's shown and in what order;
-  // reorder and customize both update it and persist. useReorderableGrid drives
-  // the drag/keyboard reorder over the enabled widgets.
+  // reorder and customize both update it and persist.
   const [layout, setLayout] = useState<HomeWidgetId[]>(initialLayout);
   const [customizing, setCustomizing] = useState(false);
 
@@ -71,6 +59,12 @@ export function HomeBoard({
     },
   );
 
+  // The most recent layout save. Toggling is fire-and-forget so the checkbox
+  // stays instant, but closing the dialog can RELOAD the page (to fetch a newly
+  // enabled widget's data) — and a reload would abort an in-flight POST and
+  // silently lose the change. So the dialog waits on this first.
+  const pendingSave = useRef<Promise<unknown> | null>(null);
+
   function toggleWidget(id: HomeWidgetId, on: boolean) {
     const next = on
       ? layout.includes(id)
@@ -78,7 +72,7 @@ export function HomeBoard({
         : [...layout, id]
       : layout.filter((w) => w !== id);
     setLayout(next);
-    void setHomeLayout(next);
+    pendingSave.current = setHomeLayout(next);
   }
 
   return (
@@ -108,62 +102,60 @@ export function HomeBoard({
           <Bubble title="Your Home Screen" span="full">
             <p className="ff-auth__hint">
               Your board is empty. Use <strong>Customize Home</strong> above to
-              add widgets — tournaments, your schedule, and your teams.
+              add bubbles — any card from around the site can live here.
             </p>
           </Bubble>
         </div>
       ) : (
         <div className="ff-bubble-grid">
           {order.map((item, index) => {
-            const meta = META.get(item.id);
+            const meta = homeWidgetMeta(item.id);
             if (!meta) return null;
-            const bp = bubbleProps(index);
             return (
-              <Bubble
+              <HomeWidget
                 key={item.id}
-                {...bp}
-                // The universal top-bubble rule: whatever's first spans the grid.
-                span={index === 0 ? "full" : undefined}
-                title={meta.title}
-                dragHandle={
-                  <DragGrip {...handleProps(index)} label={`Move ${meta.title}`} />
-                }
-                actions={
-                  <span className="ff-reorder" role="group" aria-label="Reorder">
-                    <button
-                      className="ff-reorder__btn"
-                      type="button"
-                      disabled={index === 0}
-                      title="Move up"
-                      onClick={() => reorder(index, index - 1)}
-                    >
-                      <span className="screen-reader-text">
-                        Move {meta.title} up
-                      </span>
-                      <Chevron up />
-                    </button>
-                    <button
-                      className="ff-reorder__btn"
-                      type="button"
-                      disabled={index === order.length - 1}
-                      title="Move down"
-                      onClick={() => reorder(index, index + 1)}
-                    >
-                      <span className="screen-reader-text">
-                        Move {meta.title} down
-                      </span>
-                      <Chevron />
-                    </button>
-                  </span>
-                }
-              >
-                <WidgetContent
-                  id={item.id}
-                  tournaments={tournaments}
-                  matches={matches}
-                  teams={teams}
-                />
-              </Bubble>
+                id={item.id}
+                data={data}
+                chrome={{
+                  ...bubbleProps(index),
+                  // The rotating rhythm decides the width, not the panel.
+                  span: isFullWidthAt(index, order.length) ? "full" : undefined,
+                  dragHandle: (
+                    <DragGrip
+                      {...handleProps(index)}
+                      label={`Move ${meta.title}`}
+                    />
+                  ),
+                  actions: (
+                    <span className="ff-reorder" role="group" aria-label="Reorder">
+                      <button
+                        className="ff-reorder__btn"
+                        type="button"
+                        disabled={index === 0}
+                        title="Move up"
+                        onClick={() => reorder(index, index - 1)}
+                      >
+                        <span className="screen-reader-text">
+                          Move {meta.title} up
+                        </span>
+                        <Chevron up />
+                      </button>
+                      <button
+                        className="ff-reorder__btn"
+                        type="button"
+                        disabled={index === order.length - 1}
+                        title="Move down"
+                        onClick={() => reorder(index, index + 1)}
+                      >
+                        <span className="screen-reader-text">
+                          Move {meta.title} down
+                        </span>
+                        <Chevron />
+                      </button>
+                    </span>
+                  ),
+                }}
+              />
             );
           })}
         </div>
@@ -173,6 +165,7 @@ export function HomeBoard({
         open={customizing}
         enabled={layout}
         onToggle={toggleWidget}
+        flush={() => pendingSave.current ?? Promise.resolve()}
         onClose={() => setCustomizing(false)}
       />
     </>
@@ -180,288 +173,112 @@ export function HomeBoard({
 }
 
 // ---------------------------------------------------------------------------
-// Widgets
-// ---------------------------------------------------------------------------
-
-function WidgetContent({
-  id,
-  tournaments,
-  matches,
-  teams,
-}: {
-  id: HomeWidgetId;
-  tournaments: HomeTournament[];
-  matches: ScheduleEntry[];
-  teams: MyTeam[];
-}) {
-  switch (id) {
-    case "overview":
-      return (
-        <div className="ff-hw-cols">
-          <section>
-            <p className="ff-hw-col__label">Active Tournaments</p>
-            <TournamentList tournaments={tournaments} limit={3} />
-          </section>
-          <section>
-            <p className="ff-hw-col__label">Upcoming Matches</p>
-            <MatchList matches={matches} limit={3} />
-          </section>
-        </div>
-      );
-    case "tournaments":
-      return (
-        <>
-          <TournamentList tournaments={tournaments} limit={5} />
-          <MoreLink href="/tournaments/" label="View all tournaments" />
-        </>
-      );
-    case "schedule":
-      return (
-        <>
-          <MatchList matches={matches} limit={5} />
-          <MoreLink href="/schedule/" label="Open schedule" />
-        </>
-      );
-    case "teams":
-      return (
-        <>
-          <TeamList teams={teams} />
-          <MoreLink href="/teams/" label="All teams" />
-        </>
-      );
-    default:
-      return null;
-  }
-}
-
-function TournamentList({
-  tournaments,
-  limit,
-}: {
-  tournaments: HomeTournament[];
-  limit: number;
-}) {
-  if (!tournaments.length) {
-    return <p className="ff-hw-empty">Nothing active right now.</p>;
-  }
-  return (
-    <div className="ff-hw-list">
-      {tournaments.slice(0, limit).map((t) => (
-        <Link
-          key={t.id}
-          className="ff-hw-row"
-          href={`/tournaments/${encodeURIComponent(t.id)}/`}
-          prefetch={false}
-        >
-          <span className="ff-hw-row__mark">
-            <GameLogo name={t.gameName} logoUrl={t.gameLogoUrl} />
-          </span>
-          <span className="ff-hw-row__main">
-            <span className="ff-hw-row__title">{t.name}</span>
-            <span className="ff-hw-row__sub">{formatDate(t.startsAt)}</span>
-          </span>
-          <span
-            className={`ff-hw-tag${t.live ? " ff-hw-tag--live" : ""}`}
-          >
-            {t.statusLabel}
-          </span>
-        </Link>
-      ))}
-    </div>
-  );
-}
-
-function MatchList({
-  matches,
-  limit,
-}: {
-  matches: ScheduleEntry[];
-  limit: number;
-}) {
-  if (!matches.length) {
-    return <p className="ff-hw-empty">No upcoming matches.</p>;
-  }
-  return (
-    <div className="ff-hw-list">
-      {matches.slice(0, limit).map((m) => {
-        const inner = (
-          <>
-            <span className="ff-hw-row__main">
-              <span className="ff-hw-row__title">{m.title}</span>
-              <span className="ff-hw-row__sub">
-                {m.opponent ? `vs ${m.opponent}` : m.round ? m.round : " "}
-              </span>
-            </span>
-            <span className="ff-hw-row__meta">{formatDateTime(m.scheduledAt)}</span>
-          </>
-        );
-        if (m.href) {
-          return (
-            <Link
-              key={m.id}
-              className="ff-hw-row"
-              href={m.href}
-              prefetch={false}
-            >
-              {inner}
-            </Link>
-          );
-        }
-        if (m.url) {
-          return (
-            <a
-              key={m.id}
-              className="ff-hw-row"
-              href={m.url}
-              target="_blank"
-              rel="noreferrer noopener"
-            >
-              {inner}
-            </a>
-          );
-        }
-        return (
-          <div key={m.id} className="ff-hw-row ff-hw-row--static">
-            {inner}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function TeamList({ teams }: { teams: MyTeam[] }) {
-  if (!teams.length) {
-    return (
-      <p className="ff-hw-empty">
-        You&rsquo;re not on a team yet.{" "}
-        <Link href="/teams/" prefetch={false}>
-          Create or join one
-        </Link>
-        .
-      </p>
-    );
-  }
-  return (
-    <div className="ff-hw-list">
-      {teams.slice(0, 4).map((team) => (
-        <Link
-          key={team.id}
-          className="ff-hw-row"
-          href={`/teams/${team.id}/`}
-          prefetch={false}
-        >
-          <span className="ff-hw-row__mark">
-            <Avatar src={team.logoUrl} name={team.name} shape="team" size="sm" />
-          </span>
-          <span className="ff-hw-row__main">
-            <span className="ff-hw-row__title">
-              {team.tag ? `${team.name} [${team.tag}]` : team.name}
-            </span>
-            <span className="ff-hw-row__sub">
-              {team.memberCount}{" "}
-              {team.memberCount === 1 ? "member" : "members"}
-              {team.avgSr != null ? ` · ${team.avgSr} avg SR` : ""}
-            </span>
-          </span>
-          <span className={`ff-badge ff-badge--${team.role}`}>
-            {TEAM_ROLE_LABELS[team.role]}
-          </span>
-        </Link>
-      ))}
-    </div>
-  );
-}
-
-function MoreLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link className="ff-hw-more" href={href} prefetch={false}>
-      {label} →
-    </Link>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Customize popup
+// Customize popup — every pinnable bubble on the site, grouped by the tab it
+// comes from so the list stays readable as tabs add cards.
 // ---------------------------------------------------------------------------
 
 function CustomizeDialog({
   open,
   enabled,
   onToggle,
+  flush,
   onClose,
 }: {
   open: boolean;
   enabled: HomeWidgetId[];
   onToggle: (id: HomeWidgetId, on: boolean) => void;
+  /** Resolves once the latest layout save has landed. */
+  flush: () => Promise<unknown>;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  // What was enabled when the dialog opened: if the set CHANGED, closing needs
+  // a server round-trip, because a newly enabled widget's data source wasn't
+  // loaded by this render (app/home/page.tsx fetches only what's enabled).
+  const openedWith = useRef<string>("");
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    else if (!open && dialog.open) dialog.close();
+    if (open && !dialog.open) {
+      openedWith.current = [...enabled].sort().join(",");
+      setDirty(false);
+      setSaving(false);
+      dialog.showModal();
+    } else if (!open && dialog.open) {
+      dialog.close();
+    }
+    // `enabled` is read only at the moment of opening, on purpose.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  function close() {
+    // A reload, not router.refresh(): the newly enabled panels need their
+    // server data, and several of them (Integrations, Profile) also re-read
+    // session state. One full navigation is cheaper than a partial that leaves
+    // a widget in its empty state until the next click.
+    if (dirty && [...enabled].sort().join(",") !== openedWith.current) {
+      setSaving(true);
+      // Wait for the layout POST — reloading over it would lose the change.
+      void flush().then(() => window.location.reload());
+      return;
+    }
+    onClose();
+  }
+
   return (
-    <dialog ref={ref} className="ff-dialog ff-dialog--customize" onClose={onClose}>
+    <dialog ref={ref} className="ff-dialog ff-dialog--customize" onClose={close}>
       <h2 className="ff-dialog__title">Customize Home</h2>
       <p className="ff-dialog__text">
-        Choose what appears on your Home screen. Drag the cards to reorder them.
+        Every bubble from around the site can live here. Pick the ones you want,
+        then drag them on the board to reorder — the board alternates a
+        full-width row with a two-column row, so the order also sets the size.
       </p>
-      <ul className="ff-customize__list">
-        {HOME_WIDGETS.map((w) => {
-          const on = enabled.includes(w.id);
+      <div className="ff-customize__scroll">
+        {HOME_WIDGET_GROUPS.map((group) => {
+          const widgets = HOME_WIDGETS.filter((w) => w.group === group);
+          if (!widgets.length) return null;
           return (
-            <li key={w.id} className="ff-customize__item">
-              <label className="ff-customize__label">
-                <input
-                  type="checkbox"
-                  checked={on}
-                  onChange={(event) => onToggle(w.id, event.target.checked)}
-                />
-                <span className="ff-customize__text">
-                  <span className="ff-customize__name">{w.title}</span>
-                  <span className="ff-customize__desc">{w.description}</span>
-                </span>
-              </label>
-            </li>
+            <section key={group} className="ff-customize__group">
+              <h3 className="ff-customize__grouptitle">{group}</h3>
+              <ul className="ff-customize__list">
+                {widgets.map((w) => (
+                  <li key={w.id} className="ff-customize__item">
+                    <label className="ff-customize__label">
+                      <input
+                        type="checkbox"
+                        checked={enabled.includes(w.id)}
+                        onChange={(event) => {
+                          setDirty(true);
+                          onToggle(w.id, event.target.checked);
+                        }}
+                      />
+                      <span className="ff-customize__text">
+                        <span className="ff-customize__name">{w.title}</span>
+                        <span className="ff-customize__desc">{w.description}</span>
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </section>
           );
         })}
-      </ul>
+      </div>
       <div className="ff-dialog__actions">
-        <button type="button" className="ff-btn" onClick={onClose}>
-          Done
+        <button
+          type="button"
+          className="ff-btn"
+          onClick={close}
+          disabled={saving}
+        >
+          {saving ? "Saving\u2026" : "Done"}
         </button>
       </div>
     </dialog>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Bits
-// ---------------------------------------------------------------------------
-
-function formatDate(ms: number | null): string {
-  return ms
-    ? new Date(ms).toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "Date TBD";
-}
-
-function formatDateTime(ms: number | null): string {
-  return ms
-    ? new Date(ms).toLocaleString(undefined, {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      })
-    : "Date TBD";
 }
 
 function PlusIcon() {

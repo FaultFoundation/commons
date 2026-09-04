@@ -4,23 +4,16 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { ComingSoonIntegration } from "@/components/dashboard/accounts/ComingSoonIntegration";
-import { DeleteAccount } from "@/components/dashboard/accounts/DeleteAccount";
-import { DensityRow } from "@/components/dashboard/accounts/DensityRow";
-import { IntegrationCard } from "@/components/dashboard/accounts/IntegrationCard";
-import { RecheckConnectionsButton } from "@/components/dashboard/accounts/RecheckConnectionsButton";
-import { OAuthPopupBridge } from "@/components/dashboard/accounts/OAuthPopupBridge";
 import {
-  AvatarRow,
-  EmailRow,
-  NameRow,
-  PasswordRow,
-  SetPasswordRow,
-} from "@/components/dashboard/accounts/ProfileRows";
-import { TwoFactorRows } from "@/components/dashboard/accounts/TwoFactorRows";
+  DisplayPanel,
+  IntegrationsPanel,
+  ProfilePanel,
+  SecurityPanel,
+} from "@/components/dashboard/accounts/AccountPanels";
+import { DeleteAccount } from "@/components/dashboard/accounts/DeleteAccount";
+import { OAuthPopupBridge } from "@/components/dashboard/accounts/OAuthPopupBridge";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
-import { FieldRow } from "@/components/dashboard/bubbles/FieldRow";
 import { twoFactor, user } from "@/db/schema";
 import { getAccountLinksCached } from "@/lib/account-links";
 import { battlenetAuthEnabled, discordAuthEnabled } from "@/lib/auth";
@@ -28,7 +21,6 @@ import { getDb } from "@/lib/db";
 import { getSessionCached } from "@/lib/session";
 import { DENSITY_COOKIE, asDensity } from "@/lib/density";
 import {
-  discordServerNote,
   loadConnectIntegrations,
   loadDiscordIntegration,
 } from "@/lib/integrations";
@@ -45,8 +37,6 @@ export const metadata: Metadata = {
   title: "Settings",
   robots: { index: false },
 };
-
-const SCHOOL_LOCK_NOTE = "Schools can only be changed by a support member";
 
 /** Better Auth redirects here with `?error=` when a verification link fails,
     rather than rendering an error of its own (see the callbackURL passed to
@@ -116,8 +106,6 @@ export default async function AccountPage({
   const hasTotp = Boolean(twoFactorRows[0]?.totpVerified);
   const density = asDensity(densityCookie ?? profile?.density);
 
-  const status = reg?.status ?? null;
-  const hasSchool = Boolean(reg?.schoolName);
   const verifyError = params.error ? VERIFY_ERRORS[params.error] : undefined;
 
   return (
@@ -125,134 +113,41 @@ export default async function AccountPage({
       <OAuthPopupBridge />
       <h1 className="screen-reader-text">Settings</h1>
       <div className="ff-bubble-grid">
-        <Bubble title="Profile" span="full">
-          {verifyError ? (
-            <div className="ff-auth__error" role="alert">
-              <p>{verifyError}</p>
-            </div>
-          ) : null}
-          <AvatarRow
-            name={session.user.name}
-            initialImage={session.user.image ?? null}
-          />
-          <NameRow initialName={session.user.name} />
-          <EmailRow
-            initialEmail={session.user.email}
-            verified={session.user.emailVerified}
-          />
-          {status === "VERIFIED" && hasSchool ? (
-            <>
-              {/* No `note` on either: the reason lives on the lock glyph's
-                  hover, so the two rows don't each spend a line repeating it. */}
-              <FieldRow
-                label="School"
-                value={reg?.schoolName ?? ""}
-                locked
-                lockTitle={SCHOOL_LOCK_NOTE}
-              />
-              <FieldRow
-                label="School email"
-                value={reg?.schoolEmail ?? ""}
-                inputType="email"
-                locked
-                status="verified"
-                statusLabel="Verified"
-                lockTitle={SCHOOL_LOCK_NOTE}
-              />
-            </>
-          ) : status === "VERIFIED" ? (
-            // Verified with no school on file — a guest.
-            <BubbleRow
-              label="Membership"
-              value="Guest"
-              note="You're in with community access."
-            />
-          ) : status === "CONSENT_PENDING" ? (
-            <BubbleRow
-              label="Membership"
-              value="Awaiting consent"
-              note="Waiting for your parent or guardian to confirm by email."
-              action={
-                <a className="ff-btn ff-btn--sm" href="/account/setup/">
-                  Resend
-                </a>
-              }
-            />
-          ) : status === "MANUAL_REVIEW" ? (
-            <BubbleRow
-              label="School"
-              value="In Review"
-              note="Your registration needs a manual check — we've opened a ticket in Discord and will follow up there."
-            />
-          ) : (
-            <BubbleRow
-              label="School"
-              value="Not verified"
-              note="Verify your academic email to become a member."
-              action={
-                <a className="ff-btn ff-btn--sm" href="/account/setup/">
-                  Verify
-                </a>
-              }
-            />
-          )}
-        </Bubble>
+        {/* Each bubble is a pinnable panel that renders its own Bubble, so the
+            Home board can mount the identical component — see
+            components/dashboard/bubbles/PanelChrome.tsx. */}
+        <ProfilePanel
+          data={{
+            name: session.user.name,
+            email: session.user.email,
+            image: session.user.image ?? null,
+            emailVerified: session.user.emailVerified,
+            registration: reg,
+          }}
+          verifyError={verifyError}
+        />
 
-        <Bubble title="Security">
-          {hasPassword ? <PasswordRow /> : <SetPasswordRow />}
-          <TwoFactorRows
-            enabled={twoFactorEnabled}
-            hasTotp={hasTotp}
-            hasPassword={hasPassword}
-            email={session.user.email}
-          />
-        </Bubble>
+        <SecurityPanel
+          data={{
+            hasPassword,
+            twoFactorEnabled,
+            hasTotp,
+            email: session.user.email,
+          }}
+        />
 
-        <Bubble title="Display">
-          <DensityRow initial={density} />
-        </Bubble>
+        <DisplayPanel density={density} />
 
-        <Bubble title="Integrations" actions={<RecheckConnectionsButton />}>
-          <div className="ff-integrations">
-            <IntegrationCard
-              provider="discord"
-              label="Discord"
-              linked={discord.linked}
-              handle={discord.handle}
-              enabled={discordAuthEnabled()}
-              note={discordServerNote(discord.inGuild)}
-              linkLabel="Link Discord"
-              callbackURL="/account/"
-            />
-            <IntegrationCard
-              provider="battlenet"
-              label="Blizzard"
-              linked={battlenetLinked}
-              handle={battlenetIdentity?.handle ?? null}
-              enabled={battlenetAuthEnabled()}
-              linkLabel="Link Blizzard"
-              callbackURL="/account/"
-            />
-            {connectIntegrations.map((c) => (
-              <IntegrationCard
-                key={c.id}
-                provider={c.id}
-                label={c.label}
-                linked={c.linked}
-                handle={c.handle}
-                enabled={c.enabled}
-                reachable={c.reachable}
-                linkLabel={c.linkLabel}
-                callbackURL="/account/"
-              />
-            ))}
-            <ComingSoonIntegration
-              label="LeagueSpot"
-              mark="LS"
-              note="No public sign-in to connect yet — we'll add it when LeagueSpot opens one up."
-            />
-          </div>
-        </Bubble>
+        <IntegrationsPanel
+          data={{
+            discord,
+            discordEnabled: discordAuthEnabled(),
+            battlenetLinked,
+            battlenetHandle: battlenetIdentity?.handle ?? null,
+            battlenetEnabled: battlenetAuthEnabled(),
+            connects: connectIntegrations,
+          }}
+        />
 
         <Bubble title="Danger Zone" variant="danger" span="full">
           <BubbleRow

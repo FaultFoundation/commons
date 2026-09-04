@@ -6,17 +6,25 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import {
+  mergeChrome,
+  type PanelChrome,
+} from "@/components/dashboard/bubbles/PanelChrome";
+import {
   SCHEDULE_PROVIDER_LABELS,
   type ScheduleEntry,
   type ScheduleStatus,
 } from "@/lib/schedule-shared";
 
 /**
- * The member's cross-site calendar: two bubbles, Upcoming and Results, each a
- * list of normalized entries aggregated from their connected FACEIT / start.gg
- * / Challonge accounts (lib/schedule.ts), plus the public scraped calendar.
- * Client state owns the month and All/Your scope; data is still loaded once by
- * the server page and there is no browser polling.
+ * The member's cross-site calendar: two bubbles, Calendar and Your Results,
+ * each a list of normalized entries aggregated from their connected FACEIT /
+ * start.gg / Challonge accounts (lib/schedule.ts), plus the public scraped
+ * calendar. Client state owns the month and All/Your scope; data is still
+ * loaded once by the server page and there is no browser polling.
+ *
+ * Both bubbles are exported as PINNABLE PANELS (CalendarPanel / ResultsPanel),
+ * so the Home board mounts the same components this tab does rather than a
+ * condensed re-implementation.
  */
 export function ScheduleView({
   allUpcoming,
@@ -29,17 +37,49 @@ export function ScheduleView({
   past: ScheduleEntry[];
   anyConnected: boolean;
 }) {
+  return (
+    <div className="ff-bubble-grid">
+      <CalendarPanel
+        allUpcoming={allUpcoming}
+        upcoming={upcoming}
+        anyConnected={anyConnected}
+      />
+      <ResultsPanel past={past} anyConnected={anyConnected} />
+    </div>
+  );
+}
+
+/**
+ * The month calendar, as a pinnable panel. The All / Your Matches switch is
+ * header state that drives the body, so the scope lives HERE rather than in the
+ * page — that's what lets the bubble be mounted on Home unchanged.
+ */
+export function CalendarPanel({
+  allUpcoming,
+  upcoming,
+  anyConnected,
+  chrome,
+}: {
+  allUpcoming: ScheduleEntry[];
+  upcoming: ScheduleEntry[];
+  anyConnected: boolean;
+  chrome?: PanelChrome;
+}) {
   const [scope, setScope] = useState<"all" | "mine">("all");
   const entries = scope === "all" ? allUpcoming : upcoming;
 
   return (
-    <div className="ff-bubble-grid">
-      <Bubble
-        title="Calendar"
-        span="full"
-        className="ff-schedule-calendar"
-        actions={
-          <div className="ff-segment ff-schedule-scope" role="group" aria-label="Matches shown">
+    <Bubble
+      title="Calendar"
+      {...mergeChrome(chrome, {
+        span: "full",
+        className: "ff-schedule-calendar",
+        actions: (
+          <div
+            className="ff-segment ff-schedule-scope"
+            role="group"
+            aria-label="Matches shown"
+          >
             <button
               className="ff-segment__btn"
               type="button"
@@ -57,27 +97,40 @@ export function ScheduleView({
               Your Matches
             </button>
           </div>
-        }
-      >
-        <MonthCalendar
-          entries={entries}
-          scope={scope}
-          anyConnected={anyConnected}
-        />
-      </Bubble>
+        ),
+      })}
+    >
+      <MonthCalendar
+        entries={entries}
+        scope={scope}
+        anyConnected={anyConnected}
+      />
+    </Bubble>
+  );
+}
 
-      <Bubble title="Your Results">
-        {past.length > 0 ? (
-          <div className="ff-schedule-list">
-            {past.map((e) => (
-              <EntryRow key={e.id} entry={e} />
-            ))}
-          </div>
-        ) : (
-          <EmptyState anyConnected={anyConnected} kind="past" />
-        )}
-      </Bubble>
-    </div>
+/** Recently decided matches on the member's connected accounts. */
+export function ResultsPanel({
+  past,
+  anyConnected,
+  chrome,
+}: {
+  past: ScheduleEntry[];
+  anyConnected: boolean;
+  chrome?: PanelChrome;
+}) {
+  return (
+    <Bubble title="Your Results" {...mergeChrome(chrome)}>
+      {past.length > 0 ? (
+        <div className="ff-schedule-list">
+          {past.map((e) => (
+            <EntryRow key={e.id} entry={e} />
+          ))}
+        </div>
+      ) : (
+        <EmptyState anyConnected={anyConnected} kind="past" />
+      )}
+    </Bubble>
   );
 }
 

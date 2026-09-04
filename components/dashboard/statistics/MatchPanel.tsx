@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
+import {
+  mergeChrome,
+  type PanelChrome,
+} from "@/components/dashboard/bubbles/PanelChrome";
 import { MatchList } from "@/components/dashboard/statistics/MatchList";
 import { StatLoading } from "@/components/dashboard/statistics/StatLoading";
 import {
@@ -47,7 +51,7 @@ function writeCache(data: MatchDataResponse) {
 /** How many rows render initially; "Show more" reveals the rest client-side. */
 const PAGE = 25;
 
-export function MatchPanel() {
+export function MatchPanel({ chrome }: { chrome?: PanelChrome } = {}) {
   const [resp, setResp] = useState<MatchDataResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -104,11 +108,19 @@ export function MatchPanel() {
     void load(true);
   }
 
-  if (loading && !resp) return <StatLoading />;
+  if (loading && !resp) {
+    return chrome ? (
+      <Bubble title="Match Data" {...mergeChrome(chrome)}>
+        <StatLoading />
+      </Bubble>
+    ) : (
+      <StatLoading />
+    );
+  }
 
   if (failed && !resp) {
     return (
-      <Bubble title="Match Data" span="full">
+      <Bubble title="Match Data" {...mergeChrome(chrome, { span: "full" })}>
         <p className="ff-bubble__lede">
           We couldn&apos;t load your match history just now.
         </p>
@@ -126,12 +138,12 @@ export function MatchPanel() {
   );
   const backfilling = providers.some((p) => p.status === "ok" && !p.backfillDone);
 
-  return (
-    <div className="ff-bubble-grid ff-bubble-grid--single">
-      <Bubble
-        title="Match Data"
-        span="full"
-        actions={
+  const bubble = (
+    <Bubble
+      title="Match Data"
+      {...mergeChrome(chrome, {
+        span: "full",
+        actions: (
           <span className="ff-pd-toolbar">
             {refreshing ? (
               <span className="ff-ext-refresh" aria-live="polite">
@@ -170,46 +182,52 @@ export function MatchPanel() {
               </svg>
             </button>
           </span>
-        }
-      >
-        {providers.length === 0 ? (
-          <p className="ff-bubble__lede">
-            Connect FACEIT, start.gg, or Challonge in{" "}
-            <a href="/account/">Account → Integrations</a> to pull your match
-            history from across platforms into one place.
-          </p>
-        ) : (
-          <>
-            {problems.map((p) => (
-              <p className="ff-pd-problem" key={p.provider} role="status">
-                <strong>{PD_PROVIDER_LABELS[p.provider]}:</strong>{" "}
-                {p.statusDetail ??
-                  PD_STATUS_MESSAGES[
-                    p.status as keyof typeof PD_STATUS_MESSAGES
-                  ]}
-              </p>
-            ))}
-            {backfilling ? (
-              <p className="ff-bubble__note">
-                Still backfilling your full history — older matches keep
-                arriving with each sync.
-              </p>
-            ) : null}
-            <MatchList matches={matches.slice(0, shown)} />
-            {matches.length > shown ? (
-              <div className="ff-bubble__cta">
-                <button
-                  type="button"
-                  className="ff-btn ff-btn--outline ff-btn--sm"
-                  onClick={() => setShown((s) => s + PAGE)}
-                >
-                  Show more ({matches.length - shown} remaining)
-                </button>
-              </div>
-            ) : null}
-          </>
-        )}
-      </Bubble>
-    </div>
+        ),
+      })}
+    >
+      {providers.length === 0 ? (
+        <p className="ff-bubble__lede">
+          Connect FACEIT, start.gg, or Challonge in{" "}
+          <a href="/account/">Account → Integrations</a> to pull your match
+          history from across platforms into one place.
+        </p>
+      ) : (
+        <>
+          {problems.map((p) => (
+            <p className="ff-pd-problem" key={p.provider} role="status">
+              <strong>{PD_PROVIDER_LABELS[p.provider]}:</strong>{" "}
+              {p.statusDetail ??
+                PD_STATUS_MESSAGES[p.status as keyof typeof PD_STATUS_MESSAGES]}
+            </p>
+          ))}
+          {backfilling ? (
+            <p className="ff-bubble__note">
+              Still backfilling your full history — older matches keep arriving
+              with each sync.
+            </p>
+          ) : null}
+          <MatchList matches={matches.slice(0, shown)} />
+          {matches.length > shown ? (
+            <div className="ff-bubble__cta">
+              <button
+                type="button"
+                className="ff-btn ff-btn--outline ff-btn--sm"
+                onClick={() => setShown((s) => s + PAGE)}
+              >
+                Show more ({matches.length - shown} remaining)
+              </button>
+            </div>
+          ) : null}
+        </>
+      )}
+    </Bubble>
+  );
+
+  // On its own tab the panel supplies the grid it sits in; on the Home board the
+  // board IS the grid, so the bubble is handed back bare.
+  return chrome ? (
+    bubble
+  ) : (
+    <div className="ff-bubble-grid ff-bubble-grid--single">{bubble}</div>
   );
 }

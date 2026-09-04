@@ -9,10 +9,10 @@ import { SetupShell } from "@/components/dashboard/setup/SetupShell";
 import { getAccountLinksCached } from "@/lib/account-links";
 import { battlenetAuthEnabled, discordAuthEnabled } from "@/lib/auth";
 import {
-  discordServerNote,
   loadConnectIntegrations,
   loadDiscordIntegration,
 } from "@/lib/integrations";
+import { discordServerNote } from "@/lib/integrations-shared";
 import { getPlatformIdentityCached } from "@/lib/platform-identities";
 import { getSessionCached } from "@/lib/session";
 

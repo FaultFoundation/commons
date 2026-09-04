@@ -162,6 +162,39 @@ components: they must stay free of server-only imports (db, cloudflare context).
 Constants, enums, labels, and pure validators live there; the server-only
 counterpart (`teams.ts`, `staff.ts`, `tickets.ts`) does the D1 work.
 
+### The Home board is made of the site's real bubbles
+
+`/home/` is a board the member arranges, and the tiles on it are **the portal's
+own bubbles, not condensed copies**. Two rules hold it together:
+
+- **The panel contract.** A pinnable bubble renders its OWN `Bubble` and takes a
+  `chrome` prop — the host's bubble-level props
+  ([components/dashboard/bubbles/PanelChrome.tsx](components/dashboard/bubbles/PanelChrome.tsx),
+  merged with `mergeChrome`). Its tab renders it bare; the Home board renders the
+  identical component with the span, drag grip and reorder buttons supplied. So
+  there is one copy of the markup, and a change to a tab's card lands on Home for
+  free. Panels live beside their tab (`AccountPanels.tsx`, `CalendarPanel` /
+  `ResultsPanel` in `ScheduleView.tsx`, `TournamentsPanel`, `TeamsPanel`,
+  `OverwatchPanel`, `MatchPanel`).
+- **The row rhythm.** The board alternates one full-width row with a two-column
+  row (`isFullWidthAt` in [lib/home-shared.ts](lib/home-shared.ts): full when
+  `index % 3 === 0`, plus a trailing lone tile that stretches). **Position
+  decides width, not the panel** — which is why chrome's `span` overrides the
+  panel's own preference.
+
+[lib/home-shared.ts](lib/home-shared.ts) is the registry (every pinnable bubble,
+its customize-popup `group`, and the `sources` it needs);
+[components/dashboard/home/HomeWidgets.tsx](components/dashboard/home/HomeWidgets.tsx)
+maps an id to the real panel; [lib/home.ts](lib/home.ts) loads **only the sources
+the enabled widgets declare** — the board can hold any bubble on the site, so
+fetching every tab's data up front is no longer affordable. `HomeBoard` is a
+CLIENT component, so a panel must be client-bundle-safe: that is why
+`discordServerNote` sits in `integrations-shared.ts`, not `integrations.ts`.
+
+Adding a bubble a member should be able to pin means: make it a panel, add a
+`HOME_WIDGETS` entry, load its source in `lib/home.ts`, render it in
+`HomeWidgets.tsx`. See [docs/dashboard-guide.md](docs/dashboard-guide.md).
+
 ### Two parallel capability models
 
 Team permissions in [lib/teams-shared.ts](lib/teams-shared.ts) (`manager |

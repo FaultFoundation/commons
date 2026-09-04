@@ -114,7 +114,9 @@ poller from its repo.
 
 ## Licensing / provenance
 
-No license has been chosen for this repository yet. Note regardless:
+This repository is licensed under the **GNU Affero General Public License
+v3.0** (see [LICENSE](LICENSE)) — network copyleft, so a modified fork run as
+a hosted service must also release its source. Exceptions:
 
 - `styles/wp-globals.css` is CSS emitted by WordPress core and the Twenty
   Twenty-Five theme, which are **GPL-2.0+**; that file remains under the GPL

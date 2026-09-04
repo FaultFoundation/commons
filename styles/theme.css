@@ -4157,6 +4157,7 @@ button.ff-dash__link:hover {
 /* One scoreboard card. */
 .ff-recent__row {
   display: block;
+  flex: 0 0 auto;
   border: 1px solid var(--ff-border);
   border-radius: var(--ff-radius-md);
   background: rgba(0, 0, 0, 0.22);

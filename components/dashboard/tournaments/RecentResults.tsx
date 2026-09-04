@@ -21,6 +21,8 @@ function ScoreLine({
   side: ResultSide;
   position: "left" | "right";
 }) {
+  // No mark at all when the entrant has none — an empty placeholder box read as
+  // a broken image beside teams that simply have no logo.
   const logo = side.logoUrl ? (
     <img
       className="ff-recent__logo"
@@ -30,9 +32,7 @@ function ScoreLine({
       decoding="async"
       referrerPolicy="no-referrer"
     />
-  ) : (
-    <span className="ff-recent__logo ff-recent__logo--empty" aria-hidden="true" />
-  );
+  ) : null;
 
   return (
     <div

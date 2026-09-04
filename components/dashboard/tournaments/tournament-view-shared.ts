@@ -32,7 +32,8 @@ export type ResultRow = {
   id: string;
   /** Round label ("Grand Final", "Winners Round 1"); null when unknown. */
   round: string | null;
-  /** Pre-formatted short date ("Aug 30"); null when the match has no time. */
+  /** Pre-formatted date + time ("Sep 4, 2026, @ 5:00 pm EST"); null when the
+      match has no time. */
   dateLabel: string | null;
   a: ResultSide;
   b: ResultSide;

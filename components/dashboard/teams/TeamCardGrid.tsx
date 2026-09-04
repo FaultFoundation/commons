@@ -48,7 +48,7 @@ export function TeamCardGrid({
   teams: MyTeam[];
   external?: ExternalTeamSummary[];
 }) {
-  const { order, error, reorder, bubbleProps, handleProps } =
+  const { order, error, bubbleProps, handleProps } =
     useReorderableGrid({
       items: initial,
       getId: (team) => team.id,
@@ -90,37 +90,9 @@ export function TeamCardGrid({
                 team={team}
                 {...bp}
                 controls={
-                <>
-                  <span className="ff-reorder" role="group" aria-label="Reorder">
-                    <button
-                      className="ff-reorder__btn"
-                      type="button"
-                      disabled={index === 0}
-                      title="Move up"
-                      onClick={() => reorder(index, index - 1)}
-                    >
-                      <span className="screen-reader-text">
-                        Move {team.name} up
-                      </span>
-                      <Chevron up />
-                    </button>
-                    <button
-                      className="ff-reorder__btn"
-                      type="button"
-                      disabled={index === order.length - 1}
-                      title="Move down"
-                      onClick={() => reorder(index, index + 1)}
-                    >
-                      <span className="screen-reader-text">
-                        Move {team.name} down
-                      </span>
-                      <Chevron />
-                    </button>
-                  </span>
                   <DragGrip {...handleProps(index)} label={`Move ${team.name}`} />
-                </>
-              }
-            />
+                }
+              />
           );
         })}
           {external.map((team) => (
@@ -148,7 +120,7 @@ export function TeamCard({
   team: MyTeam;
   /** The universal top-bubble rule: the first card spans the grid. */
   feature?: boolean;
-  /** Reorder buttons + drag grip, when the host is a reorderable grid. */
+  /** Drag grip, when the host is a reorderable grid. */
   controls?: ReactNode;
   className?: string;
 } & Omit<ComponentPropsWithoutRef<"article">, "className">) {
@@ -165,22 +137,30 @@ export function TeamCard({
       </span>
       <div className="ff-team-card__head">
         <span className="ff-team-card__logo">
-          <Avatar src={team.logoUrl} name={team.name} shape="team" size="md" />
+          <Avatar src={team.logoUrl} name={team.name} shape="team" size="lg" />
         </span>
         <div className="ff-team-card__identity">
-          <h3 className="ff-team-card__name">
-            {team.tag ? `${team.name} [${team.tag}]` : team.name}
-          </h3>
-          <div className="ff-team-card__badges">
+          {/* Name + role on one line; the name is the link that opens the team
+              (the explicit Manage button was dropped). */}
+          <div className="ff-team-card__nameline">
+            <h3 className="ff-team-card__name">
+              <Link
+                className="ff-team-card__namelink"
+                href={`/teams/${team.id}/`}
+                prefetch={false}
+              >
+                {team.tag ? `${team.name} [${team.tag}]` : team.name}
+              </Link>
+            </h3>
             <span className={`ff-badge ff-badge--${team.role}`}>
               {TEAM_ROLE_LABELS[team.role]}
             </span>
-            {team.collegeName || team.schools.length ? (
-              <span className="ff-team-card__sub">
-                {team.collegeName ?? team.schools.join(", ")}
-              </span>
-            ) : null}
           </div>
+          {team.collegeName || team.schools.length ? (
+            <span className="ff-team-card__sub">
+              {team.collegeName ?? team.schools.join(", ")}
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -209,13 +189,6 @@ export function TeamCard({
           {team.inviteToken ? (
             <CopyInviteButton token={team.inviteToken} small />
           ) : null}
-          <Link
-            className="ff-btn ff-btn--outline ff-btn--sm"
-            href={`/teams/${team.id}/`}
-            prefetch={false}
-          >
-            {team.inviteToken ? "Manage" : "Open"}
-          </Link>
         </span>
         {controls ? (
           <span className="ff-team-card__handle">{controls}</span>
@@ -250,18 +223,26 @@ export function ExternalTeamCard({ team }: { team: ExternalTeamSummary }) {
       <ProviderChip provider={team.provider} />
       <div className="ff-team-card__head">
         <span className="ff-team-card__logo">
-          <Avatar src={team.logoUrl} name={team.name} shape="team" size="md" />
+          <Avatar src={team.logoUrl} name={team.name} shape="team" size="lg" />
         </span>
         <div className="ff-team-card__identity">
-          <h3 className="ff-team-card__name">{team.name}</h3>
-          <div className="ff-team-card__badges">
+          <div className="ff-team-card__nameline">
+            <h3 className="ff-team-card__name">
+              <Link
+                className="ff-team-card__namelink"
+                href={`/teams/${encodeURIComponent(team.id)}/`}
+                prefetch={false}
+              >
+                {team.name}
+              </Link>
+            </h3>
             <span className="ff-badge ff-badge--player">
               {PD_PROVIDER_LABELS[team.provider]}
             </span>
-            {team.game ? (
-              <span className="ff-team-card__sub">{team.game}</span>
-            ) : null}
           </div>
+          {team.game ? (
+            <span className="ff-team-card__sub">{team.game}</span>
+          ) : null}
         </div>
       </div>
 
@@ -276,18 +257,6 @@ export function ExternalTeamCard({ team }: { team: ExternalTeamSummary }) {
             {PD_PROVIDER_LABELS[team.provider]}
           </span>
         </div>
-      </div>
-
-      <div className="ff-team-card__foot">
-        <span className="ff-team-card__actions">
-          <Link
-            className="ff-btn ff-btn--outline ff-btn--sm"
-            href={`/teams/${encodeURIComponent(team.id)}/`}
-            prefetch={false}
-          >
-            Open
-          </Link>
-        </span>
       </div>
     </article>
   );

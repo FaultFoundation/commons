@@ -303,8 +303,14 @@ with one half (shared snapshot, one instance live at a time).
 - The start.gg **About section headers** ("Format" / "Prizing" — start.gg's
   `widgetTitle`) are carried on each `AboutRow.title` and rendered by
   [AboutLayout](components/dashboard/tournaments/AboutLayout.tsx). The scraper
-  captures them best-effort (the internal widget-layout API is undocumented, so a
-  missing title just omits the header).
+  reads them from the layout API's `widget.config.title`, taken only from a
+  CONTENT widget (Markdown/Image/Video — never a dropped view widget like the
+  Events/Rules/Prizing overviews, whose titles would leak) and only when
+  `config.showTitle` isn't false — verified against the live
+  `profileWidgetPageLayout`. A Markdown section with no title (e.g. the CRL,
+  which puts `# Welcome…` headings in the body) simply has none; the header only
+  appears for tournaments whose organizer titled the markdown sections. Existing
+  `about_layout` rows predate this and read `title: null` until re-scraped.
 - **Small entrant marks everywhere.** 18–22px favicons/logos sit beside team
   names in the bracket slots, standings, top finishers and recent results.
   External favicons come from cen-sql (`ext_matches.entrant_{1,2}_logo_url`,

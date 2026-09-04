@@ -3923,7 +3923,7 @@ button.ff-dash__link:hover {
 .ff-tpanel {
   display: flex;
   flex-direction: column;
-  gap: var(--ff-space-section, 20px);
+  gap: 20px;
   min-width: 0;
 }
 
@@ -3933,7 +3933,7 @@ button.ff-dash__link:hover {
    of wrapping short and leaving whitespace. */
 .ff-toverview {
   display: grid;
-  gap: var(--ff-space-section, 20px);
+  gap: 20px;
   grid-template-columns: minmax(0, 1fr) 320px;
   align-items: start;
 }
@@ -3994,6 +3994,7 @@ button.ff-dash__link:hover {
   border: 1px solid var(--ff-border);
   border-radius: var(--ff-radius-lg);
   background: var(--ff-surface-2);
+  box-shadow: var(--ff-shadow-card);
 }
 .ff-tfin__label {
   font-size: var(--ff-dash-text-xs);
@@ -4082,7 +4083,7 @@ button.ff-dash__link:hover {
    solo modifier drops the sidebar column when there are no results yet. */
 .ff-tbracket {
   display: grid;
-  gap: var(--ff-space-section, 20px);
+  gap: 20px;
   grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
   /* Stretch so the Recent Results card fills the (taller) bracket's height by
      default — its list scrolls inside. When the sidebar is EXPANDED it opts back

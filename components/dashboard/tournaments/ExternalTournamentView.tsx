@@ -12,7 +12,8 @@ import {
   type TournamentTab,
 } from "@/components/dashboard/tournaments/TournamentChrome";
 import { TopFinishers } from "@/components/dashboard/tournaments/TopFinishers";
-import { BracketWithSidebar } from "@/components/dashboard/tournaments/BracketWithSidebar";
+import { StandingsTable } from "@/components/dashboard/tournaments/StandingsTable";
+import { TournamentOverview } from "@/components/dashboard/tournaments/TournamentOverview";
 import type {
   FinisherEntry,
   ResultRow,
@@ -389,6 +390,19 @@ function connectedComponents(
   return [...byRoot.values()];
 }
 
+/** True when the feed graph has at least one INTERNAL edge (some match names
+    another in the set as a prereq). Mirrors ExternalBracket: without an edge,
+    component inference makes every match its own singleton "pool", so a phase
+    with no feed graph (FACEIT, or start.gg before prereqs) stays one ranking. */
+function hasFeedGraph(matches: ExternalTournamentMatch[]): boolean {
+  const ids = new Set(matches.map((m) => m.sourceMatchId));
+  return matches.some(
+    (m) =>
+      (m.prereq1Id != null && ids.has(m.prereq1Id)) ||
+      (m.prereq2Id != null && ids.has(m.prereq2Id)),
+  );
+}
+
 /** Smallest bracket-position key across a set — orders inferred pools left→right
     in seed order (like the bracket tabs). */
 function minOrderKey(matches: ExternalTournamentMatch[]): string | null {
@@ -457,7 +471,7 @@ function deriveBracketResults(
         order: g.order,
         matches: g.matches,
       }));
-  } else {
+  } else if (hasFeedGraph(all)) {
     groups = connectedComponents(all)
       .map((c) => ({ c, key: minOrderKey(c) }))
       .sort((a, b) => compareOrderKeys(a.key, b.key))
@@ -467,6 +481,10 @@ function deriveBracketResults(
         order: index,
         matches: c,
       }));
+  } else {
+    // No pool signal (FACEIT, or start.gg before prereqs) — one ranking over the
+    // whole bracket, never one "pool" per match.
+    groups = [{ id: "single", label: "", order: 0, matches: all }];
   }
 
   if (groups.length <= 1) {
@@ -481,59 +499,6 @@ function deriveBracketResults(
       : [];
   });
   return pools.length ? { kind: "pools", pools } : null;
-}
-
-/** A derived-standings table (single bracket or one pool). `advanceCount`, when
-    set, tags the top-N rows as advancing. */
-function DerivedStandingsTable({
-  standings,
-  showPlace,
-  advanceCount,
-}: {
-  standings: DerivedStanding[];
-  showPlace: boolean;
-  advanceCount?: number;
-}) {
-  return (
-    <div className="ff-ticket-table-wrap">
-      <table className="ff-ticket-table">
-        <thead>
-          <tr>
-            {showPlace ? <th scope="col">Place</th> : null}
-            <th scope="col">Entrant</th>
-          </tr>
-        </thead>
-        <tbody>
-          {standings.map((s, index) => {
-            const advancing = advanceCount != null && s.placement <= advanceCount;
-            return (
-              <tr key={`${s.entrantName}-${index}`}>
-                {showPlace ? <td>{s.placement}</td> : null}
-                <td className="ff-ticket-subject">
-                  <span className="ff-ext-entrant">
-                    {s.entrantLogoUrl ? (
-                      <img
-                        className="ff-ext-entrant__logo"
-                        src={s.entrantLogoUrl}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : null}
-                    <span>{s.entrantName}</span>
-                    {advancing ? (
-                      <span className="ff-ext-adv">Advancing</span>
-                    ) : null}
-                  </span>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
 }
 
 /** The Overview finishers row from derived results: top-3 for a single bracket,
@@ -752,49 +717,49 @@ export function ExternalTournamentView({
     </section>
   );
 
+  const aboutBubble = hasAbout ? (
+    <Bubble title="About" className="ff-toverview__about">
+      {hasLayout ? (
+        <AboutLayout rows={tournament.aboutLayout} />
+      ) : (
+        <div className="ff-ext-about">
+          <Markdown source={prose} />
+        </div>
+      )}
+    </Bubble>
+  ) : null;
+
+  const detailsBubble = details.length ? (
+    <Bubble title="Details" className="ff-toverview__facts">
+      <dl className="ff-tfacts">
+        {details.map((detail) => (
+          <div className="ff-tfacts__item" key={detail.label}>
+            <dt className="ff-tfacts__label">{detail.label}</dt>
+            <dd className="ff-tfacts__value">{detail.node}</dd>
+          </div>
+        ))}
+      </dl>
+    </Bubble>
+  ) : null;
+
+  // Overview: About on the left, Details + Recent Results stacked on the right.
+  // TournamentOverview (client) measures the bubbles and caps Recent Results to
+  // stop at the About bubble's bottom, its list scrolling inside.
   const overview = (
     <div className="ff-tpanel">
       <TopFinishers finishers={finishers} />
-      {hasAbout || details.length ? (
-        <div className="ff-toverview">
-          {hasAbout ? (
-            <Bubble title="About" className="ff-toverview__about">
-              {hasLayout ? (
-                <AboutLayout rows={tournament.aboutLayout} />
-              ) : (
-                <div className="ff-ext-about">
-                  <Markdown source={prose} />
-                </div>
-              )}
-            </Bubble>
-          ) : null}
-          {details.length ? (
-            <Bubble title="Details" className="ff-toverview__facts">
-              <dl className="ff-tfacts">
-                {details.map((detail) => (
-                  <div className="ff-tfacts__item" key={detail.label}>
-                    <dt className="ff-tfacts__label">{detail.label}</dt>
-                    <dd className="ff-tfacts__value">{detail.node}</dd>
-                  </div>
-                ))}
-              </dl>
-            </Bubble>
-          ) : null}
-        </div>
-      ) : (
-        <Bubble title="About" span="full">
-          <p className="ff-auth__hint">No details have been published yet.</p>
-        </Bubble>
-      )}
+      <TournamentOverview
+        about={aboutBubble}
+        details={detailsBubble}
+        results={recentResults}
+      />
     </div>
   );
 
   const bracket = (
-    <BracketWithSidebar results={recentResults}>
-      <Bubble title="Bracket" className="ff-bubble--divided">
-        <ExternalBracket events={tournament.events} source={tournament.source} />
-      </Bubble>
-    </BracketWithSidebar>
+    <Bubble title="Bracket" className="ff-bubble--divided">
+      <ExternalBracket events={tournament.events} source={tournament.source} />
+    </Bubble>
   );
 
   const standings = (
@@ -802,8 +767,8 @@ export function ExternalTournamentView({
       {!hasPlacedStandings && derived ? (
         derived.kind === "single" ? (
           <div className="ff-ext-section">
-            <DerivedStandingsTable
-              standings={derived.standings}
+            <StandingsTable
+              rows={derived.standings}
               showPlace={hasDisplayedPlacements}
             />
           </div>
@@ -811,10 +776,12 @@ export function ExternalTournamentView({
           derived.pools.map((pool) => (
             <div key={pool.id} className="ff-ext-section">
               <h4 className="ff-ext-section__head">{pool.label}</h4>
-              <DerivedStandingsTable
-                standings={pool.standings}
+              <StandingsTable
+                rows={pool.standings.map((s) => ({
+                  ...s,
+                  advancing: s.placement <= POOL_ADVANCE_DEFAULT,
+                }))}
                 showPlace
-                advanceCount={POOL_ADVANCE_DEFAULT}
               />
             </div>
           ))
@@ -826,40 +793,14 @@ export function ExternalTournamentView({
               {multiEvent && event.name ? (
                 <h4 className="ff-ext-section__head">{event.name}</h4>
               ) : null}
-              <div className="ff-ticket-table-wrap">
-                <table className="ff-ticket-table">
-                  <thead>
-                    <tr>
-                      {hasDisplayedPlacements ? <th scope="col">Place</th> : null}
-                      <th scope="col">Entrant</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {event.standings.map((standing, index) => (
-                      <tr key={`${standing.entrantName}-${index}`}>
-                        {hasDisplayedPlacements ? (
-                          <td>{standing.placement ?? "—"}</td>
-                        ) : null}
-                        <td className="ff-ticket-subject">
-                          <span className="ff-ext-entrant">
-                            {standing.entrantLogoUrl ? (
-                              <img
-                                className="ff-ext-entrant__logo"
-                                src={standing.entrantLogoUrl}
-                                alt=""
-                                loading="lazy"
-                                decoding="async"
-                                referrerPolicy="no-referrer"
-                              />
-                            ) : null}
-                            <span>{standing.entrantName}</span>
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <StandingsTable
+                rows={event.standings.map((s) => ({
+                  entrantName: s.entrantName,
+                  entrantLogoUrl: s.entrantLogoUrl,
+                  placement: s.placement,
+                }))}
+                showPlace={hasDisplayedPlacements}
+              />
             </div>
           ),
         )

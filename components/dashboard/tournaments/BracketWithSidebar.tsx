@@ -45,9 +45,19 @@ export function BracketWithSidebar({
       {hasRecent ? (
         <RecentResults
           results={results}
-          cardMaxHeight={expanded ? null : bracketHeight}
+          cardMaxHeight={bracketHeight}
           expanded={expanded}
-          onToggle={() => setExpanded((v) => !v)}
+          footer={
+            results.length > 4 ? (
+              <button
+                type="button"
+                className="ff-recent__toggle"
+                onClick={() => setExpanded((v) => !v)}
+              >
+                {expanded ? "Show fewer" : `Show all ${results.length} matches`}
+              </button>
+            ) : null
+          }
         />
       ) : null}
       <div className="ff-tbracket__main" ref={bracketRef}>

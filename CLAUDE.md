@@ -319,21 +319,28 @@ with one half (shared snapshot, one instance live at a time).
   [TopFinishers](components/dashboard/tournaments/TopFinishers.tsx) with
   gold/silver/bronze [TrophyIcon](components/dashboard/tournaments/TrophyIcon.tsx)
   marks (inline SVG, no image assets) — then About + a Details facts panel
-  (external) or the Participants grid (internal).
-- **Bracket** pairs a **Recent Results** sidebar (broadcast-style scoreboard
-  cards, on the same surface + shadow as a tournament list card — header round +
-  date/time ("Sep 4, 2026, @ 5:00 pm EST", server-rendered in the org's ET zone
-  so the labelled clock time isn't a bare Worker-UTC one) over a hairline, a
-  "Final" status, the two entrants with scores and, only when they have one, a
-  logo; [RecentResults](components/dashboard/tournaments/RecentResults.tsx),
-  latest decided matches, finals first) with the bracket. The sidebar's height is
-  **measured in JS**, not CSS: [BracketWithSidebar](components/dashboard/tournaments/BracketWithSidebar.tsx)
-  (client) ResizeObserves the bracket bubble and caps the card's `max-height` to
-  it so the list scrolls to the bracket's bottom — a grid `stretch` can't, it
-  sizes to the TALLER child (the full match list) and would stretch the bracket
-  instead. "Show all N matches" clears the cap so the card grows past the
-  bracket. RecentResults is a controlled presentational component; the wrapper
-  owns the expanded state and the measured height.
+  (external) or the Participants grid (internal). On the **external** view the
+  Details rail also carries the **Recent Results** card beneath the facts:
+  [TournamentOverview](components/dashboard/tournaments/TournamentOverview.tsx)
+  (client) ResizeObserves the About and Details bubbles and caps the card's
+  `max-height` so Details + card stops at the About bubble's bottom, its list
+  scrolling inside (CSS can't — a grid `stretch` sizes to the TALLER child). "Show
+  all N matches" opens `RecentResultsPopup` (the shared `ff-daypop` overlay, a
+  grid of every scoreboard card) rather than expanding the rail past About.
+- **Recent Results** ([RecentResults](components/dashboard/tournaments/RecentResults.tsx))
+  is a controlled presentational card — broadcast-style scoreboard cards (on the
+  same surface + shadow as a tournament list card: header round + date/time
+  ("Sep 4, 2026, @ 5:00 pm EST", server-rendered in the org's ET zone so the
+  labelled clock time isn't a bare Worker-UTC one) over a hairline, a "Final"
+  status, the two entrants with scores and, only when they have one, a logo;
+  latest decided matches, finals first). The host caps its height and supplies the
+  footer button, so the same card serves the external Overview rail (button → the
+  popup) and the **internal** Bracket tab, where it stays a **sidebar**
+  ([BracketWithSidebar](components/dashboard/tournaments/BracketWithSidebar.tsx)
+  measures the bracket bubble and caps the card to it; the internal Overview has
+  no Details rail to host the card, so it keeps the sidebar and its in-place
+  "Show fewer"/"Show all" expand). The external Bracket tab is therefore just the
+  bracket, full width.
 - Both views carry the **same header share affordance** — the
   [ShareBar](components/dashboard/tournaments/ShareBar.tsx) (the external branch
   is passed a Commons `shareUrl`). An earlier per-tournament "known links" icon
@@ -378,6 +385,24 @@ with one half (shared snapshot, one instance live at a time).
   top-`POOL_ADVANCE_DEFAULT` (1 until the scraper collects start.gg's real
   progression count), labelled and sorted by pool, both in the Overview finishers
   row and as per-pool sections (with an "Advancing" tag) in the Standings tab.
+- **Pool inference needs a feed graph to exist.** Both `ExternalBracket` and
+  `deriveBracketResults` infer pools as weakly-connected components ONLY when the
+  set actually has an internal prereq edge (`hasFeedGraph`). Without one — FACEIT
+  ships no prereqs, and a start.gg bracket scraped before its sets carry them —
+  every match is its own singleton component, which would render one bogus "Pool"
+  tab (and one derived pool) PER MATCH. So a phase with no feed graph stays a
+  single bracket / single ranking. This is why an ordinary FACEIT event shows one
+  bracket, not N pools.
+- **The external Standings tab is a grouped-tie table.**
+  [StandingsTable](components/dashboard/tournaments/StandingsTable.tsx) (shared by
+  the placed, derived-single and derived-pool paths) renders **ordinal** ranks and
+  collapses **ties into one range cell** — the four entrants sharing 5th place
+  become a single "5th – 8th" cell spanning their rows (a `rowSpan`; range end =
+  `place + tieSize − 1`, standard competition ranking). Every entrant carries a
+  circular avatar — its favicon/logo, or a neutral person placeholder when it has
+  none. (The **internal** Standings still renders through `BracketView`'s own
+  W–L/Pts table, which is richer for the team-based Challonge events; it wasn't
+  folded into this.)
 
 **Liquipedia portability (structure only).**
 [lib/liquipedia.ts](lib/liquipedia.ts) maps a tournament onto Liquipedia's
@@ -558,7 +583,11 @@ local dev).
   the phase-group columns existed, or a provider without pools — it **infers
   pools as the weakly-connected components of the feed graph**, since disjoint
   pools share no prereq edges (a single bracket, winners+losers joined by
-  loser-drop prereqs, is one component → one tab, unchanged). Tabs are labelled
+  loser-drop prereqs, is one component → one tab, unchanged). That inference is
+  **gated on a feed graph existing** (`hasFeedGraph`): with no prereq edge at all
+  — FACEIT ships none, and a start.gg bracket scraped before its sets carry them —
+  every match would be its own singleton component (one "Pool" tab per match), so
+  such a phase stays a single bracket. Tabs are labelled
   by pool, by phase, or `phase · Pool` when both split. Within a sub-bracket it
   groups columns by round NAME (robust when `round_order` is absent),
   and a missing/forfeit score renders as a dash, never a blank cell.

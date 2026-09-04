@@ -1,18 +1,20 @@
 "use client";
 
+import { useEffect, type ReactNode } from "react";
+
 import type {
   ResultRow,
   ResultSide,
 } from "@/components/dashboard/tournaments/tournament-view-shared";
 
-// The "Recent Results" sidebar shown beside the bracket. Each result is a
-// scoreboard card modelled on a broadcast score bug: a header row (round + date)
-// over a hairline, a centred "Final" status, then the two entrants with their
-// logos and scores, the winner emphasised. It's a CONTROLLED component — the
-// BracketWithSidebar wrapper measures the bracket's height and hands it down as
-// `cardMaxHeight` so the card fills to the bracket's bottom and its list scrolls
-// inside; "Show all N" clears the cap (expanded) so the card grows past it.
-// Renders nothing when there are no decided matches yet.
+// The "Recent Results" card — a column of broadcast-style scoreboard cards, each
+// a header row (round + date) over a hairline, a centred "Final" status, then the
+// two entrants with their logos and scores, the winner emphasised. Presentational
+// and CONTROLLED: the host caps the card's height (`cardMaxHeight`, e.g. to the
+// About bubble's bottom) so its list scrolls inside, and supplies the `footer`
+// button (which opens the full-list popup on the Overview, or expands in place in
+// the internal bracket sidebar). Renders nothing when there are no decided
+// matches. `RecentResultsPopup` shows the whole list in a modal.
 
 function ScoreLine({
   side,
@@ -45,7 +47,7 @@ function ScoreLine({
   );
 }
 
-function ResultCard({ row }: { row: ResultRow }) {
+export function ResultCard({ row }: { row: ResultRow }) {
   const inner = (
     <>
       <div className="ff-recent__head">
@@ -91,23 +93,27 @@ export function RecentResults({
   results,
   cardMaxHeight,
   expanded,
-  onToggle,
+  footer,
 }: {
   results: ResultRow[];
-  /** Cap the card's height (to the bracket's) so its list scrolls; null when
-      expanded (grow to show every row). */
+  /** Cap the card's height (e.g. to the About bubble's) so its list scrolls;
+      null (or `expanded`) leaves it uncapped. */
   cardMaxHeight: number | null;
-  expanded: boolean;
-  onToggle: () => void;
+  /** When true, ignore the cap and grow to show every row (internal sidebar's
+      "Show fewer" state). */
+  expanded?: boolean;
+  /** The footer control (a "Show all N" button), built by the host so it can
+      open a popup or expand in place. */
+  footer?: ReactNode;
 }) {
   if (results.length === 0) return null;
-  const hasMore = results.length > 4;
+  const capped = !expanded && cardMaxHeight != null;
 
   return (
     <aside
       className={`ff-recent${expanded ? " ff-recent--expanded" : ""}`}
       aria-label="Recent results"
-      style={cardMaxHeight != null ? { maxHeight: cardMaxHeight } : undefined}
+      style={capped ? { maxHeight: cardMaxHeight } : undefined}
     >
       <h3 className="ff-recent__title">Recent Results</h3>
       <div className="ff-recent__list">
@@ -115,11 +121,58 @@ export function RecentResults({
           <ResultCard key={row.id} row={row} />
         ))}
       </div>
-      {hasMore ? (
-        <button type="button" className="ff-recent__toggle" onClick={onToggle}>
-          {expanded ? "Show fewer" : `Show all ${results.length} matches`}
-        </button>
-      ) : null}
+      {footer}
     </aside>
+  );
+}
+
+/** The full-list popup opened by the Overview's "Show all N matches" — every
+    decided match as a scoreboard card in a scrolling grid; closes on backdrop
+    click or Escape (the shared ff-daypop overlay). */
+export function RecentResultsPopup({
+  results,
+  onClose,
+}: {
+  results: ResultRow[];
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="ff-daypop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Recent results"
+      onClick={onClose}
+    >
+      <div
+        className="ff-daypop__panel ff-recentpop__panel"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="ff-daypop__head">
+          <h2 className="ff-daypop__title">Recent Results</h2>
+          <button
+            className="ff-daypop__close"
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+        <div className="ff-daypop__body ff-recentpop__body">
+          {results.map((row) => (
+            <ResultCard key={row.id} row={row} />
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

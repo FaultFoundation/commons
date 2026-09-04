@@ -38,6 +38,11 @@ import type {
 // absent — older data, or a provider without phase groups — we infer the pools
 // as the weakly-connected components of the feed graph, since disjoint pools
 // share no prereq edges. A plain single bracket is one component → one tab.
+// CRUCIAL guard: that component inference is only trusted when a feed graph
+// actually EXISTS. With no prereq edges at all (FACEIT ships none; a start.gg
+// bracket scraped before its sets carry prereqs) EVERY match is its own
+// singleton component, which would render one bogus "Pool" tab per match — so a
+// phase with no internal feed edges stays a single bracket.
 
 const LOSERS_RE = /los(?:er|ers|ing)?|lower|\blb\b/i;
 
@@ -423,6 +428,20 @@ function connectedComponents(
   return [...byRoot.values()];
 }
 
+/** True when the feed graph has at least one INTERNAL edge — some match names
+    another match in the same set as a prereq feeder. Pool inference by connected
+    components is only meaningful once edges exist: with none (FACEIT, or a
+    start.gg bracket scraped before prereqs), every match is its own singleton
+    component and the phase would split into one "pool" per match. */
+function hasFeedGraph(matches: ExternalTournamentMatch[]): boolean {
+  const ids = new Set(matches.map((m) => m.sourceMatchId));
+  return matches.some(
+    (m) =>
+      (m.prereq1Id != null && ids.has(m.prereq1Id)) ||
+      (m.prereq2Id != null && ids.has(m.prereq2Id)),
+  );
+}
+
 /** Smallest bracket-position key across a set of matches — orders inferred pools
     left→right in seed order. Null keys sort last (see compareOrderKeys). */
 function minOrderKey(matches: ExternalTournamentMatch[]): string | null {
@@ -472,6 +491,11 @@ function splitPools(matches: ExternalTournamentMatch[]): Pool[] {
     return [...groups.entries()]
       .sort((a, b) => a[1].order - b[1].order)
       .map(([id, g]) => ({ id, name: g.name, matches: g.matches }));
+  }
+  // No feed graph → no pools to infer; the whole phase is one bracket. (Without
+  // this, FACEIT — which ships no prereqs — splits into one pool per match.)
+  if (!hasFeedGraph(matches)) {
+    return [{ id: "__single__", name: null, matches }];
   }
   const components = connectedComponents(matches);
   if (components.length <= 1) {

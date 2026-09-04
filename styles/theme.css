@@ -3968,8 +3968,21 @@ button.ff-dash__link:hover {
   grid-template-columns: minmax(0, 1fr) 320px;
   align-items: start;
 }
-.ff-toverview > :only-child {
+.ff-toverview > :only-child,
+.ff-toverview--single {
   grid-column: 1 / -1;
+}
+.ff-toverview--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+/* The right rail: the Details facts bubble, then the Recent Results card beneath
+   it. The card is capped in JS (TournamentOverview) to stop at the About bubble's
+   bottom, its list scrolling inside. Keep this gap in sync with RAIL_GAP. */
+.ff-toverview__side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
 }
 @media (max-width: 820px) {
   .ff-toverview {
@@ -4128,6 +4141,79 @@ button.ff-dash__link:hover {
 }
 .ff-tfin__more:hover {
   text-decoration: underline;
+}
+
+/* Standings tab (external): a grouped placement table. Tied entrants share one
+   ordinal-range rank cell ("5th – 8th") that spans their rows; every entrant
+   carries a circular avatar (its favicon/logo or a person placeholder). */
+.ff-standings {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-standings th {
+  text-align: left;
+  color: var(--ff-text-dim);
+  font-weight: 700;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ff-border);
+  white-space: nowrap;
+}
+.ff-standings__rank-col {
+  width: 1%;
+}
+.ff-standings td {
+  padding: 10px 12px;
+  vertical-align: middle;
+}
+/* Hairline between placement groups only — rows tied within a group aren't
+   divided, so the shared rank cell reads as one band. */
+.ff-standings tbody tr.ff-standings__group-start td {
+  border-top: 1px solid var(--ff-border);
+}
+.ff-standings tbody tr:first-child td {
+  border-top: none;
+}
+.ff-standings__rank {
+  color: var(--ff-text-dim);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ff-standings__player {
+  color: #fff;
+  font-weight: 700;
+}
+.ff-standings__avatar {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #fff;
+}
+.ff-standings__avatar--empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ff-text-dim);
+}
+.ff-standings__avatar--empty svg {
+  width: 62%;
+  height: 62%;
+}
+
+/* Recent Results popup — the full match list opened from the Overview's "Show all
+   N matches". Reuses the ff-daypop overlay/head/close; a wider panel and a
+   responsive grid of the scoreboard cards. */
+.ff-recentpop__panel {
+  width: min(880px, 100%);
+}
+.ff-recentpop__body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
 }
 
 /* Bracket tab: Recent Results sidebar + the bracket, collapsing to a stack; a

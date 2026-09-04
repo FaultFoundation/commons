@@ -2626,10 +2626,16 @@ button.ff-dash__link:hover {
    inside it, so the Done button never walks off a short viewport. */
 .ff-dialog--customize {
   width: min(460px, calc(100% - 32px));
-  /* A column so the checklist can be the one part that scrolls. */
+  max-height: min(720px, calc(100vh - 64px));
+}
+/* The column layout (so the checklist is the one part that scrolls) MUST be
+   scoped to [open]. A bare `display: flex` here would beat the UA's
+   `dialog:not([open]) { display: none }` — author origin wins over user-agent
+   regardless of specificity — and the closed dialog would render in normal
+   flow at the bottom of the page. */
+.ff-dialog--customize[open] {
   display: flex;
   flex-direction: column;
-  max-height: min(720px, calc(100vh - 64px));
 }
 .ff-customize__scroll {
   flex: 1 1 auto;

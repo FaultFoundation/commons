@@ -31,10 +31,10 @@ export function TopFinishers({ finishers }: { finishers: FinisherEntry[] }) {
       <ol className="ff-tfin__list">
         {shown.map((f, index) => (
           <li
-            className="ff-tfin__item"
+            className={`ff-tfin__item${f.place === 1 ? " ff-tfin__item--featured" : ""}`}
             key={`${f.poolLabel ?? ""}-${f.place}-${f.name}-${index}`}
           >
-            <TrophyIcon place={f.place} size={18} />
+            <TrophyIcon place={f.place} size={f.place === 1 ? 28 : 18} />
             <span className="ff-tfin__entrant">
               {f.logoUrl ? (
                 <img

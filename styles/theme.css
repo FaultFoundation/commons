@@ -4019,6 +4019,13 @@ button.ff-dash__link:hover {
   gap: 8px;
   min-width: 0;
 }
+.ff-tfin__item--featured {
+  gap: 10px;
+  padding: 6px 10px 6px 8px;
+  border: 1px solid rgba(255, 213, 78, 0.42);
+  border-radius: var(--ff-radius-md);
+  background: rgba(255, 213, 78, 0.1);
+}
 .ff-tfin__entrant {
   display: inline-flex;
   align-items: center;
@@ -4038,6 +4045,19 @@ button.ff-dash__link:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.ff-tfin__item--featured .ff-tfin__entrant {
+  gap: 9px;
+}
+.ff-tfin__item--featured .ff-tfin__logo {
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+}
+.ff-tfin__item--featured .ff-tfin__name {
+  color: #fff;
+  font-size: var(--ff-dash-text-md);
+  font-weight: 800;
 }
 /* Pool tag after an advancing entrant's name ("Pool A1"). */
 .ff-tfin__pool {
@@ -4140,7 +4160,7 @@ button.ff-dash__link:hover {
   border: 1px solid var(--ff-border);
   border-radius: var(--ff-radius-md);
   background: rgba(0, 0, 0, 0.22);
-  padding: 10px 12px;
+  overflow: hidden;
   text-decoration: none;
   color: inherit;
 }
@@ -4155,8 +4175,8 @@ button.ff-dash__link:hover {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding-bottom: 8px;
-  margin-bottom: 8px;
+  margin: 0;
+  padding: 10px 12px 8px;
   border-bottom: 1px solid var(--ff-border);
   font-size: var(--ff-dash-text-xs);
   color: var(--ff-text-dim);
@@ -4174,17 +4194,19 @@ button.ff-dash__link:hover {
   font-variant-numeric: tabular-nums;
 }
 .ff-recent__status {
-  margin-bottom: 8px;
+  margin: 10px 0 8px;
   text-align: center;
   font-size: var(--ff-dash-text-xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--ff-text-dim);
 }
-.ff-recent__teams {
-  display: flex;
-  flex-direction: column;
+.ff-recent__match {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
   gap: 8px;
+  padding: 0 12px 14px;
 }
 .ff-recent__team {
   display: flex;
@@ -4192,10 +4214,14 @@ button.ff-dash__link:hover {
   gap: 9px;
   min-width: 0;
 }
+.ff-recent__team--left {
+  justify-content: flex-end;
+  text-align: right;
+}
 .ff-recent__logo {
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
   border-radius: 5px;
   object-fit: contain;
   background: #fff;
@@ -4204,7 +4230,6 @@ button.ff-dash__link:hover {
   background: rgba(255, 255, 255, 0.08);
 }
 .ff-recent__name {
-  flex: 1 1 auto;
   min-width: 0;
   font-size: var(--ff-dash-text-sm);
   font-weight: 600;
@@ -4213,17 +4238,28 @@ button.ff-dash__link:hover {
   white-space: nowrap;
 }
 .ff-recent__score {
-  flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
-  font-size: var(--ff-dash-text-md);
-  font-weight: 700;
+  font-size: var(--ff-dash-text-xl);
+  font-weight: 800;
+  color: #fff;
+}
+.ff-recent__scoreline {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ff-recent__score-separator {
   color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-lg);
+  font-weight: 600;
 }
 .ff-recent__team--win .ff-recent__name {
   color: #fff;
   font-weight: 800;
 }
-.ff-recent__team--win .ff-recent__score {
+.ff-recent__score--win {
   color: var(--ff-accent);
 }
 .ff-recent__toggle {

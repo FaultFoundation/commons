@@ -14,25 +14,33 @@ import type {
 // inside; "Show all N" clears the cap (expanded) so the card grows past it.
 // Renders nothing when there are no decided matches yet.
 
-function ScoreLine({ side }: { side: ResultSide }) {
+function ScoreLine({
+  side,
+  position,
+}: {
+  side: ResultSide;
+  position: "left" | "right";
+}) {
+  const logo = side.logoUrl ? (
+    <img
+      className="ff-recent__logo"
+      src={side.logoUrl}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+    />
+  ) : (
+    <span className="ff-recent__logo ff-recent__logo--empty" aria-hidden="true" />
+  );
+
   return (
     <div
-      className={`ff-recent__team${side.winner ? " ff-recent__team--win" : ""}`}
+      className={`ff-recent__team ff-recent__team--${position}${side.winner ? " ff-recent__team--win" : ""}`}
     >
-      {side.logoUrl ? (
-        <img
-          className="ff-recent__logo"
-          src={side.logoUrl}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          referrerPolicy="no-referrer"
-        />
-      ) : (
-        <span className="ff-recent__logo ff-recent__logo--empty" aria-hidden="true" />
-      )}
+      {position === "right" ? logo : null}
       <span className="ff-recent__name">{side.name}</span>
-      <span className="ff-recent__score">{side.score}</span>
+      {position === "left" ? logo : null}
     </div>
   );
 }
@@ -47,9 +55,21 @@ function ResultCard({ row }: { row: ResultRow }) {
         ) : null}
       </div>
       <div className="ff-recent__status">Final</div>
-      <div className="ff-recent__teams">
-        <ScoreLine side={row.a} />
-        <ScoreLine side={row.b} />
+      <div className="ff-recent__match">
+        <ScoreLine side={row.a} position="left" />
+        <div
+          className="ff-recent__scoreline"
+          aria-label={`${row.a.score} to ${row.b.score}`}
+        >
+          <span className={row.a.winner ? "ff-recent__score ff-recent__score--win" : "ff-recent__score"}>
+            {row.a.score}
+          </span>
+          <span className="ff-recent__score-separator" aria-hidden="true">-</span>
+          <span className={row.b.winner ? "ff-recent__score ff-recent__score--win" : "ff-recent__score"}>
+            {row.b.score}
+          </span>
+        </div>
+        <ScoreLine side={row.b} position="right" />
       </div>
     </>
   );

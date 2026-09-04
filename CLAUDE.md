@@ -288,10 +288,12 @@ with one half (shared snapshot, one instance live at a time).
   marks (inline SVG, no image assets) — then About + a Details facts panel
   (external) or the Participants grid (internal).
 - **Bracket** pairs a **Recent Results** sidebar (broadcast-style scoreboard
-  cards — header round+date over a hairline, a "Final" status, the two entrants
-  with logos + scores, winner emphasised;
-  [RecentResults](components/dashboard/tournaments/RecentResults.tsx), latest
-  decided matches, finals first) with the bracket. The sidebar's height is
+  cards, on the same surface + shadow as a tournament list card — header round +
+  date/time ("Sep 4, 2026, @ 5:00 pm EST", server-rendered in the org's ET zone
+  so the labelled clock time isn't a bare Worker-UTC one) over a hairline, a
+  "Final" status, the two entrants with scores and, only when they have one, a
+  logo; [RecentResults](components/dashboard/tournaments/RecentResults.tsx),
+  latest decided matches, finals first) with the bracket. The sidebar's height is
   **measured in JS**, not CSS: [BracketWithSidebar](components/dashboard/tournaments/BracketWithSidebar.tsx)
   (client) ResizeObserves the bracket bubble and caps the card's `max-height` to
   it so the list scrolls to the bracket's bottom — a grid `stretch` can't, it

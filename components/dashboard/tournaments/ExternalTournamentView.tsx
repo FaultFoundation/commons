@@ -58,10 +58,40 @@ function formatDateTime(date: Date | null): string | null {
     : null;
 }
 
-function formatShortDate(date: Date | null): string | null {
-  return date
-    ? date.toLocaleDateString(undefined, { month: "short", day: "numeric" })
-    : null;
+/** The Recent Results corner stamp — "Sep 4, 2026, @ 5:00 pm EST".
+    Deliberately pinned to the org's zone (Intl picks EST/EDT itself) rather
+    than left to the Worker's UTC: this is server-rendered like every other date
+    here (see ScheduleView's note), and a bare clock time with no zone on it is
+    worse than one labelled in the zone the org actually schedules in. Degrades
+    to a plain date if a runtime ever lacks the zone database. */
+const RESULT_TIME_ZONE = "America/New_York";
+
+function formatResultDateTime(date: Date | null): string | null {
+  if (!date) return null;
+  try {
+    const day = date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: RESULT_TIME_ZONE,
+    });
+    const time = date
+      .toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone: RESULT_TIME_ZONE,
+        timeZoneName: "short",
+      })
+      .replace(/\bAM\b/, "am")
+      .replace(/\bPM\b/, "pm");
+    return `${day}, @ ${time}`;
+  } catch {
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
 }
 
 /** A compact human range for the header — "Aug 30 – 31, 2026", collapsing a
@@ -175,7 +205,7 @@ function buildRecentResults(events: ExternalTournamentDetail["events"]): ResultR
         row: {
           id: m.id,
           round: m.round,
-          dateLabel: formatShortDate(m.scheduledAt),
+          dateLabel: formatResultDateTime(m.scheduledAt),
           a: {
             name: m.entrant1Name ?? "TBD",
             logoUrl: m.entrant1LogoUrl,

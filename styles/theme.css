@@ -4154,13 +4154,15 @@ button.ff-dash__link:hover {
   min-height: 0;
   overflow-y: auto;
 }
-/* One scoreboard card. */
+/* One scoreboard card — same surface + shadow as a tournament list card, so the
+   depth comes from the shadow rather than a darker fill. */
 .ff-recent__row {
   display: block;
   flex: 0 0 auto;
   border: 1px solid var(--ff-border);
   border-radius: var(--ff-radius-md);
-  background: rgba(0, 0, 0, 0.22);
+  background: var(--ff-surface-2);
+  box-shadow: var(--ff-shadow-card);
   overflow: hidden;
   text-decoration: none;
   color: inherit;
@@ -4174,8 +4176,10 @@ button.ff-dash__link:hover {
 .ff-recent__head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  /* The date is long enough to wrap on a narrow sidebar; margin-left keeps it
+     right-aligned whether it shares the round's line or drops below it. */
+  flex-wrap: wrap;
+  gap: 2px 8px;
   margin: 0;
   padding: 10px 12px 8px;
   border-bottom: 1px solid var(--ff-border);
@@ -4192,6 +4196,8 @@ button.ff-dash__link:hover {
 }
 .ff-recent__date {
   flex: 0 0 auto;
+  margin-left: auto;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 .ff-recent__status {
@@ -4226,9 +4232,6 @@ button.ff-dash__link:hover {
   border-radius: 5px;
   object-fit: contain;
   background: #fff;
-}
-.ff-recent__logo--empty {
-  background: rgba(255, 255, 255, 0.08);
 }
 .ff-recent__name {
   min-width: 0;

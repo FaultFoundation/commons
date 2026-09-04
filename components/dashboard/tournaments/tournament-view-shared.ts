@@ -5,13 +5,16 @@
 // look identical no matter where the data came from. No server-only imports —
 // this is imported by client components.
 
-/** A podium placement for the "Top finishers" row. `place` is 1/2/3 (the trophy
-    colour) — the row only ever shows the top three. `logoUrl` is the entrant's
-    small favicon/logo (school favicon for external, team logo for internal). */
+/** A placement in the "Top finishers" / "Advancing" row. `place` is the podium
+    rank (1/2/3, the trophy colour) — for a pool tournament it's the rank WITHIN
+    the pool. `logoUrl` is the entrant's small favicon/logo (school favicon for
+    external, team logo for internal). `poolLabel`, when set ("Pool A1"), marks
+    this as one of a pool's advancing entrants rather than an overall podium. */
 export type FinisherEntry = {
   place: number;
   name: string;
   logoUrl: string | null;
+  poolLabel?: string | null;
 };
 
 /** One side of a completed (or in-progress) match, as the Recent Results list
@@ -35,31 +38,6 @@ export type ResultRow = {
   b: ResultSide;
   /** Deep link to the provider match page; null for internal / no link. */
   url: string | null;
-};
-
-/** The kind of a header "known link" — picks the brand/utility icon and the
-    default accessible label. Only links we actually have are ever rendered. */
-export type HeaderLinkKind =
-  | "video"
-  | "stream"
-  | "twitch"
-  | "discord"
-  | "x"
-  | "facebook"
-  | "youtube"
-  | "instagram"
-  | "website"
-  | "email"
-  | "organizer"
-  | "rules"
-  | "provider";
-
-/** One icon in the header's social/known-links row. */
-export type HeaderLink = {
-  kind: HeaderLinkKind;
-  /** Accessible label + tooltip, e.g. "Watch the stream", "Organizer: …". */
-  label: string;
-  href: string;
 };
 
 /** The four tabs every tournament view shows, in order. */

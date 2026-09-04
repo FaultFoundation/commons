@@ -72,19 +72,23 @@ export function AboutLayout({ rows }: { rows: AboutRow[] }) {
   return (
     <div className="ff-about-layout">
       {rows.map((row, rowIndex) => (
-        <div
-          key={rowIndex}
-          className="ff-about-row"
-          style={{ "--ff-about-cols": row.columns.length } as CSSProperties}
-        >
-          {row.columns.map((cell, colIndex) => (
-            <div key={colIndex} className="ff-about-col">
-              {cell.map((widget, widgetIndex) => (
-                <Widget key={widgetIndex} widget={widget} />
-              ))}
-            </div>
-          ))}
-        </div>
+        <section key={rowIndex} className="ff-about-section">
+          {row.title ? (
+            <h3 className="ff-about-section__title">{row.title}</h3>
+          ) : null}
+          <div
+            className="ff-about-row"
+            style={{ "--ff-about-cols": row.columns.length } as CSSProperties}
+          >
+            {row.columns.map((cell, colIndex) => (
+              <div key={colIndex} className="ff-about-col">
+                {cell.map((widget, widgetIndex) => (
+                  <Widget key={widgetIndex} widget={widget} />
+                ))}
+              </div>
+            ))}
+          </div>
+        </section>
       ))}
     </div>
   );

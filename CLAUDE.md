@@ -76,7 +76,7 @@ npm run db:migrate:local  # apply to local D1 (.wrangler/state)
 npm run db:migrate:remote # apply to real D1 — run BEFORE npm run deploy
 npm run db:cen:generate   # db/cen-schema.ts -> migration in drizzle-cen/
 npm run db:cen:seed:favicons:local / :remote
-                          # load the Hipo-derived school favicon lookup into cen-sql
+                          # load the Hipo-backed + curated school favicon/university lookup into cen-sql
 npm run db:ow:generate    # db/ow-schema.ts -> migration in drizzle-ow/ (also
                           # db:ow:migrate:local / :remote). The Commons owns the
                           # ow-player-data schema; the ow-data repo only
@@ -289,21 +289,49 @@ with one half (shared snapshot, one instance live at a time).
   (external) or the Participants grid (internal).
 - **Bracket** pairs a **Recent Results** sidebar
   ([RecentResults](components/dashboard/tournaments/RecentResults.tsx), latest
-  decided matches, finals first) with the bracket.
-- The header's icon row
-  ([TournamentLinks](components/dashboard/tournaments/TournamentLinks.tsx)) shows
-  **only the tournament's own known links** — video/stream/Discord/organizer/
-  socials for external, rules/Challonge for internal — never a generic set; it
-  renders nothing when there are none.
+  decided matches, finals first) with the bracket. The sidebar renders the whole
+  list but DEFAULTS to the bracket's height (its grid column is `align-items:
+  stretch`, the list scrolls inside); "Show all N matches" adds
+  `.ff-recent--expanded`, and `.ff-tbracket:has(.ff-recent--expanded)` drops the
+  stretch so the card grows past the bracket instead of forcing the bracket tall.
+- Both views carry the **same header share affordance** — the
+  [ShareBar](components/dashboard/tournaments/ShareBar.tsx) (the external branch
+  is passed a Commons `shareUrl`). An earlier per-tournament "known links" icon
+  row was dropped in favour of this consistency; the tournament's own
+  links (stream/Discord/organizer/socials) still live in the Overview Details
+  panel.
+- The start.gg **About section headers** ("Format" / "Prizing" — start.gg's
+  `widgetTitle`) are carried on each `AboutRow.title` and rendered by
+  [AboutLayout](components/dashboard/tournaments/AboutLayout.tsx). The scraper
+  captures them best-effort (the internal widget-layout API is undocumented, so a
+  missing title just omits the header).
 - **Small entrant marks everywhere.** 18–22px favicons/logos sit beside team
   names in the bracket slots, standings, top finishers and recent results.
   External favicons come from cen-sql (`ext_matches.entrant_{1,2}_logo_url`,
   `ext_standings.entrant_logo_url` — Google s2 favicons the scraper resolves via
-  `school_favicons`); internal marks are the team `logoUrl`, now carried through
-  the bracket snapshot (`SnapshotParticipant.logoUrl`, joined by
+  `school_favicons`); their canonical school name/domain is carried separately
+  as `entrant_*_school_name`/`entrant_*_school_domain`. Internal marks are the
+  team `logoUrl`, now carried through the bracket snapshot (`SnapshotParticipant.logoUrl`, joined by
   `challonge_participant_id` in `getOrRefreshSnapshot`; snapshots cached before
   this field read as null). The shared shapes/components live in
   [tournament-view-shared.ts](components/dashboard/tournaments/tournament-view-shared.ts).
+- **Standings/finishers for external fall back to the bracket.** The scraper
+  lands many bracket tournaments with matches but an empty `ext_standings`, which
+  left the Standings tab and top-finishers blank. start.gg events with no
+  published standings instead project their `event.entrants` roster into
+  `ext_standings` with null placements; the tab is then labelled **Entrants**.
+  When no placed standings exist, `deriveBracketResults` (in
+  `ExternalTournamentView`) reconstructs placements from a **completed** bracket:
+  champion + runner-up from the highest winners-side match, the rest by
+  elimination stage (later losers-bracket exit places higher), ties shared. It is
+  **pool-aware** — it splits into pools EXACTLY the way `ExternalBracket` does
+  (prefer `phaseGroupId`, else the weakly-connected components of the feed graph,
+  so a CRL-style A1–A4 qualifier with prereq edges but no phase-group labels
+  still splits into 4) and ranks each pool on its own. A single bracket shows a
+  podium (top-3); a pool stage shows the **advancing** entrants — each pool's
+  top-`POOL_ADVANCE_DEFAULT` (1 until the scraper collects start.gg's real
+  progression count), labelled and sorted by pool, both in the Overview finishers
+  row and as per-pool sections (with an "Advancing" tag) in the Standings tab.
 
 **Liquipedia portability (structure only).**
 [lib/liquipedia.ts](lib/liquipedia.ts) maps a tournament onto Liquipedia's
@@ -360,8 +388,22 @@ Commons as `CEN` — deliberately not joined to `website-sql` at the DB level
 (D1 can't JOIN across bindings; join in app code by external id, like the bot's
 Sheets↔D1 split). It is a lean **projection** ([db/cen-schema.ts](db/cen-schema.ts):
 `ext_tournaments`/`ext_events`/`ext_matches`/`ext_standings`), not the scraper's full
-normalized model. Its migrations version independently in `drizzle-cen/`
-(`npm run db:cen:*`), separate from `website-sql`'s `drizzle/`.
+normalized model.
+
+**The live cen-sql schema is owned by the SCRAPER, not this repo.** Production
+cen-sql is migrated by `cen-news-notifications/migrations/` (its
+`db:migrate:remote`, latest `0013_entrant_school_identity`); the Commons
+`drizzle-cen/` (`npm run db:cen:*`) is a **read-side mirror** — it shapes the
+LOCAL dev DB and lets the Drizzle schema in `db/cen-schema.ts` typecheck, nothing
+more. The two histories share only `0000`/`0001` then diverge, so **never run
+`npm run db:cen:migrate:remote` against production** — it would replay the Commons
+history onto prod (whose `d1_migrations` has none of those names) and collide with
+columns that already exist. Verify with `wrangler d1 execute cen-sql --remote
+--command "SELECT name FROM d1_migrations"` (prod shows the scraper's names;
+`--local` shows the Commons names — they are NOT the same DB state). A NEW cen-sql
+column therefore goes in the **scraper's** `migrations/` + is added to
+`db/cen-schema.ts` here only to READ it (with a matching drizzle-cen migration for
+local dev).
 
 - **The Commons app never writes `cen-sql`.** The writer and all scraping APIs
   live in the separate `cen-news-notifications` repository, whose plain
@@ -501,12 +543,17 @@ normalized model. Its migrations version independently in `drizzle-cen/`
   `/championship/<id>/<encoded name>/teams`; the stable Data API equivalent is
   `/championships/<id>/subscriptions`, with a small bounded number of
   `/teams/<id>` lookups for premade teams. When those provider objects omit an
-  icon (their default-avatar state), the scraper phrase-matches the longest
-  normalized `school_favicons` name, so `Michigan State University - Gold`
-  resolves Michigan State. Provider art always wins. The lookup is generated
-  from the same Hipo directory by `npm run db:seed:generate` and seeded into
-  `cen-sql` separately; the scraper stamps only the final safe URL into
-  `ext_matches.entrant_*_logo_url` and `ext_standings.entrant_logo_url`, keeping
+  icon (their default-avatar state), the scraper first matches a leading
+  canonical `school_favicons` phrase, then checks its source-controlled,
+  high-confidence alias phrases (for example `UTD Black` → University of Texas
+  at Dallas). Generic acronyms such as `ASU`, `USC`, and `WSU` deliberately stay
+  unresolved unless a longer team phrase identifies one school. Provider art
+  always wins, but the resolved canonical name + domain are still stamped into
+  `ext_matches.entrant_*_school_*` and `ext_standings.entrant_school_*`; this is
+  the durable affiliation, while the favicon is a display fallback. The lookup
+  is generated from the Hipo directory plus
+  [scripts/supplemental-schools.mjs](scripts/supplemental-schools.mjs) by
+  `npm run db:seed:generate` and seeded into `cen-sql` separately, keeping
   Commons reads flat and cross-D1-free.
 - **The dashboard shell for the whole tab lives in
   [app/tournaments/layout.tsx](app/tournaments/layout.tsx)**, not the pages, so

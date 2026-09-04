@@ -206,6 +206,8 @@ export type ExternalTournamentMatch = {
   entrant2Name: string | null;
   entrant1LogoUrl: string | null;
   entrant2LogoUrl: string | null;
+  entrant1School: ExternalSchool | null;
+  entrant2School: ExternalSchool | null;
   entrant1Score: number | null;
   entrant2Score: number | null;
   /** 1 = entrant1 won, 2 = entrant2 won, null = undecided. */
@@ -233,13 +235,20 @@ export type ExternalTournamentMatch = {
   url: string | null;
 };
 
+export type ExternalSchool = {
+  name: string;
+  domain: string;
+};
+
 /** One content widget in the start.gg About layout (mirrors the scraper). */
 export type AboutWidget =
   | { type: "md"; content: string }
   | { type: "img"; url: string; caption: string | null }
   | { type: "vid"; url: string };
-/** One row of the About layout, preserving start.gg's column split. */
-export type AboutRow = { columns: AboutWidget[][] };
+/** One row of the About layout, preserving start.gg's column split. `title` is
+    the section header start.gg shows above the row (its `widgetTitle`, e.g.
+    "Format" / "Prizing"); null when the row has none. */
+export type AboutRow = { title: string | null; columns: AboutWidget[][] };
 
 export type ExternalTournamentDetail = {
   id: string;
@@ -287,6 +296,7 @@ export type ExternalTournamentDetail = {
     standings: {
       entrantName: string;
       entrantLogoUrl: string | null;
+      entrantSchool: ExternalSchool | null;
       isTeam: boolean;
       placement: number | null;
     }[];
@@ -486,6 +496,19 @@ function safeImageUrl(value: unknown): string | null {
   return /^https?:\/\//i.test(url) ? url : null;
 }
 
+function schoolIdentity(
+  nameValue: unknown,
+  domainValue: unknown,
+): ExternalSchool | null {
+  if (typeof nameValue !== "string" || typeof domainValue !== "string") {
+    return null;
+  }
+  const name = nameValue.trim();
+  const domain = domainValue.trim().toLowerCase();
+  if (!name || !/^[a-z0-9.-]+$/i.test(domain)) return null;
+  return { name, domain };
+}
+
 /** Parse an `about_layout` column into `AboutRow[]`, tolerating null/junk. Each
     row keeps only well-formed content widgets with safe http(s) URLs; empty
     columns/rows are dropped. Returns [] on anything malformed. */
@@ -524,7 +547,11 @@ function parseAboutLayout(value: unknown): AboutRow[] {
         }
         if (cell.length) columns.push(cell);
       }
-      if (columns.length) rows.push({ columns });
+      const title =
+        typeof row?.title === "string" && row.title.trim()
+          ? row.title.trim()
+          : null;
+      if (columns.length) rows.push({ title, columns });
     }
     return rows;
   } catch {
@@ -644,6 +671,10 @@ export async function getExternalTournament(
       list.push({
         entrantName: s.entrantName,
         entrantLogoUrl: safeImageUrl(s.entrantLogoUrl),
+        entrantSchool: schoolIdentity(
+          s.entrantSchoolName,
+          s.entrantSchoolDomain,
+        ),
         isTeam: s.isTeam,
         placement: s.placement,
       });
@@ -674,6 +705,14 @@ export async function getExternalTournament(
         entrant2Name: m.entrant2Name,
         entrant1LogoUrl: safeImageUrl(m.entrant1LogoUrl),
         entrant2LogoUrl: safeImageUrl(m.entrant2LogoUrl),
+        entrant1School: schoolIdentity(
+          m.entrant1SchoolName,
+          m.entrant1SchoolDomain,
+        ),
+        entrant2School: schoolIdentity(
+          m.entrant2SchoolName,
+          m.entrant2SchoolDomain,
+        ),
         entrant1Score: toNum(m.entrant1Score),
         entrant2Score: toNum(m.entrant2Score),
         winner: (toNum(m.winner) === 1 ? 1 : toNum(m.winner) === 2 ? 2 : null),

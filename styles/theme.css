@@ -3877,65 +3877,11 @@ button.ff-dash__link:hover {
   gap: 12px 24px;
 }
 
-/* Known-links row — circular icon buttons in the marketing social style, only
-   for links the tournament actually has (video/stream/Discord/organizer/socials
-   for external; rules/Challonge for internal). Brand-tinted on hover. */
-.ff-tlinks {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.ff-tlink {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid var(--ff-border);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--ff-text-dim);
-  text-decoration: none;
-  transition:
-    transform 0.1s ease,
-    background var(--ff-transition),
-    color var(--ff-transition),
-    border-color var(--ff-transition);
-}
-.ff-tlink:hover {
-  transform: scale(1.08);
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.28);
-}
-.ff-tlink--discord:hover {
-  background: #5865f2;
-  border-color: #5865f2;
-}
-.ff-tlink--x:hover {
-  background: #000;
-}
-.ff-tlink--facebook:hover {
-  background: #0866ff;
-  border-color: #0866ff;
-}
-.ff-tlink--youtube:hover {
-  background: #f00;
-  border-color: #f00;
-}
-.ff-tlink--twitch:hover,
-.ff-tlink--stream:hover {
-  background: #9146ff;
-  border-color: #9146ff;
-}
-.ff-tlink--instagram:hover {
-  background: #e1306c;
-  border-color: #e1306c;
-}
-.ff-tlink--video:hover,
-.ff-tlink--provider:hover {
-  background: var(--ff-blue);
-  border-color: var(--ff-blue);
+/* Bigger section headers in the tournament view than the dashboard default —
+   the bubble titles (About / Details / Bracket / Standings / Rules) and the
+   start.gg About section titles read as real headers here, not row labels. */
+.ff-tview .ff-bubble__title {
+  font-size: var(--ff-dash-text-xl);
 }
 
 /* Browser-style section tabs (same look as the bracket phase tabs). */
@@ -3981,12 +3927,14 @@ button.ff-dash__link:hover {
   min-width: 0;
 }
 
-/* Overview: About (wide) + Details (narrow), collapsing to one column; a lone
-   child takes the whole row. */
+/* Overview: About (as wide as possible) + a fixed-width Details rail, collapsing
+   to one column; a lone child takes the whole row. A fixed Details width lets the
+   About bubble take all the remaining space, so its prose fills the width instead
+   of wrapping short and leaving whitespace. */
 .ff-toverview {
   display: grid;
   gap: var(--ff-space-section, 20px);
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 320px;
   align-items: start;
 }
 .ff-toverview > :only-child {
@@ -4090,8 +4038,32 @@ button.ff-dash__link:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Pool tag after an advancing entrant's name ("Pool A1"). */
+.ff-tfin__pool {
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-pill);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  color: var(--ff-text-dim);
+  white-space: nowrap;
+}
 .ff-trophy {
   flex: 0 0 auto;
+}
+/* "Advancing" tag on a pool's advancing rows in the Standings tab. */
+.ff-ext-adv {
+  margin-left: 4px;
+  padding: 1px 7px;
+  border-radius: var(--ff-radius-pill);
+  background: rgba(95, 208, 138, 0.18);
+  color: var(--ff-ok);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 .ff-tfin__more {
   margin-left: auto;
@@ -4111,7 +4083,13 @@ button.ff-dash__link:hover {
 .ff-tbracket {
   display: grid;
   gap: var(--ff-space-section, 20px);
-  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
+  /* Stretch so the Recent Results card fills the (taller) bracket's height by
+     default — its list scrolls inside. When the sidebar is EXPANDED it opts back
+     out to natural heights so the card can grow past the bracket. */
+  align-items: stretch;
+}
+.ff-tbracket:has(.ff-recent--expanded) {
   align-items: start;
 }
 .ff-tbracket--solo {
@@ -4120,6 +4098,7 @@ button.ff-dash__link:hover {
 @media (max-width: 900px) {
   .ff-tbracket {
     grid-template-columns: minmax(0, 1fr);
+    align-items: start;
   }
 }
 .ff-tbracket__main {
@@ -4127,27 +4106,39 @@ button.ff-dash__link:hover {
 }
 
 /* Recent Results — a card of compact two-line score rows, favicons included,
-   deep-linking to the provider match page (external) when there is one. */
+   deep-linking to the provider match page (external) when there is one. Fills
+   the bracket's height by default (the list scrolls); the shadow matches the
+   other cards. */
 .ff-recent {
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--ff-border);
   border-radius: var(--ff-radius-lg);
   background: var(--ff-surface-2);
+  box-shadow: var(--ff-shadow-card);
   padding: 16px;
   min-width: 0;
-  align-self: start;
 }
 .ff-recent__title {
   margin: 0 0 12px;
-  font-size: var(--ff-dash-text-xs);
+  font-size: var(--ff-dash-text-lg);
   font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ff-text-dim);
+  letter-spacing: -0.2px;
+  color: #fff;
 }
 .ff-recent__list {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* Collapsed: take the remaining card height and scroll within it, so the card
+     ends at the bracket's bottom. Expanded: grow to show every row inline. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.ff-recent--expanded .ff-recent__list {
+  flex: 0 0 auto;
+  overflow: visible;
 }
 .ff-recent__row {
   display: block;
@@ -4218,7 +4209,9 @@ button.ff-dash__link:hover {
   font-weight: 700;
 }
 .ff-recent__toggle {
+  flex: 0 0 auto;
   margin-top: 12px;
+  align-self: flex-start;
   border: 0;
   background: none;
   cursor: pointer;
@@ -4828,6 +4821,20 @@ button.ff-dash__link:hover {
   display: flex;
   flex-direction: column;
   gap: 28px;
+}
+/* A section = start.gg's `widgetTitle` header (when present) over its row of
+   columns, so "Format" / "Prizing" read as real section headers. */
+.ff-about-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ff-about-section__title {
+  margin: 0;
+  font-size: var(--ff-dash-text-lg);
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: #fff;
 }
 .ff-about-row {
   display: grid;

@@ -6,11 +6,11 @@ import type { ResultRow } from "@/components/dashboard/tournaments/tournament-vi
 
 // The "Recent Results" sidebar shown beside the bracket: the most recent decided
 // matches (finals first), each a compact two-line score card with the entrants'
-// small logos, deep-linking to the provider match page when there is one. Starts
-// collapsed to a handful; "Show all N matches" expands the full list in place.
+// small logos, deep-linking to the provider match page when there is one. It
+// DEFAULTS to filling the height of the bracket bubble beside it — the list
+// scrolls inside that height — and "Show all N matches" expands it to the full
+// list inline (the grid drops its stretch via :has(.ff-recent--expanded)).
 // Renders nothing when there are no decided matches yet.
-
-const COLLAPSED_COUNT = 3;
 
 function ResultCard({ row }: { row: ResultRow }) {
   const inner = (
@@ -66,14 +66,18 @@ export function RecentResults({ results }: { results: ResultRow[] }) {
   const [expanded, setExpanded] = useState(false);
   if (results.length === 0) return null;
 
-  const shown = expanded ? results : results.slice(0, COLLAPSED_COUNT);
-  const hasMore = results.length > COLLAPSED_COUNT;
+  // The full list always renders; height is CSS-driven — collapsed the list
+  // scrolls within the bracket's height, expanded the card grows to show all.
+  const hasMore = results.length > 4;
 
   return (
-    <aside className="ff-recent" aria-label="Recent results">
+    <aside
+      className={`ff-recent${expanded ? " ff-recent--expanded" : ""}`}
+      aria-label="Recent results"
+    >
       <h3 className="ff-recent__title">Recent Results</h3>
       <div className="ff-recent__list">
-        {shown.map((row) => (
+        {results.map((row) => (
           <ResultCard key={row.id} row={row} />
         ))}
       </div>

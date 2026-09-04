@@ -13,10 +13,8 @@ import {
 } from "@/components/dashboard/tournaments/TournamentChrome";
 import { TopFinishers } from "@/components/dashboard/tournaments/TopFinishers";
 import { RecentResults } from "@/components/dashboard/tournaments/RecentResults";
-import { TournamentLinks } from "@/components/dashboard/tournaments/TournamentLinks";
 import type {
   FinisherEntry,
-  HeaderLink,
   ResultRow,
 } from "@/components/dashboard/tournaments/tournament-view-shared";
 import { getExternalTournament } from "@/lib/external-tournaments";
@@ -159,10 +157,16 @@ export default async function TournamentPage({
   if (!isTournamentId(id)) {
     const external = await getExternalTournament(id);
     if (!external) notFound();
+    const extHost = hdrs.get("host") ?? "commons.fault.foundation";
+    const extShareUrl = `https://${extHost}/tournaments/${encodeURIComponent(id)}/`;
     return (
       <>
         <h1 className="screen-reader-text">{external.name}</h1>
-        <ExternalTournamentView tournament={external} />
+        <ExternalTournamentView
+          tournament={external}
+          shareUrl={extShareUrl}
+          shareMessage={tournamentShareText(external.name)}
+        />
       </>
     );
   }
@@ -204,20 +208,6 @@ export default async function TournamentPage({
 
   const finishers = buildFinishers(initial?.participants ?? []);
   const recentResults = buildRecentResults(initial);
-
-  // Header known-links (this tournament's own links, as icons) — the rules doc
-  // and the live Challonge bracket, when set.
-  const headerLinks: HeaderLink[] = [];
-  if (tournament.rulesUrl) {
-    headerLinks.push({ kind: "rules", label: "Rules", href: tournament.rulesUrl });
-  }
-  if (tournament.externalUrl) {
-    headerLinks.push({
-      kind: "provider",
-      label: "View on Challonge",
-      href: tournament.externalUrl,
-    });
-  }
 
   const startDate = tournament.startsAt
     ? tournament.startsAt.toLocaleDateString(undefined, {
@@ -277,7 +267,6 @@ export default async function TournamentPage({
               </span>
             </div>
           </div>
-          <TournamentLinks links={headerLinks} />
         </div>
         <div className="ff-thero__actions">
           <TournamentRegister
@@ -356,7 +345,22 @@ export default async function TournamentPage({
       className={`ff-tbracket${recentResults.length ? "" : " ff-tbracket--solo"}`}
     >
       {recentResults.length ? <RecentResults results={recentResults} /> : null}
-      <Bubble title="Bracket" className="ff-bubble--divided ff-tbracket__main">
+      <Bubble
+        title="Bracket"
+        className="ff-bubble--divided ff-tbracket__main"
+        actions={
+          initial && tournament.externalUrl ? (
+            <a
+              className="ff-btn ff-btn--outline ff-btn--sm"
+              href={tournament.externalUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              View on Challonge
+            </a>
+          ) : undefined
+        }
+      >
         {initial ? (
           <BracketView
             tournamentId={tournament.id}

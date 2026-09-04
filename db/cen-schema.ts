@@ -157,6 +157,10 @@ export const extMatches = sqliteTable(
     entrant2Name: text("entrant_2_name"),
     entrant1LogoUrl: text("entrant_1_logo_url"),
     entrant2LogoUrl: text("entrant_2_logo_url"),
+    entrant1SchoolName: text("entrant_1_school_name"),
+    entrant1SchoolDomain: text("entrant_1_school_domain"),
+    entrant2SchoolName: text("entrant_2_school_name"),
+    entrant2SchoolDomain: text("entrant_2_school_domain"),
     // Per-side score; negative = forfeit/DQ side, null = not played.
     entrant1Score: integer("entrant_1_score"),
     entrant2Score: integer("entrant_2_score"),
@@ -196,7 +200,7 @@ export const extMatches = sqliteTable(
   ],
 );
 
-/** A final placement in an event — the "results" the Commons view renders. */
+/** A registered entrant or final placement in an event. */
 export const extStandings = sqliteTable(
   "ext_standings",
   {
@@ -204,6 +208,8 @@ export const extStandings = sqliteTable(
     eventId: text("event_id").notNull(),
     entrantName: text("entrant_name").notNull(),
     entrantLogoUrl: text("entrant_logo_url"),
+    entrantSchoolName: text("entrant_school_name"),
+    entrantSchoolDomain: text("entrant_school_domain"),
     isTeam: integer("is_team", { mode: "boolean" }).notNull().default(true),
     placement: integer("placement"),
   },

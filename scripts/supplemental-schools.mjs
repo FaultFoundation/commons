@@ -1,0 +1,77 @@
+// Officially verified institutions absent from Hipo's university-domains-list.
+// Keep this list limited to records needed by the application and retain the
+// canonical institution name plus its official primary domain.
+export const SUPPLEMENTAL_SCHOOLS = [
+  {
+    name: "Albright College",
+    country: "United States",
+    alphaTwoCode: "US",
+    stateProvince: "Pennsylvania",
+    domains: ["albright.edu"],
+    webPages: ["https://www.albright.edu/"],
+  },
+  {
+    name: "Cumberland University",
+    country: "United States",
+    alphaTwoCode: "US",
+    stateProvince: "Tennessee",
+    domains: ["cumberland.edu"],
+    webPages: ["https://www.cumberland.edu/"],
+  },
+  {
+    name: "C\u00e9gep de Drummondville",
+    country: "Canada",
+    alphaTwoCode: "CA",
+    stateProvince: "Quebec",
+    domains: ["cegepdrummond.ca"],
+    webPages: ["https://www.cegepdrummond.ca/"],
+  },
+  {
+    name: "Columbia International University",
+    country: "United States",
+    alphaTwoCode: "US",
+    stateProvince: "South Carolina",
+    domains: ["ciu.edu"],
+    webPages: ["https://ciu.edu/"],
+  },
+  {
+    name: "Fisher College",
+    country: "United States",
+    alphaTwoCode: "US",
+    stateProvince: "Massachusetts",
+    domains: ["fisher.edu"],
+    webPages: ["https://www.fisher.edu/"],
+  },
+  {
+    name: "Indiana University Northwest",
+    country: "United States",
+    alphaTwoCode: "US",
+    stateProvince: "Indiana",
+    domains: ["northwest.iu.edu"],
+    webPages: ["https://northwest.iu.edu/"],
+  },
+  {
+    name: "Lubbock Christian University",
+    country: "United States",
+    alphaTwoCode: "US",
+    stateProvince: "Texas",
+    domains: ["lcu.edu"],
+    webPages: ["https://lcu.edu/"],
+  },
+  {
+    name: "Manchester University",
+    country: "United States",
+    alphaTwoCode: "US",
+    stateProvince: "Indiana",
+    domains: ["manchester.edu"],
+    webPages: ["https://www.manchester.edu/"],
+  },
+  {
+    name: "Mount Aloysius College",
+    country: "United States",
+    alphaTwoCode: "US",
+    stateProvince: "Pennsylvania",
+    domains: ["mtaloy.edu"],
+    webPages: ["https://www.mtaloy.edu/"],
+  },
+];

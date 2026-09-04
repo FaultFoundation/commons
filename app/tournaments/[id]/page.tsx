@@ -12,7 +12,7 @@ import {
   type TournamentTab,
 } from "@/components/dashboard/tournaments/TournamentChrome";
 import { TopFinishers } from "@/components/dashboard/tournaments/TopFinishers";
-import { RecentResults } from "@/components/dashboard/tournaments/RecentResults";
+import { BracketWithSidebar } from "@/components/dashboard/tournaments/BracketWithSidebar";
 import type {
   FinisherEntry,
   ResultRow,
@@ -341,13 +341,10 @@ export default async function TournamentPage({
   );
 
   const bracket = (
-    <div
-      className={`ff-tbracket${recentResults.length ? "" : " ff-tbracket--solo"}`}
-    >
-      {recentResults.length ? <RecentResults results={recentResults} /> : null}
+    <BracketWithSidebar results={recentResults}>
       <Bubble
         title="Bracket"
-        className="ff-bubble--divided ff-tbracket__main"
+        className="ff-bubble--divided"
         actions={
           initial && tournament.externalUrl ? (
             <a
@@ -371,7 +368,7 @@ export default async function TournamentPage({
           <p className="ff-ticket-empty">No bracket has been published yet.</p>
         )}
       </Bubble>
-    </div>
+    </BracketWithSidebar>
   );
 
   const standings = (

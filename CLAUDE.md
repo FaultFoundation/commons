@@ -287,13 +287,18 @@ with one half (shared snapshot, one instance live at a time).
   gold/silver/bronze [TrophyIcon](components/dashboard/tournaments/TrophyIcon.tsx)
   marks (inline SVG, no image assets) — then About + a Details facts panel
   (external) or the Participants grid (internal).
-- **Bracket** pairs a **Recent Results** sidebar
-  ([RecentResults](components/dashboard/tournaments/RecentResults.tsx), latest
-  decided matches, finals first) with the bracket. The sidebar renders the whole
-  list but DEFAULTS to the bracket's height (its grid column is `align-items:
-  stretch`, the list scrolls inside); "Show all N matches" adds
-  `.ff-recent--expanded`, and `.ff-tbracket:has(.ff-recent--expanded)` drops the
-  stretch so the card grows past the bracket instead of forcing the bracket tall.
+- **Bracket** pairs a **Recent Results** sidebar (broadcast-style scoreboard
+  cards — header round+date over a hairline, a "Final" status, the two entrants
+  with logos + scores, winner emphasised;
+  [RecentResults](components/dashboard/tournaments/RecentResults.tsx), latest
+  decided matches, finals first) with the bracket. The sidebar's height is
+  **measured in JS**, not CSS: [BracketWithSidebar](components/dashboard/tournaments/BracketWithSidebar.tsx)
+  (client) ResizeObserves the bracket bubble and caps the card's `max-height` to
+  it so the list scrolls to the bracket's bottom — a grid `stretch` can't, it
+  sizes to the TALLER child (the full match list) and would stretch the bracket
+  instead. "Show all N matches" clears the cap so the card grows past the
+  bracket. RecentResults is a controlled presentational component; the wrapper
+  owns the expanded state and the measured height.
 - Both views carry the **same header share affordance** — the
   [ShareBar](components/dashboard/tournaments/ShareBar.tsx) (the external branch
   is passed a Commons `shareUrl`). An earlier per-tournament "known links" icon

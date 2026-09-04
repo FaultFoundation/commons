@@ -1,28 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import type {
+  ResultRow,
+  ResultSide,
+} from "@/components/dashboard/tournaments/tournament-view-shared";
 
-import type { ResultRow } from "@/components/dashboard/tournaments/tournament-view-shared";
-
-// The "Recent Results" sidebar shown beside the bracket: the most recent decided
-// matches (finals first), each a compact two-line score card with the entrants'
-// small logos, deep-linking to the provider match page when there is one. It
-// DEFAULTS to filling the height of the bracket bubble beside it — the list
-// scrolls inside that height — and "Show all N matches" expands it to the full
-// list inline (the grid drops its stretch via :has(.ff-recent--expanded)).
+// The "Recent Results" sidebar shown beside the bracket. Each result is a
+// scoreboard card modelled on a broadcast score bug: a header row (round + date)
+// over a hairline, a centred "Final" status, then the two entrants with their
+// logos and scores, the winner emphasised. It's a CONTROLLED component — the
+// BracketWithSidebar wrapper measures the bracket's height and hands it down as
+// `cardMaxHeight` so the card fills to the bracket's bottom and its list scrolls
+// inside; "Show all N" clears the cap (expanded) so the card grows past it.
 // Renders nothing when there are no decided matches yet.
+
+function ScoreLine({ side }: { side: ResultSide }) {
+  return (
+    <div
+      className={`ff-recent__team${side.winner ? " ff-recent__team--win" : ""}`}
+    >
+      {side.logoUrl ? (
+        <img
+          className="ff-recent__logo"
+          src={side.logoUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <span className="ff-recent__logo ff-recent__logo--empty" aria-hidden="true" />
+      )}
+      <span className="ff-recent__name">{side.name}</span>
+      <span className="ff-recent__score">{side.score}</span>
+    </div>
+  );
+}
 
 function ResultCard({ row }: { row: ResultRow }) {
   const inner = (
     <>
-      <div className="ff-recent__meta">
-        {row.round ? <span className="ff-recent__round">{row.round}</span> : null}
+      <div className="ff-recent__head">
+        <span className="ff-recent__round">{row.round ?? "Match"}</span>
         {row.dateLabel ? (
           <span className="ff-recent__date">{row.dateLabel}</span>
         ) : null}
       </div>
-      <ResultSideRow side={row.a} />
-      <ResultSideRow side={row.b} />
+      <div className="ff-recent__status">Final</div>
+      <div className="ff-recent__teams">
+        <ScoreLine side={row.a} />
+        <ScoreLine side={row.b} />
+      </div>
     </>
   );
   return row.url ? (
@@ -39,41 +67,27 @@ function ResultCard({ row }: { row: ResultRow }) {
   );
 }
 
-function ResultSideRow({ side }: { side: ResultRow["a"] }) {
-  return (
-    <div
-      className={`ff-recent__side${side.winner ? " ff-recent__side--win" : ""}`}
-    >
-      <span className="ff-recent__entrant">
-        {side.logoUrl ? (
-          <img
-            className="ff-recent__logo"
-            src={side.logoUrl}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            referrerPolicy="no-referrer"
-          />
-        ) : null}
-        <span className="ff-recent__name">{side.name}</span>
-      </span>
-      <span className="ff-recent__score">{side.score}</span>
-    </div>
-  );
-}
-
-export function RecentResults({ results }: { results: ResultRow[] }) {
-  const [expanded, setExpanded] = useState(false);
+export function RecentResults({
+  results,
+  cardMaxHeight,
+  expanded,
+  onToggle,
+}: {
+  results: ResultRow[];
+  /** Cap the card's height (to the bracket's) so its list scrolls; null when
+      expanded (grow to show every row). */
+  cardMaxHeight: number | null;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
   if (results.length === 0) return null;
-
-  // The full list always renders; height is CSS-driven — collapsed the list
-  // scrolls within the bracket's height, expanded the card grows to show all.
   const hasMore = results.length > 4;
 
   return (
     <aside
       className={`ff-recent${expanded ? " ff-recent--expanded" : ""}`}
       aria-label="Recent results"
+      style={cardMaxHeight != null ? { maxHeight: cardMaxHeight } : undefined}
     >
       <h3 className="ff-recent__title">Recent Results</h3>
       <div className="ff-recent__list">
@@ -82,11 +96,7 @@ export function RecentResults({ results }: { results: ResultRow[] }) {
         ))}
       </div>
       {hasMore ? (
-        <button
-          type="button"
-          className="ff-recent__toggle"
-          onClick={() => setExpanded((v) => !v)}
-        >
+        <button type="button" className="ff-recent__toggle" onClick={onToggle}>
           {expanded ? "Show fewer" : `Show all ${results.length} matches`}
         </button>
       ) : null}

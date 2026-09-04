@@ -4084,13 +4084,11 @@ button.ff-dash__link:hover {
 .ff-tbracket {
   display: grid;
   gap: 20px;
-  grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
-  /* Stretch so the Recent Results card fills the (taller) bracket's height by
-     default — its list scrolls inside. When the sidebar is EXPANDED it opts back
-     out to natural heights so the card can grow past the bracket. */
-  align-items: stretch;
-}
-.ff-tbracket:has(.ff-recent--expanded) {
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  /* Natural heights; the Recent Results card is capped to the bracket's measured
+     height in JS (BracketWithSidebar) so its list scrolls to the bracket's
+     bottom — a grid `stretch` can't, it would size to the TALLER child (the full
+     match list) and stretch the bracket instead. */
   align-items: start;
 }
 .ff-tbracket--solo {
@@ -4099,17 +4097,16 @@ button.ff-dash__link:hover {
 @media (max-width: 900px) {
   .ff-tbracket {
     grid-template-columns: minmax(0, 1fr);
-    align-items: start;
   }
 }
 .ff-tbracket__main {
   min-width: 0;
 }
 
-/* Recent Results — a card of compact two-line score rows, favicons included,
-   deep-linking to the provider match page (external) when there is one. Fills
-   the bracket's height by default (the list scrolls); the shadow matches the
-   other cards. */
+/* Recent Results — a column of broadcast-style scoreboard cards (header + "Final"
+   status + the two entrants with logos and scores). The card fills the bracket's
+   height (max-height set inline by BracketWithSidebar) with the list scrolling
+   inside; the shadow matches the other cards. */
 .ff-recent {
   display: flex;
   flex-direction: column;
@@ -4131,22 +4128,19 @@ button.ff-dash__link:hover {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  /* Collapsed: take the remaining card height and scroll within it, so the card
-     ends at the bracket's bottom. Expanded: grow to show every row inline. */
+  /* Take the remaining card height and scroll within it (the card's max-height is
+     the bracket's height); when expanded the cap is removed and this grows. */
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
 }
-.ff-recent--expanded .ff-recent__list {
-  flex: 0 0 auto;
-  overflow: visible;
-}
+/* One scoreboard card. */
 .ff-recent__row {
   display: block;
   border: 1px solid var(--ff-border);
   border-radius: var(--ff-radius-md);
-  background: rgba(255, 255, 255, 0.02);
-  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 10px 12px;
   text-decoration: none;
   color: inherit;
 }
@@ -4156,58 +4150,81 @@ button.ff-dash__link:hover {
 .ff-recent__row--link:hover {
   border-color: rgba(255, 255, 255, 0.28);
 }
-.ff-recent__meta {
+.ff-recent__head {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 6px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--ff-border);
   font-size: var(--ff-dash-text-xs);
   color: var(--ff-text-dim);
 }
 .ff-recent__round {
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-}
-.ff-recent__side {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 2px 0;
-}
-.ff-recent__entrant {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-}
-.ff-recent__logo {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  border-radius: 4px;
-  object-fit: contain;
-  background: #fff;
-}
-.ff-recent__name {
-  font-size: var(--ff-dash-text-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ff-recent__side--win .ff-recent__name {
-  font-weight: 700;
-  color: var(--ff-accent);
+.ff-recent__date {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+.ff-recent__status {
+  margin-bottom: 8px;
+  text-align: center;
+  font-size: var(--ff-dash-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ff-text-dim);
+}
+.ff-recent__teams {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ff-recent__team {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.ff-recent__logo {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 5px;
+  object-fit: contain;
+  background: #fff;
+}
+.ff-recent__logo--empty {
+  background: rgba(255, 255, 255, 0.08);
+}
+.ff-recent__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ff-recent__score {
+  flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
-  color: var(--ff-text-dim);
-  font-size: var(--ff-dash-text-sm);
-}
-.ff-recent__side--win .ff-recent__score {
-  color: var(--ff-text);
+  font-size: var(--ff-dash-text-md);
   font-weight: 700;
+  color: var(--ff-text-dim);
+}
+.ff-recent__team--win .ff-recent__name {
+  color: #fff;
+  font-weight: 800;
+}
+.ff-recent__team--win .ff-recent__score {
+  color: var(--ff-accent);
 }
 .ff-recent__toggle {
   flex: 0 0 auto;

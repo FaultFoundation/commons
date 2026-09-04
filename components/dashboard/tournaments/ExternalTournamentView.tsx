@@ -12,7 +12,7 @@ import {
   type TournamentTab,
 } from "@/components/dashboard/tournaments/TournamentChrome";
 import { TopFinishers } from "@/components/dashboard/tournaments/TopFinishers";
-import { RecentResults } from "@/components/dashboard/tournaments/RecentResults";
+import { BracketWithSidebar } from "@/components/dashboard/tournaments/BracketWithSidebar";
 import type {
   FinisherEntry,
   ResultRow,
@@ -760,12 +760,11 @@ export function ExternalTournamentView({
   );
 
   const bracket = (
-    <div className={`ff-tbracket${recentResults.length ? "" : " ff-tbracket--solo"}`}>
-      {recentResults.length ? <RecentResults results={recentResults} /> : null}
-      <Bubble title="Bracket" className="ff-bubble--divided ff-tbracket__main">
+    <BracketWithSidebar results={recentResults}>
+      <Bubble title="Bracket" className="ff-bubble--divided">
         <ExternalBracket events={tournament.events} source={tournament.source} />
       </Bubble>
-    </div>
+    </BracketWithSidebar>
   );
 
   const standings = (

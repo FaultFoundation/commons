@@ -18,7 +18,7 @@ import type {
   FinisherEntry,
   ResultRow,
 } from "@/components/dashboard/tournaments/tournament-view-shared";
-import { FORMAT_VIEW, formatViewKind } from "@/lib/tournament-format";
+import { formatViewKind } from "@/lib/tournament-format";
 import { rrGroupsFromSnapshot } from "@/lib/round-robin-shared";
 import { getExternalTournament } from "@/lib/external-tournaments";
 import { getSessionCached } from "@/lib/session";
@@ -355,7 +355,7 @@ export default async function TournamentPage({
     ) : (
       <BracketWithSidebar results={recentResults}>
         <Bubble
-          title="Bracket"
+          title={`${TOURNAMENT_FORMAT_LABELS[tournament.format] ?? tournament.format} Bracket`}
           className="ff-bubble--divided"
           actions={
             initial && tournament.externalUrl ? (
@@ -414,7 +414,7 @@ export default async function TournamentPage({
 
   const tabs: TournamentTab[] = [
     { id: "overview", label: "Overview", node: overview },
-    { id: "bracket", label: FORMAT_VIEW[tournament.format].tabLabel, node: bracket },
+    { id: "bracket", label: "Bracket", node: bracket },
     { id: "standings", label: "Standings", node: standings },
     { id: "rules", label: "Rules", node: rules },
   ];

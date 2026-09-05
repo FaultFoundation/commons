@@ -13,10 +13,11 @@ import {
 // The round-robin view — the first per-format tournament view (routed to by the
 // format framework's `roundrobin` kind). Three linked pieces on one panel:
 //
-//   1. Results matrix (full-width): rows/cols = entrants, cell = the row team's
-//      result vs the column team, shaded by round. Click a cell → match detail.
-//   2. At-a-glance graph (lower-left): entrants on a circle, every matchup a
-//      curved edge; the current round (incl. live) is emphasised, the next
+//   1. Round Robin Matrix (full-width): rows/cols = entrants, cell = the row
+//      team's result vs the column team, shaded by round with an R-number in the
+//      corner. Click a cell → match detail.
+//   2. Complete Graph (lower-left): entrants on a circle, every matchup a
+//      straight edge; the current round (incl. live) is emphasised, the next
 //      lighter, the rest dashed. All geometry computed here on the client.
 //   3. Rounds schedule (lower-right): each round's matches with a time, a score,
 //      or a LIVE marker — the RecentResults idiom.
@@ -44,12 +45,13 @@ function initials(name: string): string {
   return name.trim().slice(0, 3).toUpperCase();
 }
 
-/** A subtle per-round background tint so cells read as grouped by round. Spread
-    the hue across the rounds and keep the alpha low, so it layers legibly over
-    the card surface in both light and dark themes. */
+/** A per-round background tint so cells read as grouped by round. Spread the hue
+    across the rounds; a dark, fairly opaque fill (low lightness, mid alpha) so
+    each cell reads as a solid darker box behind full-opacity white text, with the
+    white cell outline still standing off it — not a pale wash. */
 function roundShade(round: number, maxRound: number): string {
   const hue = maxRound > 1 ? Math.round(((round - 1) / (maxRound - 1)) * 280) : 210;
-  return `hsla(${hue}, 65%, 55%, 0.13)`;
+  return `hsla(${hue}, 48%, 28%, 0.55)`;
 }
 
 function EntrantLogo({
@@ -144,7 +146,7 @@ function ResultsMatrix({
                       aria-label={`${row.name} vs ${col.name}, round ${match.round}, ${match.state}`}
                       title={`Round ${match.round}${match.timeLabel ? ` · ${match.timeLabel}` : ""}`}
                       onClick={() => onSelect(match)}>
-                      {pairMatches.length > 1 ? <small>R{match.round} </small> : null}
+                      {match.round ? <span className="ff-rr-matrix__round">R{match.round}</span> : null}
                       {match.state === "live" ? <span className="ff-rr-live">LIVE</span> : match.state === "upcoming" ? <span>·<span className="screen-reader-text">{match.timeLabel ?? "Time TBD"}</span></span> : <>
                         <span className="ff-rr-matrix__wl">{rowWon ? "W" : rowLost ? "L" : ""}</span>
                         <span className="ff-rr-matrix__score">{rowIsA ? match.aScore : match.bScore}–{rowIsA ? match.bScore : match.aScore}</span>
@@ -166,7 +168,7 @@ function ResultsMatrix({
 }
 
 // ---------------------------------------------------------------------------
-// At-a-glance matchup graph
+// Complete graph — one straight edge per matchup
 // ---------------------------------------------------------------------------
 
 type EdgeClass = "live" | "next" | "second" | "rest" | "done";
@@ -203,14 +205,10 @@ function MatchupGraph({ group }: { group: RRGroup }) {
       const b = pos.get(m.bId);
       if (!a || !b) continue;
       const cls = edgeClass(m);
-      // A quadratic curve bowed toward the centre — the organic "web" look that
-      // matches the bracket's curved connectors, rather than straight chords.
-      const mx = (a.x + b.x) / 2;
-      const my = (a.y + b.y) / 2;
-      const qx = mx + (b.y - a.y) * 0.12;
-      const qy = my - (b.x - a.x) * 0.12;
+      // A straight chord between the two entrants — the complete-graph look, one
+      // line per matchup.
       edges.push({
-        d: `M ${a.x.toFixed(2)} ${a.y.toFixed(2)} Q ${qx.toFixed(2)} ${qy.toFixed(2)} ${b.x.toFixed(2)} ${b.y.toFixed(2)}`,
+        d: `M ${a.x.toFixed(2)} ${a.y.toFixed(2)} L ${b.x.toFixed(2)} ${b.y.toFixed(2)}`,
         cls,
         key: m.id,
       });
@@ -470,7 +468,6 @@ export function RoundRobinView({ groups }: { groups: RRGroup[] }) {
   const groupIndex = Math.min(activeGroup, usable.length - 1);
   const group = usable[groupIndex];
   const byId = new Map(group.entrants.map((e) => [e.id, e]));
-  const matrixTitle = group.label ? `${group.label} — Results Matrix` : "Results Matrix";
 
   return (
     <div className="ff-rr">
@@ -491,12 +488,12 @@ export function RoundRobinView({ groups }: { groups: RRGroup[] }) {
         </div>
       ) : null}
 
-      <Bubble title={matrixTitle} span="full" className="ff-bubble--divided">
+      <Bubble title="Round Robin Matrix" span="full" className="ff-bubble--divided">
         <ResultsMatrix group={group} onSelect={setDetail} />
       </Bubble>
 
       <div className="ff-rr__lower">
-        <Bubble title="At a Glance">
+        <Bubble title="Complete Graph" className="ff-bubble--divided">
           <MatchupGraph group={group} />
         </Bubble>
         <Bubble title="Rounds and Matches">

@@ -26,7 +26,8 @@ import {
   hasFeedGraph,
   minOrderKey,
 } from "@/lib/bracket-graph-shared";
-import { FORMAT_VIEW, resolveExternalFormat, externalFormatStages } from "@/lib/tournament-format";
+import { resolveExternalFormat, externalFormatStages } from "@/lib/tournament-format";
+import { StageTabs, type StageTab } from "@/components/dashboard/tournaments/StageTabs";
 import {
   computeRRStandings,
   rrGroupsFromExternal,
@@ -783,29 +784,56 @@ export function ExternalTournamentView({
     </div>
   );
 
-  const bracket = (
-    <div className="ff-rr">
-      {externalFormatStages(tournament.events).map(stage => {
-          const stageFormat = stage.format;
-          const label = stageFormat ? TOURNAMENT_FORMAT_LABELS[stageFormat] : "Format unconfirmed";
-          const stageEvents = stage.events;
-          return <section key={stage.id}>
-            <h2 className="ff-bubble__title">{stage.name} · {label}</h2>
-            {stageFormat === "round_robin" ? (
-              <RoundRobinView groups={rrGroupsFromExternal(stageEvents)} />
-            ) : stageFormat === "swiss" || !stageFormat ? (
-              <Bubble title="Rounds" span="full">
-                <RoundRobinRounds groups={rrGroupsFromExternal(stageEvents, false)} />
-              </Bubble>
-            ) : (
-              <Bubble title="Bracket" className="ff-bubble--divided">
-                <ExternalBracket events={stageEvents} source={tournament.source} />
-              </Bubble>
-            )}
-          </section>;
-      })}
-    </div>
-  );
+  // The Bracket tab is a flat strip of stage/pool tabs (StageTabs): the finals
+  // bracket first (labelled "Finals"), then each round-robin pool as its own tab
+  // ("Pool 1", "Pool 2", …), then any swiss/unconfirmed rounds. The per-stage
+  // title moves INTO the bubble ("Top 4 · Single Elimination Bracket"); a
+  // single-stage tournament shows one titled bubble and no strip at all.
+  const multiStage = stageFormats.length > 1;
+  const bracketStageCount = stageFormats.filter(
+    (s) => s.format === "single_elim" || s.format === "double_elim",
+  ).length;
+  const finalsTabs: StageTab[] = [];
+  const otherTabs: StageTab[] = [];
+  for (const stage of stageFormats) {
+    const fmt = stage.format;
+    const stageName = stage.name?.trim() || null;
+    if (fmt === "round_robin") {
+      rrGroupsFromExternal(stage.events).forEach((group, index) => {
+        otherTabs.push({
+          key: `${stage.id}:${group.id}`,
+          label: `Pool ${index + 1}`,
+          node: <RoundRobinView groups={[group]} />,
+        });
+      });
+    } else if (fmt === "swiss" || !fmt) {
+      otherTabs.push({
+        key: stage.id,
+        label: "Rounds",
+        node: (
+          <Bubble title="Rounds" span="full">
+            <RoundRobinRounds groups={rrGroupsFromExternal(stage.events, false)} />
+          </Bubble>
+        ),
+      });
+    } else {
+      const formatLabel = TOURNAMENT_FORMAT_LABELS[fmt];
+      const title =
+        multiStage && stageName
+          ? `${stageName} · ${formatLabel} Bracket`
+          : `${formatLabel} Bracket`;
+      finalsTabs.push({
+        key: stage.id,
+        label: bracketStageCount === 1 ? "Finals" : stageName ?? formatLabel,
+        node: (
+          <Bubble title={title} className="ff-bubble--divided">
+            <ExternalBracket events={stage.events} source={tournament.source} />
+          </Bubble>
+        ),
+      });
+    }
+  }
+  const bracket = <StageTabs tabs={[...finalsTabs, ...otherTabs]} />;
 
   const standings = (
     <Bubble
@@ -884,7 +912,7 @@ export function ExternalTournamentView({
 
   const tabs: TournamentTab[] = [
     { id: "overview", label: "Overview", node: overview },
-    { id: "bracket", label: format ? FORMAT_VIEW[format].tabLabel : "Stages", node: bracket },
+    { id: "bracket", label: "Bracket", node: bracket },
     { id: "standings", label: "Standings", node: standings },
     { id: "rules", label: "Rules", node: rules },
   ];

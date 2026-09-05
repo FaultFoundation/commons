@@ -11,15 +11,14 @@ import type {
 /** Round robin uses the matrix/graph; Swiss uses rounds without feed edges. */
 export type FormatViewKind = "bracket" | "roundrobin" | "swiss";
 
-/** The dispatch registry — the single extension point for per-format views. */
-export const FORMAT_VIEW: Record<
-  TournamentFormat,
-  { tabLabel: string; kind: FormatViewKind }
-> = {
-  single_elim: { tabLabel: "Bracket", kind: "bracket" },
-  double_elim: { tabLabel: "Bracket", kind: "bracket" },
-  round_robin: { tabLabel: "Groups", kind: "roundrobin" },
-  swiss: { tabLabel: "Rounds", kind: "swiss" },
+/** The dispatch registry — the single extension point for per-format views. The
+    section tab is always labelled "Bracket" now (a round robin's own view still
+    lives under it), so the registry carries only the view `kind` to switch on. */
+export const FORMAT_VIEW: Record<TournamentFormat, { kind: FormatViewKind }> = {
+  single_elim: { kind: "bracket" },
+  double_elim: { kind: "bracket" },
+  round_robin: { kind: "roundrobin" },
+  swiss: { kind: "swiss" },
 };
 
 /** The view kind for a resolved format — the value the dispatch switches on. */

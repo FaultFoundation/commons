@@ -326,8 +326,10 @@ bracket. [lib/tournament-format.ts](lib/tournament-format.ts) is the one place
 that resolves a tournament's **format** (`single_elim | double_elim |
 round_robin | swiss`, the canonical vocabulary from
 [tournaments-shared.ts](lib/tournaments-shared.ts)) for BOTH sources, and
-`FORMAT_VIEW` maps each format to `{ tabLabel, kind }` — the **dispatch
-registry**. The internal view resolves off the explicit `tournaments.format`;
+`FORMAT_VIEW` maps each format to a view `{ kind }` — the **dispatch
+registry**. (The section tab itself is always labelled **"Bracket"** now, so the
+registry no longer carries a per-format tab label; a round robin's matrix view
+still lives under that "Bracket" tab.) The internal view resolves off the explicit `tournaments.format`;
 the external view has no format column in the projection, so
 `classifyExternalFormat` **infers** it from the scraped matches (losers bracket →
 double-elim; an internal feed graph with no losers → single-elim; otherwise
@@ -347,20 +349,28 @@ in [lib/bracket-graph-shared.ts](lib/bracket-graph-shared.ts) (was duplicated in
 external detection authoritative; the inference stays as the fallback.
 
 - **The round-robin view** ([RoundRobinView](components/dashboard/tournaments/RoundRobinView.tsx),
-  client) replaces the bracket in the Bracket tab (relabelled **"Groups"**) for a
-  round robin. It's fed one plain `RRGroup[]` by
+  client) renders a round robin inside the **"Bracket"** tab. It's fed one plain `RRGroup[]` by
   [lib/round-robin-shared.ts](lib/round-robin-shared.ts)'s per-source normalisers
   (`rrGroupsFromExternal` off the projection, `rrGroupsFromSnapshot` off the
   Challonge snapshot), the same shared-shape pattern as `TopFinishers` /
-  `RecentResults`. Three linked pieces: a full-width **results matrix** (rows/cols
+  `RecentResults`. Three linked pieces: a full-width **Round Robin Matrix** (rows/cols
   = entrants, each cell the row team's result vs the column team, **shaded by
-  round**, click → a match-detail popup over the shared `ff-daypop` overlay), then
-  a two-up row of the **at-a-glance matchup graph** (entrants on a circle, every
-  matchup a client-computed **curved** SVG edge; the current round incl. live
+  round** with the round number "R1/R2/…" in the cell corner, click → a
+  match-detail popup over the shared `ff-daypop` overlay), then
+  a two-up row of the **Complete Graph** (entrants on a circle, every
+  matchup a client-computed **straight** SVG edge; the current round incl. live
   emphasised, the next lighter, the rest dashed) and the **rounds schedule**
-  (RecentResults idiom). Multi-group stages (Group A/B/…, split by `phaseGroupId`
-  else entrant-graph components) show one group at a time behind group tabs.
-  Standings: external takes a W–L–Pts table from `computeRRStandings`; internal
+  (RecentResults idiom).
+  **Stage/pool layout is the host's job, not this view's.** The external view
+  splits a tournament into a **flat strip of stage tabs**
+  ([StageTabs](components/dashboard/tournaments/StageTabs.tsx)) under the "Bracket"
+  tab — the elimination **Finals** first, then each round-robin pool as its own
+  tab ("Pool 1", "Pool 2", …), then any swiss/unconfirmed rounds — so RoundRobinView
+  is now handed **one group at a time** (its own multi-group tab fallback stays for
+  a future Challonge group-stage snapshot, but isn't exercised today). A
+  bracket stage's per-stage title moves INTO its bubble ("Top 4 · Single
+  Elimination Bracket"); a single-stage tournament shows one titled bubble with no
+  strip. Standings: external takes a W–L–Pts table from `computeRRStandings`; internal
   keeps `BracketView`'s own round-robin table. A round robin has no single final,
   so `deriveBracketResults` is skipped and Overview finishers only show once
   completed. (Today the RR view renders from a server-built snapshot and doesn't

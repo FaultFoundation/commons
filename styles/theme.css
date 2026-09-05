@@ -3488,7 +3488,7 @@ button.ff-dash__link:hover {
   margin-top: 3px;
   font-size: var(--ff-dash-text-xs);
   font-weight: 700;
-  color: var(--ff-text-dim);
+  color: #fff;
 }
 .ff-rr-matrix__logo {
   display: inline-block;
@@ -3509,7 +3509,7 @@ button.ff-dash__link:hover {
   color: var(--ff-text-dim);
 }
 .ff-rr-matrix__cell--none {
-  color: color-mix(in srgb, var(--ff-text-dim) 55%, transparent);
+  color: var(--ff-text-dim);
 }
 .ff-rr-matrix__cell--win .ff-rr-matrix__wl {
   color: var(--ff-ok);
@@ -3522,29 +3522,43 @@ button.ff-dash__link:hover {
   border-color: var(--ff-danger-border);
 }
 .ff-rr-matrix__btn {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 1px;
   width: 100%;
-  min-height: 44px;
-  padding: 6px 8px;
+  min-height: 46px;
+  padding: 6px 8px 12px;
   border: 0;
   background: transparent;
-  color: inherit;
+  color: #fff;
   font: inherit;
   cursor: pointer;
 }
 .ff-rr-matrix__btn:hover {
-  background: rgba(127, 127, 127, 0.1);
+  /* Overlay via inset shadow, not `background` — the round shade is an inline
+     style that would otherwise win over a stylesheet background rule. */
+  box-shadow: inset 0 0 0 999px rgba(255, 255, 255, 0.12);
+}
+/* The round number, pinned bottom-left of the cell ("R1", "R2", …). */
+.ff-rr-matrix__round {
+  position: absolute;
+  left: 5px;
+  bottom: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #fff;
 }
 .ff-rr-matrix__wl {
   font-weight: 800;
 }
 .ff-rr-matrix__score {
   font-size: var(--ff-dash-text-xs);
-  color: var(--ff-text-dim);
+  color: #fff;
 }
 .ff-rr-matrix__note {
   margin: 10px 0 0;

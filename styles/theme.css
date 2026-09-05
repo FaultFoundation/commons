@@ -6343,14 +6343,11 @@ button.ff-dash__link:hover {
 .ff-home-bubble {
   padding: clamp(22px, 3vw, 40px);
 }
-/* Columns that run edge-to-edge inside the bubble (the divided "Our goal"
-   box) supply their own padding per column, so the bubble drops its own —
+/* Columns that run edge-to-edge inside the bubble (the divided goals box)
+   supply their own padding per column, so the bubble drops its own —
    otherwise the dividers stop short of the card edge. */
 .ff-home-bubble--flush {
-  padding: clamp(22px, 3vw, 40px) 0 0;
-}
-.ff-home-bubble--flush > .ff-home-bubble__title {
-  padding-inline: clamp(22px, 3vw, 40px);
+  padding: 0;
 }
 .ff-home-bubble__title {
   margin: 0 0 clamp(14px, 2vw, 22px);

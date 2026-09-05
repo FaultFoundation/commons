@@ -185,9 +185,6 @@ export default function CommonsPage() {
               <a className="ff-btn ff-btn--accent" href="/home/">
                 Open the Commons Project
               </a>
-              <a className="ff-btn ff-btn--outline" href="/schedule/">
-                View your schedule
-              </a>
             </div>
 
             <p className="ff-home-hero__note">Free for everyone</p>

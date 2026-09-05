@@ -885,20 +885,27 @@ select.ff-auth__input option {
   display: block;
 }
 .ff-usermenu__item {
+  /* width:100% + padding must not overflow the menu, same rule as
+     .ff-auth__input — matches .ff-nav__submenu a's format otherwise. */
+  box-sizing: border-box;
   display: block;
   width: 100%;
-  padding: 9px 12px;
+  padding: 0.6em 0.9em;
   border: none;
-  border-radius: var(--ff-radius-sm, 6px);
+  border-radius: 8px;
   background: none;
-  color: inherit;
-  font: inherit;
+  color: #fff;
+  font-family: inherit;
+  font-size: var(--wp--preset--font-size--medium);
+  font-weight: 600;
   text-align: left;
   text-decoration: none;
+  white-space: nowrap;
   cursor: pointer;
+  transition: background var(--ff-transition);
 }
 .ff-usermenu__item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.09);
 }
 .ff-usermenu__item--danger {
   color: #ff8a8a;

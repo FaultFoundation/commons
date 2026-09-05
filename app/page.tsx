@@ -220,10 +220,9 @@ export default function CommonsPage() {
         </div>
       </section>
 
-      {/* ---------- Our goal (three divided columns inside one bubble) ---------- */}
+      {/* ---------- Three divided columns inside one bubble ---------- */}
       <section className="ff-container ff-section">
         <div className="ff-card ff-home-bubble ff-home-bubble--flush">
-          <h2 className="ff-home-bubble__title">Our goal</h2>
           <div className="ff-home-goals">
             {GOALS.map((goal) => (
               <article key={goal.title} className="ff-home-goal">

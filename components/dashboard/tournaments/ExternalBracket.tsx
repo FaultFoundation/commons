@@ -23,10 +23,12 @@ import type {
 // feeders converge on one point. When there's NO feed graph — a start.gg bracket
 // scraped before its sets carry prereqs (an active event), or FACEIT (which
 // ships none) — it falls back to geometric column adjacency (column c match i →
-// column c+1 match ⌊i/2⌋). That fallback runs for start.gg and for any event
-// with a losers bracket (double-elim, incl. FACEIT — its `group` field splits
-// winners/losers upstream); a FACEIT swiss/league event has no losers, so it
-// stays plain columns where tree connectors would lie.
+// column c+1 match ⌊i/2⌋). That fallback runs for start.gg, for any event with a
+// losers bracket (double-elim, incl. FACEIT — its `group` field splits
+// winners/losers upstream), AND for any section whose columns form an
+// elimination tree (strictly decreasing sizes) — which covers a FACEIT
+// single-elim. A FACEIT swiss/league event has equal-sized columns and recurring
+// teams, so it stays plain columns where tree connectors would lie.
 //
 // One tab per SUB-BRACKET. An event splits two levels deep: first into PHASES
 // (start.gg's independent brackets — "Round 1 Bracket" + "Round 2 Bracket"),
@@ -136,6 +138,21 @@ function buildColumns(matches: ExternalTournamentMatch[]): BracketColumn[] {
     }));
 }
 
+/** True when a section's columns form an elimination tree — ≥2 columns whose
+    match counts are strictly decreasing (8 → 4 → 2 → 1). This is how we recover
+    geometric connectors for a FACEIT single-elim bracket (which ships no feed
+    graph and no losers section, so neither the true-feed path nor the
+    start.gg/double-elim gate fires) WITHOUT drawing false lines on a swiss/league
+    section, whose columns are equal-sized (4, 4, 4, 4) and whose teams recur
+    across rounds — a tree connector there would be a lie. */
+function looksLikeElimTree(columns: BracketColumn[]): boolean {
+  if (columns.length < 2) return false;
+  for (let i = 1; i < columns.length; i += 1) {
+    if (columns[i].matches.length >= columns[i - 1].matches.length) return false;
+  }
+  return true;
+}
+
 function Slot({
   name,
   logoUrl,
@@ -216,8 +233,10 @@ function BracketSection({
 }: {
   columns: BracketColumn[];
   title: string | null;
-  /** Draw geometric column-adjacency connectors when there's no feed graph.
-      start.gg only — FACEIT is usually swiss, where tree connectors would lie. */
+  /** Allow the geometric column-adjacency fallback when there's no feed graph
+      (start.gg, and any double-elim incl. FACEIT). A FACEIT SINGLE-elim doesn't
+      set this but still gets the fallback via its tree-shaped columns
+      (`looksLikeElimTree`); a swiss/league section stays plain. */
   geometricFallback: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -283,12 +302,15 @@ function BracketSection({
         }
       }
 
-      // Fallback when a start.gg bracket carries no feed graph yet (an active
-      // event whose sets don't have prereqs captured). Geometric column
-      // adjacency, like the internal bracket: column c's match i feeds column
-      // c+1's match ⌊i/2⌋. Gated to start.gg — FACEIT is usually swiss, where a
-      // team recurs across "rounds" and tree connectors would be a lie.
-      if (paths.length === 0 && geometricFallback) {
+      // Fallback when a section carries no feed graph (a start.gg bracket whose
+      // sets don't have prereqs captured yet, or FACEIT — which ships none).
+      // Geometric column adjacency, like the internal bracket: column c's match i
+      // feeds column c+1's match ⌊i/2⌋. Allowed when the caller opts in
+      // (start.gg / double-elim) OR when THIS section's columns look like an
+      // elimination tree (a FACEIT single-elim) — never for a swiss/league
+      // section, where a team recurs across "rounds" and tree lines would lie.
+      const drawGeometric = geometricFallback || looksLikeElimTree(columns);
+      if (paths.length === 0 && drawGeometric) {
         for (let c = 0; c < columns.length - 1; c += 1) {
           const cur = columns[c].matches;
           const next = columns[c + 1].matches;
@@ -524,10 +546,11 @@ export function ExternalBracket({
     () => events.flatMap((event) => event.matches),
     [events],
   );
-  // Draw geometric connectors for start.gg (always bracket trees) and for any
+  // Allow geometric connectors for start.gg (always bracket trees) and for any
   // tournament with a losers bracket (double-elim — e.g. FACEIT, which ships no
-  // feed graph). A swiss/league FACEIT event has no losers, so it stays plain
-  // columns where tree connectors would lie.
+  // feed graph). A FACEIT SINGLE-elim isn't covered here but still gets them
+  // per-section via `looksLikeElimTree` (tree-shaped columns); a swiss/league
+  // event has neither losers nor a decreasing tree, so it stays plain columns.
   const geometricFallback =
     source === "startgg" || allMatches.some(isLosers);
   // One entry per SUB-BRACKET — each phase split into its pools — pre-built into

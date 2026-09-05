@@ -606,11 +606,14 @@ local dev).
   section carries no feed graph (a start.gg event scraped before its sets have
   prereqs, or FACEIT which ships none), it falls back to geometric column
   adjacency (column c match i → column c+1 match ⌊i/2⌋) so the bracket still shows
-  lines. That fallback runs for **start.gg** and for **any event with a losers
+  lines. That fallback runs for **start.gg**, for **any event with a losers
   bracket** (double-elim — incl. FACEIT, whose `group` field is split into
-  winners/losers upstream in the scraper). A FACEIT **swiss/league** event has no
-  losers, so it stays plain columns, where a team recurs across "rounds" and tree
-  connectors would be a lie.
+  winners/losers upstream in the scraper), and — per section — for **any section
+  whose columns form an elimination tree** (`looksLikeElimTree`: strictly
+  decreasing sizes, 8→4→2→1), which is what recovers connectors for a FACEIT
+  **single-elim** (no losers section, no feed graph). A FACEIT **swiss/league**
+  event has equal-sized columns and recurring teams — neither a losers bracket nor
+  a decreasing tree — so it stays plain columns, where tree connectors would lie.
 - **External team icons are resolved by the scraper, not at render time.**
   start.gg's entrant `team.images` (the data behind `/attendees/teams`) and
   FACEIT championship subscriptions/team records supply provider logos.

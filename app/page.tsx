@@ -19,9 +19,9 @@ export const metadata: Metadata = {
 /**
  * The Commons Project landing page — the front door for members. Static by
  * design (no session read, so it stays cacheable and off the Worker CPU
- * budget); the hero swaps signed-in vs signed-out CTAs with the same pre-paint
- * `data-auth` attribute the header uses (.ff-auth-when-in / .ff-auth-when-out),
- * never a per-request render. All styling is §15 of styles/theme.css.
+ * budget); the hero's CTA only appears once signed in, gated by the same
+ * pre-paint `data-auth` attribute the header uses (.ff-auth-when-in), never a
+ * per-request render. All styling is §15 of styles/theme.css.
  *
  * Every section is a BUBBLE (.ff-home-bubble), matching the portal's card
  * vocabulary — see docs/dashboard-guide.md. The landing page can't use the
@@ -173,14 +173,6 @@ export default function CommonsPage() {
               check-ins.
             </p>
 
-            <div className="ff-home-hero__cta ff-auth-when-out">
-              <a className="ff-btn ff-btn--accent" href="/login/">
-                Log in to the Commons Project
-              </a>
-              <a className="ff-btn ff-btn--outline" href="/signup/">
-                Create an account
-              </a>
-            </div>
             <div className="ff-home-hero__cta ff-auth-when-in">
               <a className="ff-btn ff-btn--accent" href="/home/">
                 Open the Commons Project

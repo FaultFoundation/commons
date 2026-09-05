@@ -1,13 +1,20 @@
 "use client";
 
 /**
- * Site navigation, redesigned (ff- classes, styles/theme.css §6).
- * Commons is this app's own page; About, Policies, and News live in the
- * fault.foundation website repo and are linked absolutely. Join Today! and
- * the Sign In button round it out.
+ * Site navigation, redesigned (ff- classes, styles/theme.css §6). Mirrored by
+ * hand from the fault.foundation website repo's own MainNav.tsx — keep the
+ * two in sync when either changes.
  *
- * - Desktop: inline links right of the brand, News dropdown, CTA pill.
- * - Mobile (<782px): hamburger opens a full-screen overlay; Escape and
+ * Four top-level items, plus the header auth control: an About dropdown for
+ * the marketing site's own pages (About / News / Policies — all offsite from
+ * here), a Partners dropdown for outbound partner destinations (currently
+ * just College Esports News), then the Join Discord and Commons pills, then
+ * the avatar — which only exists in the DOM's visible state when a session is
+ * present. There is no signed-out header control at all; a logged-out
+ * visitor signs in from wherever this app's own auth pages send them.
+ *
+ * - Desktop: inline links right of the brand, two dropdowns, then the pills.
+ * - Compact (<1100px): hamburger opens a full-screen overlay; Escape and
  *   the close button dismiss it; scroll is locked via html.ff-no-scroll.
  */
 
@@ -15,6 +22,22 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { HeaderAuthButton } from "./auth/HeaderAuthButton";
+
+type DropdownId = "about" | "partners";
+
+/** Pages inside the About dropdown. All three live on the marketing site —
+    Commons is its own page, so pathname matching never applies to any of
+    them. */
+const ABOUT_PAGES: ReadonlyArray<{ href: string; label: string }> = [
+  { href: "https://fault.foundation/about/", label: "About" },
+  { href: "https://fault.foundation/news/", label: "News" },
+  { href: "https://fault.foundation/policies/", label: "Policies" },
+];
+
+/** Outbound partner destinations inside the Partners dropdown. */
+const PARTNER_PAGES: ReadonlyArray<{ href: string; label: string }> = [
+  { href: "https://collegeesportsnews.org/news/", label: "College Esports News" },
+];
 
 function Chevron() {
   return (
@@ -33,20 +56,37 @@ function Chevron() {
   );
 }
 
-/** Shared menu items (header + footer). */
-function NavLinks() {
-  const pathname = usePathname();
-  const [submenuOpen, setSubmenuOpen] = useState(false);
+/**
+ * One header dropdown: a button that toggles a submenu of links. `openId` is
+ * lifted to NavLinks so opening one dropdown closes the other, rather than
+ * having two independently-tracked menus that can both be open at once.
+ */
+function NavDropdown({
+  id,
+  label,
+  items,
+  openId,
+  setOpenId,
+  pathname,
+}: {
+  id: DropdownId;
+  label: string;
+  items: ReadonlyArray<{ href: string; label: string }>;
+  openId: DropdownId | null;
+  setOpenId: (id: DropdownId | null) => void;
+  pathname: string;
+}) {
   const groupRef = useRef<HTMLLIElement>(null);
+  const open = openId === id;
 
-  // Close the News dropdown on click outside / Escape.
+  // Close this dropdown on click outside / Escape.
   useEffect(() => {
-    if (!submenuOpen) return;
+    if (!open) return;
     const onPointerDown = (e: PointerEvent) => {
-      if (!groupRef.current?.contains(e.target as Node)) setSubmenuOpen(false);
+      if (!groupRef.current?.contains(e.target as Node)) setOpenId(null);
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSubmenuOpen(false);
+      if (e.key === "Escape") setOpenId(null);
     };
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -54,71 +94,76 @@ function NavLinks() {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [submenuOpen]);
+  }, [open, setOpenId]);
 
-  /** A route served by this app — gets aria-current when it's the one shown. */
-  const pageItem = (href: string, label: string) => {
-    const current = pathname === href;
-    return (
-      <li>
-        <a
-          className="ff-nav__link"
-          href={href}
-          aria-current={current ? "page" : undefined}
-        >
-          {label}
-        </a>
-      </li>
-    );
-  };
-
-  /** A page on the marketing site. Pathname matching doesn't apply. */
-  const siteItem = (href: string, label: string) => (
-    <li>
-      <a className="ff-nav__link" href={href}>
+  return (
+    <li ref={groupRef} className={`ff-nav__group${open ? " is-open" : ""}`}>
+      {/* Both dropdowns' destinations are entirely offsite, so the trigger
+          itself is never the current page. */}
+      <button
+        type="button"
+        className="ff-nav__link"
+        aria-haspopup="true"
+        aria-expanded={open}
+        onClick={() => setOpenId(open ? null : id)}
+      >
         {label}
-      </a>
+        <Chevron />
+      </button>
+      <ul className="ff-nav__submenu">
+        {items.map((item) => (
+          <li key={item.href}>
+            <a
+              href={item.href}
+              aria-current={pathname === item.href ? "page" : undefined}
+            >
+              {item.label}
+            </a>
+          </li>
+        ))}
+      </ul>
     </li>
   );
+}
+
+/** Shared menu items (header + footer). */
+function NavLinks() {
+  const pathname = usePathname();
+  const [openId, setOpenId] = useState<DropdownId | null>(null);
 
   return (
     <>
-      {pageItem("/", "Commons")}
-      {siteItem("https://fault.foundation/about/", "About")}
-      {siteItem("https://fault.foundation/policies/", "Policies")}
-      <li
-        ref={groupRef}
-        className={`ff-nav__group${submenuOpen ? " is-open" : ""}`}
-      >
-        {/* The whole item toggles the dropdown; both destinations are
-            off-site, so nothing here is ever the current page. */}
-        <button
-          type="button"
-          className="ff-nav__link"
-          aria-haspopup="true"
-          aria-expanded={submenuOpen}
-          onClick={() => setSubmenuOpen((open) => !open)}
-        >
-          News
-          <Chevron />
-        </button>
-        <ul className="ff-nav__submenu">
-          <li>
-            <a href="https://collegeesportsnews.org/news/">
-              College Esports News
-            </a>
-          </li>
-          <li>
-            <a href="https://fault.foundation/news/">Fault Foundation</a>
-          </li>
-        </ul>
-      </li>
+      <NavDropdown
+        id="about"
+        label="About"
+        items={ABOUT_PAGES}
+        openId={openId}
+        setOpenId={setOpenId}
+        pathname={pathname}
+      />
+      <NavDropdown
+        id="partners"
+        label="Partners"
+        items={PARTNER_PAGES}
+        openId={openId}
+        setOpenId={setOpenId}
+        pathname={pathname}
+      />
       <li className="ff-nav__cta">
         <a className="ff-btn" href="https://discord.com/invite/76D4TAdymH">
-          Join Today!
+          Join Discord
         </a>
       </li>
       <li className="ff-nav__cta">
+        <a
+          className="ff-btn ff-btn--brand"
+          href="/"
+          aria-current={pathname === "/" ? "page" : undefined}
+        >
+          Commons
+        </a>
+      </li>
+      <li className="ff-nav__cta ff-auth-when-in">
         <HeaderAuthButton />
       </li>
     </>
@@ -204,4 +249,3 @@ export function HeaderNav() {
     </nav>
   );
 }
-

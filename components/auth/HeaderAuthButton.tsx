@@ -20,13 +20,16 @@ function UserSilhouette() {
 }
 
 /**
- * Header slot right of "Join Today!". Both controls are in the DOM; CSS on
- * html[data-auth] (stamped pre-paint from the localStorage hint) decides
- * which one shows, so there's no signed-out flash on page load. useSession
- * then verifies against the server and corrects the hint if it was stale.
+ * Header slot right of "Commons": the signed-in avatar, and nothing else.
+ * There is no signed-out control here — a logged-out visitor signs in from
+ * the homepage's own CTA instead. The wrapping <li className="ff-auth-when-in">
+ * (MainNav.tsx) is what's actually hidden pre-paint via CSS on html[data-auth]
+ * (stamped from the localStorage hint), so there's no empty-slot flash on
+ * page load. useSession then verifies against the server and corrects the
+ * hint if it was stale.
  *
  * Signed in, the avatar is a dropdown toggle (Dashboard / Settings / Sign out),
- * mirroring the News menu's click-outside + Escape handling.
+ * mirroring the About/Partners dropdowns' click-outside + Escape handling.
  */
 export function HeaderAuthButton() {
   const { data: session, isPending, error } = authClient.useSession();
@@ -80,44 +83,39 @@ export function HeaderAuthButton() {
   }
 
   return (
-    <>
-      <a className="ff-btn ff-btn--outline ff-auth-when-out" href="/login/">
-        Sign In
-      </a>
-      <div className={`ff-usermenu ff-auth-when-in${open ? " is-open" : ""}`} ref={menuRef}>
+    <div className={`ff-usermenu${open ? " is-open" : ""}`} ref={menuRef}>
+      <button
+        type="button"
+        className="ff-nav__avatar"
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-label="Account menu"
+        title="Account"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {session?.user.image ? (
+          <img src={session.user.image} alt="" />
+        ) : (
+          <UserSilhouette />
+        )}
+      </button>
+      <div className="ff-usermenu__menu" role="menu">
+        <a className="ff-usermenu__item" role="menuitem" href="/home/">
+          Dashboard
+        </a>
+        <a className="ff-usermenu__item" role="menuitem" href="/account/">
+          Settings
+        </a>
         <button
           type="button"
-          className="ff-nav__avatar"
-          aria-haspopup="true"
-          aria-expanded={open}
-          aria-label="Account menu"
-          title="Account"
-          onClick={() => setOpen((v) => !v)}
+          className="ff-usermenu__item ff-usermenu__item--danger"
+          role="menuitem"
+          onClick={onSignOut}
+          disabled={signingOut}
         >
-          {session?.user.image ? (
-            <img src={session.user.image} alt="" />
-          ) : (
-            <UserSilhouette />
-          )}
+          {signingOut ? "Signing out…" : "Sign out"}
         </button>
-        <div className="ff-usermenu__menu" role="menu">
-          <a className="ff-usermenu__item" role="menuitem" href="/home/">
-            Dashboard
-          </a>
-          <a className="ff-usermenu__item" role="menuitem" href="/account/">
-            Settings
-          </a>
-          <button
-            type="button"
-            className="ff-usermenu__item ff-usermenu__item--danger"
-            role="menuitem"
-            onClick={onSignOut}
-            disabled={signingOut}
-          >
-            {signingOut ? "Signing out…" : "Sign out"}
-          </button>
-        </div>
       </div>
-    </>
+    </div>
   );
 }

@@ -273,11 +273,15 @@ html.ff-no-scroll givebutter-widget {
   width: auto;
   height: 40px;
 }
+/* The wordmark — "The Fault Foundation" as it appears in the header, footer,
+   and the homepage signature — is Montserrat Bold everywhere per the brand
+   book (styles/fonts.css), not the Manrope this app otherwise uses. */
 .ff-header__title {
   margin: 0;
   color: #fff;
   font-size: 1.15rem;
-  font-weight: 800;
+  font-family: Montserrat, ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
   letter-spacing: -0.2px;
   white-space: nowrap;
 }
@@ -391,6 +395,22 @@ button.ff-nav__link:hover {
   padding: 0.55em 1.4em;
 }
 
+/* Commons pill: yellow outline, filling on hover. Ported from the website
+   repo's theme.css, where fault.foundation links out to this app; here the
+   same pill instead links to "/", so the two headers read identically even
+   though one of them is already home. Sits last in the pill run, right
+   before the avatar slot — the rightmost position "Sign In" used to hold. */
+.ff-btn--brand {
+  background: transparent;
+  color: var(--ff-accent);
+  box-shadow: inset 0 0 0 1.5px var(--ff-accent);
+}
+.ff-btn--brand:hover {
+  background: var(--ff-accent);
+  color: var(--ff-navy-900);
+  box-shadow: inset 0 0 0 1.5px var(--ff-accent);
+}
+
 /* Hamburger / overlay close buttons */
 .ff-nav__open,
 .ff-nav__close {
@@ -411,13 +431,19 @@ button.ff-nav__link:hover {
   background: rgba(255, 255, 255, 0.09);
 }
 
-/* Mobile: the nav container becomes a full-screen overlay. */
-@media (min-width: 782px) {
+/* Compact: the nav container becomes a full-screen overlay.
+
+   The switch is at 1100px, not the 782px the rest of the layout uses. The bar
+   carries two dropdowns (About, Partners) plus a two-pill run — Join Discord,
+   Commons — and below ~1100px they collide with the wordmark. This breakpoint
+   and the overlay's own must stay equal, or the hamburger shows at a width
+   where the overlay it opens is still hidden. */
+@media (min-width: 1100px) {
   .ff-nav__container {
     display: contents;
   }
 }
-@media (max-width: 781.98px) {
+@media (max-width: 1099.98px) {
   .ff-nav__open {
     display: inline-flex;
     margin-left: auto;
@@ -481,8 +507,8 @@ button.ff-nav__link:hover {
   .ff-nav__cta .ff-btn {
     font-size: var(--wp--preset--font-size--large);
   }
-  /* In the full-screen overlay the account menu stacks inline, like the News
-     submenu, instead of floating off the avatar. */
+  /* In the full-screen overlay the account menu stacks inline, like the
+     About/Partners submenus, instead of floating off the avatar. */
   .ff-usermenu__menu {
     position: static;
     min-width: 0;
@@ -525,10 +551,12 @@ button.ff-nav__link:hover {
   width: auto;
   height: 52px;
 }
+/* Same wordmark, same override — see .ff-header__title above. */
 .ff-footer__title {
   margin: 0;
   font-size: var(--wp--preset--font-size--large);
-  font-weight: 800;
+  font-family: Montserrat, ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
 }
 .ff-footer__title a {
   color: #fff;
@@ -802,7 +830,7 @@ select.ff-auth__input option {
   text-decoration: none;
 }
 
-/* Header avatar (replaces Sign In when a session exists) */
+/* Header avatar — the only auth control; shown only when a session exists. */
 .ff-nav__avatar {
   display: inline-flex;
   align-items: center;
@@ -895,12 +923,11 @@ select.ff-auth__input option {
   flex: 1 0 auto;
 }
 
-/* Which header auth control shows is decided pre-paint by the data-auth
-   attribute (inline script in app/layout.tsx + lib/auth-hint.ts), so the
-   right one paints immediately on every full page load. */
-html[data-auth="in"] .ff-auth-when-out {
-  display: none;
-}
+/* There is no signed-out header control — a logged-out visitor has nothing
+   to hide, only an avatar to withhold until a session is confirmed. Whether
+   .ff-auth-when-in (MainNav.tsx's <li>) shows at all is decided pre-paint by
+   the data-auth attribute (inline script in app/layout.tsx + lib/auth-hint.ts),
+   so there's no empty-slot flash on page load. */
 html:not([data-auth="in"]) .ff-auth-when-in {
   display: none;
 }
@@ -6574,9 +6601,13 @@ button.ff-dash__link:hover {
   line-height: 1.6;
   color: var(--ff-text-dim);
 }
+/* Same wordmark, same override — see .ff-header__title above. Not its
+   .ff-home-why__sig span child: that's a Fira Code metadata caption
+   ("Gamers Supporting Students"), not the title. */
 .ff-home-why__sig {
   margin-top: 6px !important;
-  font-weight: 800;
+  font-family: Montserrat, ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
   color: #fff !important;
   font-size: var(--wp--preset--font-size--medium) !important;
 }

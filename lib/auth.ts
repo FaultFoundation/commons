@@ -314,6 +314,22 @@ export const getAuth = cache(function getAuth() {
       ipAddress: {
         ipAddressHeaders: ["cf-connecting-ip"],
       },
+      // Scope the session cookie to the registrable domain so the marketing
+      // site (fault.foundation) can read it and paint the header avatar
+      // instead of a permanent "Sign In". fault.foundation and
+      // commons.fault.foundation are same-SITE but cross-ORIGIN, so the
+      // cookie stays SameSite=Lax — it rides along on the site's credentialed
+      // session fetch without the CSRF exposure SameSite=None would add.
+      //
+      // The tradeoff is real and deliberate: every *.fault.foundation host now
+      // receives the session cookie, so any subdomain we point at a third
+      // party (a status page, a docs host, a marketing landing page) can read
+      // a member's session. Keep subdomains under our control, or move this
+      // back to host-only and drop the avatar from the marketing site.
+      crossSubDomainCookies: {
+        enabled: true,
+        domain: ".fault.foundation",
+      },
     },
     // `next dev` serves on :3000 while BETTER_AUTH_URL points at :3999
     // (the wrangler preview port) — trust both origins in development.
@@ -322,10 +338,13 @@ export const getAuth = cache(function getAuth() {
     // is a wrangler.jsonc var change with no code edit. Without this, auth
     // POSTs from the non-baseURL origin are rejected 403 by the origin check.
     trustedOrigins: isDev
-      ? ["http://localhost:3000", "http://localhost:3999"]
+      ? ["http://localhost:3000", "http://localhost:3001", "http://localhost:3999"]
       : [
           "https://commons.fault.foundation",
           "https://commons.oscarlabit9729.workers.dev",
+          // The marketing site's header calls get-session (and sign-out)
+          // cross-origin; without this the origin check 403s them.
+          "https://fault.foundation",
         ],
     emailAndPassword: {
       enabled: true,

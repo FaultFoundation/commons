@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, eq } from "drizzle-orm";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
@@ -449,7 +450,7 @@ async function connectReachability(
  * disabled. For linked FACEIT/start.gg accounts it also tests public API
  * reachability (best-effort, TTL-cached) so the card can flag a private account.
  */
-export async function loadConnectIntegrations(
+export const loadConnectIntegrations = cache(async function loadConnectIntegrations(
   userId: string,
 ): Promise<ConnectIntegration[]> {
   const { env } = getCloudflareContext();
@@ -478,7 +479,7 @@ export async function loadConnectIntegrations(
       };
     }),
   );
-}
+});
 
 /**
  * Force a fresh reachability test for every linked FACEIT/start.gg account,

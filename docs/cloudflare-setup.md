@@ -182,3 +182,57 @@ production:
 - **Nonprofit programs:** Cloudflare for Startups (nonprofit track) and
   Project Galileo — independent of everything above; usage fits the free
   tier either way.
+
+
+## Server-efficiency audit (September 2026)
+
+The reported first-visit-after-idle failure is consistent with expired provider
+TTLs making page rendering wait on fresh network calls. It is not sufficient
+evidence of CPU exhaustion. The public `/` landing page is statically generated;
+`/home/`, `/schedule/`, and `/tournaments/` are dynamic. Check the failing URL and
+Cloudflare error code before attributing a static-page failure to those loaders.
+
+Implemented in the Commons repo:
+
+- Home, Schedule, and both tournament lists read cached D1 rows before provider
+  refresh. Authenticated same-origin POSTs do the refresh after paint; a provider
+  outage leaves the stored page usable. No background `waitUntil` budget is used.
+- Schedule sync claims its 15-minute TTL atomically across requests before I/O,
+  preserves other identity metadata, backs off on failure, and avoids writing
+  identical match rows. Eight concurrent stale requests are regression-tested
+  to make one provider fetch.
+- Tournament TTL checks fetch one id/timestamp instead of the full catalog.
+  Full reconciliation happens only after winning the lease; the complete
+  provider pagination pass has a 20-second network deadline. Failure preserves
+  local tournaments and permits a retry after five minutes.
+- Home/Schedule connection hints no longer probe provider health. External
+  catalog and integration-card reads are request-memoized. Event status queries
+  return distinct tournament/state combinations. The CEN and OW SQL clients skip
+  unused relational-schema extraction and are memoized within server renders.
+
+Audit coverage also included the root layout/session path, database wrappers,
+external projection queries, provider adapters, statistics loading, and polling.
+Statistics and Teams already move their provider work behind client requests;
+ticket/bracket polling already pauses when hidden. Those mechanisms remain.
+Remaining scaling work includes server-side pagination for full catalogs and
+match history (the UI currently receives complete lists), moving large provider
+reconciliations into a dedicated job Worker, and profiling actual cold requests.
+Internal tournament detail/share pages still refresh stale bracket snapshots
+synchronously, and Account/Integrations can still run stale health checks. Those
+are separate remaining latency paths; migrating them needs a refresh flow that
+also updates server-derived standings and preserves the staff-role checks.
+These need data-volume and production timing evidence to size correctly.
+
+Verify locally with `node --test scripts/server-efficiency.test.mjs` (Node
+22.13+), `npx tsc --noEmit`, `npm run build`, and the built Worker preview.
+The regression tests use SQLite through the real Drizzle D1 driver and mock
+provider I/O; they do not measure Cloudflare CPU or live provider latency.
+No database migration or new binding is required for these changes.
+
+After deployment, use existing Worker observability to compare first requests
+following idle periods with warm requests: record route, error code/outcome,
+CPU time, wall time, and D1 query/row counts. Error 1102 indicates a resource
+limit; 1101 indicates an exception. Waiting for network I/O is distinct from
+CPU execution. See [Cloudflare errors](https://developers.cloudflare.com/workers/observability/errors/)
+and [limits](https://developers.cloudflare.com/workers/platform/limits/).
+Do not raise CPU limits or add keep-alive traffic without identifying the cause.

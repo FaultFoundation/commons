@@ -1,3 +1,4 @@
+import { DashboardDataRefresh } from "@/components/dashboard/DashboardDataRefresh";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -47,6 +48,7 @@ async function TournamentsContent() {
 
   return (
     <div className="ff-bubble-grid">
+      <DashboardDataRefresh tournaments />
       {!configured ? (
         <Bubble title="Challonge not configured" variant="danger" span="full">
           <p className="ff-row__note">

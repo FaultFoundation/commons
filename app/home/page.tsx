@@ -1,3 +1,4 @@
+import { DashboardDataRefresh } from "@/components/dashboard/DashboardDataRefresh";
 import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -52,6 +53,7 @@ export default async function HomePage() {
   return (
     <DashboardShell active="home" setupUserId={userId}>
       <h1 className="screen-reader-text">Home</h1>
+      <DashboardDataRefresh schedule={Boolean(data.schedule)} tournaments={Boolean(data.tournaments)} />
       <HomeBoard initialLayout={layout} data={data} />
     </DashboardShell>
   );

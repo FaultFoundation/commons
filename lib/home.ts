@@ -77,15 +77,15 @@ export async function loadHomeData({
 
     sources.has("schedule")
       ? Promise.all([
-          loadSchedule(userId, requestHeaders),
+          loadSchedule(userId),
           listUpcomingExternalScheduleEntries(),
-          loadConnectIntegrations(userId),
+          getAccountLinksCached(userId),
         ]).then(([{ upcoming, past }, allUpcoming, connects]) => {
           data.schedule = {
             allUpcoming,
             upcoming,
             past,
-            anyConnected: connects.some((c) => c.linked),
+            anyConnected: connects.some((c) => ["faceit", "startgg", "challonge"].includes(c.providerId)),
           };
         })
       : null,

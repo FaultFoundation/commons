@@ -1,7 +1,6 @@
+import { cache } from "react";
 import { drizzle } from "drizzle-orm/d1";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-
-import * as cenSchema from "@/db/cen-schema";
 
 // A Drizzle client over the SECOND D1 (cen-sql), the external-tournaments
 // projection. Same per-request rule as getDb() — the binding only exists on the
@@ -12,8 +11,9 @@ import * as cenSchema from "@/db/cen-schema";
 // declared in wrangler.jsonc, so it's normally present locally and in prod;
 // this guard covers the window before cen-sql exists and keeps the read layer
 // honest about the dependency.
-export function getCenDb() {
+export const getCenDb = cache(function getCenDb() {
   const { env } = getCloudflareContext();
   if (!env.CEN) return null;
-  return drizzle(env.CEN, { schema: cenSchema });
-}
+  // Only SQL query builders are used here; skip unused relational-schema extraction.
+  return drizzle(env.CEN);
+});

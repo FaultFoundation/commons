@@ -1,7 +1,6 @@
+import { cache } from "react";
 import { drizzle } from "drizzle-orm/d1";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-
-import * as owSchema from "@/db/ow-schema";
 
 // A Drizzle client over the THIRD D1 (ow-player-data), the Overwatch
 // player-statistics store. Same per-request rule as getDb() / getCenDb() — the
@@ -14,8 +13,9 @@ import * as owSchema from "@/db/ow-schema";
 // locally and in prod; this guard keeps the read/write layer honest about the
 // dependency and lets the Statistics tab render an empty/soft state rather than
 // 500 when it's missing.
-export function getOwDb() {
+export const getOwDb = cache(function getOwDb() {
   const { env } = getCloudflareContext();
   if (!env.OW) return null;
-  return drizzle(env.OW, { schema: owSchema });
-}
+  // Only SQL query builders are used here; skip unused relational-schema extraction.
+  return drizzle(env.OW);
+});

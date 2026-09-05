@@ -1,3 +1,4 @@
+import { cache } from "react";
 import {
   and,
   asc,
@@ -117,7 +118,7 @@ function deriveStatus(
 }
 
 /** Every external tournament, newest first — for the unified Tournaments list. */
-export async function listExternalTournaments(): Promise<
+export const listExternalTournaments = cache(async function listExternalTournaments(): Promise<
   ExternalTournamentListItem[]
 > {
   const db = getCenDb();
@@ -145,6 +146,7 @@ export async function listExternalTournaments(): Promise<
             state: extEvents.state,
           })
           .from(extEvents)
+          .groupBy(extEvents.tournamentId, extEvents.state)
       : [];
     const statesByTournament = new Map<string, (string | null)[]>();
     for (const event of eventRows) {
@@ -188,7 +190,7 @@ export async function listExternalTournaments(): Promise<
     console.error("listExternalTournaments failed:", error);
     return [];
   }
-}
+});
 
 export type ExternalTournamentMatch = {
   id: string;

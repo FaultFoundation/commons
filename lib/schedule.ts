@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 import {
@@ -34,7 +34,7 @@ import {
 // into external_matches, which the /schedule calendar reads.
 //
 // Design mirrors lib/integrations.ts: Workers has no cron, so the sync runs
-// **lazily on read** past a per-provider TTL, and every provider call is
+// **after paint** past a per-provider TTL, and every provider call is
 // best-effort — a 4s timeout, never throws, returns [] on any failure. A miss
 // degrades the calendar to whatever is already cached; it never blanks the page
 // or fails a render. Imports lib/auth.ts for token access, so lib/auth.ts must
@@ -119,26 +119,27 @@ function readSyncedAt(metadata: string | null): number {
   }
 }
 
-/**
- * Stamp scheduleSyncedAt onto the identity's metadata blob, preserving any
- * other keys. Bumped even after an empty/failed pull, so a provider that is
- * quiet or unreachable defers the next attempt by a full TTL instead of
- * retrying on every render.
- */
-async function markSynced(identityId: string, metadata: string | null) {
-  let merged: Record<string, unknown> = {};
-  if (metadata) {
-    try {
-      merged = JSON.parse(metadata) as Record<string, unknown>;
-    } catch {
-      merged = {};
-    }
-  }
-  merged.scheduleSyncedAt = Date.now();
-  await getDb()
+/** Claim the TTL before network I/O. The metadata comparison elects one request
+ * across Worker isolates; JSON_SET preserves fields written by other features.
+ * Failed pulls retain the TTL as backoff instead of retrying on every visit. */
+async function claimSync(identityId: string, metadata: string | null): Promise<boolean> {
+  const claimed = await getDb()
     .update(platformIdentities)
-    .set({ metadata: JSON.stringify(merged), updatedAt: new Date() })
-    .where(eq(platformIdentities.id, identityId));
+    .set({
+      metadata: sql`json_set(
+        CASE WHEN json_valid(${platformIdentities.metadata}) THEN
+          CASE WHEN json_type(${platformIdentities.metadata}) = 'object'
+            THEN ${platformIdentities.metadata} ELSE '{}' END
+          ELSE '{}' END,
+        '$.scheduleSyncedAt', ${Date.now()})`,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(platformIdentities.id, identityId),
+      metadata === null ? isNull(platformIdentities.metadata) : eq(platformIdentities.metadata, metadata),
+    ))
+    .returning({ id: platformIdentities.id });
+  return claimed.length > 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -398,10 +399,11 @@ async function upsertMatches(
   provider: ScheduleProvider,
   matches: SyncedMatch[],
 ) {
-  if (matches.length === 0) return;
+  if (matches.length === 0) return false;
   const now = new Date();
+  const db = getDb();
   const stmts = matches.map((m) =>
-    getDb()
+    db
       .insert(externalMatches)
       .values({
         id: crypto.randomUUID(),
@@ -431,24 +433,32 @@ async function upsertMatches(
           url: m.url,
           updatedAt: now,
         },
+        // A TTL refresh often returns identical history. Avoid rewriting it.
+        setWhere: sql`${externalMatches.title} IS NOT ${m.title}
+          OR ${externalMatches.opponentName} IS NOT ${m.opponentName}
+          OR ${externalMatches.round} IS NOT ${m.round}
+          OR ${externalMatches.status} IS NOT ${m.status}
+          OR ${externalMatches.scheduledAt} IS NOT ${m.scheduledAt?.getTime() ?? null}
+          OR ${externalMatches.url} IS NOT ${m.url}`,
       }),
   );
   // D1 has no interactive transactions; batch keeps the writes to one round trip
   // (see CLAUDE.md — use db.batch, never transaction()).
   const [first, ...rest] = stmts;
-  await getDb().batch([first, ...rest]);
+  const results = await db.batch([first, ...rest]);
+  return results.some((result) => result.meta.changes > 0);
 }
 
 /**
  * Refresh one member's schedule from every connected provider whose cache has
  * aged past the TTL. Best-effort per provider — one provider failing or being
- * unconfigured never affects the others. Returns silently; the caller reads
- * external_matches afterwards.
+ * unconfigured never affects the others. Returns whether stored matches changed.
  */
 export async function syncSchedule(
   userId: string,
   requestHeaders: Headers,
-): Promise<void> {
+): Promise<boolean> {
+  let refreshed = false;
   const { env } = getCloudflareContext();
   const identities = await getPlatformIdentitiesCached(userId);
 
@@ -460,6 +470,8 @@ export async function syncSchedule(
         const identity = identities.find((row) => row.provider === provider);
         if (!identity) return; // not connected
         if (Date.now() - readSyncedAt(identity.metadata) < SYNC_TTL_MS) return;
+
+        if (!(await claimSync(identity.id, identity.metadata))) return;
 
         let matches: SyncedMatch[] = [];
 
@@ -500,14 +512,14 @@ export async function syncSchedule(
           matches = await loadChallongeSchedule(token);
         }
 
-        await upsertMatches(userId, provider, matches);
-        // Bookkeep even on an empty pull, to defer the next attempt by a TTL.
-        await markSynced(identity.id, identity.metadata);
+        const changed = await upsertMatches(userId, provider, matches);
+        refreshed ||= changed;
       } catch (error) {
         console.error(`schedule sync failed for ${provider}:`, error);
       }
     }),
   );
+  return refreshed;
 }
 
 export type LoadedSchedule = {
@@ -614,16 +626,13 @@ async function loadInternalTournaments(
 }
 
 /**
- * The member's calendar: syncs lazily, then returns their external matches
+ * The member's cached calendar (provider refresh runs after paint): returns matches
  * split into Upcoming (scheduled/live, soonest first) and Results (finished/
  * cancelled, most recent first). Undated rows sort to the end of Upcoming.
  */
 export async function loadSchedule(
   userId: string,
-  requestHeaders: Headers,
 ): Promise<LoadedSchedule> {
-  await syncSchedule(userId, requestHeaders);
-
   const [rows, internal] = await Promise.all([
     getDb()
       .select({

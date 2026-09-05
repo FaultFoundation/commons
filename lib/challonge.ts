@@ -77,6 +77,7 @@ async function request(
   method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
   body?: { type: string; attributes: Record<string, unknown> },
+  deadline?: AbortSignal,
 ): Promise<ChallongeResult<JsonApiBody>> {
   const { env } = getCloudflareContext();
   const key = env.CHALLONGE_API_V1_KEY;
@@ -99,7 +100,9 @@ async function request(
         Authorization: key,
       },
       body: body ? JSON.stringify({ data: body }) : undefined,
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: deadline
+        ? AbortSignal.any([deadline, AbortSignal.timeout(TIMEOUT_MS)])
+        : AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch {
     return { ok: false, error: "Couldn't reach Challonge. Try again." };
@@ -231,11 +234,15 @@ const MAX_TOURNAMENT_PAGES = 100;
 export async function listChallongeTournaments(): Promise<
   ChallongeResult<ChallongeTournament[]>
 > {
+  // Bound the entire pagination pass, not just each of up to 100 pages.
+  const deadline = AbortSignal.timeout(20_000);
   const tournaments: ChallongeTournament[] = [];
   for (let page = 1; page <= MAX_TOURNAMENT_PAGES; page += 1) {
     const res = await request(
       "GET",
       `/tournaments.json?page=${page}&per_page=${TOURNAMENT_PAGE_SIZE}`,
+      undefined,
+      deadline,
     );
     if (!res.ok) return res;
 

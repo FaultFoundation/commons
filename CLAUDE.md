@@ -61,7 +61,10 @@ npx tsc --noEmit        # the typecheck — run this after any change
 npm run cf-typegen      # regenerate cloudflare-env.d.ts after editing wrangler.jsonc/.dev.vars
 ```
 
-**There is no test suite and no working linter.** `npm run lint` runs the
+**There is no working linter.** Focused server-efficiency regression tests run
+with `node --test scripts/server-efficiency.test.mjs` (Node 22.13+ for
+`node:sqlite`); they execute the real Drizzle queries with mocked provider I/O.
+The legacy import also has its own `scripts/migrate-legacy-bot-data.test.mjs`. `npm run lint` runs the
 deprecated `next lint`, and ESLint isn't installed — it drops into an
 interactive "configure ESLint?" prompt and fails. Verification is
 `npx tsc --noEmit` + `npm run build`, then exercising the change on :3000 or
@@ -101,6 +104,9 @@ Cloudflare bindings (`DB`, `CEN`, `OW`, `AVATARS`) and secrets only exist on the
   construct fresh per request, off `getCloudflareContext()`. Both use React
   `cache()` so repeated callers in one request share the stateless wrapper;
   never hoist either into a module-level constant or add cross-request caching.
+  `getCenDb()` and `getOwDb()` also memoize per render; their SQL-builder-only
+  clients omit relational schema extraction. The main DB retains its schema
+  because the Better Auth adapter needs it.
 - Per-request work that several components repeat is memoized with React
   `cache` instead — `getSessionCached` ([lib/session.ts](lib/session.ts)),
   `getStaffRoles` ([lib/staff.ts](lib/staff.ts)). The Worker's CPU budget is
@@ -114,8 +120,8 @@ Cloudflare bindings (`DB`, `CEN`, `OW`, `AVATARS`) and secrets only exist on the
   a substitute for the D1-backed staff capability checks or admin unlock gate.
 - **CPU budget still matters, but we're on Workers _Paid_ now.** Paid raises the
   CPU ceiling to **30 s/request** (from Free's 10 ms) and removes the
-  100k-requests/day cap, so the old "Error 1102 — Worker exceeded resource limits"
-  when clicking between tabs should no longer occur. The discipline that fixed it
+  100k-requests/day cap. This does not prove an idle-start error is fixed:
+  confirm the error code and CPU/wall-time metrics in production logs. The discipline that fixed it
   stays worth keeping — memoize per-request work, don't rebuild auth, prefer
   client-side work — because CPU is billed and a runaway render is now a cost, not
   just a cap. Paid also unlocks Cron Triggers, but the Commons OpenNext Worker
@@ -484,9 +490,16 @@ the TTL on demand.
 `/schedule` is the payoff: [lib/schedule.ts](lib/schedule.ts) pulls each
 connected member's matches/tournaments into `external_matches` and the page
 renders them as one calendar. Same Workers-shaped constraints as everything
-else — **no cron, so it syncs lazily on read** past a 15-min per-provider TTL
-(stamped in `platform_identities.metadata`), every provider call is best-effort
-(4s timeout, never throws, `[]` on failure), and writes go through `db.batch`.
+else — **the page reads D1 first, then DashboardDataRefresh POSTs to
+`/api/dashboard/refresh` after paint**, past a 15-min per-provider TTL
+(atomically claimed in `platform_identities.metadata` before provider I/O), every provider call is best-effort
+(4s timeout, never throws, `[]` on failure), and writes go through `db.batch`. Identical match rows are not rewritten.
+The refresh route requires a same-origin authenticated request, accepts only
+source flags (no target user or TTL bypass), and re-renders only after a refresh.
+Tournament lists use the same after-paint path with a global D1 lease; a fresh
+lease reads just one id/timestamp, not every full tournament. Pagination has a
+20-second total network budget and failed listings retain local data with a
+five-minute retry backoff.
 Provider auth differs: FACEIT and start.gg read **server-side keys**
 (`FACEIT_API_KEY`, `STARTGG_API_KEY`) keyed by the member's stored external id —
 no per-member OAuth token — while Challonge uses the member's OAuth token

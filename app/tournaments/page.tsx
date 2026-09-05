@@ -1,3 +1,4 @@
+import { DashboardDataRefresh } from "@/components/dashboard/DashboardDataRefresh";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 
@@ -29,6 +30,7 @@ export default async function TournamentsPage() {
   return (
     <>
       <h1 className="screen-reader-text">Tournaments</h1>
+      <DashboardDataRefresh tournaments />
       <div className="ff-bubble-grid">
         <TournamentsPanel
           tournaments={tournaments}

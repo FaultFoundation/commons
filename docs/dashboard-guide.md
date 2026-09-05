@@ -507,6 +507,12 @@ Integrations), `ScheduleView.tsx` (`CalendarPanel`, `ResultsPanel`),
   Glance + Calendar + Your Results all ride one `schedule` read. The trade-off is
   that *enabling* a widget needs a round-trip, which the Customize dialog does by
   reloading on close when the enabled set changed.
+- **Provider refresh is separate from rendering.** Schedule and tournament
+  widgets render stored rows first. `DashboardDataRefresh` requests only the
+  enabled sources after paint and refreshes the server view on success. Schedule
+  connection hints read account links without making provider health probes.
+  The shared external catalog and integration-card reads are memoized within
+  the server render so multiple widgets do not repeat them.
 - **Panels must be client-bundle-safe.** `HomeBoard` is a client component, so
   everything a panel calls at runtime has to be free of db/cloudflare imports.
   This is why `discordServerNote` lives in `lib/integrations-shared.ts` and not
@@ -667,11 +673,14 @@ lazy TTL). Portal conventions specific to this surface:
   `/api/tournaments/[id]/bracket` on the server-dictated interval (`nextPollMs`)
   and pausing on a hidden tab, the same request-budget discipline the ticket
   queue uses.
-- **Challonge reconciliation** runs lazily when either tournament list is read,
-  at most once per 24 hours. One paginated organization listing updates local
+- **Challonge reconciliation** starts after the cached tournament list paints,
+  through `DashboardDataRefresh` → `POST /api/dashboard/refresh`, at most once
+  per 24 hours (failed listings back off for five minutes). One paginated organization listing updates local
   names, formats, descriptions, dates, links and lifecycle states; a local row
   missing from a completely loaded listing is removed. `provider_synced_at` is
-  the D1 lease that keeps simultaneous page views to one provider sync. Bracket
+  the D1 lease that keeps simultaneous page views to one provider sync. The
+  complete paginated fetch has a 20-second deadline; a partial or failed listing
+  never authorizes removing local rows. Bracket
   participants and matches are a separate cache: 12 hours for open tournaments,
   30 days for concluded ones, plus immediate refresh after Commons admin writes.
 - **Academic-verification toggle** is on the admin create form and the Game Info

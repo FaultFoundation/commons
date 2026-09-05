@@ -254,11 +254,11 @@ async function removeDeletedChallongeTournament(
  * renders cannot multiply provider requests; missing rows are only removed
  * after the complete remote account listing has loaded successfully.
  */
-async function syncChallongeTournamentsIfStale(): Promise<void> {
+export async function syncChallongeTournamentsIfStale(): Promise<boolean> {
   const db = getDb();
   const now = new Date();
-  const candidates = (await db
-    .select()
+  const [lease] = await db
+    .select({ id: tournaments.id, providerSyncedAt: tournaments.providerSyncedAt })
     .from(tournaments)
     .where(
       and(
@@ -266,14 +266,14 @@ async function syncChallongeTournamentsIfStale(): Promise<void> {
         isNotNull(tournaments.externalId),
       ),
     )
-    .orderBy(tournaments.id)) as TournamentRow[];
-  const lease = candidates[0];
-  if (!lease) return;
+    .orderBy(tournaments.id)
+    .limit(1);
+  if (!lease) return false;
   if (
     lease.providerSyncedAt &&
     now.getTime() - lease.providerSyncedAt.getTime() < PROVIDER_SYNC_OPEN_MS
   ) {
-    return;
+    return false;
   }
 
   const claim = await db
@@ -288,12 +288,22 @@ async function syncChallongeTournamentsIfStale(): Promise<void> {
       ),
     )
     .returning({ id: tournaments.id });
-  if (!claim.length) return;
+  if (!claim.length) return false;
 
+  // Read full records only for the winner, before the remote snapshot so a
+  // tournament created during pagination cannot be mistaken for a deletion.
+  const candidates = (await db.select().from(tournaments).where(and(
+    eq(tournaments.source, "challonge"),
+    isNotNull(tournaments.externalId),
+  ))) as TournamentRow[];
   const remote = await listChallongeTournaments();
   if (!remote.ok) {
     console.error("Challonge tournament sync failed:", remote.error);
-    return;
+    // Keep a five-minute failure backoff rather than suppressing retries for a day.
+    await db.update(tournaments)
+      .set({ providerSyncedAt: new Date(now.getTime() - PROVIDER_SYNC_OPEN_MS + 5 * 60 * 1000) })
+      .where(and(eq(tournaments.id, lease.id), eq(tournaments.providerSyncedAt, now)));
+    return false;
   }
 
   const remoteById = new Map(remote.data.map((item) => [item.id, item]));
@@ -306,13 +316,13 @@ async function syncChallongeTournamentsIfStale(): Promise<void> {
       await removeDeletedChallongeTournament(tournament);
     }
   }
+  return true;
 }
 
 export async function listTournaments(opts?: {
   programId?: string;
   excludeDraft?: boolean;
 }): Promise<TournamentListItem[]> {
-  await syncChallongeTournamentsIfStale();
   const db = getDb();
   const conditions = [];
   if (opts?.programId) conditions.push(eq(tournaments.programId, opts.programId));

@@ -6293,43 +6293,49 @@ button.ff-dash__link:hover {
 .ff-main--home .ff-section {
   margin-block: clamp(34px, 4.5vw, 58px);
 }
+/* The page opens right under the site header, not a section-gap below it. */
+.ff-main--home .ff-section--hero {
+  margin-top: clamp(18px, 2.4vw, 30px);
+}
 
-/* Shared section furniture */
-.ff-home-h2 {
+/* The landing-page BUBBLE.
+
+   Every section out here is one of these, matching the portal's card
+   vocabulary (docs/dashboard-guide.md). It can't be the dashboard's <Bubble>
+   component: that one is padded and typed by the `.ff-dash` density tokens,
+   which don't exist on the marketing pages — so this is the same shape rebuilt
+   on the marketing scale, over the shared .ff-card primitive (§5) which already
+   carries the radius, surface, hairline and shadow. */
+.ff-home-bubble {
+  padding: clamp(22px, 3vw, 40px);
+}
+/* Columns that run edge-to-edge inside the bubble (the divided "Our goal"
+   box) supply their own padding per column, so the bubble drops its own —
+   otherwise the dividers stop short of the card edge. */
+.ff-home-bubble--flush {
+  padding: clamp(22px, 3vw, 40px) 0 0;
+}
+.ff-home-bubble--flush > .ff-home-bubble__title {
+  padding-inline: clamp(22px, 3vw, 40px);
+}
+.ff-home-bubble__title {
   margin: 0 0 clamp(14px, 2vw, 22px);
   font-size: var(--wp--preset--font-size--x-large);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-.ff-home-sub {
-  margin: -8px 0 clamp(16px, 2.2vw, 24px);
+/* A one-line lede under a bubble title; pulls up because the title already
+   carries the gap meant for the body. */
+.ff-home-bubble__sub {
+  margin: -10px 0 clamp(16px, 2.2vw, 24px);
   max-width: 52ch;
   color: var(--ff-text-dim);
   font-size: var(--wp--preset--font-size--large);
 }
+
+/* Shared section furniture */
 .ff-home-accent {
   color: var(--ff-accent);
-}
-.ff-home-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55em;
-  margin-bottom: 14px;
-  color: var(--ff-accent);
-  font-size: var(--wp--preset--font-size--small);
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-}
-.ff-home-eyebrow--muted {
-  color: var(--ff-text-dim);
-}
-.ff-home-eyebrow__dot {
-  width: 9px;
-  height: 9px;
-  border-radius: var(--ff-radius-pill);
-  background: var(--ff-accent);
-  box-shadow: 0 0 0 4px rgba(255, 238, 88, 0.2);
 }
 .ff-home-textlink {
   color: var(--ff-text-dim);
@@ -6351,7 +6357,6 @@ button.ff-dash__link:hover {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: center;
   gap: clamp(24px, 3.6vw, 46px);
-  margin-block: clamp(24px, 3.6vw, 48px);
 }
 .ff-home-hero__title {
   margin: 0;
@@ -6411,34 +6416,11 @@ button.ff-dash__link:hover {
 .ff-home-shot--hero {
   aspect-ratio: 16 / 13;
 }
-.ff-home-shot--tile {
-  aspect-ratio: 16 / 11;
-}
-
-/* --- See it in action (two captures side by side) --- */
-.ff-home-shots {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(18px, 2.4vw, 28px);
-}
-.ff-home-shots__item {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.ff-home-shots__title {
-  margin: 0 0 5px;
-  font-size: var(--wp--preset--font-size--large);
-  font-weight: 800;
-  letter-spacing: -0.2px;
-}
-.ff-home-shots__body {
-  margin: 0;
-  max-width: 46ch;
-  color: var(--ff-text-dim);
-  font-size: var(--wp--preset--font-size--medium);
-  line-height: 1.5;
+/* Beside the "Why we built this" prose. Slightly taller than the hero crop so
+   the bracket page's own header and standings both survive the cover crop next
+   to a column of running text. */
+.ff-home-shot--why {
+  aspect-ratio: 5 / 4;
 }
 
 /* --- Sources strip --- */
@@ -6446,9 +6428,10 @@ button.ff-dash__link:hover {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px 16px;
-  padding-block: clamp(13px, 1.8vw, 18px);
-  border-block: 1px solid var(--ff-border);
+  /* Centered as one line: the label and the four marks read as a single
+     sentence, so they're balanced in the bubble rather than left-anchored. */
+  justify-content: center;
+  gap: 12px 22px;
 }
 .ff-home-sources__label {
   color: var(--ff-text-dim);
@@ -6456,12 +6439,33 @@ button.ff-dash__link:hover {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1px;
-  margin-right: 4px;
 }
 .ff-home-sources__mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   font-size: var(--wp--preset--font-size--large);
   font-weight: 800;
   letter-spacing: -0.3px;
+}
+/* Same sizing contract as the tournament-card marks (.ff-tcard__source): fix
+   the height, let the width follow, so a square glyph and a wide lockup sit on
+   the same baseline. */
+.ff-home-sources__logo {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  color: #fff;
+}
+.ff-home-sources__logo svg,
+.ff-home-sources__logo img {
+  height: 24px;
+  width: auto;
+}
+/* FACEIT ships as a square lockup carrying its own white ground; the others are
+   transparent glyphs, so only this one needs its corners softened. */
+.ff-home-sources__logo--faceit img {
+  border-radius: 5px;
 }
 .ff-home-sources__mark--soon {
   color: var(--ff-text-dim);
@@ -6543,15 +6547,18 @@ button.ff-dash__link:hover {
   padding-top: 4px;
 }
 
-/* --- Why we built this --- */
+/* --- Why we built this (screenshot left, argument right) ---
+   The heading now sits ON TOP of the prose rather than in its own column, so
+   the freed column can carry the bracket screenshot — the proof of the argument
+   the copy is making. */
 .ff-home-why {
   display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-  gap: clamp(24px, 4vw, 56px);
-  padding: clamp(28px, 4vw, 56px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(24px, 4vw, 52px);
 }
 .ff-home-why__head {
-  margin: 0;
+  margin: 0 0 4px;
   font-size: var(--wp--preset--font-size--x-large);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -6563,12 +6570,14 @@ button.ff-dash__link:hover {
 }
 .ff-home-why__body p {
   margin: 0;
-  font-size: var(--wp--preset--font-size--large);
-  line-height: 1.55;
+  font-size: var(--wp--preset--font-size--medium);
+  line-height: 1.6;
+  color: var(--ff-text-dim);
 }
 .ff-home-why__sig {
   margin-top: 6px !important;
   font-weight: 800;
+  color: #fff !important;
   font-size: var(--wp--preset--font-size--medium) !important;
 }
 .ff-home-why__sig span {
@@ -6580,88 +6589,20 @@ button.ff-dash__link:hover {
   letter-spacing: 0.3px;
 }
 
-/* --- Overfault band --- */
-.ff-home-overfault {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-  gap: 0;
-  overflow: hidden;
-  /* No border: like .ff-card--gradient, the gradient carries the edge. A 1px
-     border here reads as a stray vertical line where the gradient's dark left
-     end meets the page background. */
-  border: 0;
-  background: var(--ff-grad-brand);
-}
-.ff-home-overfault__copy {
-  padding: clamp(26px, 3.5vw, 46px);
-}
-.ff-home-overfault__title {
-  margin: 0 0 20px;
-  font-size: var(--wp--preset--font-size--xx-large);
-  text-transform: uppercase;
-  letter-spacing: -0.5px;
-}
-.ff-home-overfault__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 26px;
-  margin: 0 0 20px;
-}
-.ff-home-overfault__meta dt {
-  color: var(--ff-text-dim);
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 3px;
-}
-.ff-home-overfault__meta dd {
-  margin: 0;
-  font-weight: 700;
-  font-size: var(--wp--preset--font-size--medium);
-}
-.ff-home-overfault__body {
-  margin: 0 0 24px;
-  max-width: 44ch;
-  color: rgba(255, 255, 255, 0.86);
-  font-size: var(--wp--preset--font-size--medium);
-  line-height: 1.5;
-}
-.ff-home-overfault__actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 20px;
-}
-.ff-home-overfault__art {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 200px;
-  color: rgba(255, 255, 255, 0.5);
-  font-family: var(--wp--preset--font-family--fira-code), ui-monospace, monospace;
-  font-size: var(--wp--preset--font-size--medium);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  background-color: rgba(0, 20, 44, 0.4);
-  background-image: repeating-linear-gradient(
-    -45deg,
-    rgba(255, 255, 255, 0.05) 0,
-    rgba(255, 255, 255, 0.05) 2px,
-    transparent 2px,
-    transparent 12px
-  );
-}
-
 /* --- Roadmap --- */
 .ff-home-roadmap {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: clamp(12px, 1.6vw, 18px);
 }
+/* Nested one level inside the Roadmap bubble, so these draw their own quieter
+   surface instead of the .ff-card primitive — a card-on-card with the same
+   background and shadow would read as a rendering bug. */
 .ff-home-roadmap__card {
   padding: clamp(18px, 2.2vw, 24px);
-  border-style: dashed;
+  border: 1px dashed var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: rgba(255, 255, 255, 0.03);
 }
 .ff-home-roadmap__title {
   margin: 0 0 8px;
@@ -6684,7 +6625,6 @@ button.ff-dash__link:hover {
   align-items: center;
   justify-content: space-between;
   gap: 20px 32px;
-  padding: clamp(24px, 3.2vw, 40px);
 }
 .ff-home-program__title {
   margin: 0 0 8px;
@@ -6698,38 +6638,15 @@ button.ff-dash__link:hover {
   line-height: 1.5;
 }
 
-/* --- Final CTA --- */
-.ff-home-final {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px 32px;
-  padding: clamp(28px, 4vw, 52px);
-  border: 0;
-}
-.ff-home-final__title {
-  margin: 0 0 8px;
-  font-size: var(--wp--preset--font-size--xx-large);
-  text-transform: uppercase;
-}
-.ff-home-final__body {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.86);
-  font-size: var(--wp--preset--font-size--large);
-}
-.ff-home-final__cta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
 /* --- Responsive --- */
 @media (max-width: 900px) {
   .ff-home-hero,
-  .ff-home-why,
-  .ff-home-overfault {
+  .ff-home-why {
     grid-template-columns: minmax(0, 1fr);
+  }
+  /* Stacked, the screenshot reads better above the prose than below it. */
+  .ff-home-why .ff-home-shot {
+    order: -1;
   }
   .ff-home-hero__lede {
     max-width: none;
@@ -6745,24 +6662,16 @@ button.ff-dash__link:hover {
   .ff-home-roadmap {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  /* One capture per row once two would each be too small to read. */
-  .ff-home-shots {
-    grid-template-columns: minmax(0, 1fr);
-  }
   /* The hero art sits under the copy when stacked, so it can run wider. */
   .ff-home-shot--hero {
     aspect-ratio: 16 / 10;
-  }
-  .ff-home-overfault__art {
-    min-height: 130px;
   }
 }
 @media (max-width: 560px) {
   .ff-home-roadmap {
     grid-template-columns: minmax(0, 1fr);
   }
-  .ff-home-hero__cta .ff-btn,
-  .ff-home-final__cta .ff-btn {
+  .ff-home-hero__cta .ff-btn {
     flex: 1 1 auto;
   }
 }

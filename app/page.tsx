@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 
 import { DonateButton } from "@/components/DonateButton";
+import {
+  ChallongeMark,
+  FaceitMark,
+  StartggMark,
+} from "@/components/brand/ProviderMark";
 
 export const metadata: Metadata = {
   // Absolute: the root layout's title.template doesn't apply to its own
@@ -17,6 +22,12 @@ export const metadata: Metadata = {
  * budget); the hero swaps signed-in vs signed-out CTAs with the same pre-paint
  * `data-auth` attribute the header uses (.ff-auth-when-in / .ff-auth-when-out),
  * never a per-request render. All styling is §15 of styles/theme.css.
+ *
+ * Every section is a BUBBLE (.ff-home-bubble), matching the portal's card
+ * vocabulary — see docs/dashboard-guide.md. The landing page can't use the
+ * dashboard's <Bubble> component directly: that one is sized by the `.ff-dash`
+ * density tokens, which don't exist out here, so .ff-home-bubble is the same
+ * shape rebuilt on the marketing type scale.
  */
 
 // Real product screenshots, in place of the hand-drawn feed panel this hero
@@ -33,20 +44,22 @@ const SHOT_HERO = {
   alt: "The Commons Project tournaments tab: a featured tournament banner above a grid of tournament cards drawn from start.gg and FACEIT, each showing its art, date, entrant count and registration status.",
 };
 
-// The two supporting captures, shown side by side under the sources strip.
-const SHOWCASE: { src: string; alt: string; title: string; body: string }[] = [
-  {
-    src: "/screenshots/tournament-detail.jpg",
-    alt: "A tournament page on the Commons Project showing the advancing teams with their school logos, an About section, and a details panel listing game, dates, entrants, stream and organizer.",
-    title: "Every bracket, one house style",
-    body: "Brackets, standings and results render here in full \u2014 school marks and all \u2014 whichever site is actually hosting the event.",
-  },
-  {
-    src: "/screenshots/schedule-calendar.png",
-    alt: "The Commons Project schedule tab showing a month calendar with tournament chips on each day, and a Your Results panel underneath.",
-    title: "One calendar, every platform",
-    body: "Each account you connect folds into the same month view, with your own finished matches collected underneath it.",
-  },
+// Beside "Why we built this", where the argument for the project is made — the
+// bracket page is the proof of it, so it sits next to the prose rather than in
+// a gallery of its own.
+const SHOT_WHY = {
+  src: "/screenshots/tournament-detail.jpg",
+  alt: "A tournament page on the Commons Project showing the advancing teams with their school logos, an About section, and a details panel listing game, dates, entrants, stream and organizer.",
+};
+
+// The platforms we read, each with its own brand glyph. Marks are the same
+// inline SVGs the tournament cards and OAuth buttons use
+// (components/brand/ProviderMark), so they can't render broken and need no
+// network fetch.
+const SOURCES: { key: string; name: string; Mark: () => React.ReactNode }[] = [
+  { key: "challonge", name: "Challonge", Mark: ChallongeMark },
+  { key: "faceit", name: "FACEIT", Mark: FaceitMark },
+  { key: "startgg", name: "start.gg", Mark: StartggMark },
 ];
 
 // The "Our goal" box: three divided columns, each an eyebrow + icon-left header
@@ -145,117 +158,118 @@ export default function CommonsPage() {
   return (
     <main id="wp--skip-link--target" className="ff-main ff-main--home">
       {/* ---------- Hero ---------- */}
-      <section className="ff-container ff-home-hero">
-        <div className="ff-home-hero__copy">
-          <h1 className="ff-home-hero__title">
-            One place
-            <br />
-            <span className="ff-home-accent">every bracket</span>
-          </h1>
-          <p className="ff-home-hero__lede">
-            The Commons Project reads Challonge, FACEIT, and start.gg into one
-            feed, so your matches, your record, and your team&rsquo;s schedule
-            live together with no tabs, no spreadsheets, and no missed
-            check-ins.
-          </p>
+      <section className="ff-container ff-section ff-section--hero">
+        <div className="ff-card ff-home-bubble ff-home-hero">
+          <div className="ff-home-hero__copy">
+            <h1 className="ff-home-hero__title">
+              One place
+              <br />
+              <span className="ff-home-accent">every bracket</span>
+            </h1>
+            <p className="ff-home-hero__lede">
+              The Commons Project reads Challonge, FACEIT, and start.gg into one
+              feed, so your matches, your record, and your team&rsquo;s schedule
+              live together with no tabs, no spreadsheets, and no missed
+              check-ins.
+            </p>
 
-          <div className="ff-home-hero__cta ff-auth-when-out">
-            <a className="ff-btn ff-btn--accent" href="/login/">
-              Log in to the Commons Project
-            </a>
-            <a className="ff-btn ff-btn--outline" href="/signup/">
-              Create an account
-            </a>
+            <div className="ff-home-hero__cta ff-auth-when-out">
+              <a className="ff-btn ff-btn--accent" href="/login/">
+                Log in to the Commons Project
+              </a>
+              <a className="ff-btn ff-btn--outline" href="/signup/">
+                Create an account
+              </a>
+            </div>
+            <div className="ff-home-hero__cta ff-auth-when-in">
+              <a className="ff-btn ff-btn--accent" href="/home/">
+                Open the Commons Project
+              </a>
+              <a className="ff-btn ff-btn--outline" href="/schedule/">
+                View your schedule
+              </a>
+            </div>
+
+            <p className="ff-home-hero__note">Free for everyone</p>
           </div>
-          <div className="ff-home-hero__cta ff-auth-when-in">
-            <a className="ff-btn ff-btn--accent" href="/home/">
-              Open the Commons Project
-            </a>
-            <a className="ff-btn ff-btn--outline" href="/schedule/">
-              View your schedule
-            </a>
+
+          <div className="ff-home-shot ff-home-shot--hero">
+            <img className="ff-home-shot__img" src={SHOT_HERO.src} alt={SHOT_HERO.alt} />
           </div>
-
-          <p className="ff-home-hero__note">Free for everyone</p>
-        </div>
-
-        <div className="ff-home-shot ff-home-shot--hero">
-          <img className="ff-home-shot__img" src={SHOT_HERO.src} alt={SHOT_HERO.alt} />
         </div>
       </section>
 
       {/* ---------- Sources strip ---------- */}
-      <section className="ff-container ff-home-sources">
-        <span className="ff-home-sources__label">Reads results from</span>
-        <span className="ff-home-sources__mark">Challonge</span>
-        <span className="ff-home-sources__mark">FACEIT</span>
-        <span className="ff-home-sources__mark">start.gg</span>
-        <span className="ff-home-sources__mark ff-home-sources__mark--soon">More coming</span>
-      </section>
-
-      {/* ---------- See it in action ---------- */}
-      <section className="ff-container ff-section ff-home-block">
-        <h2 className="ff-home-h2">See it in action</h2>
-        <div className="ff-home-shots">
-          {SHOWCASE.map((shot) => (
-            <figure key={shot.src} className="ff-home-shots__item">
-              <div className="ff-home-shot ff-home-shot--tile">
-                <img className="ff-home-shot__img" src={shot.src} alt={shot.alt} loading="lazy" />
-              </div>
-              <figcaption>
-                <h3 className="ff-home-shots__title">{shot.title}</h3>
-                <p className="ff-home-shots__body">{shot.body}</p>
-              </figcaption>
-            </figure>
-          ))}
-        </div>
-      </section>
-
-      {/* ---------- Our goal (single box, three divided columns) ---------- */}
-      <section className="ff-container ff-section ff-home-block">
-        <h2 className="ff-home-h2">Our goal</h2>
-        <div className="ff-card ff-home-goals">
-          {GOALS.map((goal) => (
-            <article key={goal.title} className="ff-home-goal">
-              <div className="ff-home-goal__head">
-                <span
-                  className={`ff-home-goal__icon${goal.accent ? " ff-home-goal__icon--accent" : ""}`}
-                >
-                  <GoalIcon icon={goal.icon} />
-                </span>
-                <div className="ff-home-goal__headings">
-                  <span className="ff-home-goal__eyebrow">{goal.eyebrow}</span>
-                  <h3 className="ff-home-goal__title">{goal.title}</h3>
-                </div>
-              </div>
-              <p className="ff-home-goal__body">{goal.body}</p>
-              {goal.cta === "donate" && (
-                <div className="ff-home-goal__cta">
-                  <DonateButton />
-                </div>
-              )}
-              {goal.cta === "github" && (
-                <div className="ff-home-goal__cta">
-                  <a
-                    className="ff-btn ff-btn--outline"
-                    href="https://github.com/FaultFoundation/commons"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    View on GitHub →
-                  </a>
-                </div>
-              )}
-            </article>
-          ))}
-        </div>
-      </section>
-
-      {/* ---------- Why we built this ---------- */}
       <section className="ff-container ff-section">
-        <div className="ff-card ff-card--gradient ff-home-why">
-          <h2 className="ff-home-why__head">Why we built this</h2>
+        <div className="ff-card ff-home-bubble ff-home-sources">
+          <span className="ff-home-sources__label">Reads results from</span>
+          {SOURCES.map(({ key, name, Mark }) => (
+            <span key={key} className="ff-home-sources__mark">
+              <span
+                className={`ff-home-sources__logo ff-home-sources__logo--${key}`}
+                aria-hidden="true"
+              >
+                <Mark />
+              </span>
+              {name}
+            </span>
+          ))}
+          <span className="ff-home-sources__mark ff-home-sources__mark--soon">
+            More coming
+          </span>
+        </div>
+      </section>
+
+      {/* ---------- Our goal (three divided columns inside one bubble) ---------- */}
+      <section className="ff-container ff-section">
+        <div className="ff-card ff-home-bubble ff-home-bubble--flush">
+          <h2 className="ff-home-bubble__title">Our goal</h2>
+          <div className="ff-home-goals">
+            {GOALS.map((goal) => (
+              <article key={goal.title} className="ff-home-goal">
+                <div className="ff-home-goal__head">
+                  <span
+                    className={`ff-home-goal__icon${goal.accent ? " ff-home-goal__icon--accent" : ""}`}
+                  >
+                    <GoalIcon icon={goal.icon} />
+                  </span>
+                  <div className="ff-home-goal__headings">
+                    <span className="ff-home-goal__eyebrow">{goal.eyebrow}</span>
+                    <h3 className="ff-home-goal__title">{goal.title}</h3>
+                  </div>
+                </div>
+                <p className="ff-home-goal__body">{goal.body}</p>
+                {goal.cta === "donate" && (
+                  <div className="ff-home-goal__cta">
+                    <DonateButton />
+                  </div>
+                )}
+                {goal.cta === "github" && (
+                  <div className="ff-home-goal__cta">
+                    <a
+                      className="ff-btn ff-btn--outline"
+                      href="https://github.com/FaultFoundation/commons"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View on GitHub →
+                    </a>
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ---------- Why we built this (screenshot left, argument right) ---------- */}
+      <section className="ff-container ff-section">
+        <div className="ff-card ff-home-bubble ff-home-why">
+          <div className="ff-home-shot ff-home-shot--why">
+            <img className="ff-home-shot__img" src={SHOT_WHY.src} alt={SHOT_WHY.alt} loading="lazy" />
+          </div>
           <div className="ff-home-why__body">
+            <h2 className="ff-home-why__head">Why we built this</h2>
             <p>
               Every season we watched programs miss deadlines, forget matches,
               and rebuild databases with students rapidly filtering out. Every
@@ -275,57 +289,27 @@ export default function CommonsPage() {
         </div>
       </section>
 
-      {/* ---------- Overfault band (coming soon) ---------- */}
-      <section className="ff-container ff-section">
-        <div className="ff-card ff-home-overfault">
-          <div className="ff-home-overfault__copy">
-            <span className="ff-home-eyebrow">
-              <span className="ff-home-eyebrow__dot" />
-              Coming soon
-            </span>
-            <h2 className="ff-home-overfault__title">Overfault Season 4</h2>
-            <dl className="ff-home-overfault__meta">
-              <div>
-                <dt>Game</dt>
-                <dd>TBD</dd>
-              </div>
-              <div>
-                <dt>Dates</dt>
-                <dd>TBD</dd>
-              </div>
-              <div>
-                <dt>Entry</dt>
-                <dd>TBD</dd>
-              </div>
-            </dl>
-            <p className="ff-home-overfault__body">
-              Details for the next Overfault season are coming soon. We&rsquo;ll
-              announce everything and update this section within the week.
-            </p>
-          </div>
-          <div className="ff-home-overfault__art" aria-hidden="true">
-            <span>Coming soon</span>
-          </div>
-        </div>
-      </section>
-
       {/* ---------- Roadmap ---------- */}
-      <section className="ff-container ff-section ff-home-block">
-        <h2 className="ff-home-h2">Roadmap</h2>
-        <p className="ff-home-sub">Where the Commons Project is headed next.</p>
-        <div className="ff-home-roadmap">
-          {ROADMAP.map((item) => (
-            <article key={item.title} className="ff-card ff-home-roadmap__card">
-              <h3 className="ff-home-roadmap__title">{item.title}</h3>
-              <p className="ff-home-roadmap__body">{item.body}</p>
-            </article>
-          ))}
+      <section className="ff-container ff-section">
+        <div className="ff-card ff-home-bubble">
+          <h2 className="ff-home-bubble__title">Roadmap</h2>
+          <p className="ff-home-bubble__sub">
+            Where the Commons Project is headed next.
+          </p>
+          <div className="ff-home-roadmap">
+            {ROADMAP.map((item) => (
+              <article key={item.title} className="ff-home-roadmap__card">
+                <h3 className="ff-home-roadmap__title">{item.title}</h3>
+                <p className="ff-home-roadmap__body">{item.body}</p>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* ---------- Program directors ---------- */}
       <section className="ff-container ff-section">
-        <div className="ff-card ff-home-program">
+        <div className="ff-card ff-home-bubble ff-home-program">
           <div>
             <h2 className="ff-home-program__title">Run a program? Talk to us.</h2>
             <p className="ff-home-program__body">
@@ -336,31 +320,6 @@ export default function CommonsPage() {
           <a className="ff-btn ff-btn--outline" href="https://discord.com/invite/76D4TAdymH">
             Get in touch
           </a>
-        </div>
-      </section>
-
-      {/* ---------- Final CTA ---------- */}
-      <section className="ff-container ff-section">
-        <div className="ff-card ff-card--gradient-rev ff-home-final">
-          <div>
-            <h2 className="ff-home-final__title">Put the tabs away.</h2>
-            <p className="ff-home-final__body">
-              Sign in and connect your first platform in under a minute.
-            </p>
-          </div>
-          <div className="ff-home-final__cta ff-auth-when-out">
-            <a className="ff-btn ff-btn--accent" href="/login/">
-              Log in to the Commons Project
-            </a>
-            <a className="ff-btn ff-btn--outline" href="/signup/">
-              Create an account
-            </a>
-          </div>
-          <div className="ff-home-final__cta ff-auth-when-in">
-            <a className="ff-btn ff-btn--accent" href="/home/">
-              Open the Commons Project
-            </a>
-          </div>
         </div>
       </section>
     </main>

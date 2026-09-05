@@ -4,6 +4,7 @@ import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { sourceKey } from "@/components/brand/SourceLogo";
 import { AboutLayout } from "@/components/dashboard/tournaments/AboutLayout";
 import { ExternalBracket } from "@/components/dashboard/tournaments/ExternalBracket";
+import { RoundRobinView } from "@/components/dashboard/tournaments/RoundRobinView";
 import { Markdown } from "@/components/dashboard/tournaments/Markdown";
 import { ExternalTournamentRefresh } from "@/components/dashboard/tournaments/ExternalTournamentRefresh";
 import { ShareBar } from "@/components/dashboard/tournaments/ShareBar";
@@ -18,6 +19,18 @@ import type {
   FinisherEntry,
   ResultRow,
 } from "@/components/dashboard/tournaments/tournament-view-shared";
+import {
+  compareOrderKeys,
+  connectedComponents,
+  hasFeedGraph,
+  minOrderKey,
+} from "@/lib/bracket-graph-shared";
+import { FORMAT_VIEW, formatViewKind, resolveExternalFormat } from "@/lib/tournament-format";
+import {
+  computeRRStandings,
+  rrGroupsFromExternal,
+  type RRGroup,
+} from "@/lib/round-robin-shared";
 import { TOURNAMENT_STATUS_LABELS } from "@/lib/tournaments-shared";
 import type {
   ExternalTournamentDetail,
@@ -336,89 +349,6 @@ function rankBracket(
   return placed;
 }
 
-/** Natural order for start.gg set identifiers ("A".."Z".."AA"): shorter first,
-    then lexical; null last. (Mirrors ExternalBracket.) */
-function compareOrderKeys(a: string | null, b: string | null): number {
-  if (a == null && b == null) return 0;
-  if (a == null) return 1;
-  if (b == null) return -1;
-  if (a.length !== b.length) return a.length - b.length;
-  return a.localeCompare(b);
-}
-
-/** Weakly-connected components of the feed graph — disjoint pools share no
-    prereq edges, so each pool falls out as its own component. Mirrors
-    ExternalBracket's pool inference so the derived standings split into exactly
-    the pools the bracket tabs show, even when `phaseGroupId` is absent (the
-    common case: the scraper often lands the CRL-style qualifiers with prereq
-    edges but no phase-group labels). */
-function connectedComponents(
-  matches: ExternalTournamentMatch[],
-): ExternalTournamentMatch[][] {
-  const indexById = new Map<string, number>();
-  matches.forEach((m, i) => indexById.set(m.sourceMatchId, i));
-  const parent = matches.map((_, i) => i);
-  const find = (x: number): number => {
-    let root = x;
-    while (parent[root] !== root) root = parent[root];
-    while (parent[x] !== root) {
-      const next = parent[x];
-      parent[x] = root;
-      x = next;
-    }
-    return root;
-  };
-  const union = (a: number, b: number) => {
-    const ra = find(a);
-    const rb = find(b);
-    if (ra !== rb) parent[ra] = rb;
-  };
-  matches.forEach((m, i) => {
-    for (const feeder of [m.prereq1Id, m.prereq2Id]) {
-      if (!feeder) continue;
-      const j = indexById.get(feeder);
-      if (j != null) union(i, j);
-    }
-  });
-  const byRoot = new Map<number, ExternalTournamentMatch[]>();
-  matches.forEach((m, i) => {
-    const root = find(i);
-    const list = byRoot.get(root) ?? [];
-    list.push(m);
-    byRoot.set(root, list);
-  });
-  return [...byRoot.values()];
-}
-
-/** True when the feed graph has at least one INTERNAL edge (some match names
-    another in the set as a prereq). Mirrors ExternalBracket: without an edge,
-    component inference makes every match its own singleton "pool", so a phase
-    with no feed graph (FACEIT, or start.gg before prereqs) stays one ranking. */
-function hasFeedGraph(matches: ExternalTournamentMatch[]): boolean {
-  const ids = new Set(matches.map((m) => m.sourceMatchId));
-  return matches.some(
-    (m) =>
-      (m.prereq1Id != null && ids.has(m.prereq1Id)) ||
-      (m.prereq2Id != null && ids.has(m.prereq2Id)),
-  );
-}
-
-/** Smallest bracket-position key across a set — orders inferred pools left→right
-    in seed order (like the bracket tabs). */
-function minOrderKey(matches: ExternalTournamentMatch[]): string | null {
-  let best: string | null = null;
-  let seen = false;
-  for (const m of matches) {
-    if (!seen) {
-      best = m.orderKey;
-      seen = true;
-    } else if (compareOrderKeys(m.orderKey, best) < 0) {
-      best = m.orderKey;
-    }
-  }
-  return best;
-}
-
 /**
  * Derive placements from a COMPLETED bracket when the projection carries no
  * placed standings (bracket tournaments routinely land matches but no
@@ -524,6 +454,87 @@ function finishersFromDerived(derived: DerivedResults | null): FinisherEntry[] {
   );
 }
 
+/** Top-of-table finishers for a COMPLETED round robin — a single group's top 3
+    (by record), or each group's leader for a multi-group stage (labelled by
+    group, like a pool stage). Empty while the event is still running: a current
+    leader isn't a final placement. */
+function rrFinishers(groups: RRGroup[], status: string): FinisherEntry[] {
+  if (status !== "completed") return [];
+  const sections = groups.map((g) => ({
+    label: g.label,
+    rows: computeRRStandings(g.entrants, g.matches),
+  }));
+  if (sections.length <= 1) {
+    return (sections[0]?.rows ?? [])
+      .filter((r) => r.placement >= 1 && r.placement <= 3)
+      .map((r) => ({ place: r.placement, name: r.name, logoUrl: r.logoUrl }));
+  }
+  return sections.flatMap(({ label, rows }) => {
+    const leader = rows[0];
+    return leader
+      ? [{ place: 1, name: leader.name, logoUrl: leader.logoUrl, poolLabel: label }]
+      : [];
+  });
+}
+
+/** The Standings tab body for a round robin — a W–L–Pts table per group (the
+    matrix already shows every head-to-head, so this is the summary table). */
+function RRStandingsSection({ groups }: { groups: RRGroup[] }) {
+  const sections = groups.map((g) => ({
+    id: g.id,
+    label: g.label,
+    rows: computeRRStandings(g.entrants, g.matches),
+  }));
+  const anyPlayed = groups.some((g) => g.matches.some((m) => m.state === "done"));
+  return (
+    <>
+      {sections.map((section) => (
+        <div key={section.id} className="ff-ext-section">
+          {section.label ? (
+            <h4 className="ff-ext-section__head">{section.label}</h4>
+          ) : null}
+          <div className="ff-ticket-table-wrap">
+            <table className="ff-ticket-table">
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Team</th>
+                  <th scope="col">W–L</th>
+                  <th scope="col">Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {section.rows.map((row) => (
+                  <tr key={row.id}>
+                    <td>{row.placement}</td>
+                    <td>
+                      <span className="ff-ext-entrant">
+                        {row.logoUrl ? (
+                          <img
+                            className="ff-ext-entrant__logo"
+                            src={row.logoUrl}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : null}
+                        <span>{row.name}</span>
+                      </span>
+                    </td>
+                    <td>{anyPlayed ? `${row.w}–${row.l}` : "—"}</td>
+                    <td>{anyPlayed ? row.pts : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 export function ExternalTournamentView({
   tournament,
   shareUrl,
@@ -550,15 +561,24 @@ export function ExternalTournamentView({
     event.standings.some((standing) => standing.placement != null),
   );
 
+  // Recognise the FORMAT (framework: lib/tournament-format.ts). A round robin
+  // routes the bracket tab to the purpose-built RoundRobinView and takes its own
+  // standings; everything else keeps the elimination bracket below.
+  const format = resolveExternalFormat(tournament.events);
+  const isRoundRobin = formatViewKind(format) === "roundrobin";
+  const rrGroups = isRoundRobin ? rrGroupsFromExternal(tournament.events) : [];
+
   // When the projection carries placed standings, use them; otherwise derive
   // them from the completed bracket. Attendee rows have null placements and do
   // not suppress this fallback. A pool stage derives one ranking per pool.
+  // (Round robin has no single "final", so the bracket deriver is skipped.)
   const derived =
-    !hasPlacedStandings
+    !hasPlacedStandings && !isRoundRobin
       ? deriveBracketResults(tournament.events, tournament.status)
       : null;
-  const finishers: FinisherEntry[] =
-    hasPlacedStandings
+  const finishers: FinisherEntry[] = isRoundRobin
+    ? rrFinishers(rrGroups, tournament.status)
+    : hasPlacedStandings
       ? buildFinishers(tournament.events)
       : finishersFromDerived(derived);
   const recentResults = buildRecentResults(tournament.events);
@@ -756,15 +776,22 @@ export function ExternalTournamentView({
     </div>
   );
 
-  const bracket = (
+  const bracket = isRoundRobin ? (
+    <RoundRobinView groups={rrGroups} />
+  ) : (
     <Bubble title="Bracket" className="ff-bubble--divided">
       <ExternalBracket events={tournament.events} source={tournament.source} />
     </Bubble>
   );
 
   const standings = (
-    <Bubble title={hasDisplayedPlacements ? "Final Standings" : "Entrants"} span="full">
-      {!hasPlacedStandings && derived ? (
+    <Bubble
+      title={isRoundRobin ? "Standings" : hasDisplayedPlacements ? "Final Standings" : "Entrants"}
+      span="full"
+    >
+      {isRoundRobin ? (
+        <RRStandingsSection groups={rrGroups} />
+      ) : !hasPlacedStandings && derived ? (
         derived.kind === "single" ? (
           <div className="ff-ext-section">
             <StandingsTable
@@ -834,7 +861,7 @@ export function ExternalTournamentView({
 
   const tabs: TournamentTab[] = [
     { id: "overview", label: "Overview", node: overview },
-    { id: "bracket", label: "Bracket", node: bracket },
+    { id: "bracket", label: FORMAT_VIEW[format].tabLabel, node: bracket },
     { id: "standings", label: "Standings", node: standings },
     { id: "rules", label: "Rules", node: rules },
   ];

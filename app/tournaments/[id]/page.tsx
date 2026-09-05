@@ -13,10 +13,13 @@ import {
 } from "@/components/dashboard/tournaments/TournamentChrome";
 import { TopFinishers } from "@/components/dashboard/tournaments/TopFinishers";
 import { BracketWithSidebar } from "@/components/dashboard/tournaments/BracketWithSidebar";
+import { RoundRobinView } from "@/components/dashboard/tournaments/RoundRobinView";
 import type {
   FinisherEntry,
   ResultRow,
 } from "@/components/dashboard/tournaments/tournament-view-shared";
+import { FORMAT_VIEW, formatViewKind } from "@/lib/tournament-format";
+import { rrGroupsFromSnapshot } from "@/lib/round-robin-shared";
 import { getExternalTournament } from "@/lib/external-tournaments";
 import { getSessionCached } from "@/lib/session";
 import {
@@ -209,6 +212,12 @@ export default async function TournamentPage({
   const finishers = buildFinishers(initial?.participants ?? []);
   const recentResults = buildRecentResults(initial);
 
+  // Recognise the FORMAT (framework: lib/tournament-format.ts). A round robin
+  // routes the bracket tab to the purpose-built RoundRobinView; the Standings tab
+  // keeps BracketView, whose round-robin table already computes W–L–Pts.
+  const isRoundRobin = formatViewKind(tournament.format) === "roundrobin";
+  const rrGroups = isRoundRobin && initial ? rrGroupsFromSnapshot(initial) : [];
+
   const startDate = tournament.startsAt
     ? tournament.startsAt.toLocaleDateString(undefined, {
         month: "short",
@@ -340,36 +349,39 @@ export default async function TournamentPage({
     </div>
   );
 
-  const bracket = (
-    <BracketWithSidebar results={recentResults}>
-      <Bubble
-        title="Bracket"
-        className="ff-bubble--divided"
-        actions={
-          initial && tournament.externalUrl ? (
-            <a
-              className="ff-btn ff-btn--outline ff-btn--sm"
-              href={tournament.externalUrl}
-              target="_blank"
-              rel="noreferrer noopener"
-            >
-              View on Challonge
-            </a>
-          ) : undefined
-        }
-      >
-        {initial ? (
-          <BracketView
-            tournamentId={tournament.id}
-            initial={initial}
-            showStandings={false}
-          />
-        ) : (
-          <p className="ff-ticket-empty">No bracket has been published yet.</p>
-        )}
-      </Bubble>
-    </BracketWithSidebar>
-  );
+  const bracket =
+    isRoundRobin && initial ? (
+      <RoundRobinView groups={rrGroups} />
+    ) : (
+      <BracketWithSidebar results={recentResults}>
+        <Bubble
+          title="Bracket"
+          className="ff-bubble--divided"
+          actions={
+            initial && tournament.externalUrl ? (
+              <a
+                className="ff-btn ff-btn--outline ff-btn--sm"
+                href={tournament.externalUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                View on Challonge
+              </a>
+            ) : undefined
+          }
+        >
+          {initial ? (
+            <BracketView
+              tournamentId={tournament.id}
+              initial={initial}
+              showStandings={false}
+            />
+          ) : (
+            <p className="ff-ticket-empty">No bracket has been published yet.</p>
+          )}
+        </Bubble>
+      </BracketWithSidebar>
+    );
 
   const standings = (
     <Bubble title="Standings" span="full">
@@ -402,7 +414,7 @@ export default async function TournamentPage({
 
   const tabs: TournamentTab[] = [
     { id: "overview", label: "Overview", node: overview },
-    { id: "bracket", label: "Bracket", node: bracket },
+    { id: "bracket", label: FORMAT_VIEW[tournament.format].tabLabel, node: bracket },
     { id: "standings", label: "Standings", node: standings },
     { id: "rules", label: "Rules", node: rules },
   ];

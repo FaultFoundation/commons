@@ -9,3 +9,6 @@
 
 /wp-content/uploads/*
   Cache-Control: public,max-age=86400,stale-while-revalidate=604800
+
+/screenshots/*
+  Cache-Control: public,max-age=86400,stale-while-revalidate=604800

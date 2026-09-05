@@ -315,6 +315,52 @@ active panel is mounted, so the polling `BracketView` and the measured
 `showBracket`/`showStandings` so the Bracket and Standings tabs each mount it
 with one half (shared snapshot, one instance live at a time).
 
+**Format recognition → per-format views.** The bracket tab isn't always a
+bracket. [lib/tournament-format.ts](lib/tournament-format.ts) is the one place
+that resolves a tournament's **format** (`single_elim | double_elim |
+round_robin | swiss`, the canonical vocabulary from
+[tournaments-shared.ts](lib/tournaments-shared.ts)) for BOTH sources, and
+`FORMAT_VIEW` maps each format to `{ tabLabel, kind }` — the **dispatch
+registry**. The internal view resolves off the explicit `tournaments.format`;
+the external view has no format column in the projection, so
+`classifyExternalFormat` **infers** it from the scraped matches (losers bracket →
+double-elim; an internal feed graph with no losers → single-elim; otherwise
+per-**entrant-component** pairing coverage separates a round robin (fills the
+matrix) from swiss (sparse) — classified per component so a multi-GROUP round
+robin, each group a clique disconnected from the others, isn't diluted into
+"swiss"). Both views then switch on `kind`: `roundrobin` renders
+[RoundRobinView](components/dashboard/tournaments/RoundRobinView.tsx); everything
+else keeps the existing `BracketView` / `ExternalBracket`. **Adding a new
+per-format view (e.g. a dedicated swiss view) is: build the component, flip that
+format's `kind`, add one dispatch `case`** — detection and routing don't change.
+The graph/pool primitives those consumers share (`hasFeedGraph`,
+`connectedComponents`, `entrantComponents`, `splitPools`, `compareOrderKeys`) live
+in [lib/bracket-graph-shared.ts](lib/bracket-graph-shared.ts) (was duplicated in
+`ExternalBracket`/`ExternalTournamentView`). **Recommended follow-up**
+(cross-repo): a scraper-written `format` column on the cen-sql projection makes
+external detection authoritative; the inference stays as the fallback.
+
+- **The round-robin view** ([RoundRobinView](components/dashboard/tournaments/RoundRobinView.tsx),
+  client) replaces the bracket in the Bracket tab (relabelled **"Groups"**) for a
+  round robin. It's fed one plain `RRGroup[]` by
+  [lib/round-robin-shared.ts](lib/round-robin-shared.ts)'s per-source normalisers
+  (`rrGroupsFromExternal` off the projection, `rrGroupsFromSnapshot` off the
+  Challonge snapshot), the same shared-shape pattern as `TopFinishers` /
+  `RecentResults`. Three linked pieces: a full-width **results matrix** (rows/cols
+  = entrants, each cell the row team's result vs the column team, **shaded by
+  round**, click → a match-detail popup over the shared `ff-daypop` overlay), then
+  a two-up row of the **at-a-glance matchup graph** (entrants on a circle, every
+  matchup a client-computed **curved** SVG edge; the current round incl. live
+  emphasised, the next lighter, the rest dashed) and the **rounds schedule**
+  (RecentResults idiom). Multi-group stages (Group A/B/…, split by `phaseGroupId`
+  else entrant-graph components) show one group at a time behind group tabs.
+  Standings: external takes a W–L–Pts table from `computeRRStandings`; internal
+  keeps `BracketView`'s own round-robin table. A round robin has no single final,
+  so `deriveBracketResults` is skipped and Overview finishers only show once
+  completed. (Today the RR view renders from a server-built snapshot and doesn't
+  self-poll like `BracketView` — it refreshes on navigation/reload; giving it the
+  poll route is a possible follow-up.)
+
 - **Overview** leads with a **Top Finishers** row —
   [TopFinishers](components/dashboard/tournaments/TopFinishers.tsx) with
   gold/silver/bronze [TrophyIcon](components/dashboard/tournaments/TrophyIcon.tsx)

@@ -19,49 +19,33 @@ export const metadata: Metadata = {
  * never a per-request render. All styling is §15 of styles/theme.css.
  */
 
-// Illustrative feed shown in the hero preview panel. Decorative sample data,
-// hidden from assistive tech (a screen-reader summary sits beside it).
-const PREVIEW_FEED: {
-  source: "start.gg" | "challonge" | "faceit";
-  name: string;
-  meta: string;
-  tag: string;
-  tone: "next" | "reg" | "result" | "wait";
-}[] = [
+// Real product screenshots, in place of the hand-drawn feed panel this hero
+// used to render in markup. A mock is cheap to keep in sync but it is also a
+// drawing of the product rather than the product; these are captures of the
+// live Commons Project, so the front door shows what a member actually gets.
+//
+// Plain <img> is the site convention (next.config.ts turns image optimization
+// off), and every shot is cropped by its frame (.ff-home-shot) rather than
+// pre-cropped as a file, so re-capturing one is a drop-in replacement with no
+// markup change. Files live in public/screenshots/.
+const SHOT_HERO = {
+  src: "/screenshots/tournaments-list.jpg",
+  alt: "The Commons Project tournaments tab: a featured tournament banner above a grid of tournament cards drawn from start.gg and FACEIT, each showing its art, date, entrant count and registration status.",
+};
+
+// The two supporting captures, shown side by side under the sources strip.
+const SHOWCASE: { src: string; alt: string; title: string; body: string }[] = [
   {
-    source: "start.gg",
-    name: "Fault Winter Open",
-    meta: "Round 2 · Sat 14:00",
-    tag: "Up next",
-    tone: "next",
+    src: "/screenshots/tournament-detail.jpg",
+    alt: "A tournament page on the Commons Project showing the advancing teams with their school logos, an About section, and a details panel listing game, dates, entrants, stream and organizer.",
+    title: "Every bracket, one house style",
+    body: "Brackets, standings and results render here in full \u2014 school marks and all \u2014 whichever site is actually hosting the event.",
   },
   {
-    source: "challonge",
-    name: "Overfault Season 3",
-    meta: "Check-in opens 18:00",
-    tag: "Registered",
-    tone: "reg",
-  },
-  {
-    source: "faceit",
-    name: "Ranked Ladder",
-    meta: "Won 13-9 · +24 elo",
-    tag: "Result",
-    tone: "result",
-  },
-  {
-    source: "start.gg",
-    name: "Campus Clash #7",
-    meta: "Placed 3rd of 32",
-    tag: "Result",
-    tone: "result",
-  },
-  {
-    source: "challonge",
-    name: "Fault Weekly",
-    meta: "Seeding pending",
-    tag: "Waiting",
-    tone: "wait",
+    src: "/screenshots/schedule-calendar.png",
+    alt: "The Commons Project schedule tab showing a month calendar with tournament chips on each day, and a Your Results panel underneath.",
+    title: "One calendar, every platform",
+    body: "Each account you connect folds into the same month view, with your own finished matches collected underneath it.",
   },
 ];
 
@@ -159,7 +143,7 @@ function GoalIcon({ icon }: { icon: "heart" | "code" | "layers" }) {
 
 export default function CommonsPage() {
   return (
-    <main id="wp--skip-link--target" className="ff-main">
+    <main id="wp--skip-link--target" className="ff-main ff-main--home">
       {/* ---------- Hero ---------- */}
       <section className="ff-container ff-home-hero">
         <div className="ff-home-hero__copy">
@@ -195,30 +179,8 @@ export default function CommonsPage() {
           <p className="ff-home-hero__note">Free for everyone</p>
         </div>
 
-        <div className="ff-home-preview" role="img" aria-label="A sample Commons Project feed pulling matches from start.gg, Challonge, and FACEIT into one list.">
-          <div className="ff-home-preview__bar" aria-hidden="true">
-            <span className="ff-home-preview__dot" />
-            <span className="ff-home-preview__dot" />
-            <span className="ff-home-preview__dot" />
-            <span className="ff-home-preview__url">preview · your feed</span>
-          </div>
-          <ul className="ff-home-preview__list" aria-hidden="true">
-            {PREVIEW_FEED.map((row) => (
-              <li key={row.name} className="ff-home-preview__row">
-                <span className="ff-home-preview__src">{row.source}</span>
-                <span className="ff-home-preview__main">
-                  <span className="ff-home-preview__name">{row.name}</span>
-                  <span className="ff-home-preview__meta">{row.meta}</span>
-                </span>
-                <span className={`ff-home-preview__tag ff-home-preview__tag--${row.tone}`}>
-                  {row.tag}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <div className="ff-home-preview__foot" aria-hidden="true">
-            view all 14 →
-          </div>
+        <div className="ff-home-shot ff-home-shot--hero">
+          <img className="ff-home-shot__img" src={SHOT_HERO.src} alt={SHOT_HERO.alt} />
         </div>
       </section>
 
@@ -229,6 +191,24 @@ export default function CommonsPage() {
         <span className="ff-home-sources__mark">FACEIT</span>
         <span className="ff-home-sources__mark">start.gg</span>
         <span className="ff-home-sources__mark ff-home-sources__mark--soon">More coming</span>
+      </section>
+
+      {/* ---------- See it in action ---------- */}
+      <section className="ff-container ff-section ff-home-block">
+        <h2 className="ff-home-h2">See it in action</h2>
+        <div className="ff-home-shots">
+          {SHOWCASE.map((shot) => (
+            <figure key={shot.src} className="ff-home-shots__item">
+              <div className="ff-home-shot ff-home-shot--tile">
+                <img className="ff-home-shot__img" src={shot.src} alt={shot.alt} loading="lazy" />
+              </div>
+              <figcaption>
+                <h3 className="ff-home-shots__title">{shot.title}</h3>
+                <p className="ff-home-shots__body">{shot.body}</p>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
       </section>
 
       {/* ---------- Our goal (single box, three divided columns) ---------- */}

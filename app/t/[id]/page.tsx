@@ -3,6 +3,9 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { BracketView } from "@/components/tournaments/BracketView";
+import { RoundRobinView } from "@/components/dashboard/tournaments/RoundRobinView";
+import { formatViewKind } from "@/lib/tournament-format";
+import { rrGroupsFromSnapshot } from "@/lib/round-robin-shared";
 import { getOrRefreshSnapshot, getTournament } from "@/lib/tournaments";
 import {
   TOURNAMENT_FORMAT_LABELS,
@@ -99,6 +102,12 @@ export default async function PublicBracketPage({
         : 60_000,
   };
 
+  // A round robin renders the purpose-built RoundRobinView (matrix + graph +
+  // schedule); the .ff-dash wrapper gives its bubbles the portal density tokens
+  // this standalone page otherwise lacks. Standings stay in BracketView, whose
+  // round-robin table computes W–L–Pts. Everything else keeps the bracket.
+  const isRoundRobin = formatViewKind(tournament.format) === "roundrobin";
+
   return (
     <main className="ff-bracket-page">
       <header className="ff-bracket-page__head">
@@ -127,7 +136,19 @@ export default async function PublicBracketPage({
         ) : null}
       </header>
 
-      <BracketView tournamentId={tournament.id} initial={initial} />
+      {isRoundRobin ? (
+        <div className="ff-dash">
+          <RoundRobinView groups={rrGroupsFromSnapshot(initial)} />
+          <BracketView
+            tournamentId={tournament.id}
+            initial={initial}
+            showBracket={false}
+            standingsHeading="Standings"
+          />
+        </div>
+      ) : (
+        <BracketView tournamentId={tournament.id} initial={initial} />
+      )}
     </main>
   );
 }

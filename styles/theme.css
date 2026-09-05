@@ -3368,6 +3368,429 @@ button.ff-dash__link:hover {
   border-top: 1px solid var(--ff-border);
 }
 
+/* ---------------------------------------------------------------------------
+   Round-robin view — the per-format view for round_robin tournaments (routed to
+   by lib/tournament-format's `roundrobin` kind). A full-width results matrix,
+   then a two-up row: the at-a-glance matchup graph + the rounds schedule.
+   --------------------------------------------------------------------------- */
+.ff-rr {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ff-space-section, 24px);
+  min-width: 0;
+}
+/* Graph left, schedule right; stack on a narrow viewport. `align-items: start`
+   so the (often shorter) graph doesn't stretch to the schedule's height. */
+.ff-rr__lower {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: var(--ff-space-section, 24px);
+  align-items: start;
+  min-width: 0;
+}
+@media (max-width: 880px) {
+  .ff-rr__lower {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* A shared "live" pill, used in the matrix and the schedule. */
+.ff-rr-live {
+  display: inline-block;
+  padding: 1px 7px;
+  border: 1px solid var(--ff-danger-border);
+  border-radius: 999px;
+  background: var(--ff-danger-bg);
+  color: var(--ff-danger-text);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* --- Results matrix ------------------------------------------------------- */
+.ff-rr-matrix-wrap {
+  overflow-x: auto; /* a wide matrix scrolls here, never the page body */
+  min-width: 0;
+}
+.ff-rr-matrix {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-rr-matrix th,
+.ff-rr-matrix td {
+  border: 1px solid var(--ff-border);
+  text-align: center;
+  vertical-align: middle;
+}
+.ff-rr-matrix__corner {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--ff-surface-2);
+}
+.ff-rr-matrix__colhead {
+  padding: 8px 6px;
+  min-width: 62px;
+}
+.ff-rr-matrix__rowhead {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--ff-surface-2);
+  padding: 6px 12px 6px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+.ff-rr-matrix__rowname {
+  margin-left: 8px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.ff-rr-matrix__abbr {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  color: var(--ff-text-dim);
+}
+.ff-rr-matrix__logo {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  object-fit: contain;
+  background: #fff;
+  vertical-align: middle;
+}
+.ff-rr-matrix__cell {
+  padding: 0;
+  min-width: 62px;
+  font-variant-numeric: tabular-nums;
+}
+.ff-rr-matrix__cell--self {
+  background: rgba(127, 127, 127, 0.12);
+  color: var(--ff-text-dim);
+}
+.ff-rr-matrix__cell--none {
+  color: color-mix(in srgb, var(--ff-text-dim) 55%, transparent);
+}
+.ff-rr-matrix__cell--win .ff-rr-matrix__wl {
+  color: var(--ff-ok);
+}
+.ff-rr-matrix__cell--loss .ff-rr-matrix__wl {
+  color: var(--ff-danger-text);
+}
+.ff-rr-matrix__cell--live {
+  border-style: dashed;
+  border-color: var(--ff-danger-border);
+}
+.ff-rr-matrix__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.ff-rr-matrix__btn:hover {
+  background: rgba(127, 127, 127, 0.1);
+}
+.ff-rr-matrix__wl {
+  font-weight: 800;
+}
+.ff-rr-matrix__score {
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-rr-matrix__note {
+  margin: 10px 0 0;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+
+/* --- At-a-glance matchup graph -------------------------------------------- */
+.ff-rr-graph {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ff-rr-graph__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 420px;
+  margin: 0 auto;
+  aspect-ratio: 1 / 1;
+  overflow: visible;
+}
+.ff-rr-edge {
+  fill: none;
+  stroke-linecap: round;
+  stroke-width: 0.8;
+}
+.ff-rr-edge--done {
+  stroke: var(--ff-text-dim);
+  opacity: 0.32;
+}
+.ff-rr-edge--rest {
+  stroke: var(--ff-text-dim);
+  opacity: 0.28;
+  stroke-dasharray: 2 2.4;
+}
+.ff-rr-edge--second {
+  stroke: var(--ff-accent);
+  opacity: 0.5;
+}
+.ff-rr-edge--next {
+  stroke: var(--ff-accent);
+  opacity: 0.95;
+  stroke-width: 1.1;
+}
+.ff-rr-edge--live {
+  stroke: var(--ff-danger);
+  stroke-width: 1.5;
+}
+.ff-rr-node__dot {
+  fill: var(--ff-surface-2);
+  stroke: var(--ff-border);
+  stroke-width: 0.7;
+}
+.ff-rr-node__label {
+  fill: var(--ff-text-dim);
+  font-size: 3.4px;
+  font-weight: 700;
+}
+.ff-rr-node--next .ff-rr-node__dot {
+  stroke: var(--ff-accent);
+  stroke-width: 1;
+}
+.ff-rr-node--live .ff-rr-node__dot {
+  fill: var(--ff-danger-bg);
+  stroke: var(--ff-danger);
+  stroke-width: 1.1;
+}
+.ff-rr-node--live .ff-rr-node__label {
+  fill: var(--ff-danger-text);
+}
+.ff-rr-graph__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  justify-content: center;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-rr-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ff-rr-legend::before {
+  content: "";
+  width: 16px;
+  height: 0;
+  border-top-width: 2px;
+  border-top-style: solid;
+}
+.ff-rr-legend--done::before {
+  border-top-color: var(--ff-text-dim);
+  opacity: 0.5;
+}
+.ff-rr-legend--live::before {
+  border-top-color: var(--ff-danger);
+}
+.ff-rr-legend--next::before {
+  border-top-color: var(--ff-accent);
+}
+.ff-rr-legend--rest::before {
+  border-top-color: var(--ff-text-dim);
+  border-top-style: dashed;
+}
+
+/* --- Rounds schedule ------------------------------------------------------ */
+.ff-rr-sched {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ff-rr-sched__head {
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ff-text-dim);
+  margin-bottom: 8px;
+}
+.ff-rr-sched__done {
+  font-weight: 600;
+  opacity: 0.8;
+}
+.ff-rr-sched__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ff-rr-sched__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-surface-2);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--ff-transition);
+}
+.ff-rr-sched__row:hover {
+  border-color: rgba(127, 127, 127, 0.4);
+}
+.ff-rr-sched__teams {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ff-rr-sched__team {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.ff-rr-sched__logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  object-fit: contain;
+  background: #fff;
+  flex: 0 0 auto;
+}
+.ff-rr-sched__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.ff-rr-sched__vs {
+  flex: 0 0 auto;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-rr-sched__meta {
+  flex: 0 0 auto;
+  font-size: var(--ff-dash-text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--ff-text-dim);
+}
+.ff-rr-sched__score {
+  font-weight: 800;
+  color: inherit;
+}
+.ff-rr-sched__time {
+  white-space: nowrap;
+}
+
+/* --- Match detail popup (over the shared ff-daypop overlay) ---------------- */
+.ff-rr-detail {
+  max-width: 460px;
+}
+.ff-rr-detail__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+.ff-rr-detail__match {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.ff-rr-detail__side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ff-rr-detail__logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: contain;
+  background: #fff;
+}
+.ff-rr-detail__name {
+  font-weight: 700;
+}
+.ff-rr-detail__center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.ff-rr-detail__score {
+  font-size: var(--ff-dash-text-xl);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.ff-rr-detail__vs {
+  font-size: var(--ff-dash-text-lg);
+  color: var(--ff-text-dim);
+}
+.ff-rr-detail__status {
+  font-size: var(--ff-dash-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ff-text-dim);
+}
+.ff-rr-detail__status--live {
+  color: var(--ff-danger-text);
+  font-weight: 800;
+}
+.ff-rr-detail__time {
+  margin: 0;
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+}
+
+/* Text-initials fallback shared by every entrant logo when there's no image. */
+.ff-rr-matrix__logo--empty,
+.ff-rr-sched__logo--empty,
+.ff-rr-detail__logo--empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ff-surface-2);
+  color: var(--ff-text-dim);
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  border: 1px solid var(--ff-border);
+}
+.ff-rr-matrix__logo--empty,
+.ff-rr-sched__logo--empty {
+  font-size: 8px;
+}
+.ff-rr-detail__logo--empty {
+  font-size: var(--ff-dash-text-md);
+}
+
 /* Two side-by-side columns of stacked bubbles inside a .ff-bubble-grid. Each
    column flows independently (flex) so unequal heights don't leave ragged gaps;
    the container spans the full parent grid and collapses to one column when
@@ -5862,15 +6285,24 @@ button.ff-dash__link:hover {
   color: var(--ff-navy-900);
 }
 
+/* Vertical rhythm on the landing page only. The shared --ff-space-section
+   (clamp(50px, 7vw, 90px)) is tuned for the portal's dense surfaces having room
+   to breathe; on a marketing page stacked eight sections deep it reads as dead
+   space and pushes the proof below two screens of scroll. Scoped to
+   .ff-main--home so nothing else on the site shifts. */
+.ff-main--home .ff-section {
+  margin-block: clamp(34px, 4.5vw, 58px);
+}
+
 /* Shared section furniture */
 .ff-home-h2 {
-  margin: 0 0 clamp(20px, 3vw, 32px);
+  margin: 0 0 clamp(14px, 2vw, 22px);
   font-size: var(--wp--preset--font-size--x-large);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 .ff-home-sub {
-  margin: -18px 0 clamp(20px, 3vw, 32px);
+  margin: -8px 0 clamp(16px, 2.2vw, 24px);
   max-width: 52ch;
   color: var(--ff-text-dim);
   font-size: var(--wp--preset--font-size--large);
@@ -5918,8 +6350,8 @@ button.ff-dash__link:hover {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: center;
-  gap: clamp(28px, 5vw, 60px);
-  margin-block: clamp(36px, 6vw, 72px);
+  gap: clamp(24px, 3.6vw, 46px);
+  margin-block: clamp(24px, 3.6vw, 48px);
 }
 .ff-home-hero__title {
   margin: 0;
@@ -5948,109 +6380,65 @@ button.ff-dash__link:hover {
   font-size: var(--wp--preset--font-size--small);
 }
 
-/* Hero preview panel — a fake browser window over a sample feed */
-.ff-home-preview {
-  border-radius: var(--ff-radius-lg);
-  background: rgba(0, 20, 44, 0.72);
+/* Product screenshots (hero + showcase).
+
+   These replaced a fake browser window this page used to draw in markup. The
+   PNGs are raw captures with square corners and no elevation, so the FRAME is
+   what carries the rounding, the hairline and the shadow — keeping the art a
+   drop-in: re-capture at any size and nothing here changes.
+
+   `cover` against a fixed aspect-ratio is deliberate. A full-page capture is
+   nearly square and would otherwise set the hero's height and shove the copy
+   off-centre; cropping in CSS instead of in the file means one screenshot can
+   serve a wide hero and a squat tile. The top anchor keeps the crop on the part
+   that reads — the header and first row — never the middle of a scroll. */
+.ff-home-shot {
+  overflow: hidden;
   border: 1px solid var(--ff-border);
-  box-shadow: var(--ff-shadow-card);
-  overflow: hidden;
-  font-family: var(--wp--preset--font-family--fira-code), ui-monospace, monospace;
+  border-radius: var(--ff-radius-lg);
+  background: var(--ff-navy-900);
+  /* Deeper than --ff-shadow-card: these sit on the navy field with no
+     surface under them, so the card shadow all but disappears. */
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 }
-.ff-home-preview__bar {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 11px 16px;
-  border-bottom: 1px solid var(--ff-border);
-  background: rgba(255, 255, 255, 0.03);
+.ff-home-shot__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
 }
-.ff-home-preview__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: var(--ff-radius-pill);
-  background: rgba(255, 255, 255, 0.22);
+.ff-home-shot--hero {
+  aspect-ratio: 16 / 13;
 }
-.ff-home-preview__url {
-  margin-left: auto;
-  color: var(--ff-text-dim);
-  font-size: 0.72rem;
-  letter-spacing: 0.3px;
+.ff-home-shot--tile {
+  aspect-ratio: 16 / 11;
 }
-.ff-home-preview__list {
-  margin: 0;
-  padding: 6px;
-  list-style: none;
-}
-.ff-home-preview__row {
+
+/* --- See it in action (two captures side by side) --- */
+.ff-home-shots {
   display: grid;
-  grid-template-columns: 66px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 12px;
-  border-radius: var(--ff-radius-md);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(18px, 2.4vw, 28px);
 }
-.ff-home-preview__row + .ff-home-preview__row {
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-}
-.ff-home-preview__src {
-  color: var(--ff-text-dim);
-  font-size: 0.66rem;
-  text-transform: lowercase;
-  letter-spacing: 0.2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ff-home-preview__main {
+.ff-home-shots__item {
+  margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+  gap: 14px;
 }
-.ff-home-preview__name {
-  color: #fff;
-  font-size: 0.82rem;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.ff-home-shots__title {
+  margin: 0 0 5px;
+  font-size: var(--wp--preset--font-size--large);
+  font-weight: 800;
+  letter-spacing: -0.2px;
 }
-.ff-home-preview__meta {
+.ff-home-shots__body {
+  margin: 0;
+  max-width: 46ch;
   color: var(--ff-text-dim);
-  font-size: 0.72rem;
-}
-.ff-home-preview__tag {
-  padding: 3px 9px;
-  border-radius: var(--ff-radius-pill);
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  white-space: nowrap;
-  border: 1px solid transparent;
-}
-.ff-home-preview__tag--next {
-  background: var(--ff-accent);
-  color: var(--ff-navy-900);
-}
-.ff-home-preview__tag--reg {
-  color: var(--ff-accent);
-  border-color: rgba(255, 238, 88, 0.4);
-}
-.ff-home-preview__tag--result {
-  color: var(--ff-ok);
-  border-color: rgba(95, 208, 138, 0.4);
-}
-.ff-home-preview__tag--wait {
-  color: var(--ff-text-dim);
-  border-color: rgba(255, 255, 255, 0.18);
-}
-.ff-home-preview__foot {
-  padding: 12px 18px;
-  border-top: 1px solid var(--ff-border);
-  color: var(--ff-text-dim);
-  font-size: 0.72rem;
+  font-size: var(--wp--preset--font-size--medium);
+  line-height: 1.5;
 }
 
 /* --- Sources strip --- */
@@ -6059,7 +6447,7 @@ button.ff-dash__link:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: 12px 16px;
-  padding-block: clamp(16px, 2.5vw, 22px);
+  padding-block: clamp(13px, 1.8vw, 18px);
   border-block: 1px solid var(--ff-border);
 }
 .ff-home-sources__label {
@@ -6092,8 +6480,8 @@ button.ff-dash__link:hover {
 .ff-home-goal {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: clamp(22px, 2.8vw, 34px);
+  gap: 14px;
+  padding: clamp(18px, 2.2vw, 26px);
 }
 /* Divider between columns rather than gaps, so the box reads as one surface. */
 .ff-home-goal + .ff-home-goal {
@@ -6356,6 +6744,14 @@ button.ff-dash__link:hover {
   }
   .ff-home-roadmap {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* One capture per row once two would each be too small to read. */
+  .ff-home-shots {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* The hero art sits under the copy when stacked, so it can run wider. */
+  .ff-home-shot--hero {
+    aspect-ratio: 16 / 10;
   }
   .ff-home-overfault__art {
     min-height: 130px;

@@ -651,7 +651,12 @@ lazy TTL). Portal conventions specific to this surface:
 - **In-app view** (`/tournaments/<id>/`, inside `DashboardShell`): the member's
   landing when they click a tournament — a condensed info bubble, the bracket
   bubble (the same `BracketView`), then a two-column row of **Register** + a
-  **Participants** list. Registration is here: a manager/captain picks one of
+  **Participants** list. The bracket tab is **format-aware**: a `round_robin`
+  tournament (recognised via `lib/tournament-format.ts`, for internal and external
+  alike) renders the `RoundRobinView` — a results matrix + at-a-glance graph +
+  rounds schedule, tab relabelled "Groups" — instead of the elimination bracket.
+  See CLAUDE.md's tabbed-view section for the format framework. Registration is
+  here: a manager/captain picks one of
   their teams and enters. When the tournament has `academic_verification_required`
   on, a team with any unverified member can't enter and the row says how many
   need verifying (`listRegisterableTeams`); `enterTournament` re-checks it

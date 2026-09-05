@@ -29,7 +29,7 @@ Ships to `commons.fault.foundation`. The public marketing site is a
 
 | Path | What it is |
 |---|---|
-| `app/page.tsx` | The Commons landing page (blank for now — tabs land here) |
+| `app/page.tsx` | The Commons landing page — hero, goals, roadmap and CTAs, with real product screenshots from `public/screenshots/` (styling is §15 of `styles/theme.css`) |
 | `app/{login,signup}/` | Auth pages (honor `?next=` after signing in) |
 | `app/{home,schedule,tournaments,statistics,teams,account}/` | Session-gated member portal tabs |
 | `app/teams/[teamId]/`, `app/join/[token]/` | Team management and the invite landing |

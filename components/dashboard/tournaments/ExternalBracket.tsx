@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { compareOrderKeys, splitPools } from "@/lib/bracket-graph-shared";
 import type {
   ExternalTournamentDetail,
   ExternalTournamentMatch,
@@ -51,16 +52,6 @@ const LOSERS_RE = /los(?:er|ers|ing)?|lower|\blb\b/i;
 function isLosers(m: ExternalTournamentMatch): boolean {
   if (m.roundOrder != null) return m.roundOrder < 0;
   return LOSERS_RE.test(m.round ?? "");
-}
-
-/** Natural order for start.gg set identifiers ("A".."Z".."AA".."AB"): shorter
-    first, then lexical, so "B" sorts before "AA". Null keys sort last. */
-function compareOrderKeys(a: string | null, b: string | null): number {
-  if (a == null && b == null) return 0;
-  if (a == null) return 1;
-  if (b == null) return -1;
-  if (a.length !== b.length) return a.length - b.length;
-  return a.localeCompare(b);
 }
 
 function roundTimeLabel(matches: ExternalTournamentMatch[]): string {
@@ -404,134 +395,11 @@ function groupByPhase(matches: ExternalTournamentMatch[]): {
     .map(([key, g]) => ({ key, name: g.name, matches: g.matches }));
 }
 
-/** Weakly-connected components of the feed graph over `matches`: two sets share a
-    component when one lists the other as a prereq feeder (either direction). An
-    event that runs several independent pool brackets under ONE phase (sharing a
-    phaseId and identical round names) has no cross-pool feed edges, so each pool
-    falls out as its own component — the shape we need to render them apart even
-    when the projection carries no explicit phase-group id. Within a pool the
-    winners and losers sub-brackets stay in one component via the loser-drop
-    prereqs, and a plain single bracket is one component (→ one tab). */
-function connectedComponents(
-  matches: ExternalTournamentMatch[],
-): ExternalTournamentMatch[][] {
-  const indexById = new Map<string, number>();
-  matches.forEach((m, i) => indexById.set(m.sourceMatchId, i));
-  const parent = matches.map((_, i) => i);
-  const find = (x: number): number => {
-    let root = x;
-    while (parent[root] !== root) root = parent[root];
-    while (parent[x] !== root) {
-      const next = parent[x];
-      parent[x] = root;
-      x = next;
-    }
-    return root;
-  };
-  const union = (a: number, b: number) => {
-    const ra = find(a);
-    const rb = find(b);
-    if (ra !== rb) parent[ra] = rb;
-  };
-  matches.forEach((m, i) => {
-    for (const feeder of [m.prereq1Id, m.prereq2Id]) {
-      if (!feeder) continue;
-      const j = indexById.get(feeder);
-      if (j != null) union(i, j);
-    }
-  });
-  const byRoot = new Map<number, ExternalTournamentMatch[]>();
-  matches.forEach((m, i) => {
-    const root = find(i);
-    const list = byRoot.get(root) ?? [];
-    list.push(m);
-    byRoot.set(root, list);
-  });
-  return [...byRoot.values()];
-}
-
-/** True when the feed graph has at least one INTERNAL edge — some match names
-    another match in the same set as a prereq feeder. Pool inference by connected
-    components is only meaningful once edges exist: with none (FACEIT, or a
-    start.gg bracket scraped before prereqs), every match is its own singleton
-    component and the phase would split into one "pool" per match. */
-function hasFeedGraph(matches: ExternalTournamentMatch[]): boolean {
-  const ids = new Set(matches.map((m) => m.sourceMatchId));
-  return matches.some(
-    (m) =>
-      (m.prereq1Id != null && ids.has(m.prereq1Id)) ||
-      (m.prereq2Id != null && ids.has(m.prereq2Id)),
-  );
-}
-
-/** Smallest bracket-position key across a set of matches — orders inferred pools
-    left→right in seed order. Null keys sort last (see compareOrderKeys). */
-function minOrderKey(matches: ExternalTournamentMatch[]): string | null {
-  let best: string | null = null;
-  let seen = false;
-  for (const m of matches) {
-    if (!seen) {
-      best = m.orderKey;
-      seen = true;
-    } else if (compareOrderKeys(m.orderKey, best) < 0) {
-      best = m.orderKey;
-    }
-  }
-  return best;
-}
-
-type Pool = {
-  id: string;
-  /** Provider pool label ("A1"); null when inferred from the feed graph. */
-  name: string | null;
-  matches: ExternalTournamentMatch[];
-};
-
-/** Split one phase's matches into pools (independent sub-brackets). Prefer the
-    explicit phase-group id the projection carries — it also names the pool;
-    otherwise infer pools from the feed graph. One pool (or no signal) → the
-    phase renders as a single bracket, unchanged. */
-function splitPools(matches: ExternalTournamentMatch[]): Pool[] {
-  if (matches.some((m) => m.phaseGroupId != null)) {
-    const groups = new Map<
-      string,
-      { order: number; name: string | null; matches: ExternalTournamentMatch[] }
-    >();
-    matches.forEach((m, index) => {
-      const id = m.phaseGroupId ?? "__ungrouped__";
-      let g = groups.get(id);
-      if (!g) {
-        g = {
-          order: m.phaseGroupOrder ?? 1000 + index,
-          name: m.phaseGroupName ?? null,
-          matches: [],
-        };
-        groups.set(id, g);
-      }
-      g.matches.push(m);
-    });
-    return [...groups.entries()]
-      .sort((a, b) => a[1].order - b[1].order)
-      .map(([id, g]) => ({ id, name: g.name, matches: g.matches }));
-  }
-  // No feed graph → no pools to infer; the whole phase is one bracket. (Without
-  // this, FACEIT — which ships no prereqs — splits into one pool per match.)
-  if (!hasFeedGraph(matches)) {
-    return [{ id: "__single__", name: null, matches }];
-  }
-  const components = connectedComponents(matches);
-  if (components.length <= 1) {
-    return [{ id: "__single__", name: null, matches }];
-  }
-  return components
-    .map((comp) => ({ comp, key: minOrderKey(comp) }))
-    .sort((a, b) => compareOrderKeys(a.key, b.key))
-    .map(({ comp }, index) => ({
-      id: `pool-${index}`,
-      name: null,
-      matches: comp,
-    }));
-}
+// The feed-graph helpers (hasFeedGraph, connectedComponents, minOrderKey) and the
+// pool split (splitPools) now live in lib/bracket-graph-shared.ts — the same
+// primitives the format classifier and the round-robin normaliser use, so the
+// pool boundaries the bracket draws and the ones those consumers see stay
+// identical. `groupByPhase` (above) is bracket-only and stays here.
 
 export function ExternalBracket({
   events,

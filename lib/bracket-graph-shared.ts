@@ -107,6 +107,66 @@ export function minOrderKey(matches: FeedMatch[]): string | null {
   return best;
 }
 
+/** Weakly-connected components of the ENTRANT graph: nodes are entrants, an edge
+    joins the two entrants of every match. A round-robin group is a clique and
+    different groups share no edge, so this splits a multi-group stage into its
+    groups even when the projection carries no phase-group labels and the sets
+    have no feed graph (the feed-graph splitter can't see RR groups — RR sets
+    don't feed each other). `sideIds` returns the two entrant ids of a match
+    (null for a bye/TBD side, which adds no edge). */
+export function entrantComponents<T>(
+  matches: T[],
+  sideIds: (m: T) => [string | null, string | null],
+): T[][] {
+  const idIndex = new Map<string, number>();
+  const idFor = (id: string): number => {
+    let i = idIndex.get(id);
+    if (i == null) {
+      i = idIndex.size;
+      idIndex.set(id, i);
+    }
+    return i;
+  };
+  // Assign a node index to every entrant first, so isolated entrants exist.
+  const edges: [number, number | null][] = matches.map((m) => {
+    const [a, b] = sideIds(m);
+    const ai = a != null ? idFor(a) : null;
+    const bi = b != null ? idFor(b) : null;
+    if (ai != null) return [ai, bi];
+    if (bi != null) return [bi, null];
+    return [-1, null];
+  });
+  const size = idIndex.size;
+  const parent = Array.from({ length: size }, (_, i) => i);
+  const find = (x: number): number => {
+    let root = x;
+    while (parent[root] !== root) root = parent[root];
+    while (parent[x] !== root) {
+      const next = parent[x];
+      parent[x] = root;
+      x = next;
+    }
+    return root;
+  };
+  const union = (a: number, b: number) => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent[ra] = rb;
+  };
+  edges.forEach(([a, b]) => {
+    if (a >= 0 && b != null) union(a, b);
+  });
+  const byRoot = new Map<number, T[]>();
+  matches.forEach((m, i) => {
+    const [a] = edges[i];
+    const root = a >= 0 ? find(a) : -1;
+    const list = byRoot.get(root) ?? [];
+    list.push(m);
+    byRoot.set(root, list);
+  });
+  return [...byRoot.values()];
+}
+
 /** One independent sub-bracket within a phase. `name` is the provider pool label
     ("A1") when the projection carries phase groups, else null (inferred pool). */
 export type Pool<T extends FeedMatch> = {

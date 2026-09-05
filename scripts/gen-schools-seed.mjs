@@ -12,7 +12,10 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { SUPPLEMENTAL_SCHOOLS } from "./supplemental-schools.mjs";
+import {
+  SCHOOL_CORRECTIONS,
+  SUPPLEMENTAL_SCHOOLS,
+} from "./supplemental-schools.mjs";
 
 const SOURCE_URL =
   "https://raw.githubusercontent.com/Hipo/university-domains-list/master/world_universities_and_domains.json";
@@ -46,8 +49,27 @@ const normalizeName = (value) =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
   const normalizeDomain = (value) => value.trim().toLowerCase();
-const faviconUrl = (domain) =>
-  `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
+const faviconUrl = (host) =>
+  `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`;
+const hostOf = (webPage) => {
+  try {
+    return new URL(webPage).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+};
+// Google's favicon service answers for the host it CRAWLED, and a number of
+// schools serve their icon on www while the bare domain returns the generic
+// globe (iwu.edu, kent.edu, cau.edu). So prefer the host the institution itself
+// publishes — but only when it is the same domain, because a typo in the
+// dataset's web_pages (Purdue Fort Wayne lists www.pdfw.edu against pfw.edu)
+// must not repoint the icon at a hostname that doesn't exist. The `domain`
+// column keeps the bare form either way: that is the durable affiliation, while
+// this is only where the picture comes from.
+const faviconHost = (domain, webPages) => {
+  const host = hostOf(webPages[0] ?? "");
+  return host === domain || host === `www.${domain}` ? host : domain;
+};
 
 const schools = [];
 for (const entry of data) {
@@ -70,6 +92,32 @@ for (const entry of data) {
     domains,
     webPages,
   });
+}
+
+const correctionsByUpstreamName = new Map(
+  SCHOOL_CORRECTIONS.map((correction) => [
+    normalizeName(correction.match),
+    correction,
+  ]),
+);
+const appliedCorrections = new Set();
+for (const school of schools) {
+  const correction = correctionsByUpstreamName.get(normalizeName(school.name));
+  if (!correction) continue;
+  appliedCorrections.add(correction.match);
+  if (correction.name) school.name = correction.name;
+  if (correction.domains) school.domains = correction.domains.map(normalizeDomain);
+  if (correction.webPages) school.webPages = correction.webPages;
+}
+const unappliedCorrections = SCHOOL_CORRECTIONS.filter(
+  (correction) => !appliedCorrections.has(correction.match),
+);
+if (unappliedCorrections.length) {
+  throw new Error(
+    `School corrections matched no upstream record (fixed upstream? drop them): ${unappliedCorrections
+      .map((correction) => correction.match)
+      .join(", ")}`,
+  );
 }
 
 const normalizedSchoolNames = new Set(
@@ -141,7 +189,8 @@ const faviconRows = records.flatMap((school) => {
   const normalizedName = normalizeName(school.name);
   if (!domain || !normalizedName) return [];
   return [
-    `(${school.id},${q(school.name)},${q(normalizedName)},${q(domain)},${q(faviconUrl(domain))})`,
+    `(${school.id},${q(school.name)},${q(normalizedName)},${q(domain)},` +
+      `${q(faviconUrl(faviconHost(domain, school.webPages)))})`,
   ];
 });
 

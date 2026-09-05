@@ -680,18 +680,47 @@ local dev).
   `/championship/<id>/<encoded name>/teams`; the stable Data API equivalent is
   `/championships/<id>/subscriptions`, with a small bounded number of
   `/teams/<id>` lookups for premade teams. When those provider objects omit an
-  icon (their default-avatar state), the scraper first matches a leading
-  canonical `school_favicons` phrase, then checks its source-controlled,
-  high-confidence alias phrases (for example `UTD Black` → University of Texas
-  at Dallas). Generic acronyms such as `ASU`, `USC`, and `WSU` deliberately stay
-  unresolved unless a longer team phrase identifies one school. Provider art
+  icon (their default-avatar state), the scraper resolves the name against
+  `school_favicons` in three passes: a leading canonical phrase, then its
+  source-controlled high-confidence alias phrases (for example `UTD Black` →
+  University of Texas at Dallas), then **completion of a name that TRUNCATES a
+  canonical one** by a single generic institution tail (`Mount Vernon Nazarene`
+  → Mount Vernon Nazarene University) — the reverse of the leading-phrase match,
+  which only allows extra TEAM words *after* the school name. Every pass also
+  retries the entrant with unambiguous abbreviations expanded (`uni`/`univ` →
+  university, `coll` → college), because providers write `Manchester Uni.` and
+  `Uni. of Mount Union` where the seed holds the full name. Expansion is
+  **entrant-side only**, so the stored `normalized_name` column needs no reseed
+  to stay in step, and the literal form is always tried first so expanding can
+  only ADD matches. `tech` and `st` have more than one reading and are
+  deliberately NOT expanded — `Indiana Tech` / `Lawrence Tech` are aliases, where
+  a human picked the school. Generic acronyms such as `ASU`, `USC`, and `WSU`
+  deliberately stay unresolved unless a longer team phrase identifies one school;
+  a single token is never completed (`Indiana` is not Indiana University); and a
+  name that completes to two different schools (`Manchester` → both Manchester
+  University and Manchester Community College) stays unresolved rather than
+  guessing. Provider art
   always wins, but the resolved canonical name + domain are still stamped into
   `ext_matches.entrant_*_school_*` and `ext_standings.entrant_school_*`; this is
   the durable affiliation, while the favicon is a display fallback. The lookup
   is generated from the Hipo directory plus
   [scripts/supplemental-schools.mjs](scripts/supplemental-schools.mjs) by
   `npm run db:seed:generate` and seeded into `cen-sql` separately, keeping
-  Commons reads flat and cross-D1-free.
+  Commons reads flat and cross-D1-free. That file carries two lists: schools
+  absent from Hipo, and `SCHOOL_CORRECTIONS`, which rewrite an upstream record
+  whose name or domain went stale (Hipo still calls Mount Union "Mount Union
+  College" on the retired `muc.edu`). A correction edits the record **in place**
+  so one institution never appears twice, and the generator **throws** when a
+  correction stops matching — an upstream fix becomes a build failure rather than
+  silent dead config. `favicon_url` asks Google for the host the institution
+  itself publishes (`www.iwu.edu`), because the bare domain is often answered
+  with the generic globe; the `domain` column stays bare, since that is the
+  durable affiliation, and the www form is used only when it is the SAME domain
+  (a dataset typo — Purdue Fort Wayne's `www.pdfw.edu` against `pfw.edu` — must
+  not repoint the icon at a host that doesn't exist).
+  **School identity is resolved when the scraper WRITES a tournament**, so a
+  matching or seed fix reaches existing rows only as each tournament is
+  re-scraped or opened (the on-demand `/refresh`) — never retroactively.
 - **The dashboard shell for the whole tab lives in
   [app/tournaments/layout.tsx](app/tournaments/layout.tsx)**, not the pages, so
   `loading.tsx` skeletons and `[id]/error.tsx` render inside the content area

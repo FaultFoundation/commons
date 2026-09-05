@@ -1,4 +1,5 @@
 "use client";
+import { TeamStatisticsPanel } from "@/components/dashboard/statistics/TeamStatisticsPanel";
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
@@ -23,19 +24,23 @@ import {
 // OverFast work runs behind a loading bar (StatLoading) via the API route, so
 // the page never freezes on an SSR render.
 
-type Tab = "player" | "match";
+type Tab = "player" | "match" | "team";
 
 export function StatisticsView({
+  initialTab = "player",
+  initialTeam = "",
   linked,
   enabled,
   battletag,
 }: {
+  initialTab?: Tab;
+  initialTeam?: string;
   linked: boolean;
   enabled: boolean;
   battletag: string | null;
 }) {
-  const [tab, setTab] = useState<Tab>("player");
-  const { resp, loading, failed } = usePlayerStats(linked);
+  const [tab, setTab] = useState<Tab>(initialTab);
+  const { resp, loading, failed } = usePlayerStats(linked && tab === "player");
 
   // Battle.net gates only the PLAYER tab (it's the Overwatch data source);
   // Match Data aggregates FACEIT / start.gg / Challonge and must stay reachable
@@ -65,7 +70,7 @@ export function StatisticsView({
 
   return (
     <div className="ff-owpage">
-      {linked ? (
+      {linked && tab === "player" ? (
         <ProfileHeader resp={resp} loading={loading} battletag={battletag} />
       ) : null}
 
@@ -88,9 +93,10 @@ export function StatisticsView({
         >
           Match Data
         </button>
+        <button type="button" role="tab" aria-selected={tab === "team"} className={`ff-owtab${tab === "team" ? " ff-owtab--active" : ""}`} onClick={() => setTab("team")}>Team Data</button>
       </div>
 
-      {tab === "player" ? (
+      {tab === "team" ? <TeamStatisticsPanel initialTeam={initialTeam} /> : tab === "player" ? (
         (playerGate ?? (
           <PlayerPanel resp={resp} loading={loading} failed={failed} />
         ))

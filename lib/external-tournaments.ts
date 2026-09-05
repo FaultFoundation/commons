@@ -234,6 +234,7 @@ export type ExternalTournamentMatch = {
   phaseGroupId: string | null;
   phaseGroupName: string | null;
   phaseGroupOrder: number | null;
+  bracketType?: string | null;
   url: string | null;
 };
 
@@ -291,6 +292,7 @@ export type ExternalTournamentDetail = {
       so the view mimics the source. Empty for FACEIT / no widget content. */
   aboutLayout: AboutRow[];
   events: {
+    phases?: { id: string; name: string | null; bracketType: string | null }[];
     id: string;
     name: string | null;
     state: string | null;
@@ -726,6 +728,7 @@ export async function getExternalTournament(
         phaseGroupId: m.phaseGroupId,
         phaseGroupName: m.phaseGroupName,
         phaseGroupOrder: toNum(m.phaseGroupOrder),
+        bracketType: m.bracketType,
         url: m.url,
       });
       matchesByEvent.set(m.eventId, list);
@@ -768,6 +771,7 @@ export async function getExternalTournament(
         name: e.name,
         state: e.state,
         numEntrants: e.numEntrants,
+        phases: parsePhases(e.phases),
         standings: byEvent.get(e.id) ?? [],
         matches: matchesByEvent.get(e.id) ?? [],
       })),
@@ -776,4 +780,12 @@ export async function getExternalTournament(
     console.error("getExternalTournament failed:", error);
     return null;
   }
+}
+
+function parsePhases(raw: string | null): NonNullable<ExternalTournamentDetail["events"][number]["phases"]> {
+  try {
+    const value: unknown = JSON.parse(raw ?? "[]");
+    if (!Array.isArray(value)) return [];
+    return value.filter(p => p && typeof p.id === "string").map(p => ({ id: p.id, name: typeof p.name === "string" ? p.name : null, bracketType: typeof p.bracketType === "string" ? p.bracketType : null }));
+  } catch { return []; }
 }

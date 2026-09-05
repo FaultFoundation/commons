@@ -296,9 +296,10 @@ export type ExternalTeamDetail = {
   matches: ExternalMatchRow[];
 };
 
-function toMatchRow(m: typeof pdMatches.$inferSelect): ExternalMatchRow {
+export function toMatchRow(m: typeof pdMatches.$inferSelect): ExternalMatchRow {
   return {
     id: m.id,
+    matchKey: `${m.provider}:${m.externalMatchId}`,
     provider: m.provider as PdProvider,
     game: m.game,
     competitionName: m.competitionName,
@@ -323,6 +324,7 @@ function toMatchRow(m: typeof pdMatches.$inferSelect): ExternalMatchRow {
 export async function getExternalTeamDetail(
   userId: string,
   teamRowId: string,
+  options: { includeMatches?: boolean } = {},
 ): Promise<ExternalTeamDetail | null> {
   const db = getOwDb();
   if (!db) return null;
@@ -346,13 +348,12 @@ export async function getExternalTeamDetail(
         .select()
         .from(pdMatches)
         .where(
-          eq(
-            pdMatches.teamExternalId,
-            sql`(select external_team_id from pd_teams where id = ${teamRowId})`,
+          options.includeMatches === false ? sql`0` : and(
+            eq(pdMatches.teamExternalId, sql`(select external_team_id from pd_teams where id = ${teamRowId})`),
+            eq(pdMatches.provider, sql`(select provider from pd_teams where id = ${teamRowId})`),
           ),
         )
-        .orderBy(desc(pdMatches.startedAt))
-        .limit(300),
+        .orderBy(desc(pdMatches.updatedAt)),
     ]);
 
     if (!links.length || !teamRows.length) return null;
@@ -391,7 +392,7 @@ export async function getExternalTeamDetail(
         memberCount: memberRows.length,
       },
       roster,
-      matches,
+      matches: matches.sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0)),
     };
   } catch (error) {
     console.error("external team detail read failed:", error);

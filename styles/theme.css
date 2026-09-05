@@ -7382,3 +7382,52 @@ button.ff-dash__link:hover {
   font-size: var(--ff-dash-text-sm);
   color: var(--ff-text);
 }
+
+/* Repeated RR meetings retain their own round tint and result. */
+.ff-rr-matrix__btn.ff-rr-matrix__cell--live {
+  outline: 1px dashed var(--ff-danger-border);
+  outline-offset: -2px;
+}
+.ff-rr-matrix__btn.ff-rr-matrix__cell--upcoming {
+  outline: 1px dashed var(--ff-border);
+  outline-offset: -2px;
+}
+.ff-rr-matrix__btn:focus-visible {
+  outline: 2px solid var(--ff-accent);
+  outline-offset: -2px;
+}
+.ff-rr-dialog {
+  margin: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  color: inherit;
+}
+.ff-dash .ff-statistics-field {
+  display: grid;
+  gap: var(--ff-field-gap);
+  min-width: 0;
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-statistics-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--ff-bubble-body-gap);
+  margin-block: var(--ff-bubble-pad);
+}
+.ff-statistics-summary .ff-stat {
+  padding: var(--ff-tile-pad);
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-surface-2);
+}
+.ff-statistics-summary .ff-stat__value { font-size: var(--ff-dash-text-xl); }
+.ff-statistics-links { margin-block: var(--ff-bubble-pad); }
+.ff-statistics-links summary { cursor: pointer; margin-block-end: var(--ff-bubble-body-gap); }
+.ff-rr, .ff-rr__lower { gap: 20px; }
+@media (max-width: 600px) {
+  .ff-statistics-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

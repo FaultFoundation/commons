@@ -11,6 +11,7 @@ import { TEAM_ROLE_LABELS, teamColor, type TeamRole } from "@/lib/teams-shared";
  * background. Server component (static): the page does the reads.
  */
 export function TeamHero({
+  teamId,
   name,
   tag,
   role,
@@ -20,10 +21,9 @@ export function TeamHero({
   gameLogoUrl,
   collegeName,
   memberCount,
-  avgSr,
-  tournamentCount,
   discordInviteUrl,
 }: {
+  teamId?: string;
   name: string;
   tag: string | null;
   role: TeamRole;
@@ -33,8 +33,6 @@ export function TeamHero({
   gameLogoUrl: string | null;
   collegeName: string | null;
   memberCount: number;
-  avgSr: number | null;
-  tournamentCount: number;
   discordInviteUrl: string | null;
 }) {
   const accent = teamColor(color);
@@ -68,16 +66,6 @@ export function TeamHero({
           <span className="ff-stat__label">Roster</span>
           <span className="ff-stat__value">{memberCount}</span>
         </div>
-        <div className="ff-stat">
-          <span className="ff-stat__label">Avg SR</span>
-          <span className="ff-stat__value ff-stat__value--hi">
-            {avgSr ?? "—"}
-          </span>
-        </div>
-        <div className="ff-stat">
-          <span className="ff-stat__label">Tournaments</span>
-          <span className="ff-stat__value">{tournamentCount}</span>
-        </div>
         {gameName ? (
           <div className="ff-stat">
             <span className="ff-stat__label">Game</span>
@@ -90,6 +78,7 @@ export function TeamHero({
         <a className="ff-btn ff-btn--outline ff-btn--sm" href="/teams/">
           All Teams
         </a>
+        <a className="ff-btn ff-btn--outline ff-btn--sm" href={`/statistics/?tab=team${teamId ? `&team=${encodeURIComponent(teamId)}` : ""}`}>View Statistics</a>
         {discordInviteUrl ? (
           <a
             className="ff-btn ff-btn--sm"

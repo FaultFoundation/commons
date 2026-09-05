@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   ChallongeMark,
   FaceitMark,
@@ -6,7 +7,6 @@ import {
 import { Avatar } from "@/components/dashboard/Avatar";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
-import { MatchList } from "@/components/dashboard/statistics/MatchList";
 import {
   PlayerDataAutoRefresh,
   PlayerDataRefreshButton,
@@ -29,7 +29,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export function ExternalTeamView({ detail }: { detail: ExternalTeamDetail }) {
-  const { team, roster, matches } = detail;
+  const { team, roster } = detail;
   const providerLabel = PD_PROVIDER_LABELS[team.provider];
 
   return (
@@ -44,6 +44,7 @@ export function ExternalTeamView({ detail }: { detail: ExternalTeamDetail }) {
           <span className="ff-pd-toolbar">
             <PlayerDataAutoRefresh />
             <PlayerDataRefreshButton />
+            <Link className="ff-btn ff-btn--outline ff-btn--sm" href={`/statistics/?tab=team&team=${encodeURIComponent(team.id)}`}>View Statistics</Link>
             {team.url ? (
               <a
                 className="ff-btn ff-btn--outline ff-btn--sm"
@@ -103,12 +104,7 @@ export function ExternalTeamView({ detail }: { detail: ExternalTeamDetail }) {
         )}
       </Bubble>
 
-      <Bubble
-        title="Matches"
-        actions={<span className="ff-row__note">{matches.length}</span>}
-      >
-        <MatchList matches={matches} />
-      </Bubble>
+
     </div>
   );
 }

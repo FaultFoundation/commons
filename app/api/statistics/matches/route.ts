@@ -1,3 +1,4 @@
+import { applyMatchTimes } from "@/lib/match-times";
 import { getMatchData, syncPlayerData } from "@/lib/player-data";
 import { getSessionCached } from "@/lib/session";
 
@@ -15,5 +16,5 @@ export async function GET(request: Request) {
   // Lazy sync first (no-op inside the TTL), then read what's cached.
   await syncPlayerData(session.user.id, request.headers);
   const payload = await getMatchData(session.user.id);
-  return Response.json(payload);
+  return Response.json({ ...payload, matches: await applyMatchTimes(payload.matches) });
 }

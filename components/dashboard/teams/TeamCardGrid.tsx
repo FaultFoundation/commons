@@ -166,12 +166,6 @@ export function TeamCard({
 
       <div className="ff-team-card__stats">
         <div className="ff-stat">
-          <span className="ff-stat__label">Avg SR</span>
-          <span className="ff-stat__value ff-stat__value--hi">
-            {team.avgSr ?? "\u2014"}
-          </span>
-        </div>
-        <div className="ff-stat">
           <span className="ff-stat__label">Roster</span>
           <span className="ff-stat__value">{team.memberCount}</span>
         </div>

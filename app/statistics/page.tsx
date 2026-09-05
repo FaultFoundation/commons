@@ -20,7 +20,8 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-export default async function StatisticsPage() {
+export default async function StatisticsPage({ searchParams }: { searchParams: Promise<{ tab?: string; team?: string }> }) {
+  const query = await searchParams;
   const session = await getSessionCached();
   if (!session) redirect("/login/");
   const userId = session.user.id;
@@ -35,6 +36,8 @@ export default async function StatisticsPage() {
     <DashboardShell active="statistics" setupUserId={userId}>
       <h1 className="screen-reader-text">Statistics</h1>
       <StatisticsView
+        initialTab={query.tab === "team" || query.team ? "team" : query.tab === "match" ? "match" : "player"}
+        initialTeam={query.team ?? ""}
         linked={linked}
         enabled={battlenetAuthEnabled()}
         battletag={identity?.handle ?? null}

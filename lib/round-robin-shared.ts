@@ -78,6 +78,8 @@ function scoreText(s: number | null): string {
     internal BracketView so the matrix and the bracket agree on a score. */
 function setWins(scores: string | null): [string, string] {
   if (!scores) return ["–", "–"];
+  const single = /^\s*(\d+)\s*-\s*(\d+)\s*$/.exec(scores);
+  if (single) return [single[1], single[2]];
   let a = 0;
   let b = 0;
   let any = false;
@@ -105,6 +107,7 @@ function formatMatchTime(date: Date | null): string | null {
         hour: "numeric",
         minute: "2-digit",
         timeZone: "America/New_York",
+        timeZoneName: "short",
       })
       .replace(/ /g, " ");
   } catch {
@@ -125,10 +128,10 @@ function externalRound(m: ExternalTournamentMatch, fallback: number): number {
 function externalState(m: ExternalTournamentMatch): RRMatch["state"] {
   if (m.winner === 1 || m.winner === 2) return "done";
   switch (m.state?.trim().toLowerCase()) {
+    case "3": case "complete": case "completed": case "finished": return "done";
     case "2":
     case "active":
     case "ongoing":
-    case "ready":
     case "live":
       return "live";
     default:
@@ -162,6 +165,7 @@ function groupLetter(index: number): string {
     split. */
 function externalRRGroups(
   matches: ExternalTournamentMatch[],
+  inferGroups = true,
 ): { name: string | null; matches: ExternalTournamentMatch[] }[] {
   if (matches.some((m) => m.phaseGroupId != null)) {
     const byGroup = new Map<
@@ -185,6 +189,7 @@ function externalRRGroups(
       .sort((a, b) => a.order - b.order)
       .map((g) => ({ name: g.name, matches: g.matches }));
   }
+  if (!inferGroups) return [{ name: null, matches }];
   const components = entrantComponents(matches, externalSides);
   if (components.length <= 1) return [{ name: null, matches }];
   return components
@@ -197,9 +202,16 @@ function externalRRGroups(
     matches (RR tournaments are single-event in practice), then groups them. */
 export function rrGroupsFromExternal(
   events: ExternalTournamentDetail["events"],
+  inferGroups = true,
 ): RRGroup[] {
-  const all = events.flatMap((event) => event.matches);
-  const groups = externalRRGroups(all);
+  const groups = events.flatMap(event => {
+    const phases = new Map<string, ExternalTournamentMatch[]>();
+    for (const m of event.matches) {
+      const id = m.phaseId ?? "default";
+      phases.set(id, [...(phases.get(id) ?? []), m]);
+    }
+    return [...phases.values()].flatMap(matches => externalRRGroups(matches, inferGroups));
+  });
   const multi = groups.length > 1;
   return groups.map((group, groupIndex) => {
     const entrants = new Map<string, RREntrant>();
@@ -221,7 +233,7 @@ export function rrGroupsFromExternal(
       const [a, b] = externalSides(m);
       return {
         id: m.id,
-        round: externalRound(m, 900 + index),
+        round: externalRound(m, 0),
         aId: a ?? "",
         bId: b ?? "",
         aScore: scoreText(m.entrant1Score),
@@ -233,7 +245,7 @@ export function rrGroupsFromExternal(
       };
     });
     return {
-      id: group.name ? `g-${group.name}` : `g-${groupIndex}`,
+      id: `g-${groupIndex}`,
       label: multi ? group.name ?? groupLetter(groupIndex) : "",
       entrants: [...entrants.values()],
       matches,
@@ -266,7 +278,7 @@ export function rrGroupsFromSnapshot(snapshot: BracketSnapshot): RRGroup[] {
       // Challonge exposes no "in progress" state in the snapshot; "open" is the
       // currently-playable match, the closest signal to live.
       state:
-        m.state === "complete" ? "done" : m.state === "open" ? "live" : "upcoming",
+        m.state === "complete" ? "done" : "upcoming",
       timeLabel: null,
       url: null,
     };

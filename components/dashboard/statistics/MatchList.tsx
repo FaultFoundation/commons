@@ -88,6 +88,7 @@ export function MatchList({ matches }: { matches: ExternalMatchRow[] }) {
                     : (m.teamName ?? "—")}
               </span>
               <span className="ff-pdmatch__meta">{meta}</span>
+              {m.reportedTime ? <span className="ff-pdmatch__meta">Team-reported time: {new Date(m.reportedTime.scheduledAt).toLocaleString()} · <a href={m.reportedTime.sourceUrl} target="_blank" rel="noreferrer">Source</a>{m.reportedTime.conflictsWithProvider ? " · Differs from provider time" : ""}</span> : null}
             </div>
             <div className="ff-pdmatch__tail">
               {m.result ? (

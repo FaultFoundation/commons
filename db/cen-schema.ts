@@ -131,6 +131,7 @@ export const extEvents = sqliteTable(
     // Provider-reported state (e.g. start.gg's ACTIVE/COMPLETED); free text.
     state: text("state"),
     numEntrants: integer("num_entrants"),
+    phases: text("phases_json"),
   },
   (t) => [index("ext_events_tournament_idx").on(t.tournamentId)],
 );
@@ -192,6 +193,7 @@ export const extMatches = sqliteTable(
     phaseGroupId: text("phase_group_id"),
     phaseGroupName: text("phase_group_name"),
     phaseGroupOrder: integer("phase_group_order"),
+    bracketType: text("bracket_type"),
     url: text("url"),
   },
   (t) => [

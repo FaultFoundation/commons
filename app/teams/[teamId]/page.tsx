@@ -66,7 +66,7 @@ export default async function TeamPage({
 
   // External team ids carry a `provider:` prefix; internal ids never do.
   if (teamId.includes(":")) {
-    const detail = await getExternalTeamDetail(session.user.id, teamId);
+    const detail = await getExternalTeamDetail(session.user.id, teamId, { includeMatches: false });
     if (!detail) notFound();
     return (
       <DashboardShell active="teams" setupUserId={session.user.id}>
@@ -101,6 +101,7 @@ export default async function TeamPage({
         {/* Identity + stats + quick links, with the game's colour and mark —
             the "boring, spread-apart" header replaced by a hero. */}
         <TeamHero
+          teamId={team.id}
           name={team.name}
           tag={team.tag}
           role={role}
@@ -110,8 +111,6 @@ export default async function TeamPage({
           gameLogoUrl={team.gameLogoUrl}
           collegeName={team.collegeName}
           memberCount={team.roster.length}
-          avgSr={team.avgSr}
-          tournamentCount={team.entries.length}
           discordInviteUrl={team.discordInviteUrl}
         />
 

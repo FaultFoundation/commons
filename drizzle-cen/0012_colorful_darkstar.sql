@@ -1,0 +1,1 @@
+ALTER TABLE `ext_matches` ADD `bracket_type` text;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import {
@@ -27,7 +27,7 @@ import {
 
 /** Order-independent key for the single match between two entrants. */
 function pairKey(a: string, b: string): string {
-  return a < b ? `${a}|${b}` : `${b}|${a}`;
+  return JSON.stringify([a, b].sort());
 }
 
 /** A short mark for a node / column head — an acronym of the words, else the
@@ -91,9 +91,9 @@ function ResultsMatrix({
 }) {
   const { entrants } = group;
   const byPair = useMemo(() => {
-    const map = new Map<string, RRMatch>();
+    const map = new Map<string, RRMatch[]>();
     for (const m of group.matches) {
-      if (m.aId && m.bId) map.set(pairKey(m.aId, m.bId), m);
+      if (m.aId && m.bId) { const key = pairKey(m.aId, m.bId); map.set(key, [...(map.get(key) ?? []), m]); }
     }
     return map;
   }, [group.matches]);
@@ -131,65 +131,27 @@ function ResultsMatrix({
                     </td>
                   );
                 }
-                const match = byPair.get(pairKey(row.id, col.id));
-                if (!match) {
-                  return (
-                    <td key={col.id} className="ff-rr-matrix__cell ff-rr-matrix__cell--none">
-                      <span aria-hidden="true">·</span>
-                      <span className="screen-reader-text">Not yet played</span>
-                    </td>
-                  );
-                }
-                const rowIsA = match.aId === row.id;
-                const rowScore = rowIsA ? match.aScore : match.bScore;
-                const colScore = rowIsA ? match.bScore : match.aScore;
-                const rowWon = match.winner === (rowIsA ? "a" : "b");
-                const rowLost = match.winner != null && !rowWon;
-
-                if (match.state === "live") {
-                  return (
-                    <td key={col.id} className="ff-rr-matrix__cell ff-rr-matrix__cell--live">
-                      <button type="button" className="ff-rr-matrix__btn" onClick={() => onSelect(match)}>
-                        <span className="ff-rr-live">LIVE</span>
-                      </button>
-                    </td>
-                  );
-                }
-                if (match.state === "upcoming") {
-                  return (
-                    <td
-                      key={col.id}
-                      className="ff-rr-matrix__cell ff-rr-matrix__cell--upcoming"
+                const pairMatches = byPair.get(pairKey(row.id, col.id)) ?? [];
+                if (!pairMatches.length) return <td key={col.id} className="ff-rr-matrix__cell ff-rr-matrix__cell--none"><span aria-hidden="true">·</span><span className="screen-reader-text">No matchup scheduled</span></td>;
+                return <td key={col.id} className="ff-rr-matrix__cell">
+                  {pairMatches.map(match => {
+                    const rowIsA = match.aId === row.id;
+                    const rowWon = match.winner === (rowIsA ? "a" : "b");
+                    const rowLost = match.winner != null && !rowWon;
+                    return <button key={match.id} type="button"
+                      className={`ff-rr-matrix__btn ff-rr-matrix__cell--${match.state === "live" ? "live" : match.state === "upcoming" ? "upcoming" : rowWon ? "win" : rowLost ? "loss" : "draw"}`}
                       style={{ background: roundShade(match.round, maxRound) }}
-                    >
-                      <button
-                        type="button"
-                        className="ff-rr-matrix__btn"
-                        onClick={() => onSelect(match)}
-                        title={match.timeLabel ?? "Scheduled"}
-                      >
-                        <span aria-hidden="true">·</span>
-                        <span className="screen-reader-text">
-                          {match.timeLabel ?? "Scheduled"}
-                        </span>
-                      </button>
-                    </td>
-                  );
-                }
-                return (
-                  <td
-                    key={col.id}
-                    className={`ff-rr-matrix__cell${rowWon ? " ff-rr-matrix__cell--win" : rowLost ? " ff-rr-matrix__cell--loss" : ""}`}
-                    style={{ background: roundShade(match.round, maxRound) }}
-                  >
-                    <button type="button" className="ff-rr-matrix__btn" onClick={() => onSelect(match)}>
-                      <span className="ff-rr-matrix__wl">{rowWon ? "W" : rowLost ? "L" : ""}</span>
-                      <span className="ff-rr-matrix__score">
-                        {rowScore}–{colScore}
-                      </span>
-                    </button>
-                  </td>
-                );
+                      aria-label={`${row.name} vs ${col.name}, round ${match.round}, ${match.state}`}
+                      title={`Round ${match.round}${match.timeLabel ? ` · ${match.timeLabel}` : ""}`}
+                      onClick={() => onSelect(match)}>
+                      {pairMatches.length > 1 ? <small>R{match.round} </small> : null}
+                      {match.state === "live" ? <span className="ff-rr-live">LIVE</span> : match.state === "upcoming" ? <span>·<span className="screen-reader-text">{match.timeLabel ?? "Time TBD"}</span></span> : <>
+                        <span className="ff-rr-matrix__wl">{rowWon ? "W" : rowLost ? "L" : ""}</span>
+                        <span className="ff-rr-matrix__score">{rowIsA ? match.aScore : match.bScore}–{rowIsA ? match.bScore : match.aScore}</span>
+                      </>}
+                    </button>;
+                  })}
+                </td>;
               })}
             </tr>
           ))}
@@ -211,6 +173,7 @@ type EdgeClass = "live" | "next" | "second" | "rest" | "done";
 
 function MatchupGraph({ group }: { group: RRGroup }) {
   const cur = useMemo(() => currentRound(group.matches), [group.matches]);
+  const second = Math.min(...group.matches.filter(m => m.state !== "done" && m.round > cur).map(m => m.round));
 
   const geometry = useMemo(() => {
     const n = group.entrants.length;
@@ -228,7 +191,7 @@ function MatchupGraph({ group }: { group: RRGroup }) {
       if (m.state === "live") return "live";
       if (m.state === "done") return "done";
       if (m.round === cur) return "next";
-      if (m.round === cur + 1) return "second";
+      if (m.round === second) return "second";
       return "rest";
     };
     // Rank so a node adopts its most-prominent match's status ring.
@@ -244,8 +207,8 @@ function MatchupGraph({ group }: { group: RRGroup }) {
       // matches the bracket's curved connectors, rather than straight chords.
       const mx = (a.x + b.x) / 2;
       const my = (a.y + b.y) / 2;
-      const qx = mx + (cx - mx) * 0.35;
-      const qy = my + (cy - my) * 0.35;
+      const qx = mx + (b.y - a.y) * 0.12;
+      const qy = my - (b.x - a.x) * 0.12;
       edges.push({
         d: `M ${a.x.toFixed(2)} ${a.y.toFixed(2)} Q ${qx.toFixed(2)} ${qy.toFixed(2)} ${b.x.toFixed(2)} ${b.y.toFixed(2)}`,
         cls,
@@ -266,7 +229,7 @@ function MatchupGraph({ group }: { group: RRGroup }) {
       r,
     }));
     return { edges, nodes };
-  }, [group.entrants, group.matches, cur]);
+  }, [group.entrants, group.matches, cur, second]);
 
   if (group.entrants.length < 2) return null;
 
@@ -363,7 +326,11 @@ function RoundSchedule({
       byRound.set(m.round, list);
     }
     return [...byRound.entries()]
-      .sort((a, b) => b[0] - a[0])
+      .sort((a, b) => {
+        const doneA = a[1].every(m => m.state === "done");
+        const doneB = b[1].every(m => m.state === "done");
+        return Number(doneA) - Number(doneB) || (doneA ? b[0] - a[0] : a[0] - b[0]);
+      })
       .map(([round, matches]) => ({
         round,
         matches,
@@ -380,7 +347,7 @@ function RoundSchedule({
       {rounds.map((r) => (
         <div className="ff-rr-sched__group" key={r.round}>
           <div className="ff-rr-sched__head">
-            Round {r.round}
+            Round {r.round || "TBD"}
             {r.done ? <span className="ff-rr-sched__done"> · done</span> : null}
           </div>
           <div className="ff-rr-sched__list">
@@ -407,13 +374,12 @@ function MatchDetailPopup({
   byId: Map<string, RREntrant>;
   onClose: () => void;
 }) {
+  const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    const element = dialog.current;
+    element?.showModal();
+    return () => element?.close();
+  }, []);
 
   const a = byId.get(match.aId);
   const b = byId.get(match.bId);
@@ -421,8 +387,10 @@ function MatchDetailPopup({
     match.state === "live" ? "Live" : match.state === "done" ? "Final" : "Scheduled";
 
   return (
-    <div
-      className="ff-daypop"
+    <dialog
+      ref={dialog}
+      onCancel={onClose}
+      className="ff-daypop ff-rr-dialog"
       role="dialog"
       aria-modal="true"
       aria-label="Match detail"
@@ -433,7 +401,7 @@ function MatchDetailPopup({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="ff-daypop__head">
-          <h2 className="ff-daypop__title">Round {match.round}</h2>
+          <h2 className="ff-daypop__title">Round {match.round || "TBD"}</h2>
           <button className="ff-daypop__close" type="button" aria-label="Close" onClick={onClose}>
             ×
           </button>
@@ -478,7 +446,7 @@ function MatchDetailPopup({
           ) : null}
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 
@@ -515,7 +483,7 @@ export function RoundRobinView({ groups }: { groups: RRGroup[] }) {
               role="tab"
               aria-selected={index === groupIndex}
               className={`ff-bracket__tab${index === groupIndex ? " ff-bracket__tab--active" : ""}`}
-              onClick={() => setActiveGroup(index)}
+              onClick={() => { setActiveGroup(index); setDetail(null); }}
             >
               {g.label || `Group ${index + 1}`}
             </button>
@@ -528,10 +496,10 @@ export function RoundRobinView({ groups }: { groups: RRGroup[] }) {
       </Bubble>
 
       <div className="ff-rr__lower">
-        <Bubble title="All Matchups">
+        <Bubble title="At a Glance">
           <MatchupGraph group={group} />
         </Bubble>
-        <Bubble title="Schedule">
+        <Bubble title="Rounds and Matches">
           <RoundSchedule group={group} onSelect={setDetail} />
         </Bubble>
       </div>
@@ -541,4 +509,16 @@ export function RoundRobinView({ groups }: { groups: RRGroup[] }) {
       ) : null}
     </div>
   );
+}
+
+/** Swiss and unconfirmed formats share the schedule without invented feed edges. */
+export function RoundRobinRounds({ groups }: { groups: RRGroup[] }) {
+  const [detail, setDetail] = useState<{ match: RRMatch; group: RRGroup } | null>(null);
+  return <>
+    {groups.map(group => <section key={group.id}>
+      {group.label ? <h3>{group.label}</h3> : null}
+      <RoundSchedule group={group} onSelect={match => setDetail({ match, group })} />
+    </section>)}
+    {detail ? <MatchDetailPopup match={detail.match} byId={new Map(detail.group.entrants.map(e => [e.id, e]))} onClose={() => setDetail(null)} /> : null}
+  </>;
 }

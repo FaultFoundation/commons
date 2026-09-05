@@ -1221,3 +1221,25 @@ export const supportTicketNotes = sqliteTable(
   },
   (t) => [index("support_ticket_notes_ticket_idx").on(t.ticketId)],
 );
+
+// Explicit cross-provider identity links, approved by a team manager/captain.
+// External ids live in OW; no cross-database foreign key is possible.
+export const teamProviderLinks = sqliteTable("team_provider_links", {
+  externalTeamId: text("external_team_id").primaryKey(),
+  teamId: text("team_id").notNull().references(() => teams.id, { onDelete: "cascade" }),
+  linkedBy: text("linked_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+}, t => [index("team_provider_links_team_idx").on(t.teamId)]);
+
+// Append-only, shared team-reported match times. A unique revision prevents
+// two captains from silently overwriting each other's simultaneous edits.
+export const matchTimeReports = sqliteTable("match_time_reports", {
+  id: text("id").primaryKey(),
+  matchKey: text("match_key").notNull(),
+  revision: integer("revision").notNull(),
+  scheduledAt: integer("scheduled_at", { mode: "timestamp_ms" }).notNull(),
+  sourceUrl: text("source_url").notNull(),
+  teamId: text("team_id").references(() => teams.id, { onDelete: "set null" }),
+  submittedBy: text("submitted_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+}, t => [uniqueIndex("match_time_reports_revision_unique").on(t.matchKey, t.revision)]);

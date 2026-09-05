@@ -72,6 +72,8 @@ export type ExternalTeamMember = {
 
 /** One match row (Match Data tab and the team detail's match list). */
 export type ExternalMatchRow = {
+  matchKey?: string;
+  reportedTime?: { revision: number; scheduledAt: number; sourceUrl: string; conflictsWithProvider: boolean };
   id: string;
   provider: PdProvider;
   game: string | null;

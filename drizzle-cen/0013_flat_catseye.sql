@@ -1,0 +1,1 @@
+ALTER TABLE `ext_events` ADD `phases_json` text;

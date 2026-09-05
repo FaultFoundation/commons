@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { summarizeMatches } from "@/lib/match-statistics";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import {
   mergeChrome,
@@ -56,6 +57,8 @@ export function MatchPanel({ chrome }: { chrome?: PanelChrome } = {}) {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [provider, setProvider] = useState("");
+  const [competition, setCompetition] = useState("");
   const [shown, setShown] = useState(PAGE);
   const alive = useRef(true);
 
@@ -132,7 +135,9 @@ export function MatchPanel({ chrome }: { chrome?: PanelChrome } = {}) {
   }
 
   const providers = resp?.providers ?? [];
-  const matches = resp?.matches ?? [];
+  const allMatches = resp?.matches ?? [];
+  const matches = allMatches.filter(m => (!provider || m.provider === provider) && (!competition || m.competitionName === competition));
+  const stats = summarizeMatches(matches);
   const problems = providers.filter(
     (p) => p.status && p.status !== "ok",
   );
@@ -206,6 +211,12 @@ export function MatchPanel({ chrome }: { chrome?: PanelChrome } = {}) {
               with each sync.
             </p>
           ) : null}
+          <div className="ff-row__buttons">
+            <label className="ff-auth__field ff-statistics-field">Platform<select className="ff-auth__input" value={provider} onChange={e => { setProvider(e.target.value); setShown(PAGE); }}><option value="">All platforms</option>{providers.map(p => <option key={p.provider} value={p.provider}>{PD_PROVIDER_LABELS[p.provider]}</option>)}</select></label>
+            <label className="ff-auth__field ff-statistics-field">Competition<select className="ff-auth__input" value={competition} onChange={e => { setCompetition(e.target.value); setShown(PAGE); }}><option value="">All competitions</option>{[...new Set(allMatches.map(m => m.competitionName).filter((n): n is string => !!n))].map(n => <option key={n}>{n}</option>)}</select></label>
+          </div>
+          <p className="ff-bubble__lede">{stats.wins} wins · {stats.losses} losses · {stats.draws} draws · {stats.winRate == null ? "No win rate yet" : `${stats.winRate}% win rate`}</p>
+          <p className="ff-bubble__note">Based on the latest {allMatches.length} synced matches (up to 300), not lifetime totals. Only finished matches with a known result count.</p>
           <MatchList matches={matches.slice(0, shown)} />
           {matches.length > shown ? (
             <div className="ff-bubble__cta">

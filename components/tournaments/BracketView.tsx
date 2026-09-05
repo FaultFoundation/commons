@@ -524,6 +524,8 @@ function Standings({
 /** Sum a Challonge scores_csv ("3-1,2-3,3-0") into set wins per side. */
 function splitScores(scores: string | null): [string, string] {
   if (!scores) return ["", ""];
+  const single = /^\s*(\d+)\s*-\s*(\d+)\s*$/.exec(scores);
+  if (single) return [single[1], single[2]];
   let a = 0;
   let b = 0;
   for (const set of scores.split(",")) {

@@ -74,4 +74,36 @@ export const SUPPLEMENTAL_SCHOOLS = [
     domains: ["mtaloy.edu"],
     webPages: ["https://www.mtaloy.edu/"],
   },
+  {
+    name: "Mount Vernon Nazarene University",
+    country: "United States",
+    alphaTwoCode: "US",
+    stateProvince: "Ohio",
+    domains: ["mvnu.edu"],
+    webPages: ["https://www.mvnu.edu/"],
+  },
+  {
+    name: "Spalding University",
+    country: "United States",
+    alphaTwoCode: "US",
+    stateProvince: "Kentucky",
+    domains: ["spalding.edu"],
+    webPages: ["https://www.spalding.edu/"],
+  },
+];
+
+// Corrections to institutions that ARE in Hipo's dataset but carry a stale name
+// or a retired domain. A correction rewrites the upstream record in place rather
+// than adding a second row, so one institution never appears twice. The
+// generator throws when a `match` no longer names an upstream record, so an
+// upstream fix surfaces as a build failure instead of silently doing nothing.
+export const SCHOOL_CORRECTIONS = [
+  {
+    // Renamed in 2010, and muc.edu has since been retired — which made the
+    // generated favicon Google's generic globe rather than the school's mark.
+    match: "Mount Union College",
+    name: "University of Mount Union",
+    domains: ["mountunion.edu"],
+    webPages: ["https://www.mountunion.edu/"],
+  },
 ];

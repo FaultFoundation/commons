@@ -1,10 +1,11 @@
+import { TOURNAMENT_FORMAT_LABELS } from "@/lib/tournaments-shared";
 import { Fragment, type ReactNode } from "react";
 
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { sourceKey } from "@/components/brand/SourceLogo";
 import { AboutLayout } from "@/components/dashboard/tournaments/AboutLayout";
 import { ExternalBracket } from "@/components/dashboard/tournaments/ExternalBracket";
-import { RoundRobinView } from "@/components/dashboard/tournaments/RoundRobinView";
+import { RoundRobinView, RoundRobinRounds } from "@/components/dashboard/tournaments/RoundRobinView";
 import { Markdown } from "@/components/dashboard/tournaments/Markdown";
 import { ExternalTournamentRefresh } from "@/components/dashboard/tournaments/ExternalTournamentRefresh";
 import { ShareBar } from "@/components/dashboard/tournaments/ShareBar";
@@ -25,7 +26,7 @@ import {
   hasFeedGraph,
   minOrderKey,
 } from "@/lib/bracket-graph-shared";
-import { FORMAT_VIEW, formatViewKind, resolveExternalFormat } from "@/lib/tournament-format";
+import { FORMAT_VIEW, resolveExternalFormat, externalFormatStages } from "@/lib/tournament-format";
 import {
   computeRRStandings,
   rrGroupsFromExternal,
@@ -565,7 +566,7 @@ export function ExternalTournamentView({
   // routes the bracket tab to the purpose-built RoundRobinView and takes its own
   // standings; everything else keeps the elimination bracket below.
   const format = resolveExternalFormat(tournament.events);
-  const isRoundRobin = formatViewKind(format) === "roundrobin";
+  const isRoundRobin = format === "round_robin";
   const rrGroups = isRoundRobin ? rrGroupsFromExternal(tournament.events) : [];
 
   // When the projection carries placed standings, use them; otherwise derive
@@ -573,13 +574,13 @@ export function ExternalTournamentView({
   // not suppress this fallback. A pool stage derives one ranking per pool.
   // (Round robin has no single "final", so the bracket deriver is skipped.)
   const derived =
-    !hasPlacedStandings && !isRoundRobin
+    !hasPlacedStandings && (format === "single_elim" || format === "double_elim")
       ? deriveBracketResults(tournament.events, tournament.status)
       : null;
-  const finishers: FinisherEntry[] = isRoundRobin
-    ? rrFinishers(rrGroups, tournament.status)
-    : hasPlacedStandings
-      ? buildFinishers(tournament.events)
+  const finishers: FinisherEntry[] = hasPlacedStandings
+    ? buildFinishers(tournament.events)
+    : isRoundRobin
+      ? rrFinishers(rrGroups, tournament.status)
       : finishersFromDerived(derived);
   const recentResults = buildRecentResults(tournament.events);
   const derivedHasStandings =
@@ -601,7 +602,13 @@ export function ExternalTournamentView({
   const location = [tournament.city, tournament.country]
     .filter(Boolean)
     .join(", ");
-  const details: { label: string; node: ReactNode }[] = [];
+  const stageFormats = externalFormatStages(tournament.events);
+  const details: { label: string; node: ReactNode }[] = [{
+    label: "Format",
+    node: format ? TOURNAMENT_FORMAT_LABELS[format] : stageFormats.length > 1
+      ? stageFormats.map(stage => `${stage.name ?? "Stage"}: ${stage.format ? TOURNAMENT_FORMAT_LABELS[stage.format] : "Unconfirmed"}`).join(" · ")
+      : "Unconfirmed",
+  }];
   if (tournament.game) details.push({ label: "Game", node: tournament.game });
   if (location) details.push({ label: "Location", node: location });
   const startsAt = formatDateTime(tournament.startAt);
@@ -776,12 +783,28 @@ export function ExternalTournamentView({
     </div>
   );
 
-  const bracket = isRoundRobin ? (
-    <RoundRobinView groups={rrGroups} />
-  ) : (
-    <Bubble title="Bracket" className="ff-bubble--divided">
-      <ExternalBracket events={tournament.events} source={tournament.source} />
-    </Bubble>
+  const bracket = (
+    <div className="ff-rr">
+      {externalFormatStages(tournament.events).map(stage => {
+          const stageFormat = stage.format;
+          const label = stageFormat ? TOURNAMENT_FORMAT_LABELS[stageFormat] : "Format unconfirmed";
+          const stageEvents = stage.events;
+          return <section key={stage.id}>
+            <h2 className="ff-bubble__title">{stage.name} · {label}</h2>
+            {stageFormat === "round_robin" ? (
+              <RoundRobinView groups={rrGroupsFromExternal(stageEvents)} />
+            ) : stageFormat === "swiss" || !stageFormat ? (
+              <Bubble title="Rounds" span="full">
+                <RoundRobinRounds groups={rrGroupsFromExternal(stageEvents, false)} />
+              </Bubble>
+            ) : (
+              <Bubble title="Bracket" className="ff-bubble--divided">
+                <ExternalBracket events={stageEvents} source={tournament.source} />
+              </Bubble>
+            )}
+          </section>;
+      })}
+    </div>
   );
 
   const standings = (
@@ -789,7 +812,7 @@ export function ExternalTournamentView({
       title={isRoundRobin ? "Standings" : hasDisplayedPlacements ? "Final Standings" : "Entrants"}
       span="full"
     >
-      {isRoundRobin ? (
+      {isRoundRobin && !hasPlacedStandings ? (
         <RRStandingsSection groups={rrGroups} />
       ) : !hasPlacedStandings && derived ? (
         derived.kind === "single" ? (
@@ -861,7 +884,7 @@ export function ExternalTournamentView({
 
   const tabs: TournamentTab[] = [
     { id: "overview", label: "Overview", node: overview },
-    { id: "bracket", label: FORMAT_VIEW[format].tabLabel, node: bracket },
+    { id: "bracket", label: format ? FORMAT_VIEW[format].tabLabel : "Stages", node: bracket },
     { id: "standings", label: "Standings", node: standings },
     { id: "rules", label: "Rules", node: rules },
   ];

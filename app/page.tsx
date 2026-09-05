@@ -95,25 +95,6 @@ const GOALS: {
   },
 ];
 
-const ROADMAP: { title: string; body: string }[] = [
-  {
-    title: "Looking for a team",
-    body: "Post your availability and let the rosters that need you come find you.",
-  },
-  {
-    title: "Looking for players",
-    body: "Captains list open slots with real match history attached to the ask.",
-  },
-  {
-    title: "Host your own",
-    body: "Create, seed, and run tournaments natively on the Commons Project.",
-  },
-  {
-    title: "More platforms",
-    body: "More sources feeding the same single feed as we add them.",
-  },
-];
-
 function GoalIcon({ icon }: { icon: "heart" | "code" | "layers" }) {
   if (icon === "heart") {
     return (
@@ -273,24 +254,6 @@ export default function CommonsPage() {
               The Fault Foundation
               <span>Gamers Supporting Students</span>
             </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ---------- Roadmap ---------- */}
-      <section className="ff-container ff-section">
-        <div className="ff-card ff-home-bubble">
-          <h2 className="ff-home-bubble__title">Roadmap</h2>
-          <p className="ff-home-bubble__sub">
-            Where the Commons Project is headed next.
-          </p>
-          <div className="ff-home-roadmap">
-            {ROADMAP.map((item) => (
-              <article key={item.title} className="ff-home-roadmap__card">
-                <h3 className="ff-home-roadmap__title">{item.title}</h3>
-                <p className="ff-home-roadmap__body">{item.body}</p>
-              </article>
-            ))}
           </div>
         </div>
       </section>

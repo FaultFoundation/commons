@@ -6349,21 +6349,6 @@ button.ff-dash__link:hover {
 .ff-home-bubble--flush {
   padding: 0;
 }
-.ff-home-bubble__title {
-  margin: 0 0 clamp(14px, 2vw, 22px);
-  font-size: var(--wp--preset--font-size--x-large);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-/* A one-line lede under a bubble title; pulls up because the title already
-   carries the gap meant for the body. */
-.ff-home-bubble__sub {
-  margin: -10px 0 clamp(16px, 2.2vw, 24px);
-  max-width: 52ch;
-  color: var(--ff-text-dim);
-  font-size: var(--wp--preset--font-size--large);
-}
-
 /* Shared section furniture */
 .ff-home-accent {
   color: var(--ff-accent);
@@ -6433,9 +6418,9 @@ button.ff-dash__link:hover {
   border: 1px solid var(--ff-border);
   border-radius: var(--ff-radius-lg);
   background: var(--ff-navy-900);
-  /* Deeper than --ff-shadow-card: these sit on the navy field with no
-     surface under them, so the card shadow all but disappears. */
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  /* Same shadow as every other bubble on the page (.ff-card), so a shot
+     reads as the same kind of surface as the bubbles around it. */
+  box-shadow: var(--ff-shadow-card);
 }
 .ff-home-shot__img {
   display: block;
@@ -6624,35 +6609,6 @@ button.ff-dash__link:hover {
   letter-spacing: 0.3px;
 }
 
-/* --- Roadmap --- */
-.ff-home-roadmap {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: clamp(12px, 1.6vw, 18px);
-}
-/* Nested one level inside the Roadmap bubble, so these draw their own quieter
-   surface instead of the .ff-card primitive — a card-on-card with the same
-   background and shadow would read as a rendering bug. */
-.ff-home-roadmap__card {
-  padding: clamp(18px, 2.2vw, 24px);
-  border: 1px dashed var(--ff-border);
-  border-radius: var(--ff-radius-md);
-  background: rgba(255, 255, 255, 0.03);
-}
-.ff-home-roadmap__title {
-  margin: 0 0 8px;
-  font-size: var(--wp--preset--font-size--medium);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-.ff-home-roadmap__body {
-  margin: 0;
-  color: var(--ff-text-dim);
-  font-size: var(--wp--preset--font-size--small);
-  line-height: 1.5;
-}
-
 /* --- Program directors --- */
 .ff-home-program {
   display: flex;
@@ -6694,18 +6650,12 @@ button.ff-dash__link:hover {
     border-left: 0;
     border-top: 1px solid var(--ff-border);
   }
-  .ff-home-roadmap {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   /* The hero art sits under the copy when stacked, so it can run wider. */
   .ff-home-shot--hero {
     aspect-ratio: 16 / 10;
   }
 }
 @media (max-width: 560px) {
-  .ff-home-roadmap {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .ff-home-hero__cta .ff-btn {
     flex: 1 1 auto;
   }

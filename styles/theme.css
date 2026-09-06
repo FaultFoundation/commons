@@ -302,6 +302,20 @@ html.ff-no-scroll givebutter-widget {
   padding: 0;
   list-style: none;
 }
+/* Header nav renders in Montserrat, not the app's Manrope body font, so the
+   Commons header matches the marketing site's exactly. fault.foundation sets
+   Montserrat as its whole body font, so its nav labels inherit it; here the
+   body stays Manrope, so the nav (triggers, dropdown items, and the pills)
+   has to name Montserrat itself. The weights already set below — 600 on the
+   links, 700 on the pills — are the ones the wordmark's variable face covers
+   (styles/fonts.css). Without this the labels render ~5% narrower and the
+   whole nav sits ~28px off from the website. Scoped to the nav on purpose:
+   the rest of the app keeps Manrope. */
+.ff-nav__link,
+.ff-nav__submenu a,
+.ff-nav__cta .ff-btn {
+  font-family: Montserrat, ui-sans-serif, system-ui, sans-serif;
+}
 .ff-nav__link {
   position: relative;
   display: inline-flex;
@@ -319,11 +333,13 @@ html.ff-no-scroll givebutter-widget {
   background: rgba(255, 255, 255, 0.09);
   color: #fff;
 }
-/* Dropdown triggers are <button>s sharing the link look. */
+/* Dropdown triggers are <button>s sharing the link look. Font-family is set
+   by the header-nav Montserrat rule above; this element+class selector must
+   NOT re-declare it (a `font-family: inherit` here would beat that class rule
+   on specificity and drag the triggers back to Manrope). */
 button.ff-nav__link {
   border: 0;
   background: transparent;
-  font-family: inherit;
   cursor: pointer;
 }
 button.ff-nav__link:hover {
@@ -405,7 +421,13 @@ button.ff-nav__link:hover {
   color: var(--ff-accent);
   box-shadow: inset 0 0 0 1.5px var(--ff-accent);
 }
-.ff-btn--brand:hover {
+/* Match the base hover's `:not([disabled])` specificity (0,3,0), not a bare
+   `:hover` (0,2,0) — otherwise `.ff-btn:hover:not([disabled])` (the app's
+   blue-darkens-on-hover primary) out-specifies this and the pill fills blue
+   with white text instead of yellow. With equal specificity, source order
+   wins and this (later) rule takes it. The marketing site needs no such
+   guard: its base `.ff-btn:hover` is itself yellow and only (0,2,0). */
+.ff-btn--brand:hover:not([disabled]) {
   background: var(--ff-accent);
   color: var(--ff-navy-900);
   box-shadow: inset 0 0 0 1.5px var(--ff-accent);

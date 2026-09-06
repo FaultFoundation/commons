@@ -121,7 +121,9 @@ a hosted service must also release its source. Exceptions:
 - `styles/wp-globals.css` is CSS emitted by WordPress core and the Twenty
   Twenty-Five theme, which are **GPL-2.0+**; that file remains under the GPL
   whatever license the rest of the repo adopts.
-- `public/fonts/manrope/` is the Manrope typeface, redistributed under the
+- `public/fonts/manrope/` (Manrope, the body typeface) and
+  `public/fonts/montserrat/` (Montserrat, the wordmark + header nav) are
+  redistributed under the
   [SIL Open Font License 1.1](https://openfontlicense.org/).
 - `db/seed/schools.sql` and `public/schools.json` derive from the Hipo
   [university-domains-list](https://github.com/Hipo/university-domains-list)

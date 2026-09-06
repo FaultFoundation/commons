@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { DonateButton } from "@/components/DonateButton";
 import {
   ChallongeMark,
+  DiscordSourceMark,
   FaceitMark,
   StartggMark,
 } from "@/components/brand/ProviderMark";
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
   // segment in current Next.
   title: { absolute: "Commons - The Fault Foundation" },
   description:
-    "The Commons Project reads Challonge, FACEIT, and start.gg into one feed. Your matches, your record, and your team's schedule live in one place.",
+    "The Commons Project reads Challonge, FACEIT, start.gg, and Discord into one feed. Your matches, your record, and your team's schedule live in one place.",
   alternates: { canonical: "/" },
 };
 
@@ -60,6 +61,7 @@ const SOURCES: { key: string; name: string; Mark: () => React.ReactNode }[] = [
   { key: "challonge", name: "Challonge", Mark: ChallongeMark },
   { key: "faceit", name: "FACEIT", Mark: FaceitMark },
   { key: "startgg", name: "start.gg", Mark: StartggMark },
+  { key: "discord", name: "Discord", Mark: DiscordSourceMark },
 ];
 
 // The "Our goal" box: three divided columns, each an eyebrow + icon-left header
@@ -148,7 +150,7 @@ export default function CommonsPage() {
               <span className="ff-home-accent">every bracket</span>
             </h1>
             <p className="ff-home-hero__lede">
-              The Commons Project reads Challonge, FACEIT, and start.gg into one
+              The Commons Project reads Challonge, FACEIT, start.gg, and Discord into one
               feed, so your matches, your record, and your team&rsquo;s schedule
               live together with no tabs, no spreadsheets, and no missed
               check-ins.

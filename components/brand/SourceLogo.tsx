@@ -1,4 +1,4 @@
-import { ChallongeMark, FaceitMark, StartggMark, DiscordMark } from "@/components/brand/ProviderMark";
+import { ChallongeMark, FaceitMark, StartggMark, DiscordSourceMark } from "@/components/brand/ProviderMark";
 
 // The "website" mark shown top-left on a tournament tile: which platform the
 // tournament lives on. Internal Commons tournaments (hosted on the org's
@@ -51,7 +51,7 @@ export function SourceLogo({ source }: { source: TournamentSource }) {
       title={label}
       aria-label={label}
     >
-      {source === "discord" ? <DiscordMark /> : source === "faceit" ? (
+      {source === "discord" ? <DiscordSourceMark /> : source === "faceit" ? (
         <FaceitMark />
       ) : source === "commons" ? (
         <CommonsMark />

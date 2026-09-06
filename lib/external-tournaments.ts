@@ -20,6 +20,7 @@ import {
   extTournaments,
 } from "@/db/cen-schema";
 import { getCenDb } from "@/lib/cen-db";
+import { discordSupplement } from "@/lib/discord-tournaments";
 import {
   isScheduleProvider,
   type ScheduleEntry,
@@ -386,7 +387,7 @@ export async function listUpcomingExternalScheduleEntries(): Promise<
         .limit(1000);
 
       for (const row of rows) {
-        if (!isScheduleProvider(row.source)) continue;
+        if (!isScheduleProvider(row.source) && row.source !== "discord") continue;
         const state = externalMatchStatus(row.state);
         if (state === "finished" || state === "cancelled") continue;
         const matchup = [row.entrant1Name, row.entrant2Name]
@@ -428,7 +429,7 @@ export async function listUpcomingExternalScheduleEntries(): Promise<
   // Tournaments tab. Tournaments with matches show those matches instead.
   const tournaments = await listExternalTournaments();
   const windowEntries = tournaments.flatMap((tournament): ScheduleEntry[] => {
-    if (!isScheduleProvider(tournament.source)) return [];
+    if (!isScheduleProvider(tournament.source) && tournament.source !== "discord") return [];
     if (tournament.status === "completed") return [];
     if (tournamentsWithMatch.has(tournament.id)) return [];
     const start = tournament.firstMatchAt ?? tournament.startAt;
@@ -735,6 +736,14 @@ export async function getExternalTournament(
     }
     for (const list of matchesByEvent.values()) list.sort(compareMatches);
 
+    const supplement = t.source === "discord" ? {notes:"",data:null} : await discordSupplement(id);
+    const extra = supplement.data;
+    const layout = parseAboutLayout(t.aboutLayout);
+    if (supplement.notes) {
+      if (!layout.length && t.description) layout.push({title:null,columns:[[{type:"md",content:t.description}]]});
+      layout.push({title:"Discord updates",columns:[[{type:"md",content:supplement.notes}]]});
+    }
+    const extraLinks = [["Register",extra?.registrationUrl],["Contact",extra?.contactUrl],["Rules",extra?.rulesUrl],["Watch",extra?.streamUrl]].filter(([,url]) => typeof url === "string" && /^https:\/\//.test(url)).map(([label,url]) => ({label:label!,url:url!}));
     return {
       id: t.id,
       source: t.source,
@@ -757,15 +766,15 @@ export async function getExternalTournament(
       description: t.description,
       contact: t.contact,
       contactType: t.contactType,
-      streamUrl: t.streamUrl,
-      registrationClosesAt: t.registrationClosesAt,
-      prizePool: t.prizePool,
+      streamUrl: t.streamUrl ?? extra?.streamUrl ?? null,
+      registrationClosesAt: t.registrationClosesAt ?? (extra?.registrationClosesAt ? new Date(extra.registrationClosesAt) : null),
+      prizePool: t.prizePool ?? extra?.prizePool ?? null,
       videoUrl: t.videoUrl,
-      organizer: t.organizer,
+      organizer: t.organizer ?? extra?.organizer ?? null,
       organizerUrl: t.organizerUrl,
-      links: parseLinkList(t.links),
+      links: [...parseLinkList(t.links), ...extraLinks],
       images: parseImageList(t.images),
-      aboutLayout: parseAboutLayout(t.aboutLayout),
+      aboutLayout: layout,
       events: events.map((e) => ({
         id: e.id,
         name: e.name,

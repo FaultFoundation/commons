@@ -1,4 +1,4 @@
-import { ChallongeMark, FaceitMark, StartggMark } from "@/components/brand/ProviderMark";
+import { ChallongeMark, FaceitMark, StartggMark, DiscordMark } from "@/components/brand/ProviderMark";
 
 // The "website" mark shown top-left on a tournament tile: which platform the
 // tournament lives on. Internal Commons tournaments (hosted on the org's
@@ -10,12 +10,14 @@ import { ChallongeMark, FaceitMark, StartggMark } from "@/components/brand/Provi
 // network fetch and can't render broken. The Commons mark is the one exception:
 // it's real org art at `public/brand/sources/commons.svg`, loaded as an <img>.
 
-export type TournamentSource = "commons" | "challonge" | "startgg" | "faceit";
+export type TournamentSource = "commons" | "challonge" | "startgg" | "faceit" | "discord";
 
 /** Normalize a list entry's `source` to a logo key. Internal Commons
     tournaments carry no source; external ones carry "startgg" | "faceit". */
 export function sourceKey(source: string | null | undefined): TournamentSource {
   switch (source) {
+    case "discord":
+      return "discord";
     case "startgg":
       return "startgg";
     case "faceit":
@@ -28,6 +30,7 @@ export function sourceKey(source: string | null | undefined): TournamentSource {
 }
 
 const SOURCE_NAMES: Record<TournamentSource, string> = {
+  discord: "Discord",
   commons: "The Fault Foundation",
   challonge: "Challonge",
   startgg: "start.gg",
@@ -48,7 +51,7 @@ export function SourceLogo({ source }: { source: TournamentSource }) {
       title={label}
       aria-label={label}
     >
-      {source === "faceit" ? (
+      {source === "discord" ? <DiscordMark /> : source === "faceit" ? (
         <FaceitMark />
       ) : source === "commons" ? (
         <CommonsMark />

@@ -20,10 +20,11 @@ export type ScheduleProvider = (typeof SCHEDULE_PROVIDERS)[number];
  * entered in it). Commons entries link into the branded tournament view; the
  * external ones link out to the native site.
  */
-export type ScheduleSource = ScheduleProvider | "commons";
+export type ScheduleSource = ScheduleProvider | "commons" | "discord";
 
 /** Brand name shown on a calendar entry's source chip. */
 export const SCHEDULE_PROVIDER_LABELS: Record<ScheduleSource, string> = {
+  discord: "Discord",
   faceit: "FACEIT",
   startgg: "start.gg",
   challonge: "Challonge",

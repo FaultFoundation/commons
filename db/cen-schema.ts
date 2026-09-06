@@ -217,3 +217,28 @@ export const extStandings = sqliteTable(
   },
   (t) => [index("ext_standings_event_idx").on(t.eventId)],
 );
+
+
+// Discord ingestion is migrated by cen-news-notifications/migrations/0015.
+// These declarations mirror its reader-facing state; Commons does not write it.
+export const discordEntities = sqliteTable("discord_entities", {
+  id: text("id").primaryKey(),
+  identityKey: text("identity_key").notNull(),
+  tournamentId: text("tournament_id").notNull(),
+  sourceChannelId: text("source_channel_id").notNull(),
+  dataJson: text("data_json").notNull(),
+  fieldTimesJson: text("field_times_json").notNull(),
+  lockedAt: integer("locked_at"),
+  lastMessageId: text("last_message_id").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+export const discordMessages = sqliteTable("discord_messages", {
+  id: text("id").primaryKey(), channelId: text("channel_id").notNull(),
+  sourceChannelId: text("source_channel_id").notNull(), sourceMessageId: text("source_message_id").notNull(),
+  sourceGuildId: text("source_guild_id"), forwardedBy: text("forwarded_by").notNull(),
+  postedAt: integer("posted_at").notNull(), capturedAt: integer("captured_at").notNull(),
+  payloadJson: text("payload_json").notNull(), captureHash: text("capture_hash"), duplicateOf: text("duplicate_of"),
+  documentText: text("document_text"), status: text("status").notNull(), attempts: integer("attempts").notNull(),
+  leaseUntil: integer("lease_until").notNull(), error: text("error"), extractionJson: text("extraction_json"),
+  targetOverride: text("target_override"), updatedAt: integer("updated_at").notNull(),
+});

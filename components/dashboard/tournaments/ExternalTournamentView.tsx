@@ -49,6 +49,7 @@ import type {
 // on top, the on-demand refresh in ExternalTournamentRefresh).
 
 const SOURCE_LABELS: Record<string, string> = {
+  discord: "Discord",
   startgg: "start.gg",
   faceit: "FACEIT",
   challonge: "Challonge",

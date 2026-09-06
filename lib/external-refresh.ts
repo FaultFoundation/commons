@@ -20,6 +20,7 @@ export type RefreshOutcome = { refreshed: boolean; skipped?: string };
 export async function requestExternalRefresh(
   id: string,
 ): Promise<RefreshOutcome> {
+  if (id.startsWith("discord:")) return { refreshed: false, skipped: "forward_updates" };
   const { env } = getCloudflareContext();
   const rawBase = env.CEN_SCRAPER_URL?.trim();
   const secret = env.CEN_REFRESH_SECRET?.trim();

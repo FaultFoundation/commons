@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { AdminGate } from "@/components/dashboard/admin/AdminGate";
 import { CreateTournamentForm } from "@/components/dashboard/admin/tournaments/CreateTournamentForm";
+import { DiscordInbox } from "@/components/dashboard/admin/tournaments/DiscordInbox";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { challongeConfigured } from "@/lib/challonge";
@@ -49,6 +50,7 @@ async function TournamentsContent() {
   return (
     <div className="ff-bubble-grid">
       <DashboardDataRefresh tournaments />
+      <Bubble title="Discord tournament inbox" span="full"><DiscordInbox /></Bubble>
       {!configured ? (
         <Bubble title="Challonge not configured" variant="danger" span="full">
           <p className="ff-row__note">

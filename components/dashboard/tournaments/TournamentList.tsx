@@ -337,7 +337,10 @@ export function TournamentList({
           {showFeatured && featured ? (
             <div className="ff-tcard-wrap ff-tcard-wrap--hero">
               <FeaturedHero tournament={featured} />
-              <CorrectButton onClick={() => setCorrecting(featured)} />
+              <div className="ff-tcard__corner">
+                <BrandMarks t={featured} />
+                <CorrectButton onClick={() => setCorrecting(featured)} />
+              </div>
             </div>
           ) : null}
 
@@ -545,22 +548,27 @@ function formatDateShort(ms: number | null): string {
   })}`;
 }
 
-/** The banner overlay shared by the hero and the regular card: the source
-    mark, a divider and the game mark grouped into one row top-left, plus the
-    status pill top-right. */
+/** The banner overlay shared by the hero and the regular card: the status pill
+    top-right. (The source + game marks moved down into the bottom-right corner
+    cluster beside the "?" — see BrandMarks / .ff-tcard__corner.) */
 function BannerChrome({ t }: { t: TournamentListEntry }) {
   const live = t.status === "registration" || t.status === "active";
   return (
-    <>
-      <div className="ff-tcard__brandrow">
-        <SourceLogo source={sourceKey(t.source)} />
-        <span className="ff-tcard__brandsep" aria-hidden="true" />
-        <GameLogo name={t.game} logoUrl={t.gameLogoUrl} />
-      </div>
-      <span className={`ff-tcard__status${live ? " ff-tcard__status--live" : ""}`}>
-        {TOURNAMENT_STATUS_LABELS[t.status as TournamentStatus] ?? t.status}
-      </span>
-    </>
+    <span className={`ff-tcard__status${live ? " ff-tcard__status--live" : ""}`}>
+      {TOURNAMENT_STATUS_LABELS[t.status as TournamentStatus] ?? t.status}
+    </span>
+  );
+}
+
+/** Source + game marks, shown in the card's bottom-right corner cluster (left of
+    the "?") and in the compact table's brand column. */
+function BrandMarks({ t }: { t: TournamentListEntry }) {
+  return (
+    <span className="ff-tcard__marks">
+      <SourceLogo source={sourceKey(t.source)} />
+      <span className="ff-tcard__brandsep" aria-hidden="true" />
+      <GameLogo name={t.game} logoUrl={t.gameLogoUrl} />
+    </span>
   );
 }
 
@@ -655,7 +663,10 @@ function CardGrid({
       {tournaments.map((t) => (
         <div className="ff-tcard-wrap" key={t.id}>
           <TournamentCard tournament={t} />
-          <CorrectButton onClick={() => onCorrect(t)} />
+          <div className="ff-tcard__corner">
+            <BrandMarks t={t} />
+            <CorrectButton onClick={() => onCorrect(t)} />
+          </div>
         </div>
       ))}
     </div>
@@ -711,6 +722,7 @@ function CompactTable({
               <tr key={t.id}>
                 <td>
                   <span className="ff-ticket-row">
+                    <CorrectButton onClick={() => onCorrect(t)} inline />
                     <span className="ff-ticket-brand">
                       <SourceLogo source={sourceKey(t.source)} />
                       <span className="ff-tcard__brandsep" aria-hidden="true" />
@@ -723,7 +735,6 @@ function CompactTable({
                     >
                       {t.name}
                     </Link>
-                    <CorrectButton onClick={() => onCorrect(t)} inline />
                   </span>
                 </td>
                 <td>

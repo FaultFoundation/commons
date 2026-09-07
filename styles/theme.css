@@ -3000,9 +3000,9 @@ button.ff-dash__link:hover {
 .ff-ticket-subject:hover {
   text-decoration: underline;
 }
-/* The tournament list view's leading marks — same source/divider/game group
-   as the card banners (.ff-tcard__brandrow), but inline and unshadowed since
-   there's a plain row background here, not a photo. */
+/* The tournament list row — a leading "?" then the source/divider/game group
+   (.ff-tcard__marks) then the name, so the "?" sits left of the brand column,
+   matching the cards' corner cluster. */
 .ff-ticket-row {
   display: inline-flex;
   align-items: center;
@@ -4119,9 +4119,9 @@ button.ff-dash__link:hover {
   color: var(--ff-text-dim);
 }
 
-/* Tile chrome: the banner carries a source mark (top-left), status pill
-   (top-right) and game mark (bottom-right), all positioned absolutely over the
-   brand gradient / banner image. Replaces the old in-flow format label. */
+/* Tile chrome: the banner carries the status pill (top-right), positioned
+   absolutely over the brand gradient / banner image. The source + game marks
+   live in the bottom-right corner cluster (.ff-tcard__corner), not the banner. */
 .ff-tcard__banner {
   position: relative;
 }
@@ -4171,18 +4171,9 @@ button.ff-dash__link:hover {
   font-weight: 800;
   letter-spacing: 0.02em;
 }
-/* Every tile groups source mark + divider + game mark into one row, top-left,
-   so the whole row is a single absolutely-positioned unit — the individual
-   marks above are plain inline-flex items with no positioning of their own. */
-.ff-tcard__brandrow {
-  position: absolute;
-  top: 12px;
-  left: 14px;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  max-width: calc(100% - 90px);
-}
+/* Source mark + divider + game mark group into one inline row — used in the
+   card's bottom-right corner cluster (.ff-tcard__marks) and the compact table's
+   brand column. The individual marks above are plain inline-flex items. */
 .ff-tcard__brandsep {
   flex: none;
   width: 1px;
@@ -7547,19 +7538,32 @@ button.ff-dash__link:hover {
 }
 .ff-filtermenu__foot { display: flex; justify-content: space-between; gap: 10px; padding-top: 12px; border-top: 1px solid var(--ff-border); }
 
-/* The "?" correction affordance in a card corner (see .ff-tcard-wrap). */
-.ff-tcard-wrap { position: relative; }
+/* The bottom-right corner cluster on each card: the source + game marks and the
+   white-outlined "?" correction button, grouped so they align in the body's
+   reserved gutter. The wrapper is a flex box and the card fills it, so every card
+   matches its grid row's height (uniform sizing) rather than shrinking to its own
+   content — which is what let the absolute overlay drift and overlap. */
+.ff-tcard-wrap { position: relative; display: flex; }
+.ff-tcard-wrap > .ff-tcard { flex: 1 1 auto; min-width: 0; }
+.ff-tcard-wrap .ff-tcard__body { padding-bottom: 40px; }
+.ff-tcard__corner {
+  position: absolute; right: 12px; bottom: 12px; z-index: 2;
+  display: inline-flex; align-items: center; gap: 10px;
+  /* Marks/space let clicks through to the card link; only the "?" is a button. */
+  pointer-events: none;
+}
+.ff-tcard-wrap--hero .ff-tcard__corner { right: 16px; bottom: 16px; }
+.ff-tcard__marks { display: inline-flex; align-items: center; gap: 10px; }
 .ff-tcard__correct {
-  position: absolute; right: 10px; bottom: 10px; z-index: 2;
+  pointer-events: auto;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px; border-radius: 50%;
-  border: 1px solid var(--ff-border); background: rgba(6, 20, 40, 0.72);
-  color: #dfe9f4; font-weight: 800; font-size: 13px; line-height: 1; cursor: pointer;
+  flex: none; width: 24px; height: 24px; border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.85); background: transparent;
+  color: #fff; font-weight: 800; font-size: 13px; line-height: 1; cursor: pointer;
   transition: background var(--ff-transition), color var(--ff-transition), border-color var(--ff-transition);
 }
-.ff-tcard__correct:hover { background: var(--ff-accent); color: var(--ff-navy-900); border-color: transparent; }
-.ff-tcard-wrap--hero .ff-tcard__correct { right: 16px; bottom: 16px; width: 28px; height: 28px; font-size: 15px; }
-.ff-tcard__correct--inline { position: static; flex: none; width: 20px; height: 20px; font-size: 12px; background: transparent; }
+.ff-tcard__correct:hover { background: #fff; color: var(--ff-navy-900); border-color: #fff; }
+.ff-tcard__correct--inline { width: 20px; height: 20px; font-size: 12px; }
 
 /* Correction dialog reuses the 2FA `.ff-dialog` shell, a touch wider for the
    pill switches. */

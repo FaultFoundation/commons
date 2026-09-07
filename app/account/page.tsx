@@ -11,7 +11,6 @@ import {
   SecurityPanel,
 } from "@/components/dashboard/accounts/AccountPanels";
 import { DeleteAccount } from "@/components/dashboard/accounts/DeleteAccount";
-import { OAuthPopupBridge } from "@/components/dashboard/accounts/OAuthPopupBridge";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { twoFactor, user } from "@/db/schema";
@@ -110,7 +109,9 @@ export default async function AccountPage({
 
   return (
     <DashboardShell active="account" setupUserId={session.user.id}>
-      <OAuthPopupBridge />
+      {/* The popup bridge is mounted by IntegrationsPanel below, so it travels
+          with the connect cards to every page that hosts them (Home included)
+          instead of only existing here. */}
       <h1 className="screen-reader-text">Settings</h1>
       <div className="ff-bubble-grid">
         {/* Each bubble is a pinnable panel that renders its own Bubble, so the

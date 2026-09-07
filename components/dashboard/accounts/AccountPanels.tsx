@@ -1,3 +1,4 @@
+import { OAuthPopupBridge } from "@/components/dashboard/accounts/OAuthPopupBridge";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { FieldRow } from "@/components/dashboard/bubbles/FieldRow";
@@ -194,6 +195,14 @@ export function IntegrationsPanel({
       title="Integrations"
       {...mergeChrome(chrome, { actions: <RecheckConnectionsButton /> })}
     >
+      {/* Mounted by the panel, not by the page or the shell, because the popup
+          lands wherever the card was clicked: `callbackURL` is the host page,
+          so Home (which pins this panel) needs the bridge just as much as
+          Settings does. It was shell-mounted once and moved to the Settings
+          page alone in the CPU sweep, which quietly left every connect started
+          from the Home board with a popup that never closed and an opening tab
+          that never refreshed. Renders nothing unless there's an error to show. */}
+      <OAuthPopupBridge />
       <div className="ff-integrations">
         <IntegrationCard
           provider="discord"

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { ComingSoonIntegration } from "@/components/dashboard/accounts/ComingSoonIntegration";
 import { IntegrationCard } from "@/components/dashboard/accounts/IntegrationCard";
+import { OAuthPopupBridge } from "@/components/dashboard/accounts/OAuthPopupBridge";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { SetupShell } from "@/components/dashboard/setup/SetupShell";
 import { getAccountLinksCached } from "@/lib/account-links";
@@ -41,6 +42,10 @@ export default async function IntegrationsSetupPage() {
 
   return (
     <SetupShell step={2}>
+      {/* This step's cards send the popup back here, so it needs the bridge
+          too — it is not carried by IntegrationsPanel, which this page doesn't
+          use. */}
+      <OAuthPopupBridge />
       <div className="ff-bubble-grid ff-bubble-grid--single">
         <Bubble title="Your Required Integrations" span="full">
           <div className="ff-integrations">

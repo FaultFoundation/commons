@@ -485,6 +485,53 @@ Each card degrades to disabled when its OAuth secrets are unset. This member
 `CHALLONGE_CLIENT_*` OAuth is distinct from the org `CHALLONGE_API_V1_KEY` that
 runs the tournament backend (above).
 
+**The connect flow runs in a popup, and three rules keep it working.** They are
+written down because breaking any one of them looks identical from the outside —
+"the FACEIT window opens, I click connect, it closes, nothing happens" — and that
+symptom cost weeks once already.
+
+- **FACEIT needs `redirect_popup=true` on the authorize URL.** FACEIT's
+  authorize page chooses WHICH window it returns to the redirect_uri: by default
+  it drives `window.opener` and closes itself; with the flag it redirects the
+  auth window itself. `LinkProviderButton` runs the flow in a popup, and
+  accounts.faceit.com serves `Cross-Origin-Opener-Policy: same-origin` (as does
+  the Cloudflare interstitial in front of it), which severs `window.opener` the
+  instant the popup lands there — so the default has nothing left to redirect and
+  the flow dies silently. The flag is passed as `authorizationUrlParams` in
+  [lib/auth.ts](lib/auth.ts). FACEIT's endpoints are **pinned, not discovered**:
+  `discoveryUrl` made the Worker fetch FACEIT's OIDC document on every connect
+  click *and* every callback, and one hiccup there 400s the link before the
+  member ever reaches FACEIT. The pinned values are exactly what
+  `https://api.faceit.com/auth/v1/openid_configuration` returns.
+- **[OAuthPopupBridge](components/dashboard/accounts/OAuthPopupBridge.tsx) must
+  broadcast before it checks `window.opener`, and it belongs to the connect
+  cards, not to a page.** BroadcastChannel is same-ORIGIN, not same-window, so it
+  still reaches the opening tab after COOP has severed the opener — gating the
+  signal on `opener` (as it was) meant a severed popup told nobody anything.
+  `IntegrationsPanel` mounts it, so it travels wherever the panel is hosted:
+  `callbackURL` is the page the card was clicked on, and the Home board pins that
+  panel. Mounting it on the Settings page alone left every connect started from
+  Home with a popup that never closed and an opener that never refreshed.
+- **Failures come back to our own page, not Better Auth's.** `LinkProviderButton`
+  passes `errorCallbackURL` alongside `callbackURL`; Better Auth appends
+  `?error=<code>`, and the bridge renders it. Left at the default, failures land
+  on `/api/auth/error` inside a popup nobody reads while the opener is told
+  nothing — a broken connect and a working one are indistinguishable. Relatedly,
+  `advanced.cookies.state` widens the OAuth `state` cookie from Better Auth's
+  5-minute default to the 10 minutes the matching `verification` row actually
+  lives; the callback checks both, so the default failed anyone who spent longer
+  than five minutes on a provider's login.
+
+**A re-link takes a different code path than a first link.** Better Auth's
+generic-OAuth callback, finding an existing `account` row, only refreshes its
+tokens — `databaseHooks.account.create.after` never fires, so the
+`platform_identities` mirror is not written. Since `linked` is read off the
+`account` row while every downstream feature (schedule sync, player data, team
+data) is keyed on the mirror, that combination reports a successful connect that
+does nothing. `databaseHooks.account.update.after` repairs it, gated on the
+mirror actually being missing or stale so an ordinary token refresh costs one
+indexed D1 read and no provider call.
+
 For a linked FACEIT/start.gg account, `loadConnectIntegrations`
 ([lib/integrations.ts](lib/integrations.ts)) also **tests public reachability**:
 it reads the member back through the server key by their stored external id (the

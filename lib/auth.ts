@@ -16,6 +16,7 @@ import {
   fetchDiscordUsername,
   fetchFaceitProfile,
   fetchStartggProfile,
+  getPlatformIdentity,
   hasScope,
   mirrorPlatformIdentity,
   pushRoleConnection,
@@ -91,19 +92,38 @@ export const getAuth = cache(function getAuth() {
           },
         ]
       : []),
-    // FACEIT ("FACEIT Connect") — OpenID Connect. Endpoints come from FACEIT's
-    // OIDC discovery (authorization_endpoint = https://accounts.faceit.com — the
-    // real, DNS-resolving authorize host).
-    // ⚠️ DO NOT set authorizationUrl to https://auth.faceit.com/... — that host
+    // FACEIT ("FACEIT Connect") — OpenID Connect. The three endpoints below are
+    // exactly what FACEIT's OIDC discovery
+    // (https://api.faceit.com/auth/v1/openid_configuration) returns; they are
+    // pinned rather than discovered because `discoveryUrl` made the Worker fetch
+    // that document on EVERY connect click and again on every callback, and a
+    // single hiccup there 400s the link with INVALID_OAUTH_CONFIGURATION before
+    // the member ever reaches FACEIT. Re-check the doc by hand if FACEIT moves.
+    // ⚠️ DO NOT point authorizationUrl at https://auth.faceit.com/... — that host
     // does NOT resolve (ERR_NAME_NOT_RESOLVED / DNS_PROBE_STARTED). FACEIT's
-    // Connect 3.0 PDF documents it, but it's dead. Keep discoveryUrl.
+    // Connect 3.0 PDF documents it, but it's dead. accounts.faceit.com is real.
     ...(env.FACEIT_CLIENT_ID && env.FACEIT_CLIENT_SECRET
       ? [
           {
             providerId: "faceit",
             clientId: env.FACEIT_CLIENT_ID,
             clientSecret: env.FACEIT_CLIENT_SECRET,
-            discoveryUrl: "https://api.faceit.com/auth/v1/openid_configuration",
+            authorizationUrl: "https://accounts.faceit.com",
+            tokenUrl: "https://api.faceit.com/auth/v1/oauth/token",
+            userInfoUrl: "https://api.faceit.com/auth/v1/resources/userinfo",
+            // THE thing that made "connect FACEIT" silently do nothing for weeks.
+            // FACEIT's authorize page decides WHICH window it sends back to the
+            // redirect_uri: without redirect_popup it drives `window.opener` and
+            // closes itself, with it the auth window itself is redirected.
+            // LinkProviderButton runs this in a popup, and accounts.faceit.com
+            // ships `Cross-Origin-Opener-Policy: same-origin` (so does the
+            // Cloudflare interstitial in front of it), which severs
+            // `window.opener` the moment the popup lands there. So the default
+            // had nothing left to redirect: FACEIT closed its own window and the
+            // member's original tab never moved — "it opens, I click connect, it
+            // closes, nothing happens". next-auth's FACEIT provider passes the
+            // same flag for the same reason.
+            authorizationUrlParams: { redirect_popup: "true" },
             scopes: ["openid", "email", "profile"],
             // MUST be true — FACEIT's authorize endpoint REQUIRES PKCE. Without a
             // code_challenge, api/v1/authorize 400s ("Unauthorized client" /
@@ -314,6 +334,18 @@ export const getAuth = cache(function getAuth() {
       ipAddress: {
         ipAddressHeaders: ["cf-connecting-ip"],
       },
+      // The OAuth `state` cookie, widened from Better Auth's 5-minute default
+      // to the 10 minutes the state record in `verification` actually lives.
+      // The callback checks BOTH, so the default left a five-minute dead zone:
+      // a member who took longer than 5 min on the provider's page (FACEIT
+      // routinely fronts its login with a Cloudflare interstitial, and any
+      // provider can ask for a password + 2FA) came back to a valid state row
+      // and an expired cookie, and the link died as `state_mismatch` on an
+      // error page they never read. Only maxAge is overridden — secure,
+      // httpOnly, SameSite=Lax, path and domain still come from the defaults.
+      cookies: {
+        state: { attributes: { maxAge: 600 } },
+      },
       // Scope the session cookie to the registrable domain so the marketing
       // site (fault.foundation) can read it and paint the header avatar
       // instead of a permanent "Sign In". fault.foundation and
@@ -477,6 +509,54 @@ export const getAuth = cache(function getAuth() {
                 p?.handle,
               );
             }
+          },
+        },
+        update: {
+          // Re-linking a provider the member ALREADY has an account row for
+          // takes a different branch inside Better Auth: the generic-OAuth
+          // callback finds the existing row and only refreshes its tokens
+          // (updateAccount), so `create.after` above never fires. That is how a
+          // connect could report success and still leave the member with
+          // nothing working — `linked` is read off the `account` row, but every
+          // downstream feature (schedule sync, player data, team data) is keyed
+          // on the `platform_identities` mirror, which was never written.
+          //
+          // Repair it here. Gated on the mirror actually being missing or stale
+          // so an ordinary token refresh — the other caller of updateAccount —
+          // costs one indexed D1 read and no provider request.
+          after: async (account) => {
+            const providerId = account.providerId;
+            if (
+              providerId !== "faceit" &&
+              providerId !== "startgg" &&
+              providerId !== "challonge" &&
+              providerId !== "battlenet"
+            ) {
+              return;
+            }
+            const existing = await getPlatformIdentity(
+              account.userId,
+              providerId,
+            );
+            if (existing?.handle && existing.externalId === account.accountId) {
+              return;
+            }
+            let handle: string | null | undefined;
+            if (providerId === "battlenet") {
+              handle = await fetchBattleTag(account.accessToken);
+            } else if (providerId === "faceit") {
+              handle = (await fetchFaceitProfile(account.accessToken))?.handle;
+            } else if (providerId === "startgg") {
+              handle = (await fetchStartggProfile(account.accessToken))?.handle;
+            } else {
+              handle = (await fetchChallongeProfile(account.accessToken))?.handle;
+            }
+            await mirrorPlatformIdentity(
+              account.userId,
+              providerId,
+              account.accountId,
+              handle,
+            );
           },
         },
       },

@@ -40,10 +40,24 @@ export function LinkProviderButton({
     // is the connect popup — it then closes itself and refreshes the opener.
     const marked =
       callbackURL + (callbackURL.includes("?") ? "&" : "?") + "ff_oauth=1";
+    // Send FAILURES to the same marked page rather than Better Auth's own
+    // `/api/auth/error`. Better Auth appends `?error=<code>` to whichever URL
+    // it redirects to; left at the default that page opens inside a popup the
+    // member never reads and the opening tab is told nothing at all, which is
+    // how a broken connect looked exactly like a working one that "just closed".
     const body =
       provider === "discord"
-        ? { provider: "discord", callbackURL: marked, disableRedirect: true }
-        : { providerId: provider, callbackURL: marked };
+        ? {
+            provider: "discord",
+            callbackURL: marked,
+            errorCallbackURL: marked,
+            disableRedirect: true,
+          }
+        : {
+            providerId: provider,
+            callbackURL: marked,
+            errorCallbackURL: marked,
+          };
     try {
       const res = await fetch(endpoint, {
         method: "POST",

@@ -1,14 +1,13 @@
 "use client";
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   inferFacts,
-  profilePath,
   type DiscoveryFacts,
   type DiscoveryProfile,
 } from "@/lib/discovery-shared";
 import type { TournamentListEntry } from "./TournamentList";
+
 export async function discoveryRequest(body: unknown) {
   const r = await fetch("/api/tournaments/discovery/", {
     method: "POST",
@@ -22,6 +21,55 @@ export async function discoveryRequest(body: unknown) {
   if (!r.ok) throw new Error(data.error ?? "Unable to save");
   return data;
 }
+
+/**
+ * A row of pills where exactly one is pressed — the same segmented control the
+ * Account → Display density row uses (`.ff-segment`), so the discovery facts read
+ * as switches/sliders rather than the old `<select>` dropdowns. The generic value
+ * lets the filter menu use `""` for its "Any" option and the correction form use
+ * the fact enums directly.
+ */
+export function Segmented<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="ff-discovery-field">
+      <span className="ff-discovery-field__label">{label}</span>
+      <div
+        className="ff-segment ff-segment--wrap"
+        role="group"
+        aria-label={label}
+      >
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            className="ff-segment__btn"
+            aria-pressed={value === o.value}
+            onClick={() => onChange(o.value)}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The discovery facts editor, as pill switches. Members editing a correction see
+ * only Audience / Venue / Type; staff (`editorial`) additionally get the
+ * organization/series grouping selects and the editorial "featured" flag, which
+ * are theirs to set — a member correction never reassigns grouping or featuring.
+ */
 export function FactsEditor({
   value,
   onChange,
@@ -35,219 +83,203 @@ export function FactsEditor({
 }) {
   return (
     <div className="ff-discovery-fields">
-      <label>
-        Audience
-        <select
-          value={value.audience}
-          onChange={(e) =>
-            onChange({
-              ...value,
-              audience: e.target.value as DiscoveryFacts["audience"],
-            })
-          }
-        >
-          {["unknown", "collegiate", "open"].map((v) => (
-            <option key={v}>{v}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Venue
-        <select
-          value={value.venue}
-          onChange={(e) =>
-            onChange({
-              ...value,
-              venue: e.target.value as DiscoveryFacts["venue"],
-            })
-          }
-        >
-          {["unknown", "online", "in-person", "hybrid"].map((v) => (
-            <option key={v}>{v}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Competition
-        <select
-          value={value.competition}
-          onChange={(e) =>
-            onChange({
-              ...value,
-              competition: e.target.value as DiscoveryFacts["competition"],
-            })
-          }
-        >
-          {["unknown", "league", "tournament"].map((v) => (
-            <option key={v}>{v}</option>
-          ))}
-        </select>
-      </label>
-      {(["organization", "series"] as const).map((kind) => (
-        <label key={kind}>
-          {kind === "organization" ? "Organization" : "Series"}
-          <select
-            value={
-              value[kind === "organization" ? "organizationId" : "seriesId"] ??
-              ""
-            }
-            onChange={(e) =>
-              onChange({
-                ...value,
-                [kind === "organization" ? "organizationId" : "seriesId"]:
-                  e.target.value || null,
-              })
-            }
-          >
-            <option value="">No grouping</option>
-            {profiles
-              .filter((p) => p.kind === kind)
-              .map((p) => (
-                <option value={p.id} key={p.id}>
-                  {p.name}
-                </option>
-              ))}
-          </select>
-        </label>
-      ))}
+      <Segmented
+        label="Audience"
+        value={value.audience}
+        options={[
+          { value: "collegiate", label: "Collegiate" },
+          { value: "unknown", label: "Not specified" },
+          { value: "open", label: "Open" },
+        ]}
+        onChange={(audience) => onChange({ ...value, audience })}
+      />
+      <Segmented
+        label="Venue"
+        value={value.venue}
+        options={[
+          { value: "in-person", label: "In-person" },
+          { value: "online", label: "Online" },
+          { value: "hybrid", label: "Hybrid" },
+          { value: "unknown", label: "Not specified" },
+        ]}
+        onChange={(venue) => onChange({ ...value, venue })}
+      />
+      <Segmented
+        label="Type"
+        value={value.competition}
+        options={[
+          { value: "tournament", label: "Tournament" },
+          { value: "league", label: "League" },
+          { value: "unknown", label: "Not specified" },
+        ]}
+        onChange={(competition) => onChange({ ...value, competition })}
+      />
       {editorial && (
-        <label>
-          <input
-            type="checkbox"
-            checked={value.featured}
-            onChange={(e) => onChange({ ...value, featured: e.target.checked })}
-          />{" "}
-          Editorially featured
-        </label>
-      )}
-    </div>
-  );
-}
-export function DiscoveryCardContext({
-  tournament: t,
-}: {
-  tournament: TournamentListEntry;
-}) {
-  const d = t.discovery;
-  return (
-    <div className="ff-discovery-context">
-      {d?.audience === "collegiate" && (
-        <span title={d.reasons.join(". ")}>
-          Collegiate{d.reviewed ? "" : " · suggested"}
-        </span>
-      )}
-      {d?.venue && d.venue !== "unknown" && <span>{d.venue}</span>}
-      {d?.competition === "league" && <span>League</span>}
-      {d?.organizationId && (
-        <Link href={profilePath(d.organizationId)}>
-          {d.organizationName ?? "Organization"}
-        </Link>
-      )}
-      {d?.seriesId && (
-        <Link href={profilePath(d.seriesId)}>{d.seriesName ?? "Series"}</Link>
-      )}
-      <CorrectionForm tournament={t} />
-    </div>
-  );
-}
-function CorrectionForm({
-  tournament: t,
-}: {
-  tournament: TournamentListEntry;
-}) {
-  const [open, setOpen] = useState(false),
-    [profiles, setProfiles] = useState<DiscoveryProfile[]>([]);
-  const [facts, setFacts] = useState<DiscoveryFacts>(
-    t.discovery ?? inferFacts(t),
-  );
-  const [evidence, setEvidence] = useState(""),
-    [message, setMessage] = useState(""),
-    [busy, setBusy] = useState(false);
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    setReady(false);
-    fetch("/api/tournaments/discovery/")
-      .then(async (r) => {
-        if (!r.ok) throw Error("Unable to load profiles");
-        return r.json() as Promise<{ profiles: DiscoveryProfile[] }>;
-      })
-      .then((d) => {
-        if (!cancelled) {
-          setProfiles(d.profiles);
-          setReady(true);
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) setMessage(e.message);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
-  return (
-    <details
-      open={open}
-      onToggle={(e) => setOpen(e.currentTarget.open)}
-      className="ff-discovery-correction"
-    >
-      <summary>Suggest a correction</summary>
-      {open && (
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setBusy(true);
-            try {
-              await discoveryRequest({
-                action: "correction",
-                targetId: t.id,
-                data: facts,
-                evidence,
-              });
-              setMessage(
-                "Submitted for review. Your suggestion will not change the source tournament.",
-              );
-            } catch (err) {
-              setMessage((err as Error).message);
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          <p>{t.name}</p>
-          {!!t.discovery?.reasons.length && (
-            <p>Classification evidence: {t.discovery.reasons.join(". ")}.</p>
-          )}
-          {ready ? (
-            <FactsEditor
-              value={facts}
-              onChange={setFacts}
-              profiles={profiles}
-            />
-          ) : (
-            <p>Loading organization and series choices…</p>
-          )}
-          <label>
-            Evidence or missing organization/series
-            <textarea
-              required
-              minLength={10}
-              maxLength={4000}
-              value={evidence}
-              onChange={(e) => setEvidence(e.target.value)}
-              placeholder="Explain what should change and include a supporting source link."
-            />
+        <>
+          {(["organization", "series"] as const).map((kind) => (
+            <label key={kind} className="ff-discovery-field">
+              <span className="ff-discovery-field__label">
+                {kind === "organization" ? "Organization" : "Series"}
+              </span>
+              <select
+                value={
+                  value[
+                    kind === "organization" ? "organizationId" : "seriesId"
+                  ] ?? ""
+                }
+                onChange={(e) =>
+                  onChange({
+                    ...value,
+                    [kind === "organization" ? "organizationId" : "seriesId"]:
+                      e.target.value || null,
+                  })
+                }
+              >
+                <option value="">No grouping</option>
+                {profiles
+                  .filter((p) => p.kind === kind)
+                  .map((p) => (
+                    <option value={p.id} key={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          ))}
+          <label className="ff-discovery-field ff-discovery-field--check">
+            <input
+              type="checkbox"
+              checked={value.featured}
+              onChange={(e) => onChange({ ...value, featured: e.target.checked })}
+            />{" "}
+            Editorially featured
           </label>
-          <button disabled={busy || !ready} type="submit">
-            Submit correction
-          </button>
-          <p role="status">{message}</p>
-        </form>
+        </>
       )}
-    </details>
+    </div>
   );
 }
+
+/**
+ * The "suggest a correction" popup — a single shared native `<dialog>` (the 2FA
+ * step-up's `ff-dialog` shell), opened from the "?" button on any tournament
+ * bubble. `tournament == null` keeps it closed; setting it opens the dialog with
+ * that tournament's inferred/reviewed facts. Members edit the pill switches and
+ * add context; the submission is queued for staff review and never mutates the
+ * source tournament. Grouping (organization/series) and featuring stay staff-only,
+ * so we carry the tournament's existing values through untouched.
+ */
+export function CorrectionDialog({
+  tournament,
+  onClose,
+}: {
+  tournament: TournamentListEntry | null;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [facts, setFacts] = useState<DiscoveryFacts | null>(null);
+  const [info, setInfo] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+    if (tournament && !dialog.open) dialog.showModal();
+    else if (!tournament && dialog.open) dialog.close();
+  }, [tournament]);
+
+  // Reset the form each time a different tournament opens it.
+  useEffect(() => {
+    if (!tournament) return;
+    setFacts(tournament.discovery ?? inferFacts(tournament));
+    setInfo("");
+    setMessage("");
+    setDone(false);
+  }, [tournament]);
+
+  return (
+    <dialog
+      ref={ref}
+      className="ff-dialog ff-dialog--correction"
+      onClose={onClose}
+    >
+      {tournament && facts ? (
+        done ? (
+          <>
+            <h2 className="ff-dialog__title">Sent for review</h2>
+            <p className="ff-dialog__text">
+              Thanks. Your suggestion won&rsquo;t change the source tournament — a
+              moderator will take a look.
+            </p>
+            <div className="ff-dialog__actions">
+              <button type="button" className="ff-btn" onClick={onClose}>
+                Close
+              </button>
+            </div>
+          </>
+        ) : (
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setBusy(true);
+              setMessage("");
+              try {
+                await discoveryRequest({
+                  action: "correction",
+                  targetId: tournament.id,
+                  data: facts,
+                  evidence: info,
+                });
+                setDone(true);
+              } catch (err) {
+                setMessage((err as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <h2 className="ff-dialog__title">Suggest a correction</h2>
+            <p className="ff-dialog__text">{tournament.name}</p>
+            <FactsEditor value={facts} onChange={setFacts} profiles={[]} />
+            <label className="ff-discovery-field">
+              <span className="ff-discovery-field__label">
+                Additional information
+              </span>
+              <textarea
+                required
+                minLength={10}
+                maxLength={4000}
+                value={info}
+                onChange={(e) => setInfo(e.target.value)}
+                placeholder="Explain what should change and add a source link if you can."
+              />
+            </label>
+            {message ? (
+              <p className="ff-dialog__error" role="alert">
+                {message}
+              </p>
+            ) : null}
+            <div className="ff-dialog__actions">
+              <button
+                type="button"
+                className="ff-btn ff-btn--outline"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="ff-btn" disabled={busy}>
+                {busy ? "Sending…" : "Submit"}
+              </button>
+            </div>
+          </form>
+        )
+      ) : null}
+    </dialog>
+  );
+}
+
 export function ProfileActions({
   profile,
   following,
@@ -282,7 +314,7 @@ export function ProfileActions({
   return (
     <div className="ff-discovery-profile-actions">
       <button
-        className="ff-ticket-view"
+        className="ff-btn ff-btn--sm"
         disabled={busy}
         aria-pressed={follow}
         onClick={() =>
@@ -318,7 +350,9 @@ export function ProfileActions({
                 onChange={(e) => setEvidence(e.target.value)}
               />
             </label>
-            <button disabled={busy}>Submit claim</button>
+            <button className="ff-btn ff-btn--sm" disabled={busy}>
+              Submit claim
+            </button>
           </form>
         </details>
       )}
@@ -363,7 +397,9 @@ export function ProfileActions({
                 onChange={(e) => setDescription(e.target.value)}
               />
             </label>
-            <button disabled={busy}>Save profile</button>
+            <button className="ff-btn ff-btn--sm" disabled={busy}>
+              Save profile
+            </button>
           </form>
         </details>
       )}

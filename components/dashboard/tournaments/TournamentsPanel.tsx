@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import {
   mergeChrome,
@@ -29,7 +28,6 @@ export function TournamentsPanel({
 }) {
   return (
     <Bubble title="Tournaments" {...mergeChrome(chrome, { span: "full" })}>
-      <p><Link href="/tournaments/featured/">Featured discovery →</Link></p>
       <TournamentList
         tournaments={tournaments}
         initialLayout={initialLayout}

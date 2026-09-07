@@ -4,8 +4,8 @@ import Link from "next/link";
 import { DiscoveryRail } from "./DiscoveryRail";
 import { DiscoveryFilters } from "./DiscoveryFilters";
 import { EMPTY_FILTERS, matchesDiscovery, discoveryScore } from "@/lib/discovery-shared";
-import { DiscoveryCardContext } from "./DiscoveryActions";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { CorrectionDialog } from "./DiscoveryActions";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { GameLogo } from "@/components/brand/GameLogo";
 import { SourceLogo, sourceKey } from "@/components/brand/SourceLogo";
@@ -56,7 +56,6 @@ export type TournamentListEntry = {
 const VIEWS = [
   { key: "all", label: "All" },
   { key: "active", label: "Active" },
-  { key: "upcoming", label: "Upcoming" },
   { key: "concluded", label: "Concluded" },
 ] as const;
 
@@ -136,14 +135,10 @@ export function TournamentList({
   tournaments,
   initialLayout,
   follows = [],
-  showSeries = true,
-  seriesTournaments = tournaments,
 }: {
   tournaments: TournamentListEntry[];
   initialLayout: TournamentLayout;
   follows?: string[];
-  showSeries?: boolean;
-  seriesTournaments?: TournamentListEntry[];
 }) {
   const [filters, setFilters] = useState({...EMPTY_FILTERS});
   const [view, setView] = useState<ViewKey>("active");
@@ -151,6 +146,9 @@ export function TournamentList({
   const [showPast, setShowPast] = useState(true);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [page, setPage] = useState(1);
+  // One shared correction dialog for the whole list — the "?" on any card/hero
+  // opens it with that tournament.
+  const [correcting, setCorrecting] = useState<TournamentListEntry | null>(null);
   // Which games to show; empty = no filter (every game shows). Kept as
   // in-memory state and applied with a plain .filter() below — same
   // client-side approach as the rest of this list, so toggling a game never
@@ -183,8 +181,8 @@ export function TournamentList({
   }
 
   const visibleTournaments = useMemo(() => {
-    return tournaments.filter(t => (selectedGames.size === 0 || (t.game != null && selectedGames.has(t.game))) && matchesDiscovery(t, filters, follows, Date.now()) && (view !== "upcoming" || (!isConcluded(t.status) && t.startsAt != null && t.startsAt > Date.now())));
-  }, [tournaments, selectedGames, filters, follows, view]);
+    return tournaments.filter(t => (selectedGames.size === 0 || (t.game != null && selectedGames.has(t.game))) && matchesDiscovery(t, filters, follows, Date.now()));
+  }, [tournaments, selectedGames, filters, follows]);
 
   const { featured, upcoming, past, concluded, all } = useMemo(() => {
     const today = startOfTodayMs();
@@ -262,25 +260,40 @@ export function TournamentList({
   return (
     <>
       <div className="ff-list-head">
-        <div className="ff-ticket-views">
-          {VIEWS.map((option) => (
-            <button
-              key={option.key}
-              className="ff-ticket-view"
-              type="button"
-              aria-current={view === option.key ? "page" : undefined}
-              onClick={() => setView(option.key)}
-            >
-              {option.label}
-            </button>
-          ))}
-          <GameFilter
+        <div className="ff-list-head__controls">
+          <div className="ff-ticket-views">
+            {VIEWS.map((option) => (
+              <button
+                key={option.key}
+                className="ff-ticket-view"
+                type="button"
+                aria-current={view === option.key ? "page" : undefined}
+                onClick={() => setView(option.key)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <span className="ff-list-head__divider" aria-hidden="true" />
+          <DiscoveryFilters
+            value={filters}
+            onChange={setFilters}
+            countries={[...new Set(tournaments.map((t) => t.country).filter((c): c is string => Boolean(c)))].sort()}
             games={availableGames}
-            selected={selectedGames}
-            onToggle={toggleGame}
-            onClear={() => setSelectedGames(new Set())}
+            selectedGames={selectedGames}
+            onToggleGame={toggleGame}
+            onClearGames={() => setSelectedGames(new Set())}
           />
         </div>
+
+        <input
+          className="ff-list-search"
+          type="search"
+          value={filters.query}
+          onChange={(e) => setFilters({ ...filters, query: e.target.value })}
+          placeholder="Search tournaments, organizers or games"
+          aria-label="Search tournaments"
+        />
 
         <div className="ff-viewtoggle" role="group" aria-label="View style">
           <button
@@ -306,26 +319,33 @@ export function TournamentList({
         </div>
       </div>
 
-      <DiscoveryFilters value={filters} onChange={setFilters} countries={[...new Set(tournaments.map(t=>t.country).filter((c): c is string=>Boolean(c)))].sort()} />
-      <p className="ff-row__note" aria-live="polite">{view === "concluded" ? concluded.length : view === "all" ? all.length + (featured ? 1 : 0) : upcoming.length + past.length + (featured ? 1 : 0)} matching tournaments</p>
-      {showSeries && view !== "concluded" && <DiscoveryRail tournaments={visibleTournaments} allTournaments={seriesTournaments}/>}
+      {view !== "concluded" ? (
+        <DiscoveryRail tournaments={visibleTournaments} />
+      ) : null}
+      <p className="ff-list-count" aria-live="polite">
+        {view === "concluded"
+          ? concluded.length
+          : view === "all"
+            ? all.length + (featured ? 1 : 0)
+            : upcoming.length + past.length + (featured ? 1 : 0)}{" "}
+        matching tournaments
+      </p>
       {isEmpty ? (
         <p className="ff-ticket-empty">{Object.values(filters).some(Boolean) || selectedGames.size ? "No tournaments match these filters. Try clearing a filter or choosing All." : emptyMessage}</p>
       ) : (
         <>
           {showFeatured && featured ? (
-            <div><FeaturedHero tournament={featured} /><DiscoveryCardContext tournament={featured} /></div>
+            <div className="ff-tcard-wrap ff-tcard-wrap--hero">
+              <FeaturedHero tournament={featured} />
+              <CorrectButton onClick={() => setCorrecting(featured)} />
+            </div>
           ) : null}
 
           {pageItems.length > 0 ? (
             layout === "modern" ? (
-              <div className="ff-tcard-grid">
-                {pageItems.map((t) => (
-                  <div key={t.id}><TournamentCard tournament={t} /><DiscoveryCardContext tournament={t} /></div>
-                ))}
-              </div>
+              <CardGrid tournaments={pageItems} onCorrect={setCorrecting} />
             ) : (
-              <CompactTable tournaments={pageItems} />
+              <CompactTable tournaments={pageItems} onCorrect={setCorrecting} />
             )
           ) : null}
 
@@ -343,11 +363,7 @@ export function TournamentList({
                 Ongoing tournaments ({past.length})
               </button>
               {showPast ? (
-                <div className="ff-tcard-grid">
-                  {past.map((t) => (
-                    <div key={t.id}><TournamentCard tournament={t} /><DiscoveryCardContext tournament={t} /></div>
-                  ))}
-                </div>
+                <CardGrid tournaments={past} onCorrect={setCorrecting} />
               ) : null}
             </div>
           ) : null}
@@ -362,6 +378,10 @@ export function TournamentList({
           />
         </>
       )}
+      <CorrectionDialog
+        tournament={correcting}
+        onClose={() => setCorrecting(null)}
+      />
     </>
   );
 }
@@ -598,10 +618,79 @@ function TournamentCard({ tournament: t }: { tournament: TournamentListEntry }) 
   );
 }
 
-function CompactTable({
+/** The small "?" affordance in a card's corner (or inline in a compact row) that
+    opens the correction dialog. It sits OUTSIDE the card's `<a>` — an anchor can't
+    hold a button — so the wrapper `.ff-tcard-wrap` is what positions it. */
+function CorrectButton({
+  onClick,
+  inline = false,
+}: {
+  onClick: () => void;
+  inline?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={`ff-tcard__correct${inline ? " ff-tcard__correct--inline" : ""}`}
+      title="Suggest a correction"
+      aria-label="Suggest a correction"
+      onClick={onClick}
+    >
+      ?
+    </button>
+  );
+}
+
+/** The card grid, each card wrapped so its "?" can float in the corner. Shared by
+    the list's paginated/past grids and the standalone `TournamentCards`. */
+function CardGrid({
   tournaments,
+  onCorrect,
 }: {
   tournaments: TournamentListEntry[];
+  onCorrect: (t: TournamentListEntry) => void;
+}) {
+  return (
+    <div className="ff-tcard-grid">
+      {tournaments.map((t) => (
+        <div className="ff-tcard-wrap" key={t.id}>
+          <TournamentCard tournament={t} />
+          <CorrectButton onClick={() => onCorrect(t)} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A self-contained card grid with its own correction dialog — for surfaces that
+    want the tournament bubbles without the whole list chrome (the series page). */
+export function TournamentCards({
+  tournaments,
+  empty = "No tournaments recorded yet.",
+}: {
+  tournaments: TournamentListEntry[];
+  empty?: string;
+}) {
+  const [correcting, setCorrecting] = useState<TournamentListEntry | null>(null);
+  if (tournaments.length === 0)
+    return <p className="ff-ticket-empty">{empty}</p>;
+  return (
+    <>
+      <CardGrid tournaments={tournaments} onCorrect={setCorrecting} />
+      <CorrectionDialog
+        tournament={correcting}
+        onClose={() => setCorrecting(null)}
+      />
+    </>
+  );
+}
+
+function CompactTable({
+  tournaments,
+  onCorrect,
+}: {
+  tournaments: TournamentListEntry[];
+  onCorrect: (t: TournamentListEntry) => void;
 }) {
   return (
     <div className="ff-ticket-table-wrap">
@@ -634,8 +723,8 @@ function CompactTable({
                     >
                       {t.name}
                     </Link>
+                    <CorrectButton onClick={() => onCorrect(t)} inline />
                   </span>
-                  <DiscoveryCardContext tournament={t}/>
                 </td>
                 <td>
                   {external
@@ -665,79 +754,6 @@ function CompactTable({
           })}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-/** The game checkbox filter, next to the view tabs. Purely client-side: it
-    narrows the already-downloaded `tournaments` list in memory, so toggling a
-    game costs no request and no Worker CPU. */
-function GameFilter({
-  games,
-  selected,
-  onToggle,
-  onClear,
-}: {
-  games: string[];
-  selected: Set<string>;
-  onToggle: (game: string) => void;
-  onClear: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
-  }, [open]);
-
-  if (games.length === 0) return null;
-
-  return (
-    <div className="ff-filter" ref={rootRef}>
-      <button
-        className="ff-ticket-view ff-filter__toggle"
-        type="button"
-        aria-haspopup="true"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        Games
-        {selected.size > 0 ? (
-          <span className="ff-filter__count">{selected.size}</span>
-        ) : null}
-        <Chevron open={open} />
-      </button>
-      {open ? (
-        <div className="ff-filter__panel" role="menu">
-          <div className="ff-filter__section-head">
-            <span>Games</span>
-            {selected.size > 0 ? (
-              <button className="ff-filter__clear" type="button" onClick={onClear}>
-                Clear
-              </button>
-            ) : null}
-          </div>
-          <div className="ff-filter__options">
-            {games.map((game) => (
-              <label key={game} className="ff-filter__option">
-                <input
-                  type="checkbox"
-                  checked={selected.has(game)}
-                  onChange={() => onToggle(game)}
-                />
-                {game}
-              </label>
-            ))}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

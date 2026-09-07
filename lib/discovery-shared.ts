@@ -169,12 +169,16 @@ export function matchesDiscovery(
     return false;
   if (f.audience && d.audience !== f.audience) return false;
   if (f.venue && d.venue !== f.venue) return false;
-  if (
-    f.competition === "series"
-      ? !d.seriesId
-      : f.competition && d.competition !== f.competition
-  )
-    return false;
+  // The Type switch sends "league" | "tournament"; "tournament" means "anything
+  // that isn't a league" so inferred (unknown-competition) events still show.
+  // "series" (kept for completeness) means "belongs to a series".
+  if (f.competition === "series") {
+    if (!d.seriesId) return false;
+  } else if (f.competition === "league") {
+    if (d.competition !== "league") return false;
+  } else if (f.competition === "tournament") {
+    if (d.competition === "league") return false;
+  }
   if (f.source && (t.source ?? "challonge") !== f.source) return false;
   if (f.country && t.country !== f.country) return false;
   if (

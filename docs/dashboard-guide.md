@@ -686,8 +686,9 @@ lazy TTL). Portal conventions specific to this surface:
 - **Academic-verification toggle** is on the admin create form and the Game Info
   settings — it gates registration, nothing on Challonge.
 - **The list** (`/tournaments/`, `TournamentList`) is all client-side over the
-  one payload the server hands down: view tabs (All / Active / Upcoming / Concluded), game and discovery
-  filters, a card/compact layout toggle (cookie-persisted), and **pagination** —
+  one payload the server hands down: view tabs (All / Active / Concluded), a
+  `Filter` dropdown of discovery pill-switches, an inline search box, a
+  card/compact layout toggle (cookie-persisted), and **pagination** —
   page numbers plus a per-page dropdown (12 / 24 / 48 / All) at the bottom
   (`PaginationBar`). Paginating in memory keeps a big catalog off Worker CPU;
   the page resets on any view/filter/size change and clamps so a shrinking list
@@ -851,22 +852,30 @@ Inspect local D1 with
 
 ## Tournament Discovery
 
-`/tournaments/` preserves the existing card/compact list, with filters for
-collegiate audience, online/in-person/hybrid venue, leagues or series, platform,
-region/country, date window, approaching registration deadlines, followed
-organizations/series, and text search. Games remains a separate multi-select.
-Filters combine with AND, reset pagination, and apply to featured selection and
-series visibility. Series progress always uses the full recorded series, so a
-registration filter cannot reset the progress bar. Game selections have their own
-Clear control; Clear filters resets the expanded panel. Filters are session-local
-component state; layout is cookie-persisted.
+`/tournaments/` keeps the card/compact list. The head row is **view pills
+(All / Active / Concluded) · a divider · a `Filter` button**, then a **search
+box** that stretches to the layout toggle. `Filter` (`DiscoveryFilters`) opens a
+popover of **pill switches** — the same `.ff-segment` control the Account density
+row uses (`Segmented` lives in `DiscoveryActions`, imported by the filter and the
+correction form so both read as switches, not `<select>` dropdowns): Games
+(multi), Type (Tournament / League), Audience (Collegiate / Open), Venue
+(In-person / Online / Hybrid), Platform, "Starts within", Region, and "Closing
+soon" / "Only followed" toggles. The button shows a count badge of active facets;
+search is the one filter that lives outside the popover, in the head bar. Filters
+combine with AND, reset pagination, and drive the hero and series rail. **Type's
+"Tournament" means "not a league"** (in `matchesDiscovery`) so inferred
+unknown-competition events still show under it; "League" narrows to leagues.
+Series progress always uses the full recorded series, so a registration filter
+cannot reset the progress bar. Filters are session-local component state; layout
+is cookie-persisted.
 
-`/tournaments/featured/` focuses on collegiate suggestions and staff picks.
-Ranking prefers editorial placement, collegiate relevance, leagues/series, and
-nearby known registration deadlines. It does not use entrant count or banner art
-as a proxy for importance. Raw counts remain visible. Date-only inferred provider
-statuses are not proof that registration is open; the new deadline filter only
-uses a known future closing timestamp.
+The **featured hero** is chosen in-list (`discoveryScore`): editorial placement
+first, then collegiate relevance, leagues/series, active status, and a nearby
+known registration deadline — never entrant count or banner art as a proxy for
+importance. Raw counts stay visible. Date-only inferred provider statuses are not
+proof that registration is open; the deadline signal only uses a known future
+closing timestamp. (There is no separate `/tournaments/featured/` page — an
+earlier "Featured discovery" entry point was removed; the ranking is the hero.)
 
 `lib/discovery-audience.ts` owns audience evidence, consumed by the shared rules.
 Its sourced competition registry recognizes whole-token NACE and NECC titles;
@@ -894,16 +903,35 @@ stages are removed. Missing organizer identity means a named league/season can
 have its own single-tournament series, but it is not merged with other events.
 These are revisable suggestions, not verified real-world organizational identity.
 
-Organization and series pages live at `/tournaments/discovery/<encoded-id>/`.
-Profiles show recorded tournaments, games, related series, and recorded completion
-counts. A progress bar measures concluded imported tournaments; it does not
-invent a total season length, standings, qualification path, or aggregate prize
-pool. A profile's history is available through All and Concluded. Following is a
-persisted per-account discovery preference, including the pinned Home widget;
-it does not send notifications. Following/approving an inferred profile stores
-its display identity so its URL remains available after source changes.
+Above the list, the **Series & leagues** rail (`DiscoveryRail`) lists grouped
+tournaments as rows linking to their series page. A group appears **only when
+more than one of the currently-shown tournaments belongs to it** — a lone
+tournament is just a card, not a series — and only while at least one of its
+tournaments is still active or upcoming. Each row shows a Series/League badge, a
+Live/Registration/Upcoming status, the game(s), the tournament count, a date
+range and a concluded-progress bar.
 
-Corrections and ownership evidence are submitted through
+Organization and series pages live at `/tournaments/discovery/<encoded-id>/`.
+The page is a **hero header** (banner strip, kind/status badges, title, a facts
+grid of game / tournaments / entrants / dates / source, and Follow) over a
+single **"Tournaments in this series"** grid of the ordinary tournament bubbles
+(`TournamentCards`) — no Overview/Standings/Stages tabs. There is **no
+qualification-path or aggregate-prize display**: the data is imported
+tournaments, not an official season schedule, so nothing invents a total season
+length, standings, qualification path or prize pool. Following is a persisted
+per-account discovery preference (including the pinned Home widget); it does not
+send notifications. Following/approving an inferred profile stores its display
+identity so its URL remains available after source changes.
+
+Every tournament bubble carries a small **"?"** button in its corner
+(`CorrectButton`) that opens **one shared correction dialog** (`CorrectionDialog`
+— the 2FA step-up's `ff-dialog` shell). Members edit Audience / Venue / Type as
+pill switches and add **Additional information**; the submission is queued for
+review and **never mutates the source tournament**. Grouping (organization/
+series) and featuring stay staff-only, so a member correction carries the
+tournament's existing values through untouched — the org/series selects and the
+featured flag only render in the staff review editor (`FactsEditor` with
+`editorial`). Corrections and ownership evidence post to
 `/api/tournaments/discovery/`. The Discovery Corrections & Claims bubble on
 `/admin/tournaments/` requires `manageTournaments` and the existing admin unlock.
 Staff can create organization/series profiles, assign or remove tournament
@@ -951,11 +979,12 @@ all historical revisions or complete season schedules from the current data.
 
 ### Manual test checklist
 
-1. Combine game + Collegiate + Online + Series; verify every visible result and
-   featured item matches. Try conflicting filters and clear them.
-2. Check In-person, Hybrid, and Not specified separately. Region/country must not
-   turn an unknown venue into an in-person label.
-3. Switch All, Active, Upcoming and Concluded in card and compact layouts. An
+1. Open `Filter`, combine game + Collegiate + Online + League as pills; verify
+   every visible result and the hero match. Try conflicting filters and Clear.
+2. Check In-person and Hybrid separately. Region/country must not
+   turn an unknown venue into an in-person label. Confirm the head search box
+   narrows by name/organizer/game.
+3. Switch All, Active and Concluded in card and compact layouts. An
    ongoing multi-week event remains visible after its original start date.
 4. Apply a date/deadline filter. Missing deadlines must not qualify as closing
    soon. Series progress must remain based on its full recorded membership.
@@ -966,7 +995,9 @@ all historical revisions or complete season schedules from the current data.
    Confirm season/division boundaries, recorded progress, and concluded history.
 7. Follow/unfollow a series and an organization. Reload, use Following on both
    Tournaments and the pinned Home widget, and check another account is unaffected.
-8. Submit a correction with evidence. Confirm it remains unpublished until staff
+8. Open a tournament bubble's "?" button, edit the Audience/Venue/Type pills, add
+   Additional information and submit. Confirm the member form has no
+   organization/series/featured controls, it stays unpublished until staff
    review, then approve/reject it from Admin → Tournaments. Refresh source data
    and verify an approved correction persists.
 9. Create a missing organization or series from the review bubble, assign it,

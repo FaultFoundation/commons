@@ -1,3 +1,5 @@
+import { discoveryFollowIds } from "@/lib/discovery";
+import { getSessionCached } from "@/lib/session";
 import { DashboardDataRefresh } from "@/components/dashboard/DashboardDataRefresh";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
@@ -23,6 +25,8 @@ export default async function TournamentsPage() {
   // merged into one unified list — the same loader the Home board's pinned
   // Tournaments bubble uses, so the two can't disagree.
   const tournaments = await loadTournamentEntries();
+  const session = await getSessionCached();
+  const follows = session ? await discoveryFollowIds(session.user.id) : [];
   const initialLayout = asTournamentLayout(
     (await cookies()).get(TOURNAMENT_LAYOUT_COOKIE)?.value,
   );
@@ -35,6 +39,7 @@ export default async function TournamentsPage() {
         <TournamentsPanel
           tournaments={tournaments}
           initialLayout={initialLayout}
+          follows={follows}
         />
       </div>
     </>

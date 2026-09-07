@@ -1,6 +1,7 @@
 // Server-only (it reads D1 through listTournaments / the cen-sql projection).
 import type { TournamentListEntry } from "@/components/dashboard/tournaments/TournamentList";
 import { listExternalTournaments } from "@/lib/external-tournaments";
+import { enrichDiscovery } from "@/lib/discovery";
 import { listTournaments } from "@/lib/tournaments";
 
 /**
@@ -29,6 +30,10 @@ export async function loadTournamentEntries(): Promise<TournamentListEntry[]> {
     startsAt: t.startsAt ? t.startsAt.getTime() : null,
     bannerUrl: t.bannerUrl,
     featured: t.featured,
+    endsAt: t.endsAt?.getTime() ?? null,
+    description: t.description,
+    registrationClosesAt: t.registrationClosesAt?.getTime() ?? null,
+    academicVerificationRequired: t.academicVerificationRequired,
     game: t.gameName,
     gameLogoUrl: t.gameLogoUrl,
   }));
@@ -46,11 +51,23 @@ export async function loadTournamentEntries(): Promise<TournamentListEntry[]> {
     startsAt: (t.firstMatchAt ?? t.startAt)?.getTime() ?? null,
     bannerUrl: t.bannerUrl,
     featured: false,
+    endsAt: t.endAt?.getTime() ?? null,
+    sourceStartsAt: t.startAt?.getTime() ?? null,
+    description: t.description,
+    organizer: t.organizer,
+    organizerUrl: t.organizerUrl,
+    country: t.country,
+    city: t.city,
+    registrationClosesAt: t.registrationClosesAt?.getTime() ?? null,
+    prizePool: t.prizePool,
     source: t.source,
     externalUrl: t.url,
     game: t.game,
     gameLogoUrl: null,
   }));
 
-  return [...internalEntries, ...externalEntries];
+  const entries = await enrichDiscovery([...internalEntries, ...externalEntries]);
+  // Classification uses source prose on the server; cards do not need a copy
+  // of every full description in their serialized client payload.
+  return entries.map(({ description: _description, ...entry }) => entry);
 }

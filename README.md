@@ -130,3 +130,8 @@ a hosted service must also release its source. Exceptions:
   dataset (MIT).
 - Site content (text, logo) is © The Fault Foundation Inc. and is not
   implicitly licensed by this repository being public.
+
+Tournament discovery now includes collegiate/venue/league/series filters,
+featured discovery, organization and series profiles, follows, and reviewed
+corrections/claims. See the [architecture, data audit, and test checklist](docs/dashboard-guide.md#tournament-discovery).
+Apply migration `0023_pale_hex.sql` to website-sql before deploying this change.

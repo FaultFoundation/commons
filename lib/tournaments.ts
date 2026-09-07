@@ -125,6 +125,9 @@ export async function reserveTournamentId(): Promise<string | null> {
 // ---------------------------------------------------------------------------
 
 export type TournamentListItem = {
+  description: string | null;
+  registrationClosesAt: Date | null;
+  academicVerificationRequired: boolean;
   id: string;
   name: string;
   format: string;
@@ -340,6 +343,9 @@ export async function listTournaments(opts?: {
       createdAt: tournaments.createdAt,
       bannerUrl: tournaments.bannerUrl,
       featured: tournaments.featured,
+      description: tournaments.description,
+      registrationClosesAt: tournaments.registrationClosesAt,
+      academicVerificationRequired: tournaments.academicVerificationRequired,
       gameName: games.name,
       gameLogoUrl: games.logoUrl,
       entrantCount:

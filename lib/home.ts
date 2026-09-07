@@ -37,6 +37,7 @@ import {
 import { getExternalTeamsForUser } from "@/lib/player-data";
 import { loadSchedule } from "@/lib/schedule";
 import { listMyTeams } from "@/lib/teams";
+import { discoveryFollowIds } from "@/lib/discovery";
 import { loadTournamentEntries } from "@/lib/tournament-entries";
 import { asTournamentLayout } from "@/lib/tournaments-shared";
 
@@ -67,9 +68,10 @@ export async function loadHomeData({
   // the Worker's CPU budget is per request, not per read.
   await Promise.all([
     sources.has("tournaments")
-      ? loadTournamentEntries().then((entries) => {
+      ? Promise.all([loadTournamentEntries(),discoveryFollowIds(userId)]).then(([entries,follows]) => {
           data.tournaments = {
             entries,
+            follows,
             layout: asTournamentLayout(tournamentLayoutCookie),
           };
         })

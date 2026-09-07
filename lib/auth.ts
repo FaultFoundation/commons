@@ -327,7 +327,8 @@ export const getAuth = cache(function getAuth() {
       // a member's session. Keep subdomains under our control, or move this
       // back to host-only and drop the avatar from the marketing site.
       crossSubDomainCookies: {
-        enabled: true,
+        // Browsers reject a .fault.foundation cookie from localhost.
+        enabled: !isDev,
         domain: ".fault.foundation",
       },
     },

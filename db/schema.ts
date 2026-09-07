@@ -1243,3 +1243,51 @@ export const matchTimeReports = sqliteTable("match_time_reports", {
   submittedBy: text("submitted_by").references(() => user.id, { onDelete: "set null" }),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
 }, t => [uniqueIndex("match_time_reports_revision_unique").on(t.matchKey, t.revision)]);
+
+// Discovery overlays belong to Commons; provider projection refreshes cannot
+// erase approved corrections, organization identity links, claims, or follows.
+export const discoveryProfiles = sqliteTable("discovery_profiles", {
+  id: text("id").primaryKey(),
+  kind: text("kind", { enum: ["organization", "series"] }).notNull(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  website: text("website"),
+  ownerId: text("owner_id").references(() => user.id, { onDelete: "set null" }),
+  updatedAt: integer("updated_at").notNull(),
+});
+export const discoveryOverrides = sqliteTable("discovery_overrides", {
+  tournamentId: text("tournament_id").primaryKey(),
+  data: text("data").notNull(),
+  updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+  updatedAt: integer("updated_at").notNull(),
+});
+// Exact source identity -> organization. This is a grouping aid, never proof
+// of ownership; historical tournament overrides take precedence over this rule.
+export const discoveryIdentities = sqliteTable("discovery_identities", {
+  id: text("id").primaryKey(),
+  identity: text("identity").notNull(),
+  organizationId: text("organization_id").notNull(),
+  validFrom: integer("valid_from").notNull(),
+  validTo: integer("valid_to"),
+  updatedAt: integer("updated_at").notNull(),
+}, t => [index("discovery_identities_source_time_idx").on(t.identity, t.validFrom)]);
+export const discoverySubmissions = sqliteTable("discovery_submissions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  kind: text("kind", { enum: ["correction", "claim"] }).notNull(),
+  targetId: text("target_id").notNull(),
+  data: text("data").notNull(),
+  evidence: text("evidence").notNull(),
+  status: text("status", { enum: ["pending", "approved", "rejected", "reverted"] }).notNull().default("pending"),
+  reviewedBy: text("reviewed_by").references(() => user.id, { onDelete: "set null" }),
+  // Before image allows a staff member to restore an earlier classification.
+  previousData: text("previous_data"),
+  createdAt: integer("created_at").notNull(),
+  reviewedAt: integer("reviewed_at"),
+}, t => [index("discovery_submissions_status_idx").on(t.status, t.createdAt)]);
+export const discoveryFollows = sqliteTable("discovery_follows", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  targetId: text("target_id").notNull(),
+  createdAt: integer("created_at").notNull(),
+}, t => [uniqueIndex("discovery_follows_user_target_idx").on(t.userId, t.targetId)]);

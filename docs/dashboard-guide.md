@@ -686,14 +686,14 @@ lazy TTL). Portal conventions specific to this surface:
 - **Academic-verification toggle** is on the admin create form and the Game Info
   settings — it gates registration, nothing on Challonge.
 - **The list** (`/tournaments/`, `TournamentList`) is all client-side over the
-  one payload the server hands down: view tabs (All / Active / Concluded), a game
-  filter, a card/compact layout toggle (cookie-persisted), and **pagination** —
+  one payload the server hands down: view tabs (All / Active / Upcoming / Concluded), game and discovery
+  filters, a card/compact layout toggle (cookie-persisted), and **pagination** —
   page numbers plus a per-page dropdown (12 / 24 / 48 / All) at the bottom
   (`PaginationBar`). Paginating in memory keeps a big catalog off Worker CPU;
   the page resets on any view/filter/size change and clamps so a shrinking list
   never strands the viewer on an empty page. The featured hero sits above the
-  paged grid; Active card-view keeps older still-running events in a separate
-  "Past tournaments" toggle. Cards show the **date + start time** (`startsAt`
+  paged grid; Active card-view shows older still-running events in an expanded
+  "Ongoing tournaments" section. Cards show the **date + start time** (`startsAt`
   carries the full timestamp; midnight — i.e. date-only data — hides the time),
   and the list sorts by that full timestamp. External tournaments use the
   earliest scheduled match (`firstMatchAt` from the projection) as their start
@@ -841,10 +841,149 @@ in `components/auth/TwoFactorChallenge.tsx`.
 
 ## Verifying changes
 
-`npm run lint` && `npm run build`, then `npm run dev` (:3000) for the
+`npx tsc --noEmit` && `npm run build`, then `npm run dev` (:3000) for the
 fast loop or `npm run preview` (:3999) for the production-like Workers
 runtime. Discord flows need `DISCORD_CLIENT_ID/SECRET` in `.dev.vars`;
 verification codes print to the terminal without
 `SUPPORT_EMAIL_APP_PASSWORD`.
 Inspect local D1 with
 `wrangler d1 execute website-sql --local --command "SELECT …"`.
+
+## Tournament Discovery
+
+`/tournaments/` preserves the existing card/compact list, with filters for
+collegiate audience, online/in-person/hybrid venue, leagues or series, platform,
+region/country, date window, approaching registration deadlines, followed
+organizations/series, and text search. Games remains a separate multi-select.
+Filters combine with AND, reset pagination, and apply to featured selection and
+series visibility. Series progress always uses the full recorded series, so a
+registration filter cannot reset the progress bar. Game selections have their own
+Clear control; Clear filters resets the expanded panel. Filters are session-local
+component state; layout is cookie-persisted.
+
+`/tournaments/featured/` focuses on collegiate suggestions and staff picks.
+Ranking prefers editorial placement, collegiate relevance, leagues/series, and
+nearby known registration deadlines. It does not use entrant count or banner art
+as a proxy for importance. Raw counts remain visible. Date-only inferred provider
+statuses are not proof that registration is open; the new deadline filter only
+uses a known future closing timestamp.
+
+`lib/discovery-audience.ts` owns audience evidence, consumed by the shared rules.
+Its sourced competition registry recognizes whole-token NACE and NECC titles;
+CRL requires Rocket League game/title context. Acronyms in descriptions or
+organizer display names alone do not classify an event. Explicit collegiate
+competition titles, college/university eligibility statements and Commons'
+academic-verification requirement also supply evidence. University, varsity,
+student-only and sponsor/alumni mentions alone are insufficient. Explicit public
+eligibility can suggest Open; an Open Qualifier is not that evidence. Conflicting
+audiences, high-school titles, negations and missing evidence remain Unknown.
+Approved tournament corrections always win, including after ingestion refresh.
+The registry does not learn new aliases from corrections or establish ownership;
+new aliases need source review and positive/negative regression fixtures in
+`scripts/discovery.test.mjs`. Suggestions explain their evidence in badge titles.
+These are audience suggestions, not verified entry eligibility; Unknown does not
+mean non-collegiate, and Open does not cover all non-collegiate competitions.
+Locations alone do not prove an event is in-person: FACEIT
+also uses its location field for regions. Source descriptions are read for
+classification on the server, then omitted from the list's client payload.
+
+`lib/discovery.ts` builds provisional organizations from exact, provider-scoped
+organizer URLs, never a shared name/acronym. Series candidates retain organizer,
+game, season, year and division. Only explicit installment markers/trailing
+stages are removed. Missing organizer identity means a named league/season can
+have its own single-tournament series, but it is not merged with other events.
+These are revisable suggestions, not verified real-world organizational identity.
+
+Organization and series pages live at `/tournaments/discovery/<encoded-id>/`.
+Profiles show recorded tournaments, games, related series, and recorded completion
+counts. A progress bar measures concluded imported tournaments; it does not
+invent a total season length, standings, qualification path, or aggregate prize
+pool. A profile's history is available through All and Concluded. Following is a
+persisted per-account discovery preference, including the pinned Home widget;
+it does not send notifications. Following/approving an inferred profile stores
+its display identity so its URL remains available after source changes.
+
+Corrections and ownership evidence are submitted through
+`/api/tournaments/discovery/`. The Discovery Corrections & Claims bubble on
+`/admin/tournaments/` requires `manageTournaments` and the existing admin unlock.
+Staff can create organization/series profiles, assign or remove tournament
+memberships, edit labels/featured placement in a review, approve/reject claims,
+and undo approvals. Claims require manual ownership verification; source account
+attribution alone never proves ownership. A verified owner can edit only their
+profile name, description and HTTPS website. A member cannot self-feature, grant
+ownership, or publish a correction directly. At most 20 submissions per account
+can remain pending; the queue puts pending records before recent history.
+
+An optional approved organizer rule applies an exact source identity to future
+starts. Rules have time bounds, so account turnover does not reattribute older
+events. Corrections override inferred facts and survive collector refreshes.
+Approval/undo uses a single D1 batch, unique transaction reservation, and stored
+before-images. Undo must proceed newest-first for a tournament or identity rule.
+Missing discovery tables degrade read-only browsing; writes report unavailable
+storage. Apply `drizzle/0023_pale_hex.sql` to **website-sql** before deployment.
+
+### Data audit (September 6, 2026)
+
+The source code confirms support for start.gg/FACEIT through `cen-sql`, Discord
+extractions through that projection plus `discord_entities`, and Challonge through
+Commons' `tournaments`. Descriptions, organizer name/link, start/end times,
+registration deadline, prize display text and update time exist in the external
+schema. Discord supplements additionally retain extracted season/division,
+format, team-size and facts in JSON. These are not uniformly populated, and
+Commons does not retain a complete source-account membership history or a
+structured online/in-person flag. Structured series relations did not exist
+before this change.
+
+The newer local projection, before QA fixtures, contained 13 start.gg and 10
+FACEIT tournaments. Three start.gg rows had descriptions; one had an organizer
+URL and one a registration deadline. FACEIT had none of those three fields filled
+in this local sample. There were no internal Challonge tournaments or Discord
+projection tournaments in the sample. These numbers describe a local snapshot,
+not production completeness. The production aggregate query was rejected by
+Cloudflare with account authorization error 7403, so live coverage remains
+unconfirmed.
+
+Retention is also not an immutable archive: provider refreshes replace child
+events/matches/standings with their latest snapshot; successful complete Challonge
+reconciliation removes tournaments deleted at the provider. Discord cleanup can
+remove its projected tournament when an extraction is replaced. Do not promise
+all historical revisions or complete season schedules from the current data.
+
+### Manual test checklist
+
+1. Combine game + Collegiate + Online + Series; verify every visible result and
+   featured item matches. Try conflicting filters and clear them.
+2. Check In-person, Hybrid, and Not specified separately. Region/country must not
+   turn an unknown venue into an in-person label.
+3. Switch All, Active, Upcoming and Concluded in card and compact layouts. An
+   ongoing multi-week event remains visible after its original start date.
+4. Apply a date/deadline filter. Missing deadlines must not qualify as closing
+   soon. Series progress must remain based on its full recorded membership.
+5. Verify staff picks outrank automated suggestions, and small playoff brackets
+   are not demoted solely for low entrant count. Verify a reviewed unfeature
+   overrides an internal tournament's previous featured flag.
+6. Open organization and series links, including encoded source identifiers.
+   Confirm season/division boundaries, recorded progress, and concluded history.
+7. Follow/unfollow a series and an organization. Reload, use Following on both
+   Tournaments and the pinned Home widget, and check another account is unaffected.
+8. Submit a correction with evidence. Confirm it remains unpublished until staff
+   review, then approve/reject it from Admin → Tournaments. Refresh source data
+   and verify an approved correction persists.
+9. Create a missing organization or series from the review bubble, assign it,
+   remove a wrong assignment, and use Undo. Test two consecutive corrections:
+   an older approval cannot undo a newer one, but newest-first undo restores both.
+10. Apply an organizer rule to future events. Check an older event keeps its
+    historical attribution and a future event uses the new organization; undo it.
+11. Submit competing claims. Verify only one approval grants profile editing,
+    another member cannot edit it, and undo revokes access without deleting its
+    description. Verify signed-out and nonstaff requests cannot approve claims.
+12. Check a narrow screen and keyboard navigation through the filter panel,
+    correction forms and profile controls; verify horizontal rails/tables scroll
+    within their container and empty results remain readable.
+
+Automated checks: `node --test scripts/discovery.test.mjs`,
+`node --test scripts/server-efficiency.test.mjs scripts/statistics-formats.test.mjs`,
+`npx tsc --noEmit`, and `npm run build`. Discovery tests exercise the production
+classification functions and API/review code against Drizzle and in-memory SQLite,
+including concurrent stale claims, approval rollback, temporal attribution,
+revision-order undo, authorization and per-account follow isolation.

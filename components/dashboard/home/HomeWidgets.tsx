@@ -54,6 +54,7 @@ import {
 export type HomeData = {
   tournaments?: {
     entries: TournamentListEntry[];
+    follows?: string[];
     layout: TournamentLayout;
   };
   schedule?: {
@@ -87,6 +88,7 @@ export function HomeWidget({
       return (
         <TournamentsPanel
           tournaments={data.tournaments?.entries ?? []}
+          follows={data.tournaments?.follows ?? []}
           initialLayout={data.tournaments?.layout ?? TOURNAMENT_LAYOUT_DEFAULT}
           chrome={chrome}
         />

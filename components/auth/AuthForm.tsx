@@ -127,7 +127,7 @@ export function AuthForm({ mode, discordEnabled, next }: Props) {
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate={mode === "login"}>
+    <form method="post" onSubmit={onSubmit} noValidate={mode === "login"}>
       {error ? (
         <div className="ff-auth__error" role="alert">
           <p>{error}</p>

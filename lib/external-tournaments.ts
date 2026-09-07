@@ -39,6 +39,13 @@ export type ExternalTournamentListItem = {
   /** 'startgg' | 'faceit' — the native site this was scraped from. */
   source: string;
   name: string;
+  description: string | null;
+  organizer: string | null;
+  organizerUrl: string | null;
+  city: string | null;
+  country: string | null;
+  registrationClosesAt: Date | null;
+  prizePool: string | null;
   game: string | null;
   /** Derived from start/end vs now: registration | active | completed. */
   status: string;
@@ -130,6 +137,13 @@ export const listExternalTournaments = cache(async function listExternalTourname
         id: extTournaments.id,
         source: extTournaments.source,
         name: extTournaments.name,
+        description: extTournaments.description,
+        organizer: extTournaments.organizer,
+        organizerUrl: extTournaments.organizerUrl,
+        city: extTournaments.city,
+        country: extTournaments.country,
+        registrationClosesAt: extTournaments.registrationClosesAt,
+        prizePool: extTournaments.prizePool,
         game: extTournaments.game,
         startAt: extTournaments.startAt,
         endAt: extTournaments.endAt,

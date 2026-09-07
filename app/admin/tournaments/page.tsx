@@ -1,3 +1,4 @@
+import { DiscoveryInbox } from "@/components/dashboard/admin/tournaments/DiscoveryInbox";
 import { DashboardDataRefresh } from "@/components/dashboard/DashboardDataRefresh";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -50,6 +51,7 @@ async function TournamentsContent() {
   return (
     <div className="ff-bubble-grid">
       <DashboardDataRefresh tournaments />
+      <Bubble title="Discovery Corrections & Claims" span="full"><DiscoveryInbox /></Bubble>
       <Bubble title="Discord tournament inbox" span="full"><DiscordInbox /></Bubble>
       {!configured ? (
         <Bubble title="Challonge not configured" variant="danger" span="full">

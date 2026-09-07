@@ -1,6 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { DiscoveryRail } from "./DiscoveryRail";
+import { DiscoveryFilters } from "./DiscoveryFilters";
+import { EMPTY_FILTERS, matchesDiscovery, discoveryScore } from "@/lib/discovery-shared";
+import { DiscoveryCardContext } from "./DiscoveryActions";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { GameLogo } from "@/components/brand/GameLogo";
@@ -16,6 +20,17 @@ import {
 } from "@/lib/tournaments-shared";
 
 export type TournamentListEntry = {
+  academicVerificationRequired?: boolean;
+  description?: string | null;
+  organizer?: string | null;
+  organizerUrl?: string | null;
+  endsAt?: number | null;
+  sourceStartsAt?: number | null;
+  country?: string | null;
+  city?: string | null;
+  registrationClosesAt?: number | null;
+  prizePool?: string | null;
+  discovery?: import("@/lib/discovery-shared").DiscoveryMetadata;
   id: string;
   name: string;
   format: string;
@@ -41,6 +56,7 @@ export type TournamentListEntry = {
 const VIEWS = [
   { key: "all", label: "All" },
   { key: "active", label: "Active" },
+  { key: "upcoming", label: "Upcoming" },
   { key: "concluded", label: "Concluded" },
 ] as const;
 
@@ -119,13 +135,20 @@ function byTimeline(today: number) {
 export function TournamentList({
   tournaments,
   initialLayout,
+  follows = [],
+  showSeries = true,
+  seriesTournaments = tournaments,
 }: {
   tournaments: TournamentListEntry[];
   initialLayout: TournamentLayout;
+  follows?: string[];
+  showSeries?: boolean;
+  seriesTournaments?: TournamentListEntry[];
 }) {
+  const [filters, setFilters] = useState({...EMPTY_FILTERS});
   const [view, setView] = useState<ViewKey>("active");
   const [layout, setLayout] = useState<TournamentLayout>(initialLayout);
-  const [showPast, setShowPast] = useState(false);
+  const [showPast, setShowPast] = useState(true);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [page, setPage] = useState(1);
   // Which games to show; empty = no filter (every game shows). Kept as
@@ -160,9 +183,8 @@ export function TournamentList({
   }
 
   const visibleTournaments = useMemo(() => {
-    if (selectedGames.size === 0) return tournaments;
-    return tournaments.filter((t) => t.game != null && selectedGames.has(t.game));
-  }, [tournaments, selectedGames]);
+    return tournaments.filter(t => (selectedGames.size === 0 || (t.game != null && selectedGames.has(t.game))) && matchesDiscovery(t, filters, follows, Date.now()) && (view !== "upcoming" || (!isConcluded(t.status) && t.startsAt != null && t.startsAt > Date.now())));
+  }, [tournaments, selectedGames, filters, follows, view]);
 
   const { featured, upcoming, past, concluded, all } = useMemo(() => {
     const today = startOfTodayMs();
@@ -174,7 +196,7 @@ export function TournamentList({
     // The hero: the admin-featured one, else the soonest upcoming, else the most
     // recent active tournament (so the slot is never empty when anything active
     // exists).
-    const flagged = active.find((t) => t.featured);
+    const flagged = [...active].sort((a,b) => discoveryScore(b, today) - discoveryScore(a,today) || byStartAsc(a,b))[0];
     const soonest = active
       .filter((t) => t.startsAt != null && t.startsAt >= today)
       .sort(byStartAsc)[0];
@@ -221,7 +243,7 @@ export function TournamentList({
   // Back to page 1 whenever the view, layout, filters, or page size change.
   useEffect(() => {
     setPage(1);
-  }, [view, layout, selectedGames, pageSize]);
+  }, [view, layout, selectedGames, filters, pageSize]);
 
   const showFeatured = view !== "concluded";
   const isEmpty =
@@ -284,19 +306,22 @@ export function TournamentList({
         </div>
       </div>
 
+      <DiscoveryFilters value={filters} onChange={setFilters} countries={[...new Set(tournaments.map(t=>t.country).filter((c): c is string=>Boolean(c)))].sort()} />
+      <p className="ff-row__note" aria-live="polite">{view === "concluded" ? concluded.length : view === "all" ? all.length + (featured ? 1 : 0) : upcoming.length + past.length + (featured ? 1 : 0)} matching tournaments</p>
+      {showSeries && view !== "concluded" && <DiscoveryRail tournaments={visibleTournaments} allTournaments={seriesTournaments}/>}
       {isEmpty ? (
-        <p className="ff-ticket-empty">{emptyMessage}</p>
+        <p className="ff-ticket-empty">{Object.values(filters).some(Boolean) || selectedGames.size ? "No tournaments match these filters. Try clearing a filter or choosing All." : emptyMessage}</p>
       ) : (
         <>
           {showFeatured && featured ? (
-            <FeaturedHero tournament={featured} />
+            <div><FeaturedHero tournament={featured} /><DiscoveryCardContext tournament={featured} /></div>
           ) : null}
 
           {pageItems.length > 0 ? (
             layout === "modern" ? (
               <div className="ff-tcard-grid">
                 {pageItems.map((t) => (
-                  <TournamentCard key={t.id} tournament={t} />
+                  <div key={t.id}><TournamentCard tournament={t} /><DiscoveryCardContext tournament={t} /></div>
                 ))}
               </div>
             ) : (
@@ -315,12 +340,12 @@ export function TournamentList({
                 onClick={() => setShowPast((v) => !v)}
               >
                 <Chevron open={showPast} />
-                Past tournaments ({past.length})
+                Ongoing tournaments ({past.length})
               </button>
               {showPast ? (
                 <div className="ff-tcard-grid">
                   {past.map((t) => (
-                    <TournamentCard key={t.id} tournament={t} />
+                    <div key={t.id}><TournamentCard tournament={t} /><DiscoveryCardContext tournament={t} /></div>
                   ))}
                 </div>
               ) : null}
@@ -610,6 +635,7 @@ function CompactTable({
                       {t.name}
                     </Link>
                   </span>
+                  <DiscoveryCardContext tournament={t}/>
                 </td>
                 <td>
                   {external
@@ -682,7 +708,7 @@ function GameFilter({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        Filter
+        Games
         {selected.size > 0 ? (
           <span className="ff-filter__count">{selected.size}</span>
         ) : null}

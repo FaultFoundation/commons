@@ -14,6 +14,13 @@
 -- db/schema.ts must appear here — a missing one survives the reset and then
 -- collides with the baseline's CREATE TABLE.
 
+-- Tournament discovery overlays (application-owned, not collector projection)
+DROP TABLE IF EXISTS discovery_follows;
+DROP TABLE IF EXISTS discovery_submissions;
+DROP TABLE IF EXISTS discovery_identities;
+DROP TABLE IF EXISTS discovery_overrides;
+DROP TABLE IF EXISTS discovery_profiles;
+
 -- Layer 10 — support tickets + the bot outbox
 DROP TABLE IF EXISTS bot_outbox;
 DROP TABLE IF EXISTS support_ticket_notes;

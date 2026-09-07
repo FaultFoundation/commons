@@ -1101,3 +1101,26 @@ for `.dev.vars`, `.env`, and `service_account.json`). Keeping that true:
   is GPL-2.0+ WordPress output, the Manrope fonts are OFL, the schools dataset
   is MIT, and site content isn't implicitly licensed. Keep that list accurate as
   vendored files are added.
+
+## Tournament discovery overlays
+
+Discovery rules and filters are in `lib/discovery-shared.ts`; server enrichment
+is in `lib/discovery.ts`. The `discovery_*` tables live in website-sql, never in
+the collector-owned projection. `lib/discovery-review.ts` performs atomic D1
+approval/undo with unique transient reservation statuses and before-images.
+`/api/tournaments/discovery/` checks origin/session and uses the existing staff
+capability + unlock gate for reviews; claims only grant profile editing. Source
+identity grouping is not ownership proof. Future identity rules are time-bounded,
+and explicit tournament corrections take precedence over inference. Do not infer
+an official season length, qualification path, or prize sum from partial imports.
+
+Run `node --test scripts/discovery.test.mjs` for classification, API authorization,
+concurrent review and rollback tests. The data audit and manual checklist are in
+`docs/dashboard-guide.md#tournament-discovery`. Migration `0023_pale_hex.sql` must
+be applied to website-sql before deploying. Production projection coverage was
+not verified in this change (Cloudflare account query authorization failed).
+
+Development auth uses host-only cookies (`crossSubDomainCookies.enabled = !isDev`)
+because browsers reject `.fault.foundation` cookies on localhost. Auth forms use
+POST even before hydration so a premature native submission does not place
+credentials in a query string.

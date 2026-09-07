@@ -803,3 +803,43 @@ Support Ticket   number, status, priority, assignee, discord_channel_id
 Schema source of truth: [`db/schema.ts`](schema.ts). Migrations:
 [`drizzle/`](../drizzle). Full rebuild: [`db/reset/drop-all.sql`](reset/drop-all.sql)
 + [`db/seed/bootstrap.sql`](seed/bootstrap.sql).
+
+## Tournament discovery overlays
+
+Migration `0023_pale_hex.sql` adds five **website-sql** tables. Provider projection
+records remain read-only to Commons; these relationships are joined by stable
+string IDs in application code.
+
+| Feature | Table | Relationship / retained state |
+| --- | --- | --- |
+| Organization and series profiles | `discovery_profiles` | `id` PK; `kind`, name, description, website; optional `owner_id → user.id` is a reviewed claim, never inferred ownership |
+| Reviewed tournament labels and memberships | `discovery_overrides` | `tournament_id` PK → either provider ID or internal tournament ID by application lookup; JSON audience/venue/competition/organization/series/featured facts, reviewer FK, monotonic revision time |
+| Source-account turnover | `discovery_identities` | `id` PK is approval submission ID; exact source identity indexed with `valid_from`; organization ID, exclusive `valid_to`; future rules cannot rewrite prior starts |
+| Corrections, claims and reversible review | `discovery_submissions` | Submitter/reviewer FKs; target ID, evidence, proposed/reviewed JSON, pending/approved/rejected/reverted status; `previous_data` records previous override data, reviewer and timestamp for ordered undo |
+| Followed organizations/series | `discovery_follows` | User FK plus target ID; unique `(user_id, target_id)` prevents duplicate follows |
+
+```mermaid
+erDiagram
+  user ||--o{ discovery_follows : follows
+  user ||--o{ discovery_submissions : submits
+  user o|--o{ discovery_profiles : verified_owner
+  user o|--o{ discovery_overrides : reviews
+  discovery_profiles ||..o{ discovery_follows : target
+  discovery_profiles ||..o{ discovery_identities : organization
+  discovery_profiles ||..o{ discovery_overrides : organization_or_series
+  discovery_submissions ||..o| discovery_identities : learns
+```
+
+Dotted relationships are application-level references, not database foreign keys:
+profile IDs can initially be computed from source records. A follow or approved
+assignment materializes the profile for URL stability. JSON override references
+must name a catalog profile of the correct kind. User deletion cascades personal
+follows/submissions and clears profile ownership/reviewer references; it does not
+remove the provider's tournament.
+
+Review transitions and their before-images use one atomic D1 batch. Unique
+transient reservation statuses are visible only inside that transaction;
+failures roll back all effects. Undo restores the previous revision timestamp as
+well as data, allowing multiple approvals to be unwound newest-first. Core reset
+inventory includes all five tables. See the [discovery guide and checklist](../docs/dashboard-guide.md#tournament-discovery)
+for classification boundaries and the source-data audit.

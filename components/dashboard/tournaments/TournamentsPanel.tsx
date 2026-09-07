@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import {
   mergeChrome,
@@ -19,16 +20,20 @@ export function TournamentsPanel({
   tournaments,
   initialLayout,
   chrome,
+  follows = [],
 }: {
   tournaments: TournamentListEntry[];
   initialLayout: TournamentLayout;
   chrome?: PanelChrome;
+  follows?: string[];
 }) {
   return (
     <Bubble title="Tournaments" {...mergeChrome(chrome, { span: "full" })}>
+      <p><Link href="/tournaments/featured/">Featured discovery →</Link></p>
       <TournamentList
         tournaments={tournaments}
         initialLayout={initialLayout}
+        follows={follows}
       />
     </Bubble>
   );

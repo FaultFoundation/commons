@@ -956,8 +956,19 @@ select.ff-auth__input option {
    to hide, only an avatar to withhold until a session is confirmed. Whether
    .ff-auth-when-in (MainNav.tsx's <li>) shows at all is decided pre-paint by
    the data-auth attribute (inline script in app/layout.tsx + lib/auth-hint.ts),
-   so there's no empty-slot flash on page load. */
+   so there's no empty-slot flash on page load.
+
+   .ff-auth-when-out is the mirror, used by the landing hero (app/page.tsx) for
+   the Log in / Create account pair. Because the header withholds its control,
+   that pair is the site's ONLY sign-in affordance — so the two selectors are
+   deliberately asymmetric: when-in hides unless data-auth is exactly "in",
+   when-out hides only when it IS "in". A missing attribute (inline script
+   blocked, storage unavailable) therefore falls back to showing the way in,
+   never to a hero with no button at all. */
 html:not([data-auth="in"]) .ff-auth-when-in {
+  display: none;
+}
+html[data-auth="in"] .ff-auth-when-out {
   display: none;
 }
 

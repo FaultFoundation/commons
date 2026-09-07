@@ -234,8 +234,9 @@ export const extStandings = sqliteTable(
 );
 
 
-// Discord ingestion is migrated by cen-news-notifications/migrations/0015.
-// These declarations mirror its reader-facing state; Commons does not write it.
+// Discord ingestion is migrated by cen-news-notifications/migrations/0015; the
+// series/held columns by its 0017. These declarations mirror its reader-facing
+// state; Commons does not write it.
 export const discordEntities = sqliteTable("discord_entities", {
   id: text("id").primaryKey(),
   identityKey: text("identity_key").notNull(),
@@ -245,6 +246,11 @@ export const discordEntities = sqliteTable("discord_entities", {
   fieldTimesJson: text("field_times_json").notNull(),
   lockedAt: integer("locked_at"),
   lastMessageId: text("last_message_id").notNull(),
+  // 0017: organizer|year series spine, the program-vs-competition flag, and the
+  // first-published timestamp (null while held below the publish bar).
+  seriesKey: text("series_key"),
+  isLeague: integer("is_league", { mode: "boolean" }).notNull().default(false),
+  publishedAt: integer("published_at"),
   updatedAt: integer("updated_at").notNull(),
 });
 export const discordMessages = sqliteTable("discord_messages", {

@@ -15,7 +15,7 @@ async function proxy(request: Request) {
   let body: string | undefined;
   if (request.method === "POST") {
     const input = await request.json().catch(() => null) as {id?:unknown;action?:unknown;targetId?:unknown}|null;
-    if (!input || typeof input.id !== "string" || (input.action !== "retry" && input.action !== "ignore")) return Response.json({error:"Invalid action"},{status:400});
+    if (!input || typeof input.id !== "string" || (input.action !== "retry" && input.action !== "ignore" && input.action !== "reparse")) return Response.json({error:"Invalid action"},{status:400});
     body = JSON.stringify({id:input.id,action:input.action,targetId:typeof input.targetId === "string" ? input.targetId : null,actor:gate.userId});
   }
   try {

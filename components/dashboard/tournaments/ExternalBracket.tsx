@@ -7,6 +7,7 @@ import type {
   ExternalTournamentDetail,
   ExternalTournamentMatch,
 } from "@/lib/external-tournaments";
+import { usePersistentState } from "@/lib/view-state";
 
 // The branded bracket for an external (start.gg / FACEIT) tournament. It reuses
 // the internal BracketView's column + connector styling (the ff-bracket__*
@@ -404,11 +405,15 @@ function groupByPhase(matches: ExternalTournamentMatch[]): {
 export function ExternalBracket({
   events,
   source,
+  storageKey,
 }: {
   events: ExternalTournamentDetail["events"];
   /** Raw provider ("startgg" | "faceit"). Gates the geometric connector
       fallback to start.gg, whose events are always bracket trees. */
   source: string;
+  /** What the remembered phase/pool tab is filed under — the tournament +
+      stage. Omit it and the tab simply doesn't persist. */
+  storageKey?: string;
 }) {
   const allMatches = useMemo(
     () => events.flatMap((event) => event.matches),
@@ -450,7 +455,17 @@ export function ExternalBracket({
       });
     });
   }, [allMatches]);
-  const [activeTab, setActiveTab] = useState(0);
+  // Remembered by sub-bracket KEY, not index (lib/view-state.ts): a re-scrape
+  // can add or reorder pools, and a stored index would then select a different
+  // bracket than the member left open.
+  const [activeTab, setActiveTab] = usePersistentState<string | null>(
+    storageKey ? `bracket-tab:${storageKey}` : null,
+    null,
+    (stored) =>
+      typeof stored === "string" && subBrackets.some((s) => s.key === stored)
+        ? stored
+        : undefined,
+  );
 
   if (allMatches.length === 0) {
     return <p className="ff-ticket-empty">No bracket data collected yet.</p>;
@@ -479,7 +494,8 @@ export function ExternalBracket({
   // Several independent sub-brackets (phases and/or pools) → browser-style tabs,
   // one visible at a time, rather than stacked (which mashed their columns and
   // crossed connectors between unrelated brackets).
-  const activeIndex = Math.min(activeTab, subBrackets.length - 1);
+  const storedIndex = subBrackets.findIndex((sub) => sub.key === activeTab);
+  const activeIndex = storedIndex >= 0 ? storedIndex : 0;
   return (
     <div className="ff-bracket">
       <div className="ff-bracket__tabs" role="tablist" aria-label="Brackets">
@@ -491,7 +507,7 @@ export function ExternalBracket({
             id={`bracket-tab-${index}`}
             aria-selected={index === activeIndex}
             className={`ff-bracket__tab${index === activeIndex ? " ff-bracket__tab--active" : ""}`}
-            onClick={() => setActiveTab(index)}
+            onClick={() => setActiveTab(sub.key)}
           >
             {sub.label}
           </button>

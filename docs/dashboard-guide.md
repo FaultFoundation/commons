@@ -131,6 +131,78 @@ the names, labels, and `asDensity()` normalizer, shared by both sides.
 - Deliberately not on `<html>`: the root layout is shared with the public
   marketing pages, and reading `cookies()` there would make them all dynamic.
 
+## Remembered view state
+
+Which tab, view, filter set or page a member last had open is restored when they
+come back. One mechanism for all of it: `usePersistentState(key, fallback,
+revive)` in `lib/view-state.ts` — a client-only hook (`"use client"`) that stores
+JSON under an `ff-view:` prefix in `localStorage`, capped at 60 keys (oldest
+evicted first) and wrapped so a blocked store simply means "no memory".
+
+### Cookie or localStorage?
+
+| The server renders from it | The browser applies it |
+| --- | --- |
+| Cookie (`ff-density`, `ff-tournaments-layout`) | `usePersistentState` |
+| Changes the markup on first paint | Only changes which already-sent data is shown |
+
+That is the whole rule. The tournament card/table layout stays a cookie because
+the server has to know it before first paint. The list's view, filters, games,
+page and page size — and every tab below — are applied client-side over data the
+server already sent, so putting them in a cookie would tax *every* request to the
+Worker (assets, poll routes, auth) forever, for state it never reads. The
+per-tournament tab keys are unbounded on top of that.
+
+The cost is one frame: the first client render has to reproduce the server's
+HTML, so a stored value lands in an effect right after hydration. Pass the same
+`fallback` the server rendered with, and never persist anything the page's
+*content* depends on — only which slice of it is shown.
+
+### Using it
+
+```tsx
+const [tab, setTab] = usePersistentState<TabId>(
+  id ? `tournament-tab:${id}` : null,   // null key = don't persist
+  "overview",                            // what the server rendered
+  (stored) =>                            // undefined = keep the fallback
+    typeof stored === "string" && tabs.some((t) => t.id === stored)
+      ? (stored as TabId)
+      : undefined,
+);
+```
+
+- **`revive` is not optional thinking.** Stored state can be stale (a shape from
+  a previous release) or hand-edited. Check it against what this surface
+  actually offers now; `undefined` keeps the fallback. Discovery filters go
+  through `asDiscoveryFilters` in `lib/discovery-shared.ts`.
+- **Persist an identity, never an index.** `StageTabs`, `ExternalBracket` and
+  `TournamentChrome` store a tab's key/id: a re-scrape can add, drop or reorder
+  stages and pools, and a stored index would then select a *different* bracket
+  than the member left open.
+- **An explicit URL wins.** `?tab=` (tournament view) and `?tab=`/`?team=`
+  (`/statistics`) are applied in an effect declared *after* the hook, so the link
+  overrides the memory — and becomes the new memory.
+- **Gate expensive work on the third element.** `usePersistentState` also
+  returns whether the restore has happened. The fallback's first frame is a real
+  render, so anything costly the restored value decides — a fetch, a poll —
+  should wait for it. `StatisticsView` does exactly this: its fallback tab is
+  Player Data, and firing the multi-second OverFast read there would waste a
+  round trip for every member whose remembered tab is Match Data.
+- **Group related state.** `TournamentList` persists one `ListState` object
+  rather than six values, so restoring is a single atomic change and "a filter
+  changed → back to page 1" can live in the setters (`refine` resets the page,
+  `patch` doesn't) instead of an effect that would race the restore.
+
+### Where each key lives
+
+| Key | Surface |
+| --- | --- |
+| `tournaments:list` | The tournaments list head bar: view, filters, games, page, page size, the ongoing-tournaments disclosure. Shared with the pinned Home tile — it's the same panel. |
+| `tournament-tab:<id>` | Overview / Bracket / Standings / Rules on a tournament. |
+| `tournament-stage:<id>` | The Bracket tab's stage/pool strip (`StageTabs`). |
+| `bracket-tab:<id>:<stage>` | `ExternalBracket`'s phase/pool sub-bracket tabs. |
+| `statistics:tab` | Player Data / Match Data / Team Data. |
+
 ## Button and control standard
 
 Appearance communicates **semantics**, not visual variety. Use these existing

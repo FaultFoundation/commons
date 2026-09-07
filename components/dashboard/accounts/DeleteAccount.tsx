@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ConfirmDialog } from "@/components/dashboard/bubbles/ConfirmDialog";
 import { authClient } from "@/lib/auth-client";
 import { setAuthHint } from "@/lib/auth-hint";
+import { clearViewState } from "@/lib/view-state";
 
 export function DeleteAccount({
   hasPassword,
@@ -33,6 +34,7 @@ export function DeleteAccount({
       return;
     }
     setAuthHint(false);
+    clearViewState();
     window.location.assign("/");
   }
 

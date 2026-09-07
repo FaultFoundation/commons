@@ -1,12 +1,8 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
+
+import { usePersistentState } from "@/lib/view-state";
 
 import {
   isTournamentTabId,
@@ -19,6 +15,12 @@ import {
 // panel shown at a time. Only the active panel is mounted, so a heavy client
 // panel (the polling BracketView, the measured ExternalBracket) does no work
 // while it's hidden.
+//
+// The open tab is remembered per tournament (lib/view-state.ts), so leaving a
+// bracket for the list and coming back lands on the bracket again rather than
+// resetting to Overview. A `?tab=` deep link still wins — it's an explicit
+// instruction from the link the member followed — and becomes the remembered
+// tab from then on.
 //
 // A tiny context lets controls DEEP inside a panel switch tabs — "Full
 // standings →" in the overview, a bracket-tab jump — without threading a
@@ -47,16 +49,31 @@ export function TournamentChrome({
   header,
   tabs,
   initialTab = "overview",
+  storageKey,
 }: {
   header: ReactNode;
   /** In display order; empty tabs should simply be omitted by the caller. */
   tabs: TournamentTab[];
   initialTab?: TournamentTabId;
+  /** What the remembered tab is filed under — the tournament id. Omit it and
+      the tab simply doesn't persist. */
+  storageKey?: string;
 }) {
-  const [active, setActive] = useState<TournamentTabId>(initialTab);
+  const [active, setActive] = usePersistentState<TournamentTabId>(
+    storageKey ? `tournament-tab:${storageKey}` : null,
+    initialTab,
+    (stored) =>
+      typeof stored === "string" &&
+      isTournamentTabId(stored) &&
+      tabs.some((t) => t.id === stored)
+        ? stored
+        : undefined,
+  );
 
   // Honour a ?tab= deep link on first mount (e.g. a shared bracket link), but
-  // only for a tab that actually exists here — no server plumbing needed.
+  // only for a tab that actually exists here — no server plumbing needed. This
+  // effect is declared after the hook above, so it runs after the restore and
+  // the link wins.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const requested = new URLSearchParams(window.location.search).get("tab");

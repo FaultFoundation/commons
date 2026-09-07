@@ -423,7 +423,11 @@ export default async function TournamentPage({
     <>
       <h1 className="screen-reader-text">{tournament.name}</h1>
       <div className="ff-tview">
-        <TournamentChrome header={header} tabs={tabs} />
+        <TournamentChrome
+          header={header}
+          tabs={tabs}
+          storageKey={tournament.id}
+        />
       </div>
     </>
   );

@@ -150,6 +150,31 @@ export const EMPTY_FILTERS: DiscoveryFilters = {
   days: "",
   following: false,
 };
+/**
+ * Revive a persisted (or otherwise untrusted) filter blob into a known-good set.
+ * Unknown keys are dropped and a wrong-typed or oversized field falls back to
+ * its empty value, so a stale shape in a member's browser can never smuggle
+ * anything unexpected into `matchesDiscovery`.
+ */
+export function asDiscoveryFilters(raw: unknown): DiscoveryFilters {
+  if (!raw || typeof raw !== "object") return { ...EMPTY_FILTERS };
+  const v = raw as Record<string, unknown>;
+  const str = (key: keyof DiscoveryFilters): string => {
+    const value = v[key];
+    return typeof value === "string" && value.length <= 200 ? value : "";
+  };
+  return {
+    query: str("query"),
+    audience: str("audience"),
+    venue: str("venue"),
+    competition: str("competition"),
+    source: str("source"),
+    country: str("country"),
+    registration: str("registration"),
+    days: str("days"),
+    following: v.following === true,
+  };
+}
 export function matchesDiscovery(
   t: DiscoverySource & {
     discovery?: DiscoveryMetadata;

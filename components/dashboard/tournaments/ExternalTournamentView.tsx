@@ -828,13 +828,22 @@ export function ExternalTournamentView({
         label: bracketStageCount === 1 ? "Finals" : stageName ?? formatLabel,
         node: (
           <Bubble title={title} className="ff-bubble--divided">
-            <ExternalBracket events={stage.events} source={tournament.source} />
+            <ExternalBracket
+              events={stage.events}
+              source={tournament.source}
+              storageKey={`${tournament.id}:${stage.id}`}
+            />
           </Bubble>
         ),
       });
     }
   }
-  const bracket = <StageTabs tabs={[...finalsTabs, ...otherTabs]} />;
+  const bracket = (
+    <StageTabs
+      tabs={[...finalsTabs, ...otherTabs]}
+      storageKey={tournament.id}
+    />
+  );
 
   const standings = (
     <Bubble
@@ -920,7 +929,11 @@ export function ExternalTournamentView({
 
   return (
     <div className="ff-tview">
-      <TournamentChrome header={header} tabs={tabs} />
+      <TournamentChrome
+        header={header}
+        tabs={tabs}
+        storageKey={tournament.id}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
 import { setAuthHint } from "@/lib/auth-hint";
+import { clearViewState } from "@/lib/view-state";
 
 export function SignOutButton() {
   const [pending, setPending] = useState(false);
@@ -31,6 +32,7 @@ export function SignOutButton() {
     // Full navigation; clearing the hint makes the destination paint the
     // Sign In pill immediately.
     setAuthHint(false);
+    clearViewState();
     window.location.assign("/login/");
   }
 

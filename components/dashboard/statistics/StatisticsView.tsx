@@ -2,7 +2,9 @@
 import { TeamStatisticsPanel } from "@/components/dashboard/statistics/TeamStatisticsPanel";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+
+import { usePersistentState } from "@/lib/view-state";
 
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { MatchPanel } from "@/components/dashboard/statistics/MatchPanel";
@@ -26,21 +28,50 @@ import {
 
 type Tab = "player" | "match" | "team";
 
+const TABS: readonly Tab[] = ["player", "match", "team"];
+
 export function StatisticsView({
-  initialTab = "player",
+  initialTab,
   initialTeam = "",
   linked,
   enabled,
   battletag,
 }: {
+  /** Only set when the URL asked for a tab (?tab= / ?team=); an explicit link
+      wins over the remembered one. */
   initialTab?: Tab;
   initialTeam?: string;
   linked: boolean;
   enabled: boolean;
   battletag: string | null;
 }) {
-  const [tab, setTab] = useState<Tab>(initialTab);
-  const { resp, loading, failed } = usePlayerStats(linked && tab === "player");
+  // The open tab is remembered across visits (lib/view-state.ts) so hopping out
+  // to a team page and back doesn't drop the member on Player Data again.
+  const [tab, setTab, restored] = usePersistentState<Tab>(
+    "statistics:tab",
+    initialTab ?? "player",
+    (stored) =>
+      typeof stored === "string" && TABS.includes(stored as Tab)
+        ? (stored as Tab)
+        : undefined,
+  );
+
+  // Declared after the hook, so a ?tab=/?team= link runs after the restore and
+  // wins — and becomes the remembered tab from then on.
+  useEffect(() => {
+    if (initialTab) setTab(initialTab);
+    // Once on mount; the URL doesn't change under this component.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Gated on `restored`: the fallback tab is Player Data, and firing the
+  // multi-second OverFast read on that first frame would waste a round trip for
+  // every member whose remembered tab is Match or Team Data.
+  const { resp, loading, failed } = usePlayerStats(
+    restored && linked && tab === "player",
+  );
+  // The restore frame is still "loading" as far as the panel is concerned —
+  // otherwise it flashes its empty state before the fetch starts.
+  const statsLoading = loading || !restored;
 
   // Battle.net gates only the PLAYER tab (it's the Overwatch data source);
   // Match Data aggregates FACEIT / start.gg / Challonge and must stay reachable
@@ -71,7 +102,7 @@ export function StatisticsView({
   return (
     <div className="ff-owpage">
       {linked && tab === "player" ? (
-        <ProfileHeader resp={resp} loading={loading} battletag={battletag} />
+        <ProfileHeader resp={resp} loading={statsLoading} battletag={battletag} />
       ) : null}
 
       <div className="ff-owtabs" role="tablist" aria-label="Statistics views">
@@ -98,7 +129,7 @@ export function StatisticsView({
 
       {tab === "team" ? <TeamStatisticsPanel initialTeam={initialTeam} /> : tab === "player" ? (
         (playerGate ?? (
-          <PlayerPanel resp={resp} loading={loading} failed={failed} />
+          <PlayerPanel resp={resp} loading={statsLoading} failed={failed} />
         ))
       ) : (
         // Cross-platform match history (FACEIT / start.gg / Challonge) — not

@@ -168,6 +168,56 @@ components: they must stay free of server-only imports (db, cloudflare context).
 Constants, enums, labels, and pure validators live there; the server-only
 counterpart (`teams.ts`, `staff.ts`, `tickets.ts`) does the D1 work.
 
+### Remembered view state — `localStorage`, not cookies
+
+Which tab, view, filter set or page a member last had open survives leaving and
+re-entering the page. [lib/view-state.ts](lib/view-state.ts) is the one
+mechanism: `usePersistentState(key, fallback, revive)`, a client-only hook
+(`"use client"`, like `lib/auth-client.ts`) storing JSON under an `ff-view:`
+prefix, capped at 60 keys (oldest evicted) and wrapped so a blocked store just
+means "no memory".
+
+**The rule for choosing between the two stores.** A cookie is for state the
+**server renders from**; `localStorage` is for state the **browser applies**. The
+tournament card/table layout is a cookie (`TOURNAMENT_LAYOUT_COOKIE`) because the
+markup differs on first paint. Everything else here — the list's view, filters,
+games, page, page size; the tournament / stage / bracket / statistics tabs — only
+decides which already-sent data is shown or which already-rendered node is
+mounted, so it stays out of the cookie jar: cookies ride along on *every* request
+to the Worker (assets, the bracket poll route, Better Auth) forever, and the
+per-tournament keys are unbounded.
+
+The cost is one frame: the first client render must reproduce the server's HTML,
+so a stored value is applied in an effect right after hydration. Pass the same
+`fallback` the server rendered, and never persist anything a page's *content*
+depends on.
+
+Two things every caller owes:
+
+- **A `revive` that validates.** Stored state can be stale or hand-edited, and
+  returning `undefined` from `revive` keeps the fallback. Filters go through
+  `asDiscoveryFilters` ([lib/discovery-shared.ts](lib/discovery-shared.ts)); a
+  list of choices is checked against that list.
+- **Persist an identity, not an index.** `StageTabs`, `ExternalBracket` and
+  `TournamentChrome` remember a tab's *key/id*, because a re-scrape can add,
+  drop or reorder stages and pools — a stored index would silently select a
+  different bracket than the member left open.
+
+`usePersistentState` also returns whether the restore has happened; gate
+anything EXPENSIVE the restored value decides on it. `StatisticsView` does —
+its fallback tab is Player Data, so without the gate every member whose
+remembered tab is Match Data would still pay one OverFast round trip per visit.
+
+An explicit URL wins over memory: `?tab=` in `TournamentChrome` and
+`?tab=`/`?team=` on `/statistics` are applied in an effect declared *after* the
+hook, and become the remembered tab from then on.
+
+`TournamentList` keeps its whole head-bar state in ONE persisted object
+(`ListState`) rather than six `useState`s — restoring is then one atomic change,
+and "a filter changed, go back to page 1" is a property of the two setters
+(`refine` resets the page, `patch` doesn't) instead of an effect that would fight
+the restore.
+
 ### The Home board is made of the site's real bubbles
 
 `/home/` is a board the member arranges, and the tiles on it are **the portal's

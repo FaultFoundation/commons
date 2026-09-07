@@ -36,7 +36,17 @@ export default async function StatisticsPage({ searchParams }: { searchParams: P
     <DashboardShell active="statistics" setupUserId={userId}>
       <h1 className="screen-reader-text">Statistics</h1>
       <StatisticsView
-        initialTab={query.tab === "team" || query.team ? "team" : query.tab === "match" ? "match" : "player"}
+        // Left undefined when the URL asked for nothing, so the view can fall
+        // back to the member's remembered tab instead of always "player".
+        initialTab={
+          query.tab === "team" || query.team
+            ? "team"
+            : query.tab === "match"
+              ? "match"
+              : query.tab === "player"
+                ? "player"
+                : undefined
+        }
         initialTeam={query.team ?? ""}
         linked={linked}
         enabled={battlenetAuthEnabled()}

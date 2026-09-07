@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
 import { setAuthHint } from "@/lib/auth-hint";
+import { clearViewState } from "@/lib/view-state";
 
 function UserSilhouette() {
   return (
@@ -79,6 +80,7 @@ export function HeaderAuthButton() {
       return;
     }
     setAuthHint(false);
+    clearViewState();
     window.location.assign("/login/");
   }
 

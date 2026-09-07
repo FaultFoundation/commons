@@ -3,9 +3,17 @@
 import Link from "next/link";
 import { DiscoveryRail } from "./DiscoveryRail";
 import { DiscoveryFilters } from "./DiscoveryFilters";
-import { EMPTY_FILTERS, matchesDiscovery, discoveryScore } from "@/lib/discovery-shared";
+import {
+  EMPTY_FILTERS,
+  asDiscoveryFilters,
+  matchesDiscovery,
+  discoveryScore,
+  type DiscoveryFilters as Filters,
+} from "@/lib/discovery-shared";
 import { CorrectionDialog } from "./DiscoveryActions";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+
+import { usePersistentState } from "@/lib/view-state";
 
 import { GameLogo } from "@/components/brand/GameLogo";
 import { SourceLogo, sourceKey } from "@/components/brand/SourceLogo";
@@ -67,6 +75,65 @@ type ViewKey = (typeof VIEWS)[number]["key"];
 /** Per-page choices; 0 means "All" (no pagination). */
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 0] as const;
 const DEFAULT_PAGE_SIZE = 12;
+
+/**
+ * Everything the head bar controls, kept as ONE remembered object rather than
+ * six `useState`s. Two reasons it's a single value: restoring is then one write
+ * and one atomic change (six separate restores would each fire the "a filter
+ * changed, go back to page 1" rule and fight each other), and the page number
+ * can live alongside the filters that decide whether it's still valid.
+ *
+ * Layout is deliberately NOT in here — it's a cookie the server renders from
+ * (see `TOURNAMENT_LAYOUT_COOKIE`), because it changes the markup on first paint.
+ */
+type ListState = {
+  view: ViewKey;
+  filters: Filters;
+  /** Persisted as an array; the Set the UI wants is derived below. */
+  games: string[];
+  pageSize: number;
+  page: number;
+  showPast: boolean;
+};
+
+/** Shared by the Tournaments tab and the pinned Home tile — they are the same
+    panel, so a filter set on one is the filter the other shows. */
+const LIST_STATE_KEY = "tournaments:list";
+
+const DEFAULT_LIST_STATE: ListState = {
+  view: "active",
+  filters: EMPTY_FILTERS,
+  games: [],
+  pageSize: DEFAULT_PAGE_SIZE,
+  page: 1,
+  showPast: true,
+};
+
+/** Storage is the member's own browser, but a stored blob can still be stale
+    (an older shape, a view we no longer offer) — every field is checked and
+    anything unrecognized falls back to its default. */
+function reviveListState(stored: unknown): ListState | undefined {
+  if (!stored || typeof stored !== "object") return undefined;
+  const v = stored as Record<string, unknown>;
+  const pageSize = PAGE_SIZE_OPTIONS.includes(v.pageSize as (typeof PAGE_SIZE_OPTIONS)[number])
+    ? (v.pageSize as number)
+    : DEFAULT_PAGE_SIZE;
+  return {
+    view: VIEWS.some((o) => o.key === v.view)
+      ? (v.view as ViewKey)
+      : DEFAULT_LIST_STATE.view,
+    filters: asDiscoveryFilters(v.filters),
+    games: Array.isArray(v.games)
+      ? v.games.filter((g): g is string => typeof g === "string").slice(0, 50)
+      : [],
+    pageSize,
+    page:
+      typeof v.page === "number" && Number.isInteger(v.page) && v.page >= 1
+        ? Math.min(v.page, 10_000)
+        : 1,
+    showPast: v.showPast !== false,
+  };
+}
 
 /** A compact page-number window: first, last, and the pages around the current
     one, with "…" gaps. */
@@ -131,8 +198,10 @@ function byTimeline(today: number) {
  * ones tucked into a "Past tournaments" disclosure. **Concluded** is the archive,
  * most-recent first. Two layouts (modern card grid / compact table) toggle
  * top-right and persist in a cookie so the server can render the saved layout on
- * first paint. All filtering is client-side: the server hands down every visible
- * tournament once (the list is small and bounded).
+ * first paint; the view, filters, games, page and page size persist too, but in
+ * the browser (see `ListState` below and lib/view-state.ts) because only the
+ * layout changes the server's markup. All filtering is client-side: the server
+ * hands down every visible tournament once (the list is small and bounded).
  */
 export function TournamentList({
   tournaments,
@@ -143,23 +212,34 @@ export function TournamentList({
   initialLayout: TournamentLayout;
   follows?: string[];
 }) {
-  const [filters, setFilters] = useState({...EMPTY_FILTERS});
-  const [view, setView] = useState<ViewKey>("active");
+  // The head bar's whole state, restored from the member's last visit (see
+  // lib/view-state.ts). Filtering stays a plain .filter() over the list the
+  // server already sent, so remembering it costs no request and no Worker CPU.
+  const [state, setState] = usePersistentState<ListState>(
+    LIST_STATE_KEY,
+    DEFAULT_LIST_STATE,
+    reviveListState,
+  );
+  const { view, filters, pageSize, page, showPast } = state;
   const [layout, setLayout] = useState<TournamentLayout>(initialLayout);
-  const [showPast, setShowPast] = useState(true);
-  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
-  const [page, setPage] = useState(1);
   // One shared correction dialog for the whole list — the "?" on any card/hero
   // opens it with that tournament.
   const [correcting, setCorrecting] = useState<TournamentListEntry | null>(null);
-  // Which games to show; empty = no filter (every game shows). Kept as
-  // in-memory state and applied with a plain .filter() below — same
-  // client-side approach as the rest of this list, so toggling a game never
-  // costs a request or Worker CPU.
-  const [selectedGames, setSelectedGames] = useState<Set<string>>(new Set());
+  // Which games to show; empty = no filter (every game shows).
+  const selectedGames = useMemo(() => new Set(state.games), [state.games]);
+
+  /** A change that leaves the result set alone (paging, the archive toggle). */
+  const patch = (next: Partial<ListState>) => setState({ ...state, ...next });
+  /** A change that reshapes the list — always back to page 1, so a shrinking
+      result set can never strand the viewer on a page that no longer exists. */
+  const refine = (next: Partial<ListState>) =>
+    setState({ ...state, ...next, page: 1 });
 
   function chooseLayout(next: TournamentLayout) {
     setLayout(next);
+    // The active view's primary list differs by layout (the compact table folds
+    // in the ongoing tournaments the card grid keeps behind a toggle).
+    patch({ page: 1 });
     document.cookie = `${TOURNAMENT_LAYOUT_COOKIE}=${next}; path=/; max-age=${TOURNAMENT_LAYOUT_COOKIE_MAX_AGE}; samesite=lax`;
   }
 
@@ -172,14 +252,10 @@ export function TournamentList({
   }, [tournaments]);
 
   function toggleGame(game: string) {
-    setSelectedGames((prev) => {
-      const next = new Set(prev);
-      if (next.has(game)) {
-        next.delete(game);
-      } else {
-        next.add(game);
-      }
-      return next;
+    refine({
+      games: state.games.includes(game)
+        ? state.games.filter((g) => g !== game)
+        : [...state.games, game],
     });
   }
 
@@ -241,11 +317,6 @@ export function TournamentList({
       ? primary.slice((currentPage - 1) * pageSize, currentPage * pageSize)
       : primary;
 
-  // Back to page 1 whenever the view, layout, filters, or page size change.
-  useEffect(() => {
-    setPage(1);
-  }, [view, layout, selectedGames, filters, pageSize]);
-
   const showFeatured = view !== "concluded";
   const isEmpty =
     view === "all"
@@ -271,7 +342,7 @@ export function TournamentList({
                 className="ff-ticket-view"
                 type="button"
                 aria-current={view === option.key ? "page" : undefined}
-                onClick={() => setView(option.key)}
+                onClick={() => refine({ view: option.key })}
               >
                 {option.label}
               </button>
@@ -280,12 +351,12 @@ export function TournamentList({
           <span className="ff-list-head__divider" aria-hidden="true" />
           <DiscoveryFilters
             value={filters}
-            onChange={setFilters}
+            onChange={(next) => refine({ filters: next })}
             countries={[...new Set(tournaments.map((t) => t.country).filter((c): c is string => Boolean(c)))].sort()}
             games={availableGames}
             selectedGames={selectedGames}
             onToggleGame={toggleGame}
-            onClearGames={() => setSelectedGames(new Set())}
+            onClearGames={() => refine({ games: [] })}
           />
         </div>
 
@@ -293,7 +364,9 @@ export function TournamentList({
           className="ff-list-search"
           type="search"
           value={filters.query}
-          onChange={(e) => setFilters({ ...filters, query: e.target.value })}
+          onChange={(e) =>
+            refine({ filters: { ...filters, query: e.target.value } })
+          }
           placeholder="Search tournaments, organizers or games"
           aria-label="Search tournaments"
         />
@@ -363,7 +436,7 @@ export function TournamentList({
                 className="ff-tpast__toggle"
                 type="button"
                 aria-expanded={showPast}
-                onClick={() => setShowPast((v) => !v)}
+                onClick={() => patch({ showPast: !showPast })}
               >
                 <Chevron open={showPast} />
                 Ongoing tournaments ({past.length})
@@ -379,8 +452,8 @@ export function TournamentList({
             totalPages={totalPages}
             page={currentPage}
             pageSize={pageSize}
-            onPage={setPage}
-            onPageSize={setPageSize}
+            onPage={(next) => patch({ page: next })}
+            onPageSize={(next) => refine({ pageSize: next })}
           />
         </>
       )}

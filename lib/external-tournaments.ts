@@ -38,6 +38,11 @@ export type ExternalTournamentListItem = {
   id: string;
   /** 'startgg' | 'faceit' — the native site this was scraped from. */
   source: string;
+  /** The provider tournament id, SHARED by every game a start.gg tournament runs
+      (each game is its own row keyed `${source}:${sourceTournamentId}:g<game>`).
+      `${source}:${sourceTournamentId}` is the key the Commons uses to regroup a
+      multi-game tournament's per-game cards into one series. */
+  sourceTournamentId: string;
   name: string;
   description: string | null;
   organizer: string | null;
@@ -136,6 +141,7 @@ export const listExternalTournaments = cache(async function listExternalTourname
       .select({
         id: extTournaments.id,
         source: extTournaments.source,
+        sourceTournamentId: extTournaments.sourceTournamentId,
         name: extTournaments.name,
         description: extTournaments.description,
         organizer: extTournaments.organizer,

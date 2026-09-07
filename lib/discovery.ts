@@ -39,6 +39,13 @@ export async function enrichDiscovery(
     overlay.overrides.map((o) => [o.tournamentId, o.data]),
   );
   const candidates = new Map<string, TournamentListEntry[]>();
+  // Every game a single provider tournament runs projects to its own external
+  // row, all sharing `${source}:${sourceTournamentId}`. Rows sharing that key are
+  // literally one tournament's several games — group size >1 means "runs multiple
+  // games", which is exactly a series (the user's definition), so we group them
+  // deterministically, without needing the fragile organizer/name inference (an
+  // older event may carry no organizer at all).
+  const tournamentGroups = new Map<string, TournamentListEntry[]>();
   const enriched = entries.map((t) => {
     const d = inferFacts(t);
     const identity = organizerIdentity(t);
@@ -58,18 +65,40 @@ export async function enrichDiscovery(
     d.organizationId = identity
       ? (identityRule?.organizationId ?? discoveryId("organization", identity))
       : null;
+    const tournamentKey =
+      t.source && t.sourceTournamentId
+        ? `${t.source}:${t.sourceTournamentId}`
+        : null;
+    if (tournamentKey) {
+      const group = tournamentGroups.get(tournamentKey) ?? [];
+      group.push(t);
+      tournamentGroups.set(tournamentKey, group);
+    }
+    // Organizer + season/series name, GAME-INDEPENDENT: a program that runs the
+    // same season across several games (or several per-game tournaments) is one
+    // series, so the game is deliberately NOT part of the key. Season/year and
+    // division stay (via seriesName), so different seasons remain distinct.
     const key = d.organizationId
-      ? `${d.organizationId}|${t.game ?? "unknown"}|${seriesName(t.name).toLowerCase()}`
+      ? `${d.organizationId}|${seriesName(t.name).toLowerCase()}`
       : null;
     if (key) {
       const group = candidates.get(key) ?? [];
       group.push(t);
       candidates.set(key, group);
     }
-    return { ...t, discovery: d, candidateKey: key };
+    return { ...t, discovery: d, candidateKey: key, tournamentKey };
   });
-  return enriched.map(({ candidateKey, ...t }) => {
-    if (candidateKey) {
+  return enriched.map(({ candidateKey, tournamentKey, ...t }) => {
+    // Highest confidence: this tournament runs several games (its per-game rows
+    // share one source tournament id). That IS a series — group its games under
+    // one bubble regardless of what the name or organizer say.
+    if (tournamentKey && (tournamentGroups.get(tournamentKey)?.length ?? 0) > 1) {
+      t.discovery.seriesId = discoveryId("series", `multigame:${tournamentKey}`);
+      t.discovery.reasons.push(
+        "One source tournament runs multiple games at once",
+      );
+    }
+    if (!t.discovery.seriesId && candidateKey) {
       const group = candidates.get(candidateKey)!;
       // A named league/season can stand alone; recurrence needs at least two
       // tournaments AND an explicit installment marker, not merely equal names.
@@ -79,7 +108,7 @@ export async function enrichDiscovery(
       ) {
         t.discovery.seriesId = discoveryId("series", candidateKey);
         t.discovery.reasons.push(
-          "Series inferred from source organizer, game and title; season/division preserved",
+          "Series inferred from source organizer and title, across games; season/division preserved",
         );
       }
     }
@@ -109,7 +138,13 @@ export async function enrichDiscovery(
       undefined;
     t.discovery.seriesName =
       overlay.profiles.find((p) => p.id === t.discovery.seriesId)?.name ??
-      (t.discovery.seriesId?.startsWith("series:tournament:") ? t.name : seriesName(t.name));
+      // A single-tournament series (whether it's a lone named event or a
+      // multi-game tournament) is named for the tournament itself; an inferred
+      // cross-tournament series uses the season/series name.
+      (t.discovery.seriesId?.startsWith("series:tournament:") ||
+      t.discovery.seriesId?.startsWith("series:multigame:")
+        ? t.name
+        : seriesName(t.name));
     return t;
   });
 }

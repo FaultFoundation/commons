@@ -61,6 +61,7 @@ export async function loadTournamentEntries(): Promise<TournamentListEntry[]> {
     registrationClosesAt: t.registrationClosesAt?.getTime() ?? null,
     prizePool: t.prizePool,
     source: t.source,
+    sourceTournamentId: t.sourceTournamentId,
     externalUrl: t.url,
     game: t.game,
     gameLogoUrl: null,

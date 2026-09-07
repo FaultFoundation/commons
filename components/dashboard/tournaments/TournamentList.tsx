@@ -49,6 +49,9 @@ export type TournamentListEntry = {
   // these unset. `externalUrl` is the native-site link the card opens for now.
   source?: string | null; // 'startgg' | 'faceit'
   externalUrl?: string | null;
+  // The provider tournament id, shared across a multi-game tournament's per-game
+  // rows. `${source}:${sourceTournamentId}` groups those cards into one series.
+  sourceTournamentId?: string | null;
 };
 
 /** All is the complete catalog; Active remains the default working view and

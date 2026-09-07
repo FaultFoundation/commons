@@ -17,8 +17,12 @@ import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqli
 // rosters, poll_runs/entity_changes) stays in the scraper's own store. Keeping
 // this thin means the import is simple and the read queries are flat.
 //
-// Ids are deterministic (`${source}:${source_id}`) so a re-import upserts in
-// place rather than duplicating. There are no foreign-key constraints across to
+// Ids are deterministic so a re-import upserts in place rather than duplicating.
+// FACEIT/Discord rows are `${source}:${source_id}`; a start.gg tournament runs
+// several games as sibling events and projects to one row PER GAME
+// (`startgg:${source_id}:g${videogameId}`), all sharing one source_tournament_id
+// so the Commons can regroup a tournament's games into one series. There are no
+// foreign-key constraints across to
 // website-sql — the two databases are joined only in application code (D1 can't
 // JOIN across bindings), by external id, exactly like the bot's Sheets↔D1 split.
 // ===========================================================================
@@ -36,13 +40,18 @@ export const schoolFavicons = sqliteTable(
   (t) => [index("school_favicons_normalized_name_idx").on(t.normalizedName)],
 );
 
-/** One external tournament (a start.gg tournament or a FACEIT championship). */
+/** One external tournament — for start.gg, one row per GAME within a tournament
+    (a tournament runs several games as sibling events); for FACEIT, one
+    championship (single-game). */
 export const extTournaments = sqliteTable(
   "ext_tournaments",
   {
-    // `${source}:${sourceTournamentId}` — deterministic, so imports upsert.
+    // Deterministic, so imports upsert. FACEIT: `${source}:${sourceTournamentId}`.
+    // start.gg: `${source}:${sourceTournamentId}:g${videogameId}` (per game).
     id: text("id").primaryKey(),
     source: text("source").notNull(), // 'startgg' | 'faceit'
+    // The provider tournament id — SHARED across a start.gg tournament's per-game
+    // rows, so `${source}:${sourceTournamentId}` regroups them into one series.
     sourceTournamentId: text("source_tournament_id").notNull(),
     name: text("name").notNull(),
     slug: text("slug"),
@@ -113,9 +122,15 @@ export const extTournaments = sqliteTable(
   },
   (t) => [
     index("ext_tournaments_start_at_idx").on(t.startAt),
+    // Unique per (source, source_tournament_id, GAME): a start.gg tournament runs
+    // several games as sibling events, and the scraper projects one row PER GAME
+    // (id `startgg:<tournamentId>:g<videogameId>`), all sharing one
+    // source_tournament_id so the Commons can regroup them into a series. The
+    // game is what keeps those rows distinct here. (Scraper migration 0016.)
     uniqueIndex("ext_tournaments_source_unique").on(
       t.source,
       t.sourceTournamentId,
+      t.game,
     ),
   ],
 );

@@ -572,6 +572,10 @@ local dev).
   Their ids carry a `source:` prefix, so the card links percent-encode them and
   [app/tournaments/[id]/page.tsx](app/tournaments/[id]/page.tsx) `safeDecode`s
   the param and branches: `isTournamentId` (6-digit) → internal; otherwise
+  external. A start.gg tournament runs several games as sibling events, so it
+  projects to one external row **per game** (`startgg:<id>:g<videogameId>`) —
+  each is its own card and its own detail page; they share `source_tournament_id`
+  and are regrouped into one series (see the discovery section). It routes via
   `getExternalTournament` → [ExternalTournamentView](components/dashboard/tournaments/ExternalTournamentView.tsx),
   which reuses the internal hero template plus an "About" bubble that renders the
   provider blurb as markdown ([Markdown](components/dashboard/tournaments/Markdown.tsx)
@@ -1113,6 +1117,24 @@ capability + unlock gate for reviews; claims only grant profile editing. Source
 identity grouping is not ownership proof. Future identity rules are time-bounded,
 and explicit tournament corrections take precedence over inference. Do not infer
 an official season length, qualification path, or prize sum from partial imports.
+
+**Series grouping (`enrichDiscovery`).** A tournament is grouped into a series two
+ways, in precedence order. **(1) One tournament, several games.** A start.gg
+tournament runs several games as sibling events and the scraper projects one
+external row PER GAME (`startgg:<id>:g<videogameId>`), all sharing one
+`source_tournament_id`. Rows sharing `${source}:${sourceTournamentId}` are that
+one tournament's games — grouped **deterministically** as a series
+(`series:multigame:<source>:<sourceTournamentId>`), independent of the
+organizer/name inference (which fails on older events that carry no organizer).
+This is why the read model exposes `sourceTournamentId` on the list item and
+carries it through `TournamentListEntry`. **(2) Same organizer + season name,
+across games.** The recurring-series key is `${organizationId}|${seriesName}` —
+**game is deliberately NOT in the key**, because a program that runs the same
+season across several games (or several per-game tournaments) is one series.
+`seriesName` still keeps the season/year and division, so different seasons stay
+distinct series (per-season, not a cross-year franchise). The `DiscoveryRail`
+("Series & leagues") groups the shown cards by `seriesId`; the individual cards
+stay in the grid (grouping is a rail affordance, it does not collapse the grid).
 
 Run `node --test scripts/discovery.test.mjs` for classification, API authorization,
 concurrent review and rollback tests. The data audit and manual checklist are in

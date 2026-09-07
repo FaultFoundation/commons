@@ -56,6 +56,16 @@ as a deep link to that match's own result page (a start.gg set URL / a FACEIT
 match room). All ids are deterministic strings from
 provider lineage, so projection imports upsert the same logical rows.
 
+A start.gg tournament runs several games as sibling events, and the scraper walks
+one game at a time, so it projects **one `ext_tournaments` row per game**
+(`id = startgg:<sourceTournamentId>:g<videogameId>`, `num_attendees` the game's
+own entrant count) rather than a single row where each game's scrape clobbers the
+last. Every one of a tournament's game rows shares the same `source_tournament_id`
+— that is the key the Commons uses to regroup them into one series bubble. The
+unique index is therefore `(source, source_tournament_id, game)`, not just
+`(source, source_tournament_id)`. FACEIT championships are single-game and keep
+`id = faceit:<sourceTournamentId>`.
+
 Relational form:
 
 ```text

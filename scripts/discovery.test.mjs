@@ -250,6 +250,54 @@ test("grouping preserves season, division and source identity, and never merges 
     assert.notEqual(e[0].discovery.seriesId, e[i].discovery.seriesId);
   assert.equal(e[5].discovery.organizationId, null);
 });
+test("a tournament running several games groups its games into one per-season series", async () => {
+  const f = fixture();
+  f.entries = [
+    // 2026 AEL: two games projected as sibling rows of ONE start.gg tournament.
+    f.entry("startgg:949634:g14", "2026 AEL University Open Series - Season 2", {
+      sourceTournamentId: "949634",
+      game: "Rocket League",
+    }),
+    f.entry("startgg:949634:g34223", "2026 AEL University Open Series - Season 2", {
+      sourceTournamentId: "949634",
+      game: "VALORANT",
+    }),
+    // 2025 AEL: two games, but NO organizer at all — organizer/name inference
+    // cannot group these, so ONLY the shared source-tournament id can.
+    f.entry("startgg:806959:g14", "2025 AEL University Open Series - Season 2", {
+      sourceTournamentId: "806959",
+      game: "Rocket League",
+      organizer: null,
+      organizerUrl: null,
+    }),
+    f.entry("startgg:806959:g34223", "2025 AEL University Open Series - Season 2", {
+      sourceTournamentId: "806959",
+      game: "VALORANT",
+      organizer: null,
+      organizerUrl: null,
+    }),
+    // A single-game tournament (one row) is a plain card, not a series.
+    f.entry("startgg:111:g14", "Solo Cup", {
+      sourceTournamentId: "111",
+      game: "Rocket League",
+    }),
+  ];
+  const e = await f.load("@/lib/discovery").enrichDiscovery(f.entries);
+  // 2026's two games share a series, named for the tournament itself.
+  assert.equal(e[0].discovery.seriesId, e[1].discovery.seriesId);
+  assert.equal(e[0].discovery.seriesId, "series:multigame:startgg:949634");
+  assert.equal(
+    e[0].discovery.seriesName,
+    "2026 AEL University Open Series - Season 2",
+  );
+  // 2025's two games group even with no organizer (shared tournament id alone).
+  assert.equal(e[2].discovery.seriesId, e[3].discovery.seriesId);
+  assert.equal(e[2].discovery.seriesId, "series:multigame:startgg:806959");
+  // Different seasons stay DISTINCT series (per-season, not a cross-year franchise).
+  assert.notEqual(e[0].discovery.seriesId, e[2].discovery.seriesId);
+  // The lone single-game tournament is never a multi-game series.
+  assert.equal(e[4].discovery.seriesId ?? null, null);
+});
 test("filters combine dimensions and include ongoing leagues in date window", () => {
   const f = fixture(),
     s = f.load("@/lib/discovery-shared"),

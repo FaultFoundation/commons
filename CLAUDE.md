@@ -285,8 +285,8 @@ unlock → `/home/?unlock=1&next=<the admin URL>`, where
 modal ([AdminUnlockDialog](components/dashboard/admin/AdminUnlockDialog.tsx)),
 scrubs the query, and on success resumes `next` (re-sanitized with
 `sanitizeNextPath`). The rail opens the same dialog when the Admin group is
-clicked, *before* sliding across — `DashboardShell` passes `adminLocked`, which
-is a cookie read with no D1 cost. That flag is UX only; the boundary is still
+clicked, *before* the sub-tabs drop open — `DashboardShell` passes `adminLocked`,
+which is a cookie read with no D1 cost. That flag is UX only; the boundary is still
 AdminGate plus `requireAdminUnlock` inside every privileged action.
 
 Two things are load-bearing in that flow. `AdminGate` learns its own URL from
@@ -892,7 +892,7 @@ group) shows a member's Overwatch career, sourced from the unofficial **OverFast
 API** (`https://overfast-api.tekrop.fr`, which scrapes a player's public Blizzard
 career page by BattleTag). The **Player Data / Match Data** split is **browser-style
 tabs inside the page**, under a shared profile header (`.ff-owtab*`), deliberately
-not the admin-style rail slide-out. "By game" is the intended shape; Overwatch is
+not an admin-style rail group. "By game" is the intended shape; Overwatch is
 the only game today; Match Data is the cross-provider match history (next section).
 
 - **A THIRD D1, `ow-player-data`**, bound as **`OW`** ([db/ow-schema.ts](db/ow-schema.ts),

@@ -13,11 +13,13 @@ now 308s via `middleware.ts`). `/` stays the public Commons landing page.
 | `/home/`                       | Experimental › Home | The member's board of pinned bubbles |
 | `/schedule/`                   | Schedule    | All/public + personal match calendar |
 | `/tournaments/`                | Tournaments | List of open/live/finished tournaments |
+| `/series/`                     | Experimental › Series | Series & leagues + Discord-sourced tournaments |
 | `/t/<id>/<name>/`              | —           | Public branded bracket (signed-out-safe) |
 | `/admin/tournaments/`          | Admin       | Create + manage (Challonge-backed) |
 | `/teams/`                      | Teams       | Your teams + create          |
 | `/teams/<teamId>/`             | Teams       | One team: roster, invites, settings, tournaments. External (`provider:id`) ids render the read-only synced view |
 | `/statistics/`                 | Experimental › Statistics | Player Data (Overwatch) + Match Data (cross-provider) tabs |
+| `/tournaments/discovery/<id>/` | —           | One series / organization profile (reached from the Series tab) |
 | `/join/<token>/`               | —           | Invite landing (join a team) |
 | `/account/`                    | Account     | Profile / integrations       |
 | `/account/setup/`              | —           | Resolver → current step      |
@@ -511,7 +513,7 @@ around it is. There are two:
 
 | Group          | Sub-tabs                | Why it's a group |
 | -------------- | ----------------------- | ---------------- |
-| `experimental` | Home, Statistics        | Surfaces still being shaped, kept out of the finished tabs |
+| `experimental` | Home, Series, Statistics | Surfaces still being shaped, kept out of the finished tabs |
 | `admin`        | Support, Verification, Teams, Tournaments, Staff | Staff-only; the group is absent entirely for a member with no capability |
 
 A page inside a group passes **both** halves of the active state —
@@ -972,7 +974,8 @@ correction form so both read as switches, not `<select>` dropdowns): Games
 (In-person / Online / Hybrid), Platform, "Starts within", Region, and "Closing
 soon" / "Only followed" toggles. The button shows a count badge of active facets;
 search is the one filter that lives outside the popover, in the head bar. Filters
-combine with AND, reset pagination, and drive the hero and series rail. **Type's
+combine with AND, reset pagination, and drive the featured hero. They do NOT
+reach the Series tab, which groups every recorded tournament. **Type's
 "Tournament" means "not a league"** (in `matchesDiscovery`) so inferred
 unknown-competition events still show under it; "League" narrows to leagues.
 Series progress always uses the full recorded series, so a registration filter
@@ -1013,15 +1016,38 @@ stages are removed. Missing organizer identity means a named league/season can
 have its own single-tournament series, but it is not merged with other events.
 These are revisable suggestions, not verified real-world organizational identity.
 
-Above the list, the **Series & leagues** rail (`DiscoveryRail`) lists grouped
-tournaments as rows linking to their series page. A group appears **only when
-more than one of the currently-shown tournaments belongs to it** — a lone
-tournament is just a card, not a series — and only while at least one of its
-tournaments is still active or upcoming. Each row shows a Series/League badge, a
-Live/Registration/Upcoming status, the game(s), the tournament count, a date
-range and a concluded-progress bar.
+### The Series tab
 
-Organization and series pages live at `/tournaments/discovery/<encoded-id>/`.
+Grouped competition lives on its **own tab** (`/series/`, under Experimental),
+not above the tournament list. `/tournaments/` is the flat list of individual
+tournaments; anything that gathers several of them is a Series-tab concern.
+
+`SeriesList` (`components/dashboard/series/SeriesList.tsx`) lists grouped
+tournaments as rows linking to their series page. A group appears **only when
+more than one tournament belongs to it** — a lone tournament is just a card, not
+a series — and only while at least one of its tournaments is still active or
+upcoming. Each row shows a Series/League badge, a Live/Registration/Upcoming
+status, the game(s), the tournament count, a date range and a
+concluded-progress bar. It was the `DiscoveryRail` above the list; as a page it
+drops the old 8-row cap and renders an empty-state line instead of nothing,
+because a blank tab reads as broken where a missing rail read as "none today".
+
+Beneath it, a **Discord Tournaments** bubble lists entries whose `source` is
+`"discord"`. **Nothing writes that source today** — the collectors produce
+`startgg` and `faceit`, and internal Commons tournaments leave `source` unset —
+so the section renders its empty state until a collector projects Discord rows.
+It is wired end-to-end and verified against seeded local rows, so it needs no
+further work when that data arrives; the matching `Platform → Discord` facet in
+the tournament filter is equally dormant.
+
+The page reads the **same** `loadTournamentEntries()` the Tournaments tab does
+and groups in the component, so it is not a second source of truth. Both bubbles
+pass `titleHidden` and render their own `.ff-list-heading` — the shared head
+shape (name left, dim count beside it) the tournaments grid uses.
+
+Organization and series pages live at `/tournaments/discovery/<encoded-id>/`
+(the route stayed put; the Series tab is now the only thing that links into it,
+so their back link reads "← All series").
 The page is a **hero header** (banner strip, kind/status badges, title, a facts
 grid of game / tournaments / entrants / dates / source, and Follow) over a
 single **"Tournaments in this series"** grid of the ordinary tournament bubbles

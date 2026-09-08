@@ -50,6 +50,9 @@ const NAV_ITEMS: NavItem[] = [
     label: "Experimental",
     children: [
       { key: "home", label: "Home", href: "/home/" },
+      // Grouped competition — the series/league rail that used to sit above
+      // the /tournaments/ list, plus Discord-sourced tournaments.
+      { key: "series", label: "Series", href: "/series/" },
       // The Player/Match split is browser-style tabs INSIDE the page (under
       // the profile header), not further rail children. Overwatch is the only
       // game today.

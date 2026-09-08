@@ -1233,9 +1233,16 @@ across games.** The recurring-series key is `${organizationId}|${seriesName}` �
 **game is deliberately NOT in the key**, because a program that runs the same
 season across several games (or several per-game tournaments) is one series.
 `seriesName` still keeps the season/year and division, so different seasons stay
-distinct series (per-season, not a cross-year franchise). The `DiscoveryRail`
-("Series & leagues") groups the shown cards by `seriesId`; the individual cards
-stay in the grid (grouping is a rail affordance, it does not collapse the grid).
+distinct series (per-season, not a cross-year franchise). `SeriesList`
+("Series & Leagues", [components/dashboard/series/SeriesList.tsx](components/dashboard/series/SeriesList.tsx))
+groups by `seriesId` on its **own tab** — `/series/`, under Experimental —
+rather than as a rail above the list; the individual tournaments stay as
+ordinary cards in the `/tournaments/` grid, which grouping never collapses.
+Moving it off the list changed one thing beyond placement: it groups **every**
+recorded tournament, not just the ones the list's filters currently show, since
+there are no filters on the Series tab to narrow it. That tab also carries a
+**Discord Tournaments** bubble (`source === "discord"`), wired and verified but
+dormant — no collector writes that source yet.
 
 Run `node --test scripts/discovery.test.mjs` for classification, API authorization,
 concurrent review and rollback tests. The data audit and manual checklist are in

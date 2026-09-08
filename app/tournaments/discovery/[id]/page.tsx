@@ -109,8 +109,10 @@ export default async function DiscoveryProfilePage({
           aria-hidden="true"
         />
         <div className="ff-serieshero__body">
-          <Link className="ff-serieshero__back" href="/tournaments/">
-            ← All tournaments
+          {/* The Series tab is the only entry point now that the rail has
+              left /tournaments/, so back means back to it. */}
+          <Link className="ff-serieshero__back" href="/series/">
+            ← All series
           </Link>
           <div className="ff-serieshero__badges">
             <span className="ff-serieslist__kind">

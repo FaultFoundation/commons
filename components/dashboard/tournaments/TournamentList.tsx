@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { DiscoveryRail } from "./DiscoveryRail";
 import { DiscoveryFilters } from "./DiscoveryFilters";
 import {
   EMPTY_FILTERS,
@@ -395,9 +394,6 @@ export function TournamentList({
         </div>
       </div>
 
-      {view !== "concluded" ? (
-        <DiscoveryRail tournaments={visibleTournaments} />
-      ) : null}
       {/* The grid's own section head, built like the "Series & leagues" one
           above it: the name left, the dim count beside it. This is where the
           word "Tournaments" lives now — TournamentsPanel hides the bubble's

@@ -7644,11 +7644,11 @@ button.ff-dash__link:hover {
 .ff-discovery-profile-actions details { flex: 1 1 240px; }
 .ff-discovery-profile-actions [role="status"]:empty { display: none; }
 
-/* Series & leagues rail — a vertical list of grouped-tournament rows. */
-.ff-serieslist { margin: 4px 0 18px; }
-.ff-serieslist__head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
-.ff-serieslist__head h2 { margin: 0; font-size: var(--ff-dash-text-lg); }
-.ff-serieslist__count { color: var(--ff-text-dim); font-size: var(--ff-dash-text-sm); }
+/* Series & Leagues — a vertical list of grouped-tournament rows, the Series
+   tab's first bubble. Its head is the shared .ff-list-heading (see the
+   tournament list section); the private __head/__count rules it used to carry
+   were the same declarations under a second name. */
+.ff-serieslist { margin: 0; }
 .ff-serieslist__rows { display: flex; flex-direction: column; gap: 10px; }
 .ff-serieslist__row {
   display: grid; grid-template-columns: auto minmax(0, 1fr) 160px auto; align-items: center; gap: 16px;

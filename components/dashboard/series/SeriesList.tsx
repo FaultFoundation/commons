@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { profilePath, seriesName } from "@/lib/discovery-shared";
-import type { TournamentListEntry } from "./TournamentList";
+import type { TournamentListEntry } from "@/components/dashboard/tournaments/TournamentList";
 
 const CONCLUDED = new Set(["completed", "cancelled"]);
 
@@ -31,12 +31,17 @@ function dateRange(events: TournamentListEntry[]): string | null {
 }
 
 /**
- * "Series & leagues" — the grouped-tournament rail above the list. A group only
- * appears when **more than one** of the currently-shown tournaments belongs to it
- * (a lone tournament is just a card, not a series), and only while at least one of
- * its tournaments is still active or upcoming. Each row links to the series page.
+ * "Series & Leagues" — the Series tab's grouped-tournament list. A group only
+ * appears when **more than one** tournament belongs to it (a lone tournament is
+ * just a card, not a series), and only while at least one of its tournaments is
+ * still active or upcoming. Each row links to the series page.
+ *
+ * This was the rail above the /tournaments/ list. It is now the Series tab's
+ * own content, which changes two things: there is no 8-row cap (the page IS the
+ * list), and an empty result renders a message rather than nothing — a blank
+ * tab reads as broken where a missing rail read as "no series right now".
  */
-export function DiscoveryRail({
+export function SeriesList({
   tournaments,
 }: {
   tournaments: TournamentListEntry[];
@@ -76,18 +81,23 @@ export function DiscoveryRail({
           ) || a.name.localeCompare(b.name),
     );
 
-  if (!series.length) return null;
-
   return (
     <section className="ff-serieslist">
-      <div className="ff-serieslist__head">
-        <h2>Series &amp; leagues</h2>
-        <span className="ff-serieslist__count">
-          {series.length} running now
-        </span>
+      {/* The same head shape as the tournaments grid (.ff-list-heading): name
+          left, dim count on the baseline beside it. One class, so the two
+          sections cannot drift apart. */}
+      <div className="ff-list-heading">
+        <h2>Series &amp; Leagues</h2>
+        <span className="ff-list-count">{series.length} running now</span>
       </div>
+      {series.length === 0 ? (
+        <p className="ff-ticket-empty">
+          No series or leagues are running right now. A group appears here once
+          more than one recorded tournament belongs to it.
+        </p>
+      ) : null}
       <div className="ff-serieslist__rows">
-        {series.slice(0, 8).map((g) => {
+        {series.map((g) => {
           const done = g.events.filter((t) => CONCLUDED.has(t.status)).length;
           const isLeague = g.events.some(
             (t) => t.discovery?.competition === "league",

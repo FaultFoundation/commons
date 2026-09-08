@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ScoutingView } from "@/components/dashboard/scouting/ScoutingView";
-import { faceitSearchConfigured } from "@/lib/faceit-scouting";
 import { getPlatformIdentityCached } from "@/lib/platform-identities";
 import { getSessionCached } from "@/lib/session";
 
@@ -36,7 +35,6 @@ export default async function ScoutingPage({
         // An explicit ?q= wins; otherwise seed with the member's own FACEIT
         // nickname if they've linked one, so the first search has a target.
         initialQuery={query.q ?? identity?.handle ?? ""}
-        searchEnabled={faceitSearchConfigured()}
       />
     </DashboardShell>
   );

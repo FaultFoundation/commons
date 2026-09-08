@@ -54,15 +54,7 @@ function writeCache(nickname: string, resp: ScoutResponse) {
 /** How many rows the Recent Matches card shows before "Show more". */
 const PAGE = 20;
 
-export function ScoutingView({
-  initialQuery,
-  searchEnabled,
-}: {
-  initialQuery: string;
-  /** Whether the search TRIGGER (the ow-data Worker) is configured. Reads work
-      regardless; a disabled trigger just can't collect a not-yet-cached player. */
-  searchEnabled: boolean;
-}) {
+export function ScoutingView({ initialQuery }: { initialQuery: string }) {
   // The search box remembers the last query across visits; ?q= / the member's
   // own handle is the fallback the server seeded.
   const [query, setQuery, restored] = usePersistentState<string>(
@@ -212,19 +204,17 @@ export function ScoutingView({
   useEffect(() => {
     if (!restored || hydrated.current) return;
     hydrated.current = true;
+    // Repaint a search made earlier THIS session (cache only exists after a
+    // search) so hopping away and back doesn't re-wait. No network read on
+    // mount: until the member actually searches, the screen is just the header
+    // and the search bar — the seeded query only pre-fills the box.
     const seed = normalizeNickname(query);
     const cached = readCache();
     if (cached && seed && cached.nickname.toLowerCase() === seed.toLowerCase()) {
       setResp(cached.resp);
       activeNick.current = cached.nickname;
     }
-    if (seed) {
-      void (async () => {
-        const data = await runRead(seed);
-        if (alive.current && data && data.status !== "idle") applyResp(seed, data);
-      })();
-    }
-    // Run once after restore; query/runRead are stable enough for this seed.
+    // Run once after restore.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restored]);
 
@@ -240,18 +230,14 @@ export function ScoutingView({
 
   return (
     <div className="ff-owpage">
-      <Bubble title="Scout a FACEIT Player" span="full">
-        <p className="ff-bubble__lede">
-          Look up any FACEIT Overwatch player&apos;s match history and see their win
-          rate on each map. Search by their exact FACEIT nickname.
-        </p>
+      <Bubble title="Scouting" span="full">
         <form className="ff-scoutsearch" onSubmit={onSubmit} role="search">
           <input
             className="ff-auth__input ff-scoutsearch__input"
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="FACEIT nickname (e.g. Jakal_OW)"
+            placeholder="FACEIT nickname"
             aria-label="FACEIT nickname"
             autoComplete="off"
             spellCheck={false}
@@ -264,13 +250,6 @@ export function ScoutingView({
             {loading ? "Searching…" : "Scout"}
           </button>
         </form>
-        {!searchEnabled ? (
-          <p className="ff-bubble__note">
-            New searches are unavailable on this environment right now — already
-            scouted players still load, but a name that hasn&apos;t been collected
-            yet can&apos;t be fetched.
-          </p>
-        ) : null}
       </Bubble>
 
       {loading ? (
@@ -324,14 +303,7 @@ export function ScoutingView({
             ) : null}
           </Bubble>
         </>
-      ) : (
-        <Bubble title="Scouting" span="full">
-          <p className="ff-bubble__lede">
-            Search a FACEIT nickname above to pull their match history and map win
-            rates.
-          </p>
-        </Bubble>
-      )}
+      ) : null}
     </div>
   );
 }

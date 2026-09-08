@@ -32,12 +32,6 @@ import {
 const DEFAULT_MATCH_LIMIT = 150;
 const MAX_MATCH_LIMIT = 300;
 
-/** Whether the search TRIGGER is wired (the reader only needs the OW binding). */
-export function faceitSearchConfigured(): boolean {
-  const { env } = getCloudflareContext();
-  return Boolean(env.OW && env.OW_DATA_URL && env.OW_POLLER_SECRET);
-}
-
 type FaceitFactions = Record<
   string,
   { teamId?: string; nickname?: string; avatar?: string; score?: number | string } | undefined

@@ -7394,7 +7394,6 @@ button.ff-dash__link:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 14px;
 }
 .ff-scoutsearch__input {
   flex: 1 1 260px;

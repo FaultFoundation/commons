@@ -1038,6 +1038,71 @@ documented in [db/README.md](db/README.md)); the same `ow-data` Worker crons it.
   external team requires a `pd_team_links` row — a team you're not linked to is
   a 404, matching the internal-team rule.
 
+### FACEIT scouting — search any player's match history (`faceit_*`)
+
+The **Scouting** tab (`/scouting/`, a sub-tab of the **Experimental** rail group)
+looks up **any** FACEIT Overwatch player by nickname — opponents, not the linked
+member — and shows their **win rate on each map** over their collected match
+history. It lives in the **same third D1** (`ow-player-data`) as the `ow_*`/`pd_*`
+tables, in tables prefixed `faceit_*`, but the ownership is **the reverse of
+everything else here**.
+
+- **The ow-data Worker OWNS the `faceit_*` schema + migrations**, not the Commons.
+  Unlike `ow_*`/`pd_*` (Commons-owned, migrated via `drizzle.ow.config.ts`), the
+  `faceit_*` tables are the ow-data repo's (`src/faceit-schema.ts` + its
+  `drizzle-faceit/` migrations, tracked in a separate `d1_migrations_faceit`
+  table on the shared DB). The Commons keeps a **column-compatible TYPING MIRROR**
+  at [db/faceit-schema.ts](db/faceit-schema.ts), deliberately kept OUT of
+  `drizzle.ow.config.ts` (which globs the single file `./db/ow-schema.ts`) so
+  `npm run db:ow:*` never migrates it. **A new `faceit_*` column goes in the
+  ow-data repo, then is mirrored here to READ it** — never generate a Commons
+  migration for these tables. (The local dev DB gets the tables by applying the
+  ow-data repo's `drizzle-faceit/*.sql` once; prod already has them.)
+- **Read directly, trigger over HTTP.** The Commons reads `faceit_*` straight off
+  the OW binding ([lib/faceit-scouting.ts](lib/faceit-scouting.ts) over
+  `getOwDb()`) — the same "read the rows the Worker wrote" relationship the
+  Statistics/Teams tabs have to `pd_*`. But the *collection* engine
+  (`faceit-collect.ts`, three Data API calls per match: history LIST →
+  `/matches/{id}` overview → `/matches/{id}/stats` scoreboard) exists ONLY on the
+  ow-data Worker. So a search is an authenticated server-to-server POST to that
+  Worker's `/faceit/search` (`requestFaceitSearch`, mirroring
+  [lib/external-refresh.ts](lib/external-refresh.ts) — best-effort, scheme-
+  tolerant, bounded timeout), gated by the shared **`OW_POLLER_SECRET`** with the
+  Worker base at **`OW_DATA_URL`**. Both unset → the tab still reads already-cached
+  players but can't collect a new one; the search box shows a soft note.
+- **The read/trigger split → two API routes.** `POST /api/scouting/search`
+  (session + same-origin, since it triggers the outbound call) asks the Worker to
+  collect, then reads the freshened cache back;
+  `GET /api/scouting/player?nickname=|player_id=` (session) is a cache-only read,
+  used by the "Refresh" control and the bounded background poll. Both return one
+  `ScoutResponse` shape from `getScoutingData`, degrading to a member-visible
+  status (`collecting` | `ready` | `not_found` | `error` | `not_configured`) the
+  same way the Match Data tab surfaces `pd_sync.status`.
+- **The view** ([ScoutingView](components/dashboard/scouting/ScoutingView.tsx),
+  client) mirrors the Statistics tab's client-loaded-behind-a-loading-bar pattern
+  (`StatLoading`, a sessionStorage stale-while-revalidate cache, `usePersistentState`
+  for the remembered query). Opening the tab does a **cache-only read** of the
+  seeded query (the member's own linked FACEIT handle, or `?q=`) — it never kicks
+  off a collection without an explicit search. While the Worker is still
+  `collecting`, the view **re-reads a few times** (`POLL_MS`/`MAX_POLLS`) so maps
+  and scoreboards appear without hunting for the refresh button. The client-safe
+  half — types, the `computeMapWinrates`/`computeSummary` pure derivations, and
+  formatters — is [lib/faceit-scouting-shared.ts](lib/faceit-scouting-shared.ts).
+- **The headline graphic** is
+  [MapWinrateChart](components/dashboard/scouting/MapWinrateChart.tsx): a **thin
+  horizontal bar per map**, sorted by win rate, the bar width tracking win rate
+  against a 0–100% scale (inline CSS-track bars, no chart lib — the OW dashboard's
+  meter idiom). Only matches whose overview has landed (a known `map_name` from
+  the DETAIL phase) count, and low-sample maps (`< LOW_SAMPLE` games) are muted so
+  one lucky game doesn't read as loud as a 40-game trend.
+  [FaceitMatchList](components/dashboard/scouting/FaceitMatchList.tsx) shows the
+  recent matches (map, score, the player's own K/D/A) beneath it, close to the
+  `pd_*` `MatchList` idiom. **Deferred** (the user flagged the approach as open):
+  the richer analytics from the mockup — K/D-over-time regression, consistency
+  (CV/stdev), performance anomalies (>2 SD), damage-vs-healing, role distribution
+  — are not built yet; the collected `stats_json` scoreboard blobs carry the data
+  for them.
+
 ### Styling
 
 **No CSS framework.** `styles/theme.css` is the design system (every selector

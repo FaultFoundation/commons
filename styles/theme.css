@@ -7383,6 +7383,184 @@ button.ff-dash__link:hover {
 }
 
 /* =====================================================
+   FACEIT Scouting (Experimental → Scouting): search box,
+   scouted-player header, and the win-rate-by-map chart.
+   Reuses the OW page scaffold (.ff-owpage) + the pd_*
+   match list (.ff-pdmatch*).
+   ===================================================== */
+
+/* Search box — a text input + submit on one row, wrapping on narrow widths. */
+.ff-scoutsearch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+.ff-scoutsearch__input {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+/* Scouted-player header — avatar, identity, out-link/refresh, and a stat strip. */
+.ff-scouthead {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ff-scouthead__body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.ff-scouthead__avatar {
+  width: 64px;
+  height: 64px;
+  flex: none;
+  border-radius: var(--ff-radius-md);
+  object-fit: cover;
+  background: var(--ff-surface-2);
+  border: 2px solid var(--ff-accent);
+}
+.ff-scouthead__avatar--empty {
+  border: 2px solid var(--ff-border);
+}
+.ff-scouthead__meta {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.ff-scouthead__name {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: var(--ff-dash-text-xl);
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+.ff-scouthead__collecting {
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ff-accent);
+}
+.ff-scouthead__sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+}
+.ff-scouthead__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.ff-scouthead__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ff-border);
+}
+
+/* Win-rate-by-map bar chart — thin horizontal bars, label · track · value. */
+.ff-scoutmap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ff-scoutmap__summary {
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-scoutmap__row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.2fr) minmax(0, 3fr) minmax(140px, auto);
+  align-items: center;
+  gap: 14px;
+}
+.ff-scoutmap__row--low {
+  opacity: 0.5;
+}
+.ff-scoutmap__label {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  min-width: 0;
+}
+.ff-scoutmap__map {
+  font-weight: 700;
+  font-size: var(--ff-dash-text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ff-scoutmap__mode {
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-scoutmap__track {
+  height: 10px;
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-surface-2);
+  overflow: hidden;
+}
+.ff-scoutmap__bar {
+  height: 100%;
+  border-radius: var(--ff-radius-pill);
+  background: linear-gradient(90deg, var(--ff-blue), var(--ff-accent));
+  min-width: 2px;
+}
+.ff-scoutmap__value {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  justify-content: flex-end;
+  text-align: right;
+  white-space: nowrap;
+}
+.ff-scoutmap__pct {
+  font-size: var(--ff-dash-text-md);
+  font-weight: 800;
+  color: var(--ff-accent);
+}
+.ff-scoutmap__record {
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+/* Ticks mirror the row grid so 0/50/100% land under the track column. */
+.ff-scoutmap__axis {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.2fr) minmax(0, 3fr) minmax(140px, auto);
+  gap: 14px;
+  margin-top: 2px;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-scoutmap__ticks {
+  grid-column: 2;
+  display: flex;
+  justify-content: space-between;
+}
+@media (max-width: 560px) {
+  .ff-scoutmap__row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .ff-scoutmap__value {
+    justify-content: flex-start;
+  }
+  .ff-scoutmap__axis {
+    display: none;
+  }
+}
+
+/* =====================================================
    Cross-provider player data (external teams + matches)
    — the Teams tab's external cards, the external team
    detail view, and the Statistics → Match Data tab.

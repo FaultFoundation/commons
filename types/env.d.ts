@@ -84,4 +84,16 @@ interface CloudflareEnv {
   // secret — OverFast needs no auth to read a public career profile. The separate
   // ow-stats-poller Worker reads the same var from its own config.
   OVERFAST_API_URL?: string;
+  // FACEIT Scouting (lib/faceit-scouting.ts). The Scouting tab reads the
+  // search-driven `faceit_*` cache directly off the OW binding, but COLLECTING a
+  // newly-searched player is done by the ow-data Worker (which owns the
+  // faceit-collect engine). OW_DATA_URL is that Worker's base URL — include the
+  // scheme (https://…); a bare hostname is tolerated (the code prepends https://)
+  // but store the full URL, e.g. http://localhost:8787 for a local wrangler dev
+  // or https://ow-data.<subdomain>.workers.dev in prod. OW_POLLER_SECRET is the
+  // bearer it checks (must match the ow-data Worker's own OW_POLLER_SECRET — the
+  // same secret that gates its /run and /faceit/* routes). Both unset → the tab
+  // still reads any already-cached players but can't trigger new collections.
+  OW_DATA_URL?: string;
+  OW_POLLER_SECRET?: string;
 }

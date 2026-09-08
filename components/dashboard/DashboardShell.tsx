@@ -57,6 +57,10 @@ const NAV_ITEMS: NavItem[] = [
       // the profile header), not further rail children. Overwatch is the only
       // game today.
       { key: "statistics", label: "Statistics", href: "/statistics/" },
+      // FACEIT opponent scouting — search any FACEIT OW player and read their
+      // win rate by map (over the `faceit_*` search cache the ow-data Worker
+      // fills). See the FACEIT scouting section of CLAUDE.md.
+      { key: "scouting", label: "Scouting", href: "/scouting/" },
     ],
   },
 ];

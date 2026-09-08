@@ -119,3 +119,14 @@ BETTER_AUTH_URL=http://localhost:3999
 # self-hosted OverFast (Docker) if the public one rate-limits you. Not a secret.
 # The daily poller (the separate ow-stats-poller repo) reads its own copy of this.
 # OVERFAST_API_URL=https://overfast-api.tekrop.fr
+
+# Optional — FACEIT Scouting tab (Experimental → Scouting). The tab reads the
+# `faceit_*` search cache directly off the OW binding, but collecting a
+# newly-searched player is triggered on the ow-data Worker. OW_DATA_URL is that
+# Worker's base URL — INCLUDE THE SCHEME (e.g. http://localhost:8787 for a local
+# `wrangler dev`, or https://ow-data.<subdomain>.workers.dev in prod).
+# OW_POLLER_SECRET must match the same secret set on the ow-data Worker (it gates
+# its /run and /faceit/* routes). Leave both unset and the tab still reads any
+# already-cached players — it just can't kick off new searches.
+# OW_DATA_URL=http://localhost:8787
+# OW_POLLER_SECRET=replace-with-a-long-random-string

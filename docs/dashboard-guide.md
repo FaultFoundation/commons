@@ -503,8 +503,11 @@ shell.
 ### Rail groups (a tab with sub-tabs)
 
 A `NAV_ITEMS` entry with `children` and **no** `href` is a group: clicking it
-expands a recessed dropdown of its sub-tabs beneath its own row, in place, with
-every sibling tab still on screen. There are two:
+expands a dropdown of its sub-tabs beneath its own row, in place, with every
+sibling tab still on screen. The sub-tabs are ordinary rail links — same
+surface, size, weight and colour as every other tab — set apart only by an
+indent; the tray itself is transparent, so it is whatever colour the rail
+around it is. There are two:
 
 | Group          | Sub-tabs                | Why it's a group |
 | -------------- | ----------------------- | ---------------- |

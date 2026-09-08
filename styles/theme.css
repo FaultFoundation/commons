@@ -1072,11 +1072,11 @@ html[data-auth="in"] .ff-auth-when-out {
   top: calc(var(--ff-header-h) + 20px);
   padding: 16px;
 }
-/* One-level rail: a tab with sub-tabs expands IN PLACE into a recessed
-   dropdown under its own row. Nothing slides and nothing leaves the screen,
-   so the sibling tabs stay one click away and there is no Back control to
-   find — which is also why depth is carried by the surface (a darker, sunken
-   tray) rather than by position. */
+/* One-level rail: a tab with sub-tabs expands IN PLACE into a dropdown under
+   its own row. Nothing slides and nothing leaves the screen, so the sibling
+   tabs stay one click away and there is no Back control to find. The tray
+   borrows the rail's own surface and the sub-tabs the rail's own type; the
+   only thing marking them as belonging to the tab above is their indent. */
 .ff-dash__nav-list {
   display: grid;
   gap: 4px;
@@ -1138,28 +1138,24 @@ html[data-auth="in"] .ff-auth-when-out {
   min-height: 0;
   overflow: hidden;
 }
-/* Darker than the rail card it sits in, with the shadow inset under its top
-   lip, so the tray reads as cut INTO the rail rather than laid on top of it.
-   Deliberately not --ff-surface-2: every surface token in the set lightens
-   against the page, and this is the one surface that digs down. */
+/* The tray carries NO surface of its own: transparent, so it is the same
+   colour as whatever it sits on — the rail card on desktop, the drawer's page
+   background on a phone. An earlier pass gave it a darker inset tray to say
+   "these belong to the tab above"; the indent below says it more quietly, and
+   a second surface inside the rail read as a patch rather than as depth. */
 .ff-dash__sublist {
   display: grid;
   gap: 2px;
   margin-top: 4px;
-  padding: 6px;
-  border-radius: var(--ff-radius-md);
-  background: rgba(0, 0, 0, 0.24);
-  box-shadow:
-    inset 0 2px 6px rgba(0, 0, 0, 0.36),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.22),
-    0 1px 0 rgba(255, 255, 255, 0.05);
+  padding: 0;
+  background: transparent;
 }
-/* Subordinate to the tab above it: dimmer and a step down the type scale until
-   hovered or current, both of which are inherited from .ff-dash__link below. */
+/* Same size, weight and colour as every other tab — a sub-tab is a tab, and
+   dimming it made the group look half-disabled. Subordination is carried by
+   the indent alone (the base padding plus one step), so hover and current
+   still come straight from .ff-dash__link below. */
 .ff-dash__link--child {
-  padding: 8px 12px;
-  font-size: var(--ff-dash-text-sm);
-  color: var(--ff-text-dim);
+  padding: 10px 14px 10px 28px;
 }
 a.ff-dash__link:hover,
 button.ff-dash__link:hover {
@@ -1339,6 +1335,11 @@ button.ff-dash__link:hover {
     display: grid;
     gap: 2px;
     margin-top: 4px;
+  }
+  /* The tablet block's pill padding applies at this width too and would
+     flatten the indent, which is now the only thing marking a sub-tab. */
+  .ff-dash__link--child {
+    padding-left: 28px;
   }
   .ff-dash__link {
     white-space: normal;

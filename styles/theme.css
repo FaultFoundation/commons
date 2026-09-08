@@ -4246,8 +4246,12 @@ button.ff-dash__link:hover {
   background: rgba(255, 255, 255, 0.6);
 }
 
-/* Featured hero — the big, full-width tile at the top of the Active view. */
-.ff-tcard--hero {
+/* Featured hero — the big, full-width tile at the top of the Active view. The
+   gap below it belongs to the WRAPPER, not the card: `.ff-tcard__corner` is
+   positioned against `.ff-tcard-wrap`, and a margin on the flex child grows that
+   box past the card's own bottom edge — which pushed the corner marks flush to
+   the border, so the hero looked unpadded next to every other card. */
+.ff-tcard-wrap--hero {
   margin-bottom: 16px;
 }
 .ff-tcard--hero .ff-tcard__banner {
@@ -7794,7 +7798,6 @@ button.ff-dash__link:hover {
   /* Marks/space let clicks through to the card link; only the "?" is a button. */
   pointer-events: none;
 }
-.ff-tcard-wrap--hero .ff-tcard__corner { right: 16px; bottom: 16px; }
 .ff-tcard__marks { display: inline-flex; align-items: center; gap: 10px; }
 .ff-tcard__correct {
   pointer-events: auto;

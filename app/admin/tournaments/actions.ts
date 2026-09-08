@@ -20,6 +20,7 @@ import {
 import { getDb } from "@/lib/db";
 import { GAME_OVERWATCH_ID, PROGRAM_COLLEGIATE_ID } from "@/lib/programs";
 import { requireStaffCapability } from "@/lib/staff";
+import { invalidateTournamentEntries } from "@/lib/tournament-entries";
 import {
   buildSnapshot,
   getParticipantCount,
@@ -72,12 +73,16 @@ async function requireActor(): Promise<ActionResult<{ userId: string }>> {
 }
 
 /** Refresh the admin surfaces plus the public ones a change touches. Takes the
-    name because the public path derives its cosmetic segment from it. */
-function revalidateTournament(tournamentId: string, name?: string) {
+    name because the public path derives its cosmetic segment from it.
+    Also drops the shared tournament-list cache: Next's route revalidation only
+    invalidates rendered output, and the list is cached in D1 BEHIND that, so
+    without this a staff edit would sit unseen until the TTL lapsed. */
+async function revalidateTournament(tournamentId: string, name?: string) {
   revalidatePath("/admin/tournaments/", "layout");
   revalidatePath(`/admin/tournaments/${tournamentId}/`, "layout");
   revalidatePath("/tournaments/", "layout");
   if (name) revalidatePath(tournamentPath(tournamentId, name), "layout");
+  await invalidateTournamentEntries();
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +144,7 @@ export async function createTournament(input: {
     updatedAt: now,
   });
 
-  revalidateTournament(id, name);
+  await revalidateTournament(id, name);
   return { ok: true, tournamentId: id };
 }
 
@@ -273,7 +278,7 @@ export async function updateTournamentSettings(
     .where(eq(tournaments.id, tournamentId));
 
   const newName = (fields.name as string | undefined) ?? tournament.name;
-  revalidateTournament(tournamentId, newName);
+  await revalidateTournament(tournamentId, newName);
   if (newName !== tournament.name) {
     revalidatePath(tournamentPath(tournamentId, tournament.name), "layout");
   }
@@ -322,7 +327,7 @@ export async function setTournamentFeatured(
       .where(eq(tournaments.id, tournamentId));
   }
 
-  revalidateTournament(tournamentId, tournament.name);
+  await revalidateTournament(tournamentId, tournament.name);
   return { ok: true };
 }
 
@@ -406,7 +411,7 @@ export async function setTournamentStatus(
   if (!result.ok) return result;
 
   await buildSnapshot(tournamentId);
-  revalidateTournament(tournamentId, tournament.name);
+  await revalidateTournament(tournamentId, tournament.name);
   return { ok: true };
 }
 
@@ -477,7 +482,7 @@ export async function saveSeeds(
   );
 
   await buildSnapshot(tournamentId);
-  revalidateTournament(tournamentId, tournament.name);
+  await revalidateTournament(tournamentId, tournament.name);
   return { ok: true };
 }
 
@@ -509,7 +514,7 @@ export async function startTournament(tournamentId: string): Promise<ActionResul
   if (!moved.ok) return moved;
 
   await buildSnapshot(tournamentId);
-  revalidateTournament(tournamentId, tournament.name);
+  await revalidateTournament(tournamentId, tournament.name);
   return { ok: true };
 }
 
@@ -550,7 +555,7 @@ export async function reportResult(
     .set({ version: tournament.version + 1, updatedAt: new Date() })
     .where(eq(tournaments.id, tournamentId));
   await buildSnapshot(tournamentId);
-  revalidateTournament(tournamentId, tournament.name);
+  await revalidateTournament(tournamentId, tournament.name);
   return { ok: true };
 }
 
@@ -580,7 +585,7 @@ export async function resetBracket(tournamentId: string): Promise<ActionResult> 
     .where(eq(tournaments.id, tournamentId));
 
   await buildSnapshot(tournamentId);
-  revalidateTournament(tournamentId, tournament.name);
+  await revalidateTournament(tournamentId, tournament.name);
   return { ok: true };
 }
 
@@ -609,7 +614,7 @@ export async function deleteTournament(tournamentId: string): Promise<ActionResu
   ]);
   await deleteAvatarByUrl(tournament.bannerUrl);
 
-  revalidateTournament(tournamentId, tournament.name);
+  await revalidateTournament(tournamentId, tournament.name);
   return { ok: true };
 }
 
@@ -654,7 +659,7 @@ export async function uploadTournamentBanner(
     await deleteAvatarByUrl(tournament.bannerUrl);
   }
 
-  revalidateTournament(tournamentId, tournament.name);
+  await revalidateTournament(tournamentId, tournament.name);
   return { ok: true };
 }
 
@@ -673,6 +678,6 @@ export async function removeTournamentBanner(
     .where(eq(tournaments.id, tournamentId));
   await deleteAvatarByUrl(tournament.bannerUrl);
 
-  revalidateTournament(tournamentId, tournament.name);
+  await revalidateTournament(tournamentId, tournament.name);
   return { ok: true };
 }

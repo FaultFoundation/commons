@@ -319,6 +319,24 @@ export const getAuth = cache(function getAuth() {
     // bounds revocation/profile staleness; privileged staff and unlock state is
     // still re-derived by its own gates rather than trusted from the session.
     session: {
+      // Both were Better Auth's defaults; they are spelled out because the
+      // pair IS the sign-in lifetime and reading it out of the library was a
+      // step in diagnosing "members get logged out randomly". A session lives
+      // 7 days, and `updateAge` makes that ROLLING: any request more than a day
+      // after the last refresh extends it another 7. So an active member is
+      // never signed out, and only a 7-day absence ends a session.
+      //
+      // Deliberately no "remember me" checkbox. Better Auth's rememberMe:false
+      // does not mean "a shorter number of days" — it means a 1-day row plus a
+      // cookie with no maxAge, so the member is signed out when they close the
+      // browser. With auto-logouts being the live complaint, an unchecked box
+      // would read as the bug getting worse. Overriding `expiresAt` in a
+      // create hook to split the two durations does not work either: the
+      // refresh test is `expiresAt - expiresIn + updateAge <= now`, which a
+      // shortened expiresAt makes permanently true, so every request refreshes
+      // and silently promotes the session back to the long duration.
+      expiresIn: 60 * 60 * 24 * 7,
+      updateAge: 60 * 60 * 24,
       cookieCache: {
         enabled: true,
         maxAge: 60,

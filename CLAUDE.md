@@ -287,7 +287,7 @@ scrubs the query, and on success resumes `next` (re-sanitized with
 `sanitizeNextPath`). The rail opens the same dialog when the Admin group is
 clicked, *before* the sub-tabs drop open — `DashboardShell` passes `adminLocked`,
 which is a cookie read with no D1 cost. The rail now holds a second group
-(**Experimental**: Home, Statistics), so that prompt is keyed on
+(**Experimental**: Series, Statistics, Scouting), so that prompt is keyed on
 `item.key === "admin"`, never on "this item has children" — a group is a UI
 shape, not a permission boundary. That flag is UX only; the boundary is still
 AdminGate plus `requireAdminUnlock` inside every privileged action.
@@ -666,6 +666,27 @@ local dev).
   daily metadata reconciliation; its snapshot `fetchedAt` is cache freshness,
   not evidence that a match happened. Never guess lifecycle from fetch time or
   parse every bracket payload on the list path.
+- **The list is built once and cached, not per request.**
+  [lib/tournament-entries.ts](lib/tournament-entries.ts) `loadTournamentEntries()`
+  is the ONE way to get the unified list — the Tournaments tab, the Series tab
+  and `lib/home.ts` all go through it, and `/home/` is the portal's landing
+  page, so this is the hottest read in the app. Built live it costs ~2.4k
+  `ext_tournaments` rows (including ~1.4MB of description prose), an
+  `ext_events` group-by, a ~32k-row aggregate join over `ext_matches`, and a
+  full pass of the discovery classifier's regexes over that prose. Its output is
+  IDENTICAL for every member — `enrichDiscovery` reads only the global
+  `discovery_*` overlay, and the per-member `follows` is a separate query — so it
+  is cached as one row in `tournament_list_cache` (website-sql) and rebuilt
+  lazily past a 10-minute TTL, the same seam as `tournament_brackets` one level
+  up. Whichever reader claims `lease_until` rebuilds; the rest serve the stale
+  copy rather than stampeding cen-sql (the `claimSync` idiom in
+  [lib/schedule.ts](lib/schedule.ts)). Admin tournament mutations call
+  `invalidateTournamentEntries()` so a staff edit doesn't wait out the TTL —
+  Next's `revalidatePath` only invalidates rendered output, and this cache sits
+  BEHIND it. Every failure degrades to building live. **A new caller wanting the
+  list calls `loadTournamentEntries()`; never re-derive it from
+  `listExternalTournaments()` directly**, or that surface silently reintroduces
+  the per-request cost.
 - The list ([app/tournaments/page.tsx](app/tournaments/page.tsx)) merges both
   into one `TournamentListEntry[]`; external cards carry a `source`, show the
   scraped `banner_url`, and link **into** the branded Commons view (not out).

@@ -21,10 +21,12 @@ import {
   type StaffRole,
 } from "@/lib/staff-shared";
 
-/** Top-level rail keys. Home and Statistics are no longer among them — they
-    are sub-tabs of the Experimental group, so their pages pass
-    `active="experimental"` with an `activeChild`. */
+/** Top-level rail keys. Statistics is not among them — it is a sub-tab of the
+    Experimental group, so its page passes `active="experimental"` with an
+    `activeChild`. Home is top-level: it is where sign-in lands, so it leads the
+    rail rather than sitting inside a group the member has to open. */
 export type DashboardNavKey =
+  | "home"
   | "schedule"
   | "tournaments"
   | "teams"
@@ -34,6 +36,10 @@ export type DashboardNavKey =
 
 /** Items without an href have no page yet: rendered dimmed and inert. */
 const NAV_ITEMS: NavItem[] = [
+  // First, and top-level: /home/ is the post-sign-in landing page and the
+  // AdminGate's redirect target, so the rail's own entry for it has to be
+  // reachable in one click rather than behind the Experimental dropdown.
+  { key: "home", label: "Home", href: "/home/" },
   { key: "schedule", label: "Schedule", href: "/schedule/" },
   { key: "tournaments", label: "Tournaments", href: "/tournaments/" },
   { key: "teams", label: "Teams", href: "/teams/" },
@@ -41,15 +47,13 @@ const NAV_ITEMS: NavItem[] = [
   // only the label reads "Settings".
   { key: "account", label: "Settings", href: "/account/" },
   // Surfaces that are still being shaped live behind one group rather than
-  // sitting among the finished tabs. The routes are unchanged — /home/ is
-  // still where sign-in lands — only where the rail offers them moved. It is
-  // the second group after Admin, and the SAME dropdown mechanism: a group is
-  // no longer an admin-only shape.
+  // sitting among the finished tabs. The routes are unchanged — only where the
+  // rail offers them moved. It is the second group after Admin, and the SAME
+  // dropdown mechanism: a group is no longer an admin-only shape.
   {
     key: "experimental",
     label: "Experimental",
     children: [
-      { key: "home", label: "Home", href: "/home/" },
       // Grouped competition — the series/league rail that used to sit above
       // the /tournaments/ list, plus Discord-sourced tournaments.
       { key: "series", label: "Series", href: "/series/" },

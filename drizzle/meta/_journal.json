@@ -169,6 +169,13 @@
       "when": 1788719171859,
       "tag": "0023_pale_hex",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1788905942384,
+      "tag": "0024_known_random",
+      "breakpoints": true
     }
   ]
 }

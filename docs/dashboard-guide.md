@@ -10,7 +10,7 @@ now 308s via `middleware.ts`). `/` stays the public Commons landing page.
 
 | Route                          | Tab         | What                         |
 | ------------------------------ | ----------- | ---------------------------- |
-| `/home/`                       | Experimental › Home | The member's board of pinned bubbles |
+| `/home/`                       | Home                | The member's board of pinned bubbles (top-level: sign-in lands here) |
 | `/schedule/`                   | Schedule    | All/public + personal match calendar |
 | `/tournaments/`                | Tournaments | List of open/live/finished tournaments |
 | `/series/`                     | Experimental › Series | Series & leagues + Discord-sourced tournaments |

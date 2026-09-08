@@ -785,6 +785,32 @@ export const tournamentBrackets = sqliteTable("tournament_brackets", {
     .$defaultFn(() => new Date()),
 });
 
+// The unified tournament LIST, built once and shared by every reader — the same
+// "cache the expensive shape, refresh lazily on read" seam as
+// `tournament_brackets` above, one level up.
+//
+// Why it exists: `loadTournamentEntries()` is the most expensive read in the
+// app and runs on /home/ (the landing page), /tournaments/ and /series/. Built
+// live it costs ~2.4k rows of ext_tournaments (incl. ~1.4MB of description
+// prose), an ext_events group-by, a ~32k-row aggregate join over ext_matches,
+// and a full pass of the discovery classifier's regexes over that prose — per
+// request, for output that is IDENTICAL for every member (enrichDiscovery reads
+// only global overlay tables; the per-member `follows` is a separate query).
+//
+// Deliberately ONE row (`id` is always LIST_CACHE_ID). `lease_until` is the
+// rebuild lease, claimed atomically before the work so concurrent readers serve
+// the stale payload instead of stampeding cen-sql — the claimSync idiom in
+// lib/schedule.ts. Admin tournament mutations clear `built_at` rather than
+// waiting out the TTL, so a staff edit shows up immediately.
+export const tournamentListCache = sqliteTable("tournament_list_cache", {
+  id: text("id").primaryKey(),
+  /** JSON: the enriched TournamentListEntry[] exactly as the pages consume it. */
+  payload: text("payload").notNull(),
+  builtAt: integer("built_at", { mode: "timestamp_ms" }).notNull(),
+  /** Held until this instant by whichever request is rebuilding; null when free. */
+  leaseUntil: integer("lease_until", { mode: "timestamp_ms" }),
+});
+
 // A member's individual matches on a connected external platform (FACEIT /
 // start.gg / Challonge), for the pending personal calendar. These are flat,
 // per-user schedule rows the calendar reads — populated by the schedule sync

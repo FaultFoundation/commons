@@ -51,7 +51,7 @@ export default async function HomePage() {
   });
 
   return (
-    <DashboardShell active="experimental" activeChild="home" setupUserId={userId}>
+    <DashboardShell active="home" setupUserId={userId}>
       <h1 className="screen-reader-text">Home</h1>
       <DashboardDataRefresh schedule={Boolean(data.schedule)} tournaments={Boolean(data.tournaments)} />
       <HomeBoard initialLayout={layout} data={data} />

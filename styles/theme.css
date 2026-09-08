@@ -3982,8 +3982,25 @@ button.ff-dash__link:hover {
   outline: none;
   border-color: var(--ff-accent);
 }
+/* The grid's section head — deliberately the same shape as the Series &
+   leagues head above it (name left, dim count on the baseline beside it), so
+   the two sections inside the bubble read as siblings. The bubble's own title
+   is hidden here; this row is it. */
+.ff-list-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.ff-list-heading h2 {
+  margin: 0;
+  font-size: var(--ff-dash-text-lg);
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
 .ff-list-count {
-  margin: 0 0 12px;
+  margin: 0;
   color: var(--ff-text-dim);
   font-size: var(--ff-dash-text-sm);
 }

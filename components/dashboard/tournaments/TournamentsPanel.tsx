@@ -27,7 +27,14 @@ export function TournamentsPanel({
   follows?: string[];
 }) {
   return (
-    <Bubble title="Tournaments" {...mergeChrome(chrome, { span: "full" })}>
+    // `titleHidden` on both surfaces: the list renders its own "Tournaments"
+    // section head beside the matching-count, so a visible bubble title would
+    // just repeat it. On Home the header row survives for the board's chrome.
+    <Bubble
+      title="Tournaments"
+      titleHidden
+      {...mergeChrome(chrome, { span: "full" })}
+    >
       <TournamentList
         tournaments={tournaments}
         initialLayout={initialLayout}

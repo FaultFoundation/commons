@@ -398,14 +398,22 @@ export function TournamentList({
       {view !== "concluded" ? (
         <DiscoveryRail tournaments={visibleTournaments} />
       ) : null}
-      <p className="ff-list-count" aria-live="polite">
-        {view === "concluded"
-          ? concluded.length
-          : view === "all"
-            ? all.length + (featured ? 1 : 0)
-            : upcoming.length + past.length + (featured ? 1 : 0)}{" "}
-        matching tournaments
-      </p>
+      {/* The grid's own section head, built like the "Series & leagues" one
+          above it: the name left, the dim count beside it. This is where the
+          word "Tournaments" lives now — TournamentsPanel hides the bubble's
+          title so the card carries one heading, not two saying the same
+          thing. */}
+      <div className="ff-list-heading">
+        <h2>Tournaments</h2>
+        <span className="ff-list-count" aria-live="polite">
+          {view === "concluded"
+            ? concluded.length
+            : view === "all"
+              ? all.length + (featured ? 1 : 0)
+              : upcoming.length + past.length + (featured ? 1 : 0)}{" "}
+          matching tournaments
+        </span>
+      </div>
       {isEmpty ? (
         <p className="ff-ticket-empty">{Object.values(filters).some(Boolean) || selectedGames.size ? "No tournaments match these filters. Try clearing a filter or choosing All." : emptyMessage}</p>
       ) : (

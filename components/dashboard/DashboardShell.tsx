@@ -21,28 +21,41 @@ import {
   type StaffRole,
 } from "@/lib/staff-shared";
 
+/** Top-level rail keys. Home and Statistics are no longer among them — they
+    are sub-tabs of the Experimental group, so their pages pass
+    `active="experimental"` with an `activeChild`. */
 export type DashboardNavKey =
-  | "home"
   | "schedule"
   | "tournaments"
-  | "statistics"
   | "teams"
   | "account"
+  | "experimental"
   | "admin";
 
 /** Items without an href have no page yet: rendered dimmed and inert. */
 const NAV_ITEMS: NavItem[] = [
-  { key: "home", label: "Home", href: "/home/" },
   { key: "schedule", label: "Schedule", href: "/schedule/" },
   { key: "tournaments", label: "Tournaments", href: "/tournaments/" },
-  // A plain top-level tab — the Player/Match split is browser-style tabs INSIDE
-  // the page (under the profile header), not a rail slide-out. Overwatch is the
-  // only game today.
-  { key: "statistics", label: "Statistics", href: "/statistics/" },
   { key: "teams", label: "Teams", href: "/teams/" },
   // Route stays /account/ (many callbackURLs and OAuth redirects point at it);
   // only the label reads "Settings".
   { key: "account", label: "Settings", href: "/account/" },
+  // Surfaces that are still being shaped live behind one group rather than
+  // sitting among the finished tabs. The routes are unchanged — /home/ is
+  // still where sign-in lands — only where the rail offers them moved. It is
+  // the second group after Admin, and the SAME dropdown mechanism: a group is
+  // no longer an admin-only shape.
+  {
+    key: "experimental",
+    label: "Experimental",
+    children: [
+      { key: "home", label: "Home", href: "/home/" },
+      // The Player/Match split is browser-style tabs INSIDE the page (under
+      // the profile header), not further rail children. Overwatch is the only
+      // game today.
+      { key: "statistics", label: "Statistics", href: "/statistics/" },
+    ],
+  },
 ];
 
 /**

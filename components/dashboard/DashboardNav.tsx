@@ -16,7 +16,7 @@ const AdminUnlockDialog = dynamic(
 );
 
 // The sidebar rail, extracted from DashboardShell as a client island because it
-// now holds interactive state: a tab with sub-tabs (currently only Admin)
+// now holds interactive state: a tab with sub-tabs (Admin, Experimental)
 // expands IN PLACE into a recessed dropdown beneath its own row, rather than
 // sliding the whole rail across to a second panel. Everything stays on screen —
 // the sibling tabs never leave, so there is nothing to go "Back" from, and the

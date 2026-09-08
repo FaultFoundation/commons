@@ -33,7 +33,11 @@ export default async function StatisticsPage({ searchParams }: { searchParams: P
   const linked = links.some((r) => r.providerId === "battlenet");
 
   return (
-    <DashboardShell active="statistics" setupUserId={userId}>
+    <DashboardShell
+      active="experimental"
+      activeChild="statistics"
+      setupUserId={userId}
+    >
       <h1 className="screen-reader-text">Statistics</h1>
       <StatisticsView
         // Left undefined when the URL asked for nothing, so the view can fall

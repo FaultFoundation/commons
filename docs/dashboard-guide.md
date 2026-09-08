@@ -10,14 +10,14 @@ now 308s via `middleware.ts`). `/` stays the public Commons landing page.
 
 | Route                          | Tab         | What                         |
 | ------------------------------ | ----------- | ---------------------------- |
-| `/home/`                       | Home        | Condensed widget views       |
+| `/home/`                       | Experimental › Home | The member's board of pinned bubbles |
 | `/schedule/`                   | Schedule    | All/public + personal match calendar |
 | `/tournaments/`                | Tournaments | List of open/live/finished tournaments |
 | `/t/<id>/<name>/`              | —           | Public branded bracket (signed-out-safe) |
 | `/admin/tournaments/`          | Admin       | Create + manage (Challonge-backed) |
 | `/teams/`                      | Teams       | Your teams + create          |
 | `/teams/<teamId>/`             | Teams       | One team: roster, invites, settings, tournaments. External (`provider:id`) ids render the read-only synced view |
-| `/statistics/`                 | Statistics  | Player Data (Overwatch) + Match Data (cross-provider) tabs |
+| `/statistics/`                 | Experimental › Statistics | Player Data (Overwatch) + Match Data (cross-provider) tabs |
 | `/join/<token>/`               | —           | Invite landing (join a team) |
 | `/account/`                    | Account     | Profile / integrations       |
 | `/account/setup/`              | —           | Resolver → current step      |
@@ -264,7 +264,14 @@ import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 <Bubble title="Danger Zone" variant="danger" span="full">…</Bubble>
 ```
 
-- `title` — Title Case, rendered as an `h2`.
+- `title` — Title Case, rendered as an `h2`. Always required, even with
+  `titleHidden`.
+- `titleHidden` — keeps the `h2` for assistive tech but takes it out of the
+  layout, and drops the header row entirely when there is nothing else in it.
+  For the one case where the bubble's BODY already carries the same heading as
+  its own section head: `TournamentsPanel` passes it because the list renders
+  "Tournaments · N matching tournaments" above the grid. Not a way to ship an
+  unlabelled card — if the body has no heading of its own, don't reach for it.
 - `variant` — `"default"` | `"danger"` (red border/title) | `"wip"`
   (dimmed title; pair with a `.ff-bubble__wip` placeholder body).
 - `span="full"` — spans the whole grid row. **Required on every page's first
@@ -492,6 +499,34 @@ tab active, no banner) and draws the numbered step rail. Takes `step: 1 | 2
 
 That's it — the strip, sidebar, and responsive behavior come from the
 shell.
+
+### Rail groups (a tab with sub-tabs)
+
+A `NAV_ITEMS` entry with `children` and **no** `href` is a group: clicking it
+expands a recessed dropdown of its sub-tabs beneath its own row, in place, with
+every sibling tab still on screen. There are two:
+
+| Group          | Sub-tabs                | Why it's a group |
+| -------------- | ----------------------- | ---------------- |
+| `experimental` | Home, Statistics        | Surfaces still being shaped, kept out of the finished tabs |
+| `admin`        | Support, Verification, Teams, Tournaments, Staff | Staff-only; the group is absent entirely for a member with no capability |
+
+A page inside a group passes **both** halves of the active state —
+`active="<group key>" activeChild="<child key>"` — which is what lands the
+member with the group already expanded and the sub-tab marked current. Forget
+`activeChild` and the page renders fine but the rail looks like nothing is
+selected.
+
+**A group is a plain UI shape, not a permission boundary.** Only the Admin group
+prompts for a two-factor unlock before it expands, and `DashboardNav` keys that
+on `item.key === "admin"` rather than on "has children" — so adding a group
+never accidentally puts a lock in front of it, and never accidentally leaves one
+off. The real boundary is `AdminGate` plus `requireAdminUnlock` in every
+privileged action; the rail's `adminLocked` flag is UX only.
+
+The routes are independent of the grouping: moving a page under a group changes
+where the rail offers it and nothing else. `/home/` is still where sign-in
+lands, and every existing link and `callbackURL` keeps working.
 
 ## Recipe: add a new bubble to a tab
 

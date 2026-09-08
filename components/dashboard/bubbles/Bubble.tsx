@@ -9,6 +9,7 @@ import type { ComponentPropsWithoutRef, ReactNode } from "react";
 export function Bubble({
   id,
   title,
+  titleHidden,
   variant = "default",
   span,
   className,
@@ -21,6 +22,12 @@ export function Bubble({
   /** Anchor target, for pages that get deep-linked to a specific card. */
   id?: string;
   title: string;
+  /** Keep the title for assistive tech but take it out of the layout, for the
+      rare bubble whose BODY already carries the same heading as its own
+      section head (the tournaments list). The card still has exactly one
+      visible heading — it just lives with the content it names. Not a way to
+      ship an unlabelled card: the title stays required and is still read. */
+  titleHidden?: boolean;
   /** "danger" = red destructive card, "wip" = dimmed placeholder card. */
   variant?: "default" | "danger" | "wip";
   /** "full" spans the whole bubble grid row. Universal rule: the FIRST bubble
@@ -48,15 +55,30 @@ export function Bubble({
   if (dragHandle) classes.push("ff-bubble--has-grip");
   if (className) classes.push(className);
 
+  // With the title hidden and nothing else to place, the header row would
+  // contribute only its gap, so it is dropped and the clipped heading stands
+  // alone. Any host chrome (Home's reorder buttons) keeps the row, where the
+  // zero-width heading lets space-between hold the actions right as usual.
+  const headerless = titleHidden && !media && !actions;
+  const heading = (
+    <h2 className={titleHidden ? "screen-reader-text" : "ff-bubble__title"}>
+      {title}
+    </h2>
+  );
+
   return (
     <section id={id} className={classes.join(" ")} {...rest}>
-      <header className="ff-bubble__head">
-        <div className="ff-bubble__heading">
-          {media}
-          <h2 className="ff-bubble__title">{title}</h2>
-        </div>
-        {actions ? <div className="ff-bubble__actions">{actions}</div> : null}
-      </header>
+      {headerless ? (
+        heading
+      ) : (
+        <header className="ff-bubble__head">
+          <div className="ff-bubble__heading">
+            {media}
+            {heading}
+          </div>
+          {actions ? <div className="ff-bubble__actions">{actions}</div> : null}
+        </header>
+      )}
       <div className="ff-bubble__body">{children}</div>
       {dragHandle ? <div className="ff-bubble__grip">{dragHandle}</div> : null}
     </section>

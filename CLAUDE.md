@@ -286,7 +286,10 @@ modal ([AdminUnlockDialog](components/dashboard/admin/AdminUnlockDialog.tsx)),
 scrubs the query, and on success resumes `next` (re-sanitized with
 `sanitizeNextPath`). The rail opens the same dialog when the Admin group is
 clicked, *before* the sub-tabs drop open — `DashboardShell` passes `adminLocked`,
-which is a cookie read with no D1 cost. That flag is UX only; the boundary is still
+which is a cookie read with no D1 cost. The rail now holds a second group
+(**Experimental**: Home, Statistics), so that prompt is keyed on
+`item.key === "admin"`, never on "this item has children" — a group is a UI
+shape, not a permission boundary. That flag is UX only; the boundary is still
 AdminGate plus `requireAdminUnlock` inside every privileged action.
 
 Two things are load-bearing in that flow. `AdminGate` learns its own URL from
@@ -887,12 +890,13 @@ local dev).
 
 ### Overwatch player statistics — the third D1 (`ow-player-data`)
 
-The **Statistics** tab (`/statistics/`, a **plain top-level tab** — not a rail
-group) shows a member's Overwatch career, sourced from the unofficial **OverFast
+The **Statistics** page (`/statistics/`, a sub-tab of the **Experimental** rail
+group — see [docs/dashboard-guide.md](docs/dashboard-guide.md)) shows a member's Overwatch career, sourced
+from the unofficial **OverFast
 API** (`https://overfast-api.tekrop.fr`, which scrapes a player's public Blizzard
 career page by BattleTag). The **Player Data / Match Data** split is **browser-style
-tabs inside the page**, under a shared profile header (`.ff-owtab*`), deliberately
-not an admin-style rail group. "By game" is the intended shape; Overwatch is
+tabs inside the page**, under a shared profile header (`.ff-owtab*`) — the rail
+carries the page, never that split. "By game" is the intended shape; Overwatch is
 the only game today; Match Data is the cross-provider match history (next section).
 
 - **A THIRD D1, `ow-player-data`**, bound as **`OW`** ([db/ow-schema.ts](db/ow-schema.ts),

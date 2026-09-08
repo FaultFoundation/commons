@@ -139,6 +139,20 @@ export type DiscoveryFilters = {
   days: string;
   following: boolean;
 };
+/**
+ * Platforms the tournament list can filter by, and their labels — one list, so
+ * the popover's switches and the validator below cannot drift.
+ *
+ * **Discord is deliberately absent.** Discord-sourced tournaments never reach
+ * the general list (`withoutDiscordSourced` in lib/tournaments-shared.ts keeps
+ * them to the Series tab), so the facet could only ever return an empty page.
+ */
+export const DISCOVERY_SOURCE_FILTERS: { value: string; label: string }[] = [
+  { value: "startgg", label: "start.gg" },
+  { value: "faceit", label: "FACEIT" },
+  { value: "challonge", label: "Challonge" },
+];
+
 export const EMPTY_FILTERS: DiscoveryFilters = {
   query: "",
   audience: "",
@@ -163,12 +177,19 @@ export function asDiscoveryFilters(raw: unknown): DiscoveryFilters {
     const value = v[key];
     return typeof value === "string" && value.length <= 200 ? value : "";
   };
+  // `source` is checked against the offered platforms rather than merely
+  // type-checked: a filter persisted while "Discord" was still on offer would
+  // otherwise strand its owner on a permanently empty list, with no switch left
+  // in the popover to turn it back off.
+  const source = str("source");
   return {
     query: str("query"),
     audience: str("audience"),
     venue: str("venue"),
     competition: str("competition"),
-    source: str("source"),
+    source: DISCOVERY_SOURCE_FILTERS.some((o) => o.value === source)
+      ? source
+      : "",
     country: str("country"),
     registration: str("registration"),
     days: str("days"),

@@ -1241,8 +1241,19 @@ ordinary cards in the `/tournaments/` grid, which grouping never collapses.
 Moving it off the list changed one thing beyond placement: it groups **every**
 recorded tournament, not just the ones the list's filters currently show, since
 there are no filters on the Series tab to narrow it. That tab also carries a
-**Discord Tournaments** bubble (`source === "discord"`), wired and verified but
-dormant — no collector writes that source yet.
+**Discord Tournaments** bubble (`source === "discord"` — the cen-scraper's
+Discord ingestion, `discord_entities`/`discord_messages` in
+[db/cen-schema.ts](db/cen-schema.ts)), and it is the ONLY surface that shows
+them: `withoutDiscordSourced` ([lib/tournaments-shared.ts](lib/tournaments-shared.ts))
+strips them from the general list at both of its sources — the tournaments page
+and `lib/home.ts`'s `tournaments` source, which feeds the pinned tile and At a
+Glance. `listUpcomingExternalScheduleEntries` in
+[lib/external-tournaments.ts](lib/external-tournaments.ts) used to let `discord`
+past its `SCHEDULE_PROVIDERS` check explicitly on both layers (match rows and
+start-date entries); those escape hatches are gone, so the calendar excludes
+them too. Only a **series profile page** still shows one — a Discord tournament
+in a series is part of that series, and that page is reachable only from the
+Series tab.
 
 Run `node --test scripts/discovery.test.mjs` for classification, API authorization,
 concurrent review and rollback tests. The data audit and manual checklist are in

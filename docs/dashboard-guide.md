@@ -1033,12 +1033,34 @@ drops the old 8-row cap and renders an empty-state line instead of nothing,
 because a blank tab reads as broken where a missing rail read as "none today".
 
 Beneath it, a **Discord Tournaments** bubble lists entries whose `source` is
-`"discord"`. **Nothing writes that source today** — the collectors produce
-`startgg` and `faceit`, and internal Commons tournaments leave `source` unset —
-so the section renders its empty state until a collector projects Discord rows.
-It is wired end-to-end and verified against seeded local rows, so it needs no
-further work when that data arrives; the matching `Platform → Discord` facet in
-the tournament filter is equally dormant.
+`"discord"` — tournaments the **cen-scraper** ingests from forwarded Discord
+posts (`discord_messages` → extraction → `discord_entities`, migrated by its
+`migrations/0015` and `0017`; `lib/discord-tournaments.ts` reads the supplement
+side of it here). This is a real production source, not a placeholder: local dev
+cen-sql simply has none.
+
+**Discord-sourced tournaments appear ONLY on the Series tab.** Three places
+exclude them, and all three read the one rule in `lib/tournaments-shared.ts`
+(`withoutDiscordSourced` / `isDiscordSourced`), which the Series page inverts:
+
+| Surface | How |
+| ------- | --- |
+| `/tournaments/` | `withoutDiscordSourced` in `app/tournaments/page.tsx`, before the panel, so counts, filters, pagination and the featured hero all ignore them |
+| Home board | `withoutDiscordSourced` on the `tournaments` source in `lib/home.ts` — one filter for both the pinned Tournaments tile (literally the same panel the tab mounts) and At a Glance's active list, so the board can't disagree with the tab |
+| `/schedule/` calendar | `listUpcomingExternalScheduleEntries` (`lib/external-tournaments.ts`) had an explicit `\|\| source === "discord"` escape hatch on **both** its layers — the match rows and the no-matches-yet start-date entries. Both are gone, so `discord` now falls out with every other non-`SCHEDULE_PROVIDERS` source |
+
+The one place besides the Series tab that still shows them is a **series profile
+page** (`/tournaments/discovery/<id>/`) — a Discord tournament that belongs to a
+series is part of that series, and that page is only reachable from the Series
+tab. A Discord tournament's own detail page also still renders, since the Series
+tab's cards have to open somewhere.
+
+Because they can no longer reach the list, the `Platform → Discord` facet was
+removed from the filter popover — it could only ever have returned an empty
+page. The offered platforms are `DISCOVERY_SOURCE_FILTERS` in
+`lib/discovery-shared.ts`, and `asDiscoveryFilters` now validates `source`
+against that list, so a filter persisted while Discord was still on offer clears
+itself instead of stranding its owner on an empty list with no switch to undo.
 
 The page reads the **same** `loadTournamentEntries()` the Tournaments tab does
 and groups in the component, so it is not a second source of truth. Both bubbles

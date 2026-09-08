@@ -335,3 +335,34 @@ export type BracketSnapshot = SnapshotPayload & {
   version: number;
   nextPollMs: number | null;
 };
+
+// ---------------------------------------------------------------------------
+// Discord-sourced tournaments — Series tab only
+// ---------------------------------------------------------------------------
+
+/** The `source` value a Discord-projected tournament carries. */
+export const DISCORD_SOURCE = "discord";
+
+/**
+ * Discord-sourced tournaments are deliberately kept OFF the general tournament
+ * list. They surface only under Experimental → Series (`/series/`), which is
+ * also where the "Discord Tournaments" bubble lives, and on a series profile
+ * page reached from there — a Discord tournament that belongs to a series is
+ * still part of that series.
+ *
+ * The predicate and the filter live here, next to the rest of the tournament
+ * vocabulary, so the surfaces that hide them and the surface that shows them
+ * read the same rule. Both are `source`-only, hence the structural parameter:
+ * `TournamentListEntry` lives in a client component and importing it here
+ * would drag the whole list into every consumer's bundle.
+ */
+export function isDiscordSourced(t: { source?: string | null }): boolean {
+  return t.source === DISCORD_SOURCE;
+}
+
+/** The general list's view of a set of tournaments: everything but Discord. */
+export function withoutDiscordSourced<T extends { source?: string | null }>(
+  tournaments: T[],
+): T[] {
+  return tournaments.filter((t) => !isDiscordSourced(t));
+}

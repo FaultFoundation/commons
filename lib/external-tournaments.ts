@@ -407,7 +407,10 @@ export async function listUpcomingExternalScheduleEntries(): Promise<
         .limit(1000);
 
       for (const row of rows) {
-        if (!isScheduleProvider(row.source) && row.source !== "discord") continue;
+        // Schedule providers only. Discord-sourced tournaments used to be let
+        // through here explicitly; they are now Series-tab only, so they fall
+        // out with every other non-schedule source.
+        if (!isScheduleProvider(row.source)) continue;
         const state = externalMatchStatus(row.state);
         if (state === "finished" || state === "cancelled") continue;
         const matchup = [row.entrant1Name, row.entrant2Name]
@@ -449,7 +452,8 @@ export async function listUpcomingExternalScheduleEntries(): Promise<
   // Tournaments tab. Tournaments with matches show those matches instead.
   const tournaments = await listExternalTournaments();
   const windowEntries = tournaments.flatMap((tournament): ScheduleEntry[] => {
-    if (!isScheduleProvider(tournament.source) && tournament.source !== "discord") return [];
+    // Same rule as the match layer above: no Discord on the calendar.
+    if (!isScheduleProvider(tournament.source)) return [];
     if (tournament.status === "completed") return [];
     if (tournamentsWithMatch.has(tournament.id)) return [];
     const start = tournament.firstMatchAt ?? tournament.startAt;

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import {
+  DISCOVERY_SOURCE_FILTERS,
   EMPTY_FILTERS,
   type DiscoveryFilters as Filters,
 } from "@/lib/discovery-shared";
@@ -141,10 +142,7 @@ export function DiscoveryFilters({
             value={value.source}
             options={[
               { value: "", label: "Any" },
-              { value: "startgg", label: "start.gg" },
-              { value: "faceit", label: "FACEIT" },
-              { value: "challonge", label: "Challonge" },
-              { value: "discord", label: "Discord" },
+              ...DISCOVERY_SOURCE_FILTERS,
             ]}
             onChange={(source) => onChange({ ...value, source })}
           />

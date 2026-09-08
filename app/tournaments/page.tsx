@@ -9,6 +9,7 @@ import { loadTournamentEntries } from "@/lib/tournament-entries";
 import {
   TOURNAMENT_LAYOUT_COOKIE,
   asTournamentLayout,
+  withoutDiscordSourced,
 } from "@/lib/tournaments-shared";
 
 // Session-gated: always rendered per request.
@@ -24,7 +25,9 @@ export default async function TournamentsPage() {
   // Internal (Challonge-backed) + external (cen-sql projection) tournaments,
   // merged into one unified list — the same loader the Home board's pinned
   // Tournaments bubble uses, so the two can't disagree.
-  const tournaments = await loadTournamentEntries();
+  // Discord-sourced tournaments are Series-tab only, so they never reach the
+  // general list — including its counts, filters, pagination and featured hero.
+  const tournaments = withoutDiscordSourced(await loadTournamentEntries());
   const session = await getSessionCached();
   const follows = session ? await discoveryFollowIds(session.user.id) : [];
   const initialLayout = asTournamentLayout(

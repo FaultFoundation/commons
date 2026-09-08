@@ -7,6 +7,7 @@ import { SeriesList } from "@/components/dashboard/series/SeriesList";
 import { TournamentCards } from "@/components/dashboard/tournaments/TournamentList";
 import { loadTournamentEntries } from "@/lib/tournament-entries";
 import { getSessionCached } from "@/lib/session";
+import { isDiscordSourced } from "@/lib/tournaments-shared";
 
 // Session-gated: always rendered per request.
 export const dynamic = "force-dynamic";
@@ -31,9 +32,10 @@ export default async function SeriesPage() {
   }
 
   const tournaments = await loadTournamentEntries();
-  // Internal Commons tournaments leave `source` unset (they read as Challonge),
-  // so this is only ever the collector-written Discord rows.
-  const discord = tournaments.filter((t) => t.source === "discord");
+  // The one surface that shows them: everywhere else runs the complementary
+  // `withoutDiscordSourced`. Internal Commons tournaments leave `source` unset
+  // (they read as Challonge), so this is only ever collector-written rows.
+  const discord = tournaments.filter(isDiscordSourced);
 
   return (
     <DashboardShell

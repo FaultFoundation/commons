@@ -39,7 +39,10 @@ import { loadSchedule } from "@/lib/schedule";
 import { listMyTeams } from "@/lib/teams";
 import { discoveryFollowIds } from "@/lib/discovery";
 import { loadTournamentEntries } from "@/lib/tournament-entries";
-import { asTournamentLayout } from "@/lib/tournaments-shared";
+import {
+  asTournamentLayout,
+  withoutDiscordSourced,
+} from "@/lib/tournaments-shared";
 
 export async function loadHomeData({
   userId, 
@@ -70,7 +73,11 @@ export async function loadHomeData({
     sources.has("tournaments")
       ? Promise.all([loadTournamentEntries(),discoveryFollowIds(userId)]).then(([entries,follows]) => {
           data.tournaments = {
-            entries,
+            // Filtered once here rather than per widget: this source feeds the
+            // pinned Tournaments tile (the same panel the tab mounts) and At a
+            // Glance's active list, and the board must not disagree with the
+            // tab about what the tournament list contains.
+            entries: withoutDiscordSourced(entries),
             follows,
             layout: asTournamentLayout(tournamentLayoutCookie),
           };

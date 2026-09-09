@@ -139,7 +139,19 @@ function OverviewPanel({ detail }: { detail: ScoutMatchDetail }) {
 
   const facts: { label: string; value: string }[] = [];
   if (detail.serverName) facts.push({ label: "Server", value: detail.serverName });
-  if (detail.mapName) {
+  // The maps actually played, in order — `detail.mapName` is only the series'
+  // first veto pick and is the fallback for pre-rounds matches.
+  const played = detail.rounds.filter((r) => r.mapName);
+  if (played.length) {
+    facts.push({
+      label: played.length === 1 ? "Map" : "Maps",
+      value: played
+        .map((r) =>
+          r.scoreSummary ? `${r.mapName} (${r.scoreSummary})` : (r.mapName as string),
+        )
+        .join(", "),
+    });
+  } else if (detail.mapName) {
     facts.push({
       label: "Map",
       value: detail.mapMode ? `${detail.mapName} · ${detail.mapMode}` : detail.mapName,
@@ -211,7 +223,9 @@ export function ScoutMatchScoreboard({ detail }: { detail: ScoutMatchDetail }) {
               className={`ff-sb__tab${round === r ? " ff-sb__tab--on" : ""}`}
               onClick={() => setRound(r)}
             >
-              Round {r}
+              {/* Each round of a series IS a map, so name it — falling back to
+                  the index for matches collected before rounds were stored. */}
+              {detail.rounds.find((m) => m.round === r)?.mapName ?? `Round ${r}`}
             </button>
           ))}
         </div>

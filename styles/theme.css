@@ -7483,10 +7483,6 @@ button.ff-dash__link:hover {
   flex-direction: column;
   gap: 8px;
 }
-.ff-scoutmap__summary {
-  font-size: var(--ff-dash-text-xs);
-  color: var(--ff-text-dim);
-}
 .ff-scoutmap__row {
   display: grid;
   grid-template-columns: minmax(120px, 1.2fr) minmax(0, 3fr) minmax(140px, auto);
@@ -7574,6 +7570,24 @@ button.ff-dash__link:hover {
   margin: 8px 0 0;
   font-size: var(--ff-dash-text-xs);
   color: var(--ff-text-dim);
+}
+/* Page-level format filter (1v1 / 5v5 / 6v6) under the search row. It reuses the
+   tournament list's head bar and pill group wholesale — same control, same
+   affordance — and only adds the leading label and the spacing that puts it
+   under the search box rather than above a grid. */
+.ff-scoutfilters {
+  margin: 12px 0 0;
+}
+.ff-scoutfilters__label {
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ff-text-dim);
+}
+.ff-scoutfilters .ff-ticket-view[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .ff-scoutmode {
   display: inline-flex;

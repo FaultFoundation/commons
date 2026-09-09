@@ -1,20 +1,25 @@
 import "server-only";
 
-import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 import { getOwDb } from "@/lib/ow-db";
 import {
   faceitMatchPlayers,
+  faceitMatchRounds,
   faceitMatches,
   faceitPlayers,
 } from "@/db/faceit-schema";
 import {
+  DEFAULT_GAME_MODE,
   type MapWinrate,
+  type ScoutGameMode,
+  type ScoutMapRound,
   type ScoutMatch,
   type ScoutMatchDetail,
   type ScoutMode,
   type ScoutPlayer,
+  type ScoutRecord,
   type ScoutResponse,
   type ScoutResult,
   type ScoutRoundStats,
@@ -31,6 +36,14 @@ import {
 // so a search is TRIGGERED over HTTP (requestFaceitSearch → POST /faceit/search),
 // never performed here. Everything degrades: no OW binding → not_configured; no
 // Worker config → the read still serves whatever is already cached.
+
+// A note on UNITS, because two of them are in play and mixing them up is what
+// made this page disagree with faceit.com: a FACEIT Overwatch match is a Bo3/Bo5
+// SERIES, and the maps inside it are its ROUNDS. `faceit_matches.map_name` is
+// only the series' first veto pick, so every map aggregate below reads
+// `faceit_match_rounds` instead, attributing each map to the player by comparing
+// its winning team id with the player's own. FACEIT's profile counts maps; our
+// match list counts series; the summary carries both, labelled.
 
 /** How many match rows we pull for the graphs + list window. The overall record
  *  and per-map win rates come from SQL aggregates over ALL matches (below), so
@@ -84,9 +97,16 @@ function asResult(v: string | null): ScoutResult | null {
  * Read the cached scouting profile for a player (by resolved id, else nickname).
  * Returns a full ScoutResponse — identity + matches + the derived map win rates
  * and summary — or a degraded status when the cache has nothing (yet).
+ *
+ * `gameMode` filters EVERY displayed number to one team-size format, the way
+ * FACEIT segments its own stats. Collection state is deliberately NOT filtered:
+ * `progress` and the ready/collecting status describe the backfill of the whole
+ * history, so a 5v5 view of a player mid-collection still reports honest
+ * progress instead of looking finished because their 5v5 slice happens to be.
  */
 export async function getScoutingData(
   query: { playerId?: string; nickname?: string },
+  gameMode: ScoutGameMode = DEFAULT_GAME_MODE,
   limit = DEFAULT_MATCH_LIMIT,
 ): Promise<ScoutResponse> {
   const db = getOwDb();
@@ -121,9 +141,56 @@ export async function getScoutingData(
         faceitMatches,
         eq(faceitMatchPlayers.matchId, faceitMatches.matchId),
       )
-      .where(eq(faceitMatchPlayers.playerId, row.playerId))
+      .where(
+        and(
+          eq(faceitMatchPlayers.playerId, row.playerId),
+          eq(faceitMatches.gameMode, gameMode),
+        ),
+      )
       .orderBy(desc(faceitMatches.startedAt))
       .limit(take);
+
+    // The maps each of those matches was played on: one query for the whole
+    // window rather than one per row. The window is re-expressed as a SUBQUERY
+    // rather than a list of the ids just fetched, because `take` runs to 500 and
+    // D1 caps a statement at 100 bound parameters — the same reason the external
+    // tournament reader keys its children off a subquery.
+    const windowMatchIds = db
+      .select({ matchId: faceitMatches.matchId })
+      .from(faceitMatchPlayers)
+      .innerJoin(
+        faceitMatches,
+        eq(faceitMatchPlayers.matchId, faceitMatches.matchId),
+      )
+      .where(
+        and(
+          eq(faceitMatchPlayers.playerId, row.playerId),
+          eq(faceitMatches.gameMode, gameMode),
+        ),
+      )
+      .orderBy(desc(faceitMatches.startedAt))
+      .limit(take);
+    const roundRows = rows.length
+      ? await db
+          .select({
+            matchId: faceitMatchRounds.matchId,
+            mapName: faceitMatchRounds.mapName,
+          })
+          .from(faceitMatchRounds)
+          .where(
+            and(
+              inArray(faceitMatchRounds.matchId, windowMatchIds),
+              isNotNull(faceitMatchRounds.mapName),
+            ),
+          )
+          .orderBy(asc(faceitMatchRounds.matchId), asc(faceitMatchRounds.roundIndex))
+      : [];
+    const mapsByMatch = new Map<string, string[]>();
+    for (const r of roundRows) {
+      const list = mapsByMatch.get(r.matchId);
+      if (list) list.push(r.mapName as string);
+      else mapsByMatch.set(r.matchId, [r.mapName as string]);
+    }
 
     const matches: ScoutMatch[] = rows.map((r) => {
       const me = r.faceit_match_players;
@@ -135,6 +202,7 @@ export async function getScoutingData(
         competitionType: match.competitionType,
         mapName: match.mapName,
         mapMode: match.mapMode,
+        maps: mapsByMatch.get(match.matchId) ?? [],
         serverName: match.serverName,
         bestOf: match.bestOf,
         startedAt: match.startedAt ? match.startedAt.getTime() : null,
@@ -155,59 +223,78 @@ export async function getScoutingData(
       };
     });
 
-    // The overall record + per-map win rates come from SQL aggregates over EVERY
-    // collected match (not just the ~300-row display window above), so a Deep
-    // result is accurate no matter how deep the history runs. `detailed` (rows
-    // with a synced scoreboard) also drives the deep progress bar.
+    // Both records come from SQL aggregates over EVERY collected match (not just
+    // the ~300-row display window above), so a Deep result is accurate no matter
+    // how deep the history runs. `detailed` (rows with a synced scoreboard) also
+    // drives the deep progress bar.
+    //
+    // SERIES record: one row per FACEIT match. `result` is written from the
+    // match overview's winner during DETAIL — the history listing reports only
+    // the first map's winner, which is why it is not read here.
+    //
+    // One pass yields both populations: the `*All` columns count the player's
+    // WHOLE collected history (collection progress + readiness), the rest count
+    // only the selected format (everything shown). Splitting this into two
+    // queries would double a read that runs on every keystroke-free refresh.
+    const inMode = sql`${faceitMatches.gameMode} = ${gameMode}`;
     const [agg] = await db
       .select({
-        total: sql<number>`count(*)`,
-        wins: sql<number>`sum(case when ${faceitMatchPlayers.result} = 'win' then 1 else 0 end)`,
-        losses: sql<number>`sum(case when ${faceitMatchPlayers.result} = 'loss' then 1 else 0 end)`,
-        draws: sql<number>`sum(case when ${faceitMatchPlayers.result} = 'draw' then 1 else 0 end)`,
-        detailed: sql<number>`sum(case when ${faceitMatchPlayers.statsSyncedAt} is not null then 1 else 0 end)`,
-      })
-      .from(faceitMatchPlayers)
-      .where(eq(faceitMatchPlayers.playerId, row.playerId));
-
-    const mapAgg = await db
-      .select({
-        map: faceitMatches.mapName,
-        mode: faceitMatches.mapMode,
-        wins: sql<number>`sum(case when ${faceitMatchPlayers.result} = 'win' then 1 else 0 end)`,
-        losses: sql<number>`sum(case when ${faceitMatchPlayers.result} = 'loss' then 1 else 0 end)`,
-        draws: sql<number>`sum(case when ${faceitMatchPlayers.result} = 'draw' then 1 else 0 end)`,
-        total: sql<number>`count(*)`,
+        totalAll: sql<number>`count(*)`,
+        detailedAll: sql<number>`sum(case when ${faceitMatchPlayers.statsSyncedAt} is not null then 1 else 0 end)`,
+        total: sql<number>`sum(case when ${inMode} then 1 else 0 end)`,
+        wins: sql<number>`sum(case when ${inMode} and ${faceitMatchPlayers.result} = 'win' then 1 else 0 end)`,
+        losses: sql<number>`sum(case when ${inMode} and ${faceitMatchPlayers.result} = 'loss' then 1 else 0 end)`,
+        draws: sql<number>`sum(case when ${inMode} and ${faceitMatchPlayers.result} = 'draw' then 1 else 0 end)`,
+        withMaps: sql<number>`sum(case when ${inMode} and ${faceitMatches.roundsSyncedAt} is not null then 1 else 0 end)`,
       })
       .from(faceitMatchPlayers)
       .innerJoin(
         faceitMatches,
         eq(faceitMatchPlayers.matchId, faceitMatches.matchId),
       )
+      .where(eq(faceitMatchPlayers.playerId, row.playerId));
+
+    // MAP record, grouped by map NAME only. The mode is a property of the map
+    // (Ilios is always Control), so it rides along as max() rather than being
+    // part of the key — grouping on it used to split one map into two bars
+    // whenever a match's veto shipped no mode tag. A map is won when its own
+    // winning team is the player's team; a map with no winner counts as a draw.
+    const mapWon = sql`${faceitMatchRounds.winnerTeamId} is not null and ${faceitMatchRounds.winnerTeamId} = ${faceitMatchPlayers.teamId}`;
+    const mapLost = sql`${faceitMatchRounds.winnerTeamId} is not null and ${faceitMatchRounds.winnerTeamId} <> ${faceitMatchPlayers.teamId}`;
+    const mapAgg = await db
+      .select({
+        map: faceitMatchRounds.mapName,
+        mode: sql<string | null>`max(${faceitMatchRounds.mapMode})`,
+        wins: sql<number>`sum(case when ${mapWon} then 1 else 0 end)`,
+        losses: sql<number>`sum(case when ${mapLost} then 1 else 0 end)`,
+        draws: sql<number>`sum(case when ${faceitMatchRounds.winnerTeamId} is null then 1 else 0 end)`,
+        total: sql<number>`count(*)`,
+      })
+      .from(faceitMatchPlayers)
+      .innerJoin(
+        faceitMatchRounds,
+        eq(faceitMatchPlayers.matchId, faceitMatchRounds.matchId),
+      )
+      .innerJoin(
+        faceitMatches,
+        eq(faceitMatchRounds.matchId, faceitMatches.matchId),
+      )
       .where(
         and(
           eq(faceitMatchPlayers.playerId, row.playerId),
-          isNotNull(faceitMatches.mapName),
+          eq(faceitMatches.gameMode, gameMode),
+          isNotNull(faceitMatchRounds.mapName),
         ),
       )
-      .groupBy(faceitMatches.mapName, faceitMatches.mapMode);
+      .groupBy(faceitMatchRounds.mapName);
 
     const total = Number(agg?.total ?? 0);
     const wins = Number(agg?.wins ?? 0);
     const losses = Number(agg?.losses ?? 0);
     const draws = Number(agg?.draws ?? 0);
-    const detailed = Number(agg?.detailed ?? 0);
+    const totalAll = Number(agg?.totalAll ?? 0);
+    const detailedAll = Number(agg?.detailedAll ?? 0);
     const decidedAll = wins + losses;
-    const withMap = mapAgg.reduce((s, r) => s + Number(r.total), 0);
-
-    const summary: ScoutSummary = {
-      total,
-      wins,
-      losses,
-      draws,
-      winrate: decidedAll > 0 ? wins / decidedAll : null,
-      withMap,
-    };
 
     const mapWinrates: MapWinrate[] = mapAgg
       .filter((r) => r.map)
@@ -226,6 +313,31 @@ export async function getScoutingData(
         };
       })
       .sort((a, b) => b.total - a.total || (b.winrate ?? -1) - (a.winrate ?? -1));
+
+    // The map-level totals are the sum of the same rows the chart draws, so the
+    // headline and the bars can never disagree.
+    const maps = mapWinrates.reduce<ScoutRecord>(
+      (acc, m) => ({
+        total: acc.total + m.total,
+        wins: acc.wins + m.wins,
+        losses: acc.losses + m.losses,
+        draws: acc.draws + m.draws,
+        winrate: null,
+      }),
+      { total: 0, wins: 0, losses: 0, draws: 0, winrate: null },
+    );
+    const decidedMaps = maps.wins + maps.losses;
+    maps.winrate = decidedMaps > 0 ? maps.wins / decidedMaps : null;
+
+    const summary: ScoutSummary = {
+      total,
+      wins,
+      losses,
+      draws,
+      winrate: decidedAll > 0 ? wins / decidedAll : null,
+      maps,
+      matchesWithMaps: Number(agg?.withMaps ?? 0),
+    };
 
     const player: ScoutPlayer = {
       playerId: row.playerId,
@@ -246,12 +358,14 @@ export async function getScoutingData(
     // Display readiness: a deep search is "ready" only when the whole history is
     // collected; a quick search is "ready" once its recent target window is
     // detailed (details land newest-first), so it doesn't sit in "collecting"
-    // waiting on a full backfill it never asked for.
+    // waiting on a full backfill it never asked for. Both read the UNFILTERED
+    // counts — readiness is a property of the collection, not of the format the
+    // viewer happens to be looking at.
     const fullyReady = row.listDone && row.detailDone;
     const quickReady =
       row.searchMode === "quick" &&
-      total > 0 &&
-      detailed >= Math.min(total, QUICK_READY_MATCHES);
+      totalAll > 0 &&
+      detailedAll >= Math.min(totalAll, QUICK_READY_MATCHES);
     const status: ScoutStatus =
       row.status === "not_found"
         ? "not_found"
@@ -264,8 +378,8 @@ export async function getScoutingData(
     return {
       status,
       player,
-      data: { summary, mapWinrates, matches },
-      progress: { total, detailed },
+      data: { summary, mapWinrates, matches, gameMode },
+      progress: { total: totalAll, detailed: detailedAll },
     };
   } catch (error) {
     console.error("scouting: read failed", error);
@@ -534,6 +648,30 @@ export async function getScoutMatchDetail(
       .from(faceitMatchPlayers)
       .where(eq(faceitMatchPlayers.matchId, id));
 
+    // The maps of the series, so the round tabs can be named. A match collected
+    // before rounds existed simply has none and the tabs stay "Round N".
+    const roundRows = await db
+      .select()
+      .from(faceitMatchRounds)
+      .where(eq(faceitMatchRounds.matchId, id))
+      .orderBy(asc(faceitMatchRounds.roundIndex));
+
+    const scoutedTeamId = scoutedPlayerId
+      ? (players.find((p) => p.playerId === scoutedPlayerId)?.teamId ?? null)
+      : null;
+    const rounds: ScoutMapRound[] = roundRows.map((r) => ({
+      round: r.roundIndex,
+      mapName: r.mapName,
+      mapMode: r.mapMode,
+      scoreSummary: r.scoreSummary,
+      result:
+        !r.winnerTeamId || !scoutedTeamId
+          ? null
+          : r.winnerTeamId === scoutedTeamId
+            ? "win"
+            : "loss",
+    }));
+
     const factions = parseFactionSummaries(match.factionsJson);
 
     const sbPlayers: ScoutScoreboardPlayer[] = players.map((p) => ({
@@ -557,7 +695,7 @@ export async function getScoutMatchDetail(
 
     const roundCount = sbPlayers.reduce(
       (max, p) => Math.max(max, p.rounds.length),
-      0,
+      rounds.length,
     );
 
     const scoutedFaction = scoutedPlayerId
@@ -607,6 +745,7 @@ export async function getScoutMatchDetail(
       heroBans: parseHeroBans(match.heroBansJson),
       teams,
       roundCount,
+      rounds,
       detailed: match.statsSyncedAt != null,
     };
   } catch (error) {

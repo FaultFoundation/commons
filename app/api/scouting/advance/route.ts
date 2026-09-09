@@ -1,5 +1,10 @@
 import { advanceFaceitSearch, getScoutingData } from "@/lib/faceit-scouting";
-import { type ScoutMode, type ScoutResponse } from "@/lib/faceit-scouting-shared";
+import {
+  DEFAULT_GAME_MODE,
+  asScoutGameMode,
+  type ScoutMode,
+  type ScoutResponse,
+} from "@/lib/faceit-scouting-shared";
 import { getSessionCached } from "@/lib/session";
 
 // POST /api/scouting/advance — the Deep search's drive-to-completion loop. Given
@@ -23,12 +28,14 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as {
     player_id?: unknown;
     mode?: unknown;
+    game_mode?: unknown;
   };
   const playerId = typeof body.player_id === "string" ? body.player_id.trim() : "";
   if (!playerId) {
     return Response.json({ error: "player_id required" }, { status: 400 });
   }
   const mode: ScoutMode = body.mode === "quick" ? "quick" : "deep";
+  const gameMode = asScoutGameMode(body.game_mode) ?? DEFAULT_GAME_MODE;
 
   const advanced = await advanceFaceitSearch(playerId, mode);
 
@@ -44,6 +51,6 @@ export async function POST(request: Request) {
 
   // Read the freshened cache. Even if the advance call itself errored transiently,
   // the cached read is the better answer than the transient error.
-  const read = await getScoutingData({ playerId });
+  const read = await getScoutingData({ playerId }, gameMode);
   return Response.json(read);
 }

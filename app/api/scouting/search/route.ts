@@ -1,5 +1,7 @@
 import { getScoutingData, requestFaceitSearch } from "@/lib/faceit-scouting";
 import {
+  DEFAULT_GAME_MODE,
+  asScoutGameMode,
   normalizeNickname,
   type ScoutMode,
   type ScoutResponse,
@@ -26,13 +28,18 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as {
     nickname?: unknown;
     mode?: unknown;
+    game_mode?: unknown;
   };
   const nickname =
     typeof body.nickname === "string" ? normalizeNickname(body.nickname) : null;
   if (!nickname) {
     return Response.json({ error: "nickname required" }, { status: 400 });
   }
+  // `mode` is the search DEPTH (quick/deep); `game_mode` is the team-size
+  // filter the results are read back under. Collection ignores the latter — the
+  // Worker always collects the whole history — so it only shapes the read.
   const mode: ScoutMode = body.mode === "deep" ? "deep" : "quick";
+  const gameMode = asScoutGameMode(body.game_mode) ?? DEFAULT_GAME_MODE;
 
   const trigger = await requestFaceitSearch({ nickname }, mode);
 
@@ -51,6 +58,7 @@ export async function POST(request: Request) {
     trigger.resolved
       ? { playerId: trigger.resolved.playerId }
       : { nickname },
+    gameMode,
   );
 
   // The Worker collected a first page synchronously, so the row normally exists.

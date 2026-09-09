@@ -24,15 +24,44 @@ export type ScoutStatus =
   | "not_configured";
 
 /** 'quick' surfaces the match list fast and fills detail lazily; 'deep'
- *  front-loads the per-match scoreboard/overview with bigger budgets. */
+ *  front-loads the per-match scoreboard/overview with bigger budgets. Note this
+ *  is the search DEPTH — distinct from `ScoutGameMode`, the team size. */
 export type ScoutMode = "quick" | "deep";
 
+/**
+ * The FACEIT team-size format a match was played in, which every scouting read
+ * is filtered by. FACEIT reports it per match as `game_mode` and segments its
+ * own map statistics the same way — which is exactly why this filter exists: a
+ * 1v1 Tank Duel on Lijiang Tower says nothing about a player's 5v5 map strength,
+ * and merging the two put our win rates above FACEIT's for any player with both.
+ *
+ * Ordered by team size, which is also how the filter pills read. FACEIT may emit
+ * values beyond these; the list here is the set the tab offers, and is meant to
+ * grow — adding one is this array plus nothing else, since every read validates
+ * against it and the SQL filter is a plain equality on `game_mode`.
+ */
+export const SCOUT_GAME_MODES = ["1v1", "3v3", "5v5", "6v6"] as const;
+export type ScoutGameMode = (typeof SCOUT_GAME_MODES)[number];
+
+/** 5v5 is the competitive default — the format nearly every scouted match is in. */
+export const DEFAULT_GAME_MODE: ScoutGameMode = "5v5";
+
+/** Validate an untrusted mode (a query string, a stored view-state value). */
+export function asScoutGameMode(value: unknown): ScoutGameMode | undefined {
+  return typeof value === "string" &&
+    (SCOUT_GAME_MODES as readonly string[]).includes(value)
+    ? (value as ScoutGameMode)
+    : undefined;
+}
+
 export const SCOUT_STATUS_MESSAGES: Record<
-  Exclude<ScoutStatus, "ready" | "idle">,
+  Exclude<ScoutStatus, "ready" | "idle"> | "no_matches",
   string
 > = {
   collecting:
     "Collecting this player's match history — maps and scoreboards keep filling in. Refresh in a moment for more.",
+  no_matches:
+    "No matches in this format for this player. Their history is collected — try another format above.",
   not_found:
     "No FACEIT Overwatch player found with that name. Check the exact FACEIT nickname (not their BattleTag) and try again.",
   error:
@@ -70,8 +99,12 @@ export type ScoutMatch = {
   matchId: string;
   competitionName: string | null;
   competitionType: string | null;
+  /** The FIRST map of the series only — kept for rows collected before per-map
+   *  rounds existed. Prefer `maps`, which is every map actually played. */
   mapName: string | null;
   mapMode: string | null;
+  /** Every map of the series, in play order (empty until rounds are collected). */
+  maps: string[];
   serverName: string | null;
   bestOf: number | null;
   startedAt: number | null;
@@ -93,7 +126,10 @@ export type ScoutMatch = {
 };
 
 /** Win rate on a single map — one bar in the headline chart. `winrate` is a
- *  fraction (0..1) so a component can drive a bar width directly. */
+ *  fraction (0..1) so a component can drive a bar width directly.
+ *
+ *  The unit is a MAP, not a match: an Overwatch FACEIT match is a Bo3/Bo5
+ *  series, so one match contributes one row here per map it played. */
 export type MapWinrate = {
   map: string;
   mapMode: string | null;
@@ -105,21 +141,39 @@ export type MapWinrate = {
   winrate: number | null;
 };
 
-export type ScoutSummary = {
+/** A win/loss record over some unit of play. */
+export type ScoutRecord = {
   total: number;
   wins: number;
   losses: number;
   draws: number;
   /** wins / decided (0..1), or null when nothing is decided. */
   winrate: number | null;
-  /** How many of `total` carry a synced scoreboard (per-map/detail readiness). */
-  withMap: number;
+};
+
+/**
+ * A scouted player's headline numbers, in BOTH units — because FACEIT's own
+ * profile and our match list count different things and it is confusing to see
+ * two "records" that disagree with no label saying why.
+ *
+ * - the top-level fields are SERIES: one per FACEIT match (a Bo3/Bo5).
+ * - `maps` is per MAP played inside those series. This is what
+ *   faceit.com/players/<name>/ow shows as "Matches" and "Win rate %".
+ */
+export type ScoutSummary = ScoutRecord & {
+  maps: ScoutRecord;
+  /** How many of `total` have had their per-map rounds collected — the
+   *  readiness counter behind "N of M matches" while a search is filling in. */
+  matchesWithMaps: number;
 };
 
 export type ScoutData = {
   summary: ScoutSummary;
   mapWinrates: MapWinrate[];
   matches: ScoutMatch[];
+  /** The team-size format everything above was filtered to. Echoed back so a
+   *  client can tell a stale payload from a fresh one after the filter moves. */
+  gameMode: ScoutGameMode;
 };
 
 export type ScoutResponse = {
@@ -128,7 +182,8 @@ export type ScoutResponse = {
   data: ScoutData | null;
   /** Collection progress, for the Deep search's loading bar. `total` is every
    *  match known for the player; `detailed` is how many carry a synced
-   *  scoreboard. Present on deep-advance reads. */
+   *  scoreboard. Both count the WHOLE history, never the selected format — the
+   *  bar tracks the backfill, not the view. Present on deep-advance reads. */
   progress?: { total: number; detailed: number };
   /** Human-readable detail for a non-ready status (else undefined). */
   message?: string;
@@ -205,70 +260,24 @@ export type ScoutMatchDetail = {
   teams: ScoutScoreboardTeam[];
   /** Max number of rounds across participants (>1 → per-round tabs). */
   roundCount: number;
+  /** The map played in each round, so a series' round tabs read "Ilios" rather
+   *  than "Round 1". Indexed by `round` (1-based); may be shorter than
+   *  `roundCount` for matches collected before rounds existed. */
+  rounds: ScoutMapRound[];
   /** True once the scoreboard has been synced; false → nothing to show yet. */
   detailed: boolean;
 };
 
-// --- Pure derivations -------------------------------------------------------
-
-/** Win rate per map, most-played first (ties broken by win rate). Only matches
- *  whose overview has landed (a known `mapName`) count — the rest are still
- *  collecting. Draws are shown but excluded from the win-rate denominator. */
-export function computeMapWinrates(matches: ScoutMatch[]): MapWinrate[] {
-  const byMap = new Map<string, MapWinrate>();
-  for (const m of matches) {
-    if (!m.mapName) continue;
-    const key = m.mapName;
-    let row = byMap.get(key);
-    if (!row) {
-      row = {
-        map: key,
-        mapMode: m.mapMode,
-        wins: 0,
-        losses: 0,
-        draws: 0,
-        total: 0,
-        winrate: null,
-      };
-      byMap.set(key, row);
-    }
-    row.total += 1;
-    if (m.result === "win") row.wins += 1;
-    else if (m.result === "loss") row.losses += 1;
-    else if (m.result === "draw") row.draws += 1;
-  }
-  const rows = [...byMap.values()];
-  for (const row of rows) {
-    const decided = row.wins + row.losses;
-    row.winrate = decided > 0 ? row.wins / decided : null;
-  }
-  return rows.sort(
-    (a, b) => b.total - a.total || (b.winrate ?? -1) - (a.winrate ?? -1),
-  );
-}
-
-/** Overall record across all returned matches (with a `withMap` readiness count). */
-export function computeSummary(matches: ScoutMatch[]): ScoutSummary {
-  let wins = 0;
-  let losses = 0;
-  let draws = 0;
-  let withMap = 0;
-  for (const m of matches) {
-    if (m.result === "win") wins += 1;
-    else if (m.result === "loss") losses += 1;
-    else if (m.result === "draw") draws += 1;
-    if (m.mapName) withMap += 1;
-  }
-  const decided = wins + losses;
-  return {
-    total: matches.length,
-    wins,
-    losses,
-    draws,
-    winrate: decided > 0 ? wins / decided : null,
-    withMap,
-  };
-}
+/** One map of a series, as stored per round. */
+export type ScoutMapRound = {
+  round: number;
+  mapName: string | null;
+  mapMode: string | null;
+  /** "2 / 1" — the map's own scoreline, as FACEIT words it. */
+  scoreSummary: string | null;
+  /** The scouted player's outcome on this map, when a winner is known. */
+  result: ScoutResult | null;
+};
 
 // --- Formatters -------------------------------------------------------------
 

@@ -71,7 +71,21 @@ export function ScoutMatchRow({
       ? `${match.scoreFor}–${match.scoreAgainst}`
       : null;
   const kda = formatKda(match);
-  const meta = [match.mapMode, match.bestOf ? `Bo${match.bestOf}` : null]
+  // An Overwatch match is usually a Bo3/Bo5 SERIES across several maps, so the
+  // row is named for its one map only when there genuinely was one; otherwise it
+  // is named for the competition and counts its maps, which the expanded round
+  // tabs then name individually. (`mapName` is the pre-rounds fallback — the
+  // series' first veto pick, which is what made every row read as a Control map.)
+  const title =
+    match.maps.length === 1
+      ? match.maps[0]
+      : match.maps.length > 1
+        ? (match.competitionName ?? "FACEIT match")
+        : (match.mapName ?? match.competitionName ?? "FACEIT match");
+  const meta = [
+    match.maps.length > 1 ? `${match.maps.length} maps` : match.mapMode,
+    match.bestOf ? `Bo${match.bestOf}` : null,
+  ]
     .filter(Boolean)
     .join(" · ");
 
@@ -91,9 +105,7 @@ export function ScoutMatchRow({
           <span className="ff-scoutmatch__res ff-scoutmatch__res--none">—</span>
         )}
         <span className="ff-scoutmatch__main">
-          <span className="ff-scoutmatch__map">
-            {match.mapName ?? match.competitionName ?? "FACEIT match"}
-          </span>
+          <span className="ff-scoutmatch__map">{title}</span>
           {meta ? <span className="ff-scoutmatch__meta">{meta}</span> : null}
         </span>
         <span className="ff-scoutmatch__score">{score ?? "—"}</span>

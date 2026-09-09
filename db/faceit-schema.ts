@@ -121,6 +121,10 @@ export const faceitMatches = sqliteTable(
 
     detailSyncedAt: integer("detail_synced_at", { mode: "timestamp_ms" }),
     statsSyncedAt: integer("stats_synced_at", { mode: "timestamp_ms" }),
+    /** When this match's per-map `faceit_match_rounds` rows were written. Null
+     *  on every match collected before rounds existed, which is what drives the
+     *  Worker's one-off backfill through them. */
+    roundsSyncedAt: integer("rounds_synced_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -132,7 +136,47 @@ export const faceitMatches = sqliteTable(
     index("faceit_matches_started_idx").on(t.startedAt),
     index("faceit_matches_detail_synced_idx").on(t.detailSyncedAt),
     index("faceit_matches_stats_synced_idx").on(t.statsSyncedAt),
+    index("faceit_matches_rounds_synced_idx").on(t.roundsSyncedAt),
     index("faceit_matches_competition_idx").on(t.competitionId),
+  ],
+);
+
+/**
+ * One row per MAP played inside a match — the unit a scouting map aggregate
+ * counts, and the unit FACEIT's own profile counts.
+ *
+ * An Overwatch FACEIT match is a Bo3/Bo5 SERIES: `faceit_matches.map_name` only
+ * ever holds the first map of the veto, so reading map win rates off it showed
+ * mostly Control (map 1 in the OW competitive format) and dropped the rest of
+ * every series. These rows come from the per-round stats the Worker parses; each
+ * carries the team id that won that map, which joins to
+ * `faceit_match_players.team_id` to give a player's per-map record.
+ */
+export const faceitMatchRounds = sqliteTable(
+  "faceit_match_rounds",
+  {
+    /** Deterministic `${matchId}:${roundIndex}`. */
+    id: text("id").primaryKey(),
+    matchId: text("match_id").notNull(),
+    /** 1-based position in the series (the order the maps were played). */
+    roundIndex: integer("round_index").notNull(),
+    mapId: text("map_id"),
+    mapName: text("map_name"),
+    mapMode: text("map_mode"),
+    /** Team/faction id that won this map; null = undecided. */
+    winnerTeamId: text("winner_team_id"),
+    /** The map's own scoreline as FACEIT words it ("2 / 1"). */
+    scoreSummary: text("score_summary"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [
+    index("faceit_match_rounds_match_idx").on(t.matchId),
+    index("faceit_match_rounds_map_idx").on(t.mapName),
   ],
 );
 

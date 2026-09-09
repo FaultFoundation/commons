@@ -61,10 +61,11 @@ npx tsc --noEmit        # the typecheck — run this after any change
 npm run cf-typegen      # regenerate cloudflare-env.d.ts after editing wrangler.jsonc/.dev.vars
 ```
 
-**There is no working linter.** Focused server-efficiency regression tests run
-with `node --test scripts/server-efficiency.test.mjs` (Node 22.13+ for
-`node:sqlite`); they execute the real Drizzle queries with mocked provider I/O.
-The legacy import also has its own `scripts/migrate-legacy-bot-data.test.mjs`. `npm run lint` runs the
+**There is no working linter.** Focused regression tests live in `scripts/` and
+run with `node --test scripts/*.test.mjs` (Node 22.13+ for `node:sqlite`); they
+execute the real Drizzle queries against real SQLite with mocked provider I/O —
+`server-efficiency`, `discovery`, `statistics-formats`, `faceit-scouting`, and
+the legacy import's own `migrate-legacy-bot-data`. `npm run lint` runs the
 deprecated `next lint`, and ESLint isn't installed — it drops into an
 interactive "configure ESLint?" prompt and fails. Verification is
 `npx tsc --noEmit` + `npm run build`, then exercising the change on :3000 or
@@ -1093,7 +1094,10 @@ the ownership is **the reverse of everything else here**.
   `npm run db:ow:*` never migrates it. **A new `faceit_*` column goes in the
   ow-data repo, then is mirrored here to READ it** — never generate a Commons
   migration for these tables. (The local dev DB gets the tables by applying the
-  ow-data repo's `drizzle-faceit/*.sql` once; prod already has them.)
+  ow-data repo's `drizzle-faceit/*.sql` once; prod already has them.) A schema
+  change there therefore ships as: migrate the shared D1 from the ow-data repo,
+  deploy `ow-data`, then deploy the Commons — the mirror only types reads, so the
+  Commons cannot create what it is missing.
 - **Read directly, trigger over HTTP.** The Commons reads `faceit_*` straight off
   the OW binding ([lib/faceit-scouting.ts](lib/faceit-scouting.ts) over
   `getOwDb()`) — the same "read the rows the Worker wrote" relationship the
@@ -1111,6 +1115,44 @@ the ownership is **the reverse of everything else here**.
   **`/faceit/advance` is worker-owned like the schema** — the endpoint + the
   quick/deep budgets live in the ow-data repo's `src/index.ts`; adding one there
   means a redeploy of `ow-data`, never a Commons migration.
+- **A page-level FORMAT filter shapes every number.** FACEIT reports a match's
+  team size as `game_mode` and segments its own statistics by it; a 1v1 "Tank
+  Duel" on Lijiang Tower says nothing about 5v5 map strength, and merging the two
+  is what put our win rates above the player's own FACEIT profile. So the tab
+  carries a filter (`SCOUT_GAME_MODES` = 1v1 / 3v3 / 5v5 / 6v6, **5v5 by default**,
+  remembered as `scouting:format`) in the tournament list's head-bar idiom
+  (`.ff-ticket-views` pills), and `getScoutingData(query, gameMode)` applies it in
+  **SQL** — the map win rates and both records are aggregates over the whole
+  collected history, so narrowing them is a re-read (`game_mode=` on all three
+  scouting routes), never a client-side re-filter. Collection is deliberately
+  NOT filtered: the Worker always collects everything, and `progress` plus the
+  ready/collecting status read the unfiltered counts (`totalAll`/`detailedAll`,
+  computed in the same aggregate), or a mid-backfill 5v5 view would report itself
+  finished. FACEIT may emit modes beyond these four — the list is meant to grow
+  (adding one is the `SCOUT_GAME_MODES` array and nothing else), and a format with
+  no matches renders a "no matches in this format" panel rather than a page of
+  zeroes.
+- **A match is a SERIES; a map is a round. Never confuse the two.** An Overwatch
+  FACEIT match is a Bo3/Bo5 across several maps, and two API shapes follow from
+  that — both of which silently produced numbers that disagreed with the player's
+  own FACEIT profile, and both of which are easy to reintroduce:
+  - `faceit_matches.map_name` is only the **first map of the veto**
+    (`voting.map.pick[0]`), which in the OW competitive format is nearly always
+    the Control map. Map statistics therefore aggregate **`faceit_match_rounds`**
+    — one row per map actually played — attributing a map to a player by matching
+    its `winner_team_id` against `faceit_match_players.team_id`. Group by map
+    **name only**: the mode is a property of the map (`max()`), and having it in
+    the key split one map into two bars whenever a veto shipped untagged
+    entities.
+  - `faceit_match_players.result` is the **series** result, written during DETAIL
+    from `/matches/{id}`. The match LIST's `results` reports only the first map's
+    winner (a 3–2 win is listed as `winner: <map-1 winner>, score 1–2`), so it is
+    never the last word on a match; ~1 in 8 flips once DETAIL lands.
+  Because the two units genuinely differ, `ScoutSummary` carries **both** — the
+  top-level record is per series, `maps` is per map — and `ScoutFacts` labels them,
+  since faceit.com's own "Matches"/"Win rate %" count MAPS and an unlabelled
+  single number reads as a bug to anyone comparing. The map totals are summed from
+  the same rows the chart draws, so headline and bars cannot disagree.
 - **Accuracy comes from SQL aggregates, not the row window.** `getScoutingData`
   pulls a bounded window (~300 newest) of full match rows for the graphs + list,
   but computes the **overall record, win rate, and per-map win rates via SQL
@@ -1119,6 +1161,8 @@ the ownership is **the reverse of everything else here**.
   drives the deep progress bar, and a **quick** search is reported "ready" for
   display once its recent window (`QUICK_READY_MATCHES`) is detailed, rather than
   waiting on a full backfill it never asked for.
+  `node --test scripts/faceit-scouting.test.mjs` runs the map/series aggregates
+  through real Drizzle + SQLite (the ow-data repo's `npm test` covers the parsers).
 - **The read/trigger split → four API routes**, all returning one `ScoutResponse`
   (or `ScoutMatchDetail`) and degrading to a member-visible status
   (`collecting` | `ready` | `not_found` | `error` | `not_configured`) like the
@@ -1141,18 +1185,22 @@ the ownership is **the reverse of everything else here**.
   [lib/faceit-scouting-shared.ts](lib/faceit-scouting-shared.ts).
 - **Overview left column — analytics graph cards** ([ScoutAnalytics](components/dashboard/scouting/ScoutAnalytics.tsx),
   a stack of collapsible [ScoutGraphCard](components/dashboard/scouting/ScoutGraphCard.tsx)
-  `<details>` cards): **K/D over time** (line + least-squares trend), **win/loss
+  `<details>` cards): **Win Rate by Map** first and `defaultOpen` — the headline
+  scouting read, in the stack rather than its own bubble so every graph on the
+  page collapses the same way (its bubble-action counter became the card's
+  caption) — then **K/D over time** (line + least-squares trend), **win/loss
   strip** (+ current streak), **damage vs healing** (paired bars), **performance
   anomalies** (matches ≥2 SD from the player's own mean), **consistency by stat**
   (CV, lower is steadier). All are **pure derivations** in the shared module
   (`computeKdOverTime`/`computeWinLossStrip`/`computeDamageHealing`/
   `computePerformanceAnomalies`/`computeConsistency` + `mean`/`stddev`/
   `linearRegression`) over the windowed matches, rendered as inline-SVG/CSS-track
-  charts (no chart lib — the `ff-owchart*` idiom). Beneath them sits
-  [MapWinrateChart](components/dashboard/scouting/MapWinrateChart.tsx) (the
-  win-rate-by-map bars). The **right rail** is
+  charts (no chart lib — the `ff-owchart*` idiom).
+  [MapWinrateChart](components/dashboard/scouting/MapWinrateChart.tsx) draws the
+  win-rate-by-map bars inside that first card. The **right rail** is
   [ScoutFacts](components/dashboard/scouting/ScoutFacts.tsx) — the `ff-tfacts`
-  Details panel carrying Win Rate, Record, Matches, ELO and **Blizzard ID**
+  Details panel carrying the map and series records (labelled — see the units
+  rule above), Matches, Maps Played, ELO and **Blizzard ID**
   (`game_player_name`).
 - **Matches tab — expandable rows.** [FaceitMatchList](components/dashboard/scouting/FaceitMatchList.tsx)
   renders [ScoutMatchRow](components/dashboard/scouting/ScoutMatchRow.tsx): a

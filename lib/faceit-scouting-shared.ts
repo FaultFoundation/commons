@@ -241,6 +241,15 @@ export type ScoutScoreboardTeam = {
   players: ScoutScoreboardPlayer[];
 };
 
+export type ScoutVoting = {
+  teams: Record<string, { id?: string; name?: string }>;
+  games: Array<{
+    game: number; mapId: string; mapName: string; pickedBy: string | null;
+    heroBans: Array<{ id: string; name: string; by: string | null; random: boolean }>;
+    mapBans: Array<{ id: string; name: string; by: string | null; random: boolean }>;
+  }>;
+};
+
 /** The fully-expanded detail for one match: overview + both teams' scoreboards. */
 export type ScoutMatchDetail = {
   matchId: string;
@@ -257,6 +266,7 @@ export type ScoutMatchDetail = {
   faceitUrl: string | null;
   replayCodes: string[];
   heroBans: string[];
+  voting?: ScoutVoting | null;
   teams: ScoutScoreboardTeam[];
   /** Max number of rounds across participants (>1 → per-round tabs). */
   roundCount: number;

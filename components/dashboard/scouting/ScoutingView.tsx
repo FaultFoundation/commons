@@ -25,7 +25,7 @@ import { usePersistentState } from "@/lib/view-state";
 // The whole Scouting surface (Experimental → Scouting). Search ANY FACEIT
 // Overwatch player by nickname; the result is a tournament-view-style profile —
 // a hero header, Overview / Matches tabs, and a two-column Overview (analytics
-// graph cards + Win Rate by Map on the left, a Details facts rail on the right).
+// graph cards + Map Profile on the left, a Details facts rail on the right).
 //
 // Two search depths (ScoutModeToggle). A QUICK search pulls the recent ~50 games
 // fast and shows results as they land. A DEEP search opens a load screen and

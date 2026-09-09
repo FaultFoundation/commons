@@ -111,6 +111,8 @@ export const faceitMatches = sqliteTable(
     mapName: text("map_name"),
     mapMode: text("map_mode"),
     heroBansJson: text("hero_bans_json"),
+    votingJson: text("voting_json"),
+    votingSyncedAt: integer("voting_synced_at", { mode: "timestamp_ms" }),
     replayCodesJson: text("replay_codes_json"),
     attackingFirst: text("attacking_first"),
 

@@ -45,7 +45,7 @@ CREATE TABLE faceit_matches (
   match_type TEXT, best_of INTEGER, round INTEGER, group_num INTEGER,
   status TEXT NOT NULL DEFAULT 'finished', winner_faction TEXT, factions_json TEXT,
   location_id TEXT, server_name TEXT, map_id TEXT, map_name TEXT, map_mode TEXT,
-  hero_bans_json TEXT, replay_codes_json TEXT, attacking_first TEXT,
+  hero_bans_json TEXT, voting_json TEXT, voting_synced_at INTEGER, replay_codes_json TEXT, attacking_first TEXT,
   configured_at INTEGER, started_at INTEGER, finished_at INTEGER, faceit_url TEXT,
   detail_synced_at INTEGER, stats_synced_at INTEGER, rounds_synced_at INTEGER,
   created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);

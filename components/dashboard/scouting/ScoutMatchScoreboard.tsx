@@ -239,7 +239,20 @@ export function ScoutMatchScoreboard({ detail }: { detail: ScoutMatchDetail }) {
         </div>
         <aside className="ff-sb__side">
           <OverviewPanel detail={detail} />
-          {detail.heroBans.length ? (
+          {detail.voting?.games.length ? (
+            <div className="ff-sb__panel">
+              <h4 className="ff-sb__paneltitle">Map picks &amp; bans</h4>
+              {detail.voting.games.filter(g => (round == null || g.game === round) && (!detail.rounds.length || detail.rounds.some(r => r.round === g.game))).map(g => {
+                const team = (faction: string | null) => faction ? detail.voting?.teams[faction]?.name ?? "Unknown team" : "Unknown team";
+                return <div className="ff-tfacts__item" key={g.game}>
+                  <h5>Game {g.game} · {g.mapName}</h5>
+                  <p>Picked by {team(g.pickedBy)}</p>
+                  {g.mapBans.map(b => <p key={b.id}>{b.name} — map banned by {team(b.by)}{b.random ? " (automatic)" : ""}</p>)}
+                  {g.heroBans.map(b => <p key={b.id}>{b.name} — banned by {team(b.by)}{b.random ? " (automatic)" : ""}</p>)}
+                </div>;
+              })}
+            </div>
+          ) : detail.heroBans.length ? (
             <div className="ff-sb__panel">
               <h4 className="ff-sb__paneltitle">Hero bans</h4>
               <div className="ff-sb__bans">

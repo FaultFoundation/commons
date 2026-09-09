@@ -743,6 +743,7 @@ export async function getScoutMatchDetail(
       faceitUrl: match.faceitUrl,
       replayCodes: parseStringArray(match.replayCodesJson),
       heroBans: parseHeroBans(match.heroBansJson),
+      voting: match.votingJson ? JSON.parse(match.votingJson) : null,
       teams,
       roundCount,
       rounds,

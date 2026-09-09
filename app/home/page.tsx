@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { HomeBoard } from "@/components/dashboard/home/HomeBoard";
 import { DENSITY_COOKIE } from "@/lib/density";
+import { packTournamentEntries } from "@/lib/tournament-wire";
 import { loadHomeData } from "@/lib/home";
 import { asHomeLayout } from "@/lib/home-shared";
 import { getProfileCached } from "@/lib/registration";
@@ -54,7 +55,16 @@ export default async function HomePage() {
     <DashboardShell active="home" setupUserId={userId}>
       <h1 className="screen-reader-text">Home</h1>
       <DashboardDataRefresh schedule={Boolean(data.schedule)} tournaments={Boolean(data.tournaments)} />
-      <HomeBoard initialLayout={layout} data={data} />
+      <HomeBoard
+        initialLayout={layout}
+        data={{
+          ...data,
+          tournaments: data.tournaments ? {
+            ...data.tournaments,
+            entries: packTournamentEntries(data.tournaments.entries),
+          } : undefined,
+        }}
+      />
     </DashboardShell>
   );
 }

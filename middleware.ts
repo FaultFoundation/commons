@@ -20,6 +20,15 @@ const LEGACY_PATHS: Record<string, string> = {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Cheap rejection only; pages still validate the real session before reads.
+  // A forged/expired cookie cannot authorize anything.
+  if ((pathname === "/home" || pathname.startsWith("/home/") ||
+       pathname === "/tournaments" || pathname.startsWith("/tournaments/")) &&
+      !request.cookies.get("better-auth.session_token")?.value &&
+      !request.cookies.get("__Secure-better-auth.session_token")?.value) {
+    return NextResponse.redirect(new URL("/login/", request.url));
+  }
+
   const moved = LEGACY_PATHS[pathname];
   if (moved) {
     const url = new URL(request.url);

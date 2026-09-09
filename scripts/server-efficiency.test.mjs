@@ -68,7 +68,7 @@ function fixture({ metadata = null, fail = false, authenticated = true } = {}) {
     const exports = {};
     modules.set(id, exports);
     runInNewContext(code, {
-      exports, require: load, Date, crypto, AbortSignal, Response, URL,
+      exports, require: load, Date, crypto, AbortSignal, Response, URL, Headers,
       console: { ...console, error() {} },
       fetch: async () => {
         fetches++;
@@ -181,4 +181,110 @@ test('refresh endpoint validates origin, authentication, body, and source select
     assert.equal(response.status, 401);
     assert.equal(anonymous.fetches(), 0);
   } finally { anonymous.sqlite.close(); }
+});
+
+test('public schedule cache reuses fresh data and refreshes expired data', async () => {
+  const f = fixture();
+  try {
+    const { cachedPublicSchedule } = f.load('@/lib/public-schedule-cache');
+    let builds = 0;
+    const build = async () => [{ id: 'public:match', status: 'scheduled', title: `Revision ${++builds}` }];
+    assert.equal((await cachedPublicSchedule(build))[0].title, 'Revision 1');
+    assert.equal((await cachedPublicSchedule(build))[0].title, 'Revision 1');
+    assert.equal(builds, 1);
+    f.sqlite.exec("UPDATE tournament_list_cache SET built_at = 0");
+    assert.equal((await cachedPublicSchedule(build))[0].title, 'Revision 2');
+    assert.equal(builds, 2);
+  } finally { f.sqlite.close(); }
+});
+
+test('concurrent stale schedule reads elect one builder and a failure preserves the snapshot', async () => {
+  const f = fixture();
+  try {
+    const { cachedPublicSchedule } = f.load('@/lib/public-schedule-cache');
+    await cachedPublicSchedule(async () => [{ id: 'public:match', status: 'scheduled', title: 'Known good' }]);
+    f.sqlite.exec("UPDATE tournament_list_cache SET built_at = 0");
+    let builds = 0;
+    const results = await Promise.all(Array.from({ length: 8 }, () => cachedPublicSchedule(async () => {
+      builds++;
+      throw new Error('CEN overloaded');
+    })));
+    assert.equal(builds, 1);
+    assert.ok(results.every(entries => entries[0].title === 'Known good'));
+    const row = f.sqlite.prepare("SELECT payload, built_at FROM tournament_list_cache WHERE id = 'public-schedule-v1'").get();
+    assert.equal(JSON.parse(row.payload)[0].title, 'Known good');
+    assert.equal(row.built_at, 0, 'failure does not mark stale data fresh');
+  } finally { f.sqlite.close(); }
+});
+
+test('schedule cache recovers from malformed data and tolerates a missing cache table', async () => {
+  const f = fixture();
+  try {
+    const { cachedPublicSchedule } = f.load('@/lib/public-schedule-cache');
+    f.sqlite.exec("INSERT INTO tournament_list_cache (id,payload,built_at) VALUES ('public-schedule-v1','broken',0)");
+    assert.equal((await cachedPublicSchedule(async () => [{ id: 'public:new', status: 'live' }]))[0].status, 'live');
+    f.sqlite.exec('DROP TABLE tournament_list_cache');
+    assert.equal((await cachedPublicSchedule(async () => [{ id: 'public:new', status: 'finished' }]))[0].status, 'finished');
+  } finally { f.sqlite.close(); }
+});
+
+test('tournament transport preserves all values and discovery behavior with fewer bytes', () => {
+  const f = fixture();
+  try {
+    const { packTournamentEntries, unpackTournamentEntries } = f.load('@/lib/tournament-wire');
+    const { matchesDiscovery, discoveryScore, EMPTY_FILTERS } = f.load('@/lib/discovery-shared');
+    const entries = Array.from({ length: 2446 }, (_, i) => ({
+      id: `startgg:${i}`, name: `College Tournament ${i}`, format: '', status: 'registration',
+      entrantCount: i, maxParticipants: null, startsAt: 1900000000000, bannerUrl: null,
+      featured: false, game: 'Overwatch', gameLogoUrl: null, organizer: 'College League',
+      organizerUrl: null, prizePool: null, registrationClosesAt: null,
+      discovery: { audience: 'collegiate', venue: 'online', competition: 'league',
+        organizationId: null, seriesId: null, featured: false, reviewed: false, reasons: ['College wording'] },
+    }));
+    entries.push({ ...entries[0], discovery: undefined, name: 'Unicode 🎮 <script> & "quotes"' });
+    const packed = JSON.parse(JSON.stringify(packTournamentEntries(entries)));
+    const decoded = unpackTournamentEntries(packed);
+    assert.deepEqual(JSON.parse(JSON.stringify(decoded)), JSON.parse(JSON.stringify(entries)));
+    assert.deepEqual(JSON.parse(JSON.stringify(unpackTournamentEntries(packTournamentEntries([])))), []);
+    const before = Buffer.byteLength(JSON.stringify(entries));
+    const after = Buffer.byteLength(JSON.stringify(packed));
+    assert.ok(after < before * 0.65, `${before} -> ${after}`);
+    const filters = { ...EMPTY_FILTERS, audience: 'collegiate', query: 'league' };
+    assert.deepEqual(entries.map(t => matchesDiscovery(t, filters, [])), decoded.map(t => matchesDiscovery(t, filters, [])));
+    assert.deepEqual(entries.map(t => discoveryScore(t)), decoded.map(t => discoveryScore(t)));
+  } finally { f.sqlite.close(); }
+});
+
+test('missing session cookies redirect before protected rendering; cookie hints still require page auth', () => {
+  const f = fixture();
+  try {
+    const { middleware } = f.load('@/middleware');
+    const { NextRequest } = require('next/server');
+    for (const path of ['/home/', '/tournaments/', '/tournaments/startgg%3A1/']) {
+      const response = middleware(new NextRequest(`https://commons.fault.foundation${path}`));
+      assert.equal(response.status, 307);
+      assert.equal(response.headers.get('location'), 'https://commons.fault.foundation/login/');
+    }
+    for (const name of ['better-auth.session_token', '__Secure-better-auth.session_token']) {
+      assert.equal(middleware(new NextRequest('https://commons.fault.foundation/home/', {
+        headers: { cookie: `${name}=test` },
+      })).headers.get('x-middleware-next'), '1');
+    }
+    assert.equal(middleware(new NextRequest('https://commons.fault.foundation/login/')).status, 200);
+  } finally { f.sqlite.close(); }
+});
+
+test('tournament list cache reads both existing and compact payloads', async () => {
+  const f = fixture();
+  try {
+    const { loadTournamentEntries } = f.load('@/lib/tournament-entries');
+    const { packTournamentEntries } = f.load('@/lib/tournament-wire');
+    const entries = [{ id: 'public:1', name: 'Event', status: 'active', startsAt: null, featured: false }];
+    f.sqlite.prepare('INSERT INTO tournament_list_cache (id,payload,built_at) VALUES (?,?,?)')
+      .run('default', JSON.stringify(entries), Date.now());
+    assert.deepEqual(JSON.parse(JSON.stringify(await loadTournamentEntries())), entries);
+    f.sqlite.prepare('UPDATE tournament_list_cache SET payload = ? WHERE id = ?')
+      .run(JSON.stringify({ version: 1, data: packTournamentEntries(entries) }), 'default');
+    assert.deepEqual(JSON.parse(JSON.stringify(await loadTournamentEntries())), entries);
+  } finally { f.sqlite.close(); }
 });

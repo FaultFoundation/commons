@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { TournamentCards } from "@/components/dashboard/tournaments/TournamentList";
 import { ProfileActions } from "@/components/dashboard/tournaments/DiscoveryActions";
@@ -38,6 +38,8 @@ export default async function DiscoveryProfilePage({
     id: string;
   }>;
 }) {
+  const session = await getSessionCached();
+  if (!session) redirect("/login/");
   const { id: routeId } = await params;
   let id = routeId;
   try {
@@ -51,8 +53,7 @@ export default async function DiscoveryProfilePage({
     profiles.find((p) => p.id === routeId) ?? profiles.find((p) => p.id === id);
   if (!profile) notFound();
   id = profile.id;
-  const session = await getSessionCached();
-  const follows = session ? await discoveryFollowIds(session.user.id) : [];
+  const follows = await discoveryFollowIds(session.user.id);
   const tournaments = entries.filter((t) =>
     profile.kind === "organization"
       ? t.discovery?.organizationId === id

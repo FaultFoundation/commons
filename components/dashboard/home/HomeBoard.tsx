@@ -2,6 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  unpackTournamentEntries,
+  type PackedTournamentEntries,
+} from "@/lib/tournament-wire";
+
 import { setHomeLayout } from "@/app/home/actions";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { DragGrip } from "@/components/dashboard/bubbles/DragGrip";
@@ -32,13 +37,26 @@ import {
 // app/home/page.tsx); toggling one on therefore needs a refresh to fill in a
 // source that wasn't loaded, which the customize dialog triggers on close.
 
+type PackedHomeData = Omit<HomeData, "tournaments"> & {
+  tournaments?: Omit<NonNullable<HomeData["tournaments"]>, "entries"> & {
+    entries: PackedTournamentEntries;
+  };
+};
+
 export function HomeBoard({
   initialLayout,
-  data,
+  data: packedData,
 }: {
   initialLayout: HomeWidgetId[];
-  data: HomeData;
+  data: PackedHomeData;
 }) {
+  const data: HomeData = useMemo(() => ({
+    ...packedData,
+    tournaments: packedData.tournaments ? {
+      ...packedData.tournaments,
+      entries: unpackTournamentEntries(packedData.tournaments.entries),
+    } : undefined,
+  }), [packedData]);
   // Local layout is the source of truth for what's shown and in what order;
   // reorder and customize both update it and persist.
   const [layout, setLayout] = useState<HomeWidgetId[]>(initialLayout);

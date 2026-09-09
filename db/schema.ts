@@ -797,14 +797,14 @@ export const tournamentBrackets = sqliteTable("tournament_brackets", {
 // request, for output that is IDENTICAL for every member (enrichDiscovery reads
 // only global overlay tables; the per-member `follows` is a separate query).
 //
-// Deliberately ONE row (`id` is always LIST_CACHE_ID). `lease_until` is the
+// Named public snapshots: the tournament list and public schedule. `lease_until` is the
 // rebuild lease, claimed atomically before the work so concurrent readers serve
 // the stale payload instead of stampeding cen-sql — the claimSync idiom in
 // lib/schedule.ts. Admin tournament mutations clear `built_at` rather than
 // waiting out the TTL, so a staff edit shows up immediately.
 export const tournamentListCache = sqliteTable("tournament_list_cache", {
   id: text("id").primaryKey(),
-  /** JSON: the enriched TournamentListEntry[] exactly as the pages consume it. */
+  /** JSON: public entries for the snapshot identified by id. Never user data. */
   payload: text("payload").notNull(),
   builtAt: integer("built_at", { mode: "timestamp_ms" }).notNull(),
   /** Held until this instant by whichever request is rebuilding; null when free. */

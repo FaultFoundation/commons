@@ -5,34 +5,52 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { FaceitMatchList } from "@/components/dashboard/scouting/FaceitMatchList";
 import { MapWinrateChart } from "@/components/dashboard/scouting/MapWinrateChart";
+import { ScoutAnalytics } from "@/components/dashboard/scouting/ScoutAnalytics";
+import { ScoutDeepLoading } from "@/components/dashboard/scouting/ScoutDeepLoading";
+import { ScoutFacts } from "@/components/dashboard/scouting/ScoutFacts";
+import { ScoutModeToggle } from "@/components/dashboard/scouting/ScoutModeToggle";
 import { StatLoading } from "@/components/dashboard/statistics/StatLoading";
 import {
   SCOUT_STATUS_MESSAGES,
   formatElo,
-  formatRecord,
-  formatWinratePct,
   normalizeNickname,
+  type ScoutMode,
   type ScoutResponse,
 } from "@/lib/faceit-scouting-shared";
 import { usePersistentState } from "@/lib/view-state";
 
 // The whole Scouting surface (Experimental → Scouting). Search ANY FACEIT
-// Overwatch player by nickname; the headline is win rate by map, over the
-// search-driven `faceit_*` cache the ow-data Worker fills. The heavy work (the
-// FACEIT search + collection) runs server-side behind a loading bar via
-// /api/scouting/*, mirroring the Statistics tab.
+// Overwatch player by nickname; the result is a tournament-view-style profile —
+// a hero header, Overview / Matches tabs, and a two-column Overview (analytics
+// graph cards + Win Rate by Map on the left, a Details facts rail on the right).
 //
-// Two calls: a READ (GET /api/scouting/player) hydrates from the cache without
-// triggering anything (used on mount + Refresh); a SEARCH (POST
-// /api/scouting/search) asks the Worker to collect the player, then reads back.
-// While the Worker is still collecting, we re-read a few times so maps and
-// scoreboards appear without the searcher hunting for the refresh button.
+// Two search depths (ScoutModeToggle). A QUICK search pulls the recent ~50 games
+// fast and shows results as they land. A DEEP search opens a load screen and
+// drives the ow-data Worker's bounded, resumable collection to completion (a loop
+// of POST /api/scouting/advance, reading real progress), so the stats are exact —
+// with a safety cap for extreme accounts.
+//
+// Three calls behind it all: a READ (GET /api/scouting/player) hydrates from the
+// cache without triggering anything; a SEARCH (POST /api/scouting/search) asks the
+// Worker to collect; an ADVANCE (POST /api/scouting/advance) pushes a deep
+// collection forward one chunk.
 
 const CACHE_KEY = "ff-scouting-v1";
 const POLL_MS = 4000;
 const MAX_POLLS = 4;
 
+// Deep drive-to-completion bounds (the safety cap the user signed off on).
+const MAX_ADVANCE = 80;
+const DEEP_CAP_MATCHES = 2000;
+const ADVANCE_RETRY_MS = 2500;
+const MAX_ADVANCE_FAILS = 5;
+
+/** How many rows the Matches tab shows before "Show more". */
+const PAGE = 20;
+
 type Cached = { nickname: string; resp: ScoutResponse };
+type Tab = "overview" | "matches";
+type DeepState = { active: boolean; total: number | null; detailed: number | null };
 
 function readCache(): Cached | null {
   try {
@@ -51,22 +69,33 @@ function writeCache(nickname: string, resp: ScoutResponse) {
   }
 }
 
-/** How many rows the Recent Matches card shows before "Show more". */
-const PAGE = 20;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function ScoutingView({ initialQuery }: { initialQuery: string }) {
-  // The search box remembers the last query across visits; ?q= / the member's
-  // own handle is the fallback the server seeded.
+  // The search box + depth remember the last choice across visits; ?q= / the
+  // member's own handle is the fallback the server seeded.
   const [query, setQuery, restored] = usePersistentState<string>(
     "scouting:query",
     initialQuery,
     (stored) =>
       typeof stored === "string" && stored.length <= 64 ? stored : undefined,
   );
+  const [mode, setMode] = usePersistentState<ScoutMode>(
+    "scouting:mode",
+    "quick",
+    (stored) => (stored === "quick" || stored === "deep" ? stored : undefined),
+  );
+  const [tab, setTab] = usePersistentState<Tab>(
+    "scouting:tab",
+    "overview",
+    (stored) => (stored === "overview" || stored === "matches" ? stored : undefined),
+  );
 
   const [resp, setResp] = useState<ScoutResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [deep, setDeep] = useState<DeepState>({ active: false, total: null, detailed: null });
+  const [deepCapped, setDeepCapped] = useState(false);
   const [shown, setShown] = useState(PAGE);
 
   const alive = useRef(true);
@@ -112,8 +141,8 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
     [],
   );
 
-  // Re-read a handful of times while the Worker is still collecting, so maps and
-  // scoreboards surface on their own. Stops as soon as status is terminal.
+  // Re-read a handful of times while a quick search is still collecting, so maps
+  // and scoreboards surface on their own. Stops as soon as status is terminal.
   const schedulePoll = useCallback(
     (nickname: string, playerId?: string) => {
       clearPoll();
@@ -137,22 +166,20 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
     [applyResp, clearPoll, runRead],
   );
 
-  // A full search: ask the Worker to collect, then read back + start polling.
-  const runSearch = useCallback(
-    async (raw: string, mode: "quick" | "deep" = "quick") => {
+  // A quick search: ask the Worker to collect, then read back + poll a few times.
+  const runQuick = useCallback(
+    async (raw: string) => {
       const nickname = normalizeNickname(raw);
       if (!nickname) return;
       clearPoll();
-      if (mode === "deep") setRefreshing(true);
-      else {
-        setLoading(true);
-        setResp(null);
-      }
+      setLoading(true);
+      setResp(null);
+      setDeepCapped(false);
       try {
         const res = await fetch("/api/scouting/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nickname, mode }),
+          body: JSON.stringify({ nickname, mode: "quick" }),
         });
         const data = res.ok
           ? ((await res.json()) as ScoutResponse)
@@ -163,17 +190,100 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
           schedulePoll(nickname, data.player?.playerId);
         }
       } catch {
-        if (alive.current) {
-          setResp({ status: "error", player: null, data: null });
-        }
+        if (alive.current) setResp({ status: "error", player: null, data: null });
       } finally {
-        if (alive.current) {
-          setLoading(false);
-          setRefreshing(false);
-        }
+        if (alive.current) setLoading(false);
       }
     },
     [applyResp, clearPoll, schedulePoll],
+  );
+
+  // A deep search: register + first page, then loop /advance behind the load
+  // screen until the whole history is collected (status "ready") or a safety cap.
+  const runDeep = useCallback(
+    async (raw: string) => {
+      const nickname = normalizeNickname(raw);
+      if (!nickname) return;
+      clearPoll();
+      setLoading(false);
+      setResp(null);
+      setDeepCapped(false);
+      setDeep({ active: true, total: null, detailed: null });
+
+      const post = async (path: string, body: unknown): Promise<ScoutResponse | null> => {
+        try {
+          const res = await fetch(path, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          return res.ok ? ((await res.json()) as ScoutResponse) : null;
+        } catch {
+          return null;
+        }
+      };
+
+      // 1. Register the deep search + do the first page.
+      let current =
+        (await post("/api/scouting/search", { nickname, mode: "deep" })) ??
+        ({ status: "error", player: null, data: null } as ScoutResponse);
+      if (!alive.current) return;
+
+      // A definitive non-result (not found / unconfigured / error with no player)
+      // ends here — nothing to advance.
+      if (!current.player) {
+        setDeep({ active: false, total: null, detailed: null });
+        applyResp(nickname, current);
+        return;
+      }
+
+      const playerId = current.player.playerId;
+      let total = current.progress?.total ?? null;
+      let detailed = current.progress?.detailed ?? null;
+      setDeep({ active: true, total, detailed });
+
+      // 2. Drive to completion (unless the trigger already reported it done).
+      let fails = 0;
+      let capped = false;
+      for (let i = 0; current.status !== "ready" && i < MAX_ADVANCE; i++) {
+        if (!alive.current) return;
+        const adv = await post("/api/scouting/advance", {
+          player_id: playerId,
+          mode: "deep",
+        });
+        if (!alive.current) return;
+        if (!adv) {
+          if (++fails >= MAX_ADVANCE_FAILS) break;
+          await sleep(ADVANCE_RETRY_MS);
+          continue;
+        }
+        fails = 0;
+        current = adv;
+        // A terminal non-collecting status (e.g. the Worker went unreachable) —
+        // stop rather than spin out the whole budget.
+        if (adv.status === "not_found" || adv.status === "not_configured") break;
+        total = adv.progress?.total ?? total;
+        detailed = adv.progress?.detailed ?? detailed;
+        setDeep({ active: true, total, detailed });
+        if (adv.status === "ready") break;
+        if ((total ?? 0) >= DEEP_CAP_MATCHES) {
+          capped = true;
+          break;
+        }
+      }
+
+      // 3. Done — drop the load screen and show the collected profile.
+      if (!alive.current) return;
+      setDeep({ active: false, total: null, detailed: null });
+      setDeepCapped(capped || (current.status !== "ready" && (total ?? 0) > 0));
+      applyResp(nickname, current);
+    },
+    [applyResp, clearPoll],
+  );
+
+  const runSearch = useCallback(
+    (raw: string, m: ScoutMode) => (m === "deep" ? runDeep(raw) : runQuick(raw)),
+    [runDeep, runQuick],
   );
 
   // Refresh: re-read the current player from the cache (picks up background
@@ -189,10 +299,6 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
     }
   }, [applyResp, refreshing, resp?.player?.playerId, runRead]);
 
-  // On mount (after the remembered query restores): paint any cached result and
-  // do a cache-only read for the seeded query. No Worker trigger without an
-  // explicit search — opening the tab shouldn't kick off a collection.
-  const hydrated = useRef(false);
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -201,13 +307,13 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
     };
   }, [clearPoll]);
 
+  // On mount (after the remembered query restores): repaint any cached result.
+  // No Worker trigger without an explicit search — opening the tab shouldn't kick
+  // off a collection.
+  const hydrated = useRef(false);
   useEffect(() => {
     if (!restored || hydrated.current) return;
     hydrated.current = true;
-    // Repaint a search made earlier THIS session (cache only exists after a
-    // search) so hopping away and back doesn't re-wait. No network read on
-    // mount: until the member actually searches, the screen is just the header
-    // and the search bar — the seeded query only pre-fills the box.
     const seed = normalizeNickname(query);
     const cached = readCache();
     if (cached && seed && cached.nickname.toLowerCase() === seed.toLowerCase()) {
@@ -220,13 +326,14 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    void runSearch(query, "quick");
+    void runSearch(query, mode);
   }
 
   const player = resp?.player ?? null;
   const data = resp?.data ?? null;
   const status = resp?.status ?? "idle";
   const collecting = status === "collecting";
+  const busy = loading || deep.active;
 
   return (
     <div className="ff-owpage">
@@ -242,86 +349,138 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
             autoComplete="off"
             spellCheck={false}
           />
+          <ScoutModeToggle mode={mode} onChange={setMode} disabled={busy} />
           <button
             type="submit"
             className="ff-btn ff-btn--brand"
-            disabled={loading || !normalizeNickname(query)}
+            disabled={busy || !normalizeNickname(query)}
           >
-            {loading ? "Searching…" : "Scout"}
+            {busy ? "Scouting…" : "Scout"}
           </button>
         </form>
+        <p className="ff-scoutsearch__hint">
+          {mode === "quick"
+            ? "Quick — the recent ~50 games, fast."
+            : "Deep — waits for the full match history, so every stat is exact."}
+        </p>
       </Bubble>
 
-      {loading ? (
+      {deep.active ? (
+        <ScoutDeepLoading total={deep.total} detailed={deep.detailed} />
+      ) : loading ? (
         <StatLoading />
       ) : status === "not_found" || status === "error" || status === "not_configured" ? (
         <Bubble title="Scouting" span="full">
           <p className="ff-bubble__lede">{SCOUT_STATUS_MESSAGES[status]}</p>
         </Bubble>
-      ) : player ? (
+      ) : player && data ? (
         <>
-          <ScoutHeader resp={resp!} refreshing={refreshing} onRefresh={onRefresh} />
+          <ScoutHeader
+            resp={resp!}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            onDeep={() => runDeep(activeNick.current ?? query)}
+          />
 
-          <Bubble
-            title="Win Rate by Map"
-            span="full"
-            actions={
-              data?.summary ? (
-                <span className="ff-scoutmap__summary">
-                  {data.summary.withMap} of {data.summary.total} matches mapped
-                </span>
-              ) : null
-            }
-          >
-            {collecting && (!data || data.mapWinrates.length === 0) ? (
-              <p className="ff-bubble__note">
-                Collecting matches… map win rates appear here as each match&apos;s
-                overview is pulled. This can take a moment on the first search.
-              </p>
-            ) : (
-              <MapWinrateChart rows={data?.mapWinrates ?? []} />
-            )}
-          </Bubble>
+          {deepCapped ? (
+            <p className="ff-scoutcap">
+              Showing the most recent {DEEP_CAP_MATCHES.toLocaleString()}+ matches —
+              this account&apos;s history is large, so the deep scan stopped at the
+              safety cap. The stats above reflect what was collected.
+            </p>
+          ) : null}
 
-          <Bubble title="Recent Matches" span="full">
-            {collecting ? (
-              <p className="ff-bubble__note">
-                Still collecting — more matches keep arriving.
-              </p>
-            ) : null}
-            <FaceitMatchList matches={(data?.matches ?? []).slice(0, shown)} />
-            {(data?.matches.length ?? 0) > shown ? (
-              <div className="ff-bubble__cta">
-                <button
-                  type="button"
-                  className="ff-btn ff-btn--outline ff-btn--sm"
-                  onClick={() => setShown((s) => s + PAGE)}
+          <div className="ff-owtabs" role="tablist" aria-label="Scouting sections">
+            {(["overview", "matches"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                aria-selected={tab === t}
+                className={`ff-owtab${tab === t ? " ff-owtab--active" : ""}`}
+                onClick={() => setTab(t)}
+              >
+                {t === "overview" ? "Overview" : "Matches"}
+              </button>
+            ))}
+          </div>
+
+          {tab === "overview" ? (
+            <div className="ff-toverview">
+              <div className="ff-tpanel">
+                <ScoutAnalytics matches={data.matches} />
+                <Bubble
+                  title="Win Rate by Map"
+                  span="full"
+                  actions={
+                    data.summary ? (
+                      <span className="ff-scoutmap__summary">
+                        {data.summary.withMap} of {data.summary.total} mapped
+                      </span>
+                    ) : null
+                  }
                 >
-                  Show more ({(data?.matches.length ?? 0) - shown} remaining)
-                </button>
+                  {collecting && data.mapWinrates.length === 0 ? (
+                    <p className="ff-bubble__note">
+                      Collecting matches… map win rates appear as each match&apos;s
+                      overview is pulled.
+                    </p>
+                  ) : (
+                    <MapWinrateChart rows={data.mapWinrates} />
+                  )}
+                </Bubble>
               </div>
-            ) : null}
-          </Bubble>
+              <div className="ff-toverview__side">
+                <ScoutFacts player={player} summary={data.summary} />
+              </div>
+            </div>
+          ) : (
+            <Bubble title="Recent Matches" span="full">
+              {collecting ? (
+                <p className="ff-bubble__note">
+                  Still collecting — more matches keep arriving. Open a match for its
+                  full scoreboard.
+                </p>
+              ) : null}
+              <FaceitMatchList
+                matches={data.matches.slice(0, shown)}
+                scoutedPlayerId={player.playerId}
+              />
+              {data.matches.length > shown ? (
+                <div className="ff-bubble__cta">
+                  <button
+                    type="button"
+                    className="ff-btn ff-btn--outline ff-btn--sm"
+                    onClick={() => setShown((s) => s + PAGE)}
+                  >
+                    Show more ({data.matches.length - shown} remaining)
+                  </button>
+                </div>
+              ) : null}
+            </Bubble>
+          )}
         </>
       ) : null}
     </div>
   );
 }
 
-// --- Profile header ---------------------------------------------------------
+// --- Profile header (identity only; the stats live in the Details rail) ------
 
 function ScoutHeader({
   resp,
   refreshing,
   onRefresh,
+  onDeep,
 }: {
   resp: ScoutResponse;
   refreshing: boolean;
   onRefresh: () => void;
+  onDeep: () => void;
 }) {
   const player = resp.player!;
-  const summary = resp.data?.summary ?? null;
   const collecting = resp.status === "collecting";
+  const canDeepen = player.searchMode !== "deep";
 
   return (
     <section className="ff-card ff-bubble ff-bubble--full ff-scouthead">
@@ -357,6 +516,16 @@ function ScoutHeader({
           </div>
         </div>
         <div className="ff-scouthead__actions">
+          {canDeepen ? (
+            <button
+              type="button"
+              className="ff-btn ff-btn--outline ff-btn--sm"
+              onClick={onDeep}
+              title="Collect the full match history for exact stats"
+            >
+              Deep scan
+            </button>
+          ) : null}
           {player.faceitUrl ? (
             <a
               className="ff-btn ff-btn--outline ff-btn--sm"
@@ -390,30 +559,6 @@ function ScoutHeader({
           </button>
         </div>
       </div>
-      <div className="ff-scouthead__stats">
-        <HeadStat
-          label="Win Rate"
-          value={formatWinratePct(summary?.winrate ?? null)}
-          hi
-        />
-        <HeadStat
-          label="Record"
-          value={summary ? formatRecord(summary) : "—"}
-        />
-        <HeadStat
-          label="Matches"
-          value={summary ? String(summary.total) : String(player.matchCount)}
-        />
-      </div>
     </section>
-  );
-}
-
-function HeadStat({ label, value, hi }: { label: string; value: string; hi?: boolean }) {
-  return (
-    <div className="ff-stat">
-      <span className="ff-stat__label">{label}</span>
-      <span className={`ff-stat__value${hi ? " ff-stat__value--hi" : ""}`}>{value}</span>
-    </div>
   );
 }

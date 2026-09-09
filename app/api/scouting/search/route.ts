@@ -72,6 +72,7 @@ export async function POST(request: Request) {
         matchCount: 0,
         listDone: false,
         detailDone: false,
+        searchMode: mode,
       },
       data: null,
     };

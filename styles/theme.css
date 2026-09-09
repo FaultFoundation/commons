@@ -7387,10 +7387,16 @@ button.ff-dash__link:hover {
 }
 
 /* =====================================================
-   FACEIT Scouting (Experimental → Scouting): search box,
-   scouted-player header, and the win-rate-by-map chart.
-   Reuses the OW page scaffold (.ff-owpage) + the pd_*
-   match list (.ff-pdmatch*).
+   FACEIT Scouting (Experimental → Scouting): a tournament-
+   view-style profile — search box + Quick/Deep switch,
+   scouted-player header, Overview/Matches tabs (ff-owtabs),
+   a two-column Overview (ff-toverview: analytics graph cards
+   + win-rate-by-map on the left, a Details rail on the right),
+   and the Matches tab's expandable rows with per-round
+   scoreboards. Reuses the OW page scaffold (.ff-owpage), the
+   tab (.ff-owtab*) / column (.ff-toverview*) / facts
+   (.ff-tfacts*) primitives, and the OW line-chart classes
+   (.ff-owchart*).
    ===================================================== */
 
 /* Search box — a text input + submit on one row, wrapping on narrow widths. */
@@ -7561,6 +7567,573 @@ button.ff-dash__link:hover {
   .ff-scoutmap__axis {
     display: none;
   }
+}
+
+/* Search sub-copy + the Quick/Deep depth switch beside the Scout button. */
+.ff-scoutsearch__hint {
+  margin: 8px 0 0;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-scoutmode {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-surface-2);
+}
+.ff-scoutmode__opt {
+  border: none;
+  background: transparent;
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+  padding: 7px 16px;
+  border-radius: var(--ff-radius-pill);
+  cursor: pointer;
+  transition:
+    color var(--ff-transition),
+    background var(--ff-transition);
+}
+.ff-scoutmode__opt:hover:not(:disabled) {
+  color: #fff;
+}
+.ff-scoutmode__opt--on {
+  background: var(--ff-accent);
+  color: #12151b;
+}
+.ff-scoutmode__opt:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* Deep-scan safety-cap note. */
+.ff-scoutcap {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-surface-2);
+  font-size: var(--ff-dash-text-sm);
+  color: var(--ff-text-dim);
+}
+
+/* Indeterminate variant of the OW load bar (deep scan, before a count lands). */
+.ff-owload__bar--indeterminate {
+  width: 40%;
+  animation:
+    ff-owslide 2s linear infinite,
+    ff-scoutindet 1.5s ease-in-out infinite;
+}
+@keyframes ff-scoutindet {
+  0% { margin-left: -40%; }
+  100% { margin-left: 100%; }
+}
+
+/* --- Overview left column: the analytics graph cards ---------------------- */
+.ff-scoutanalytics {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Each analytic is its own collapsible card (native <details>). */
+.ff-scoutgraph {
+  padding: 0;
+}
+.ff-scoutgraph__summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  cursor: pointer;
+  list-style: none;
+}
+.ff-scoutgraph__summary::-webkit-details-marker {
+  display: none;
+}
+.ff-scoutgraph__title {
+  font-size: var(--ff-dash-text-md);
+  font-weight: 800;
+}
+.ff-scoutgraph__caption {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--ff-dash-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ff-text-dim);
+}
+.ff-scoutgraph__caption--pos {
+  color: #6ee7a0;
+}
+.ff-scoutgraph__caption--neg {
+  color: #f08a8a;
+}
+.ff-scoutgraph__caption--warn {
+  color: #f0b866;
+}
+.ff-scoutgraph__chev {
+  margin-left: auto;
+  color: var(--ff-text-dim);
+  display: inline-flex;
+  transition: transform var(--ff-transition);
+}
+.ff-scoutgraph[open] .ff-scoutgraph__chev {
+  transform: rotate(180deg);
+}
+.ff-scoutgraph__body {
+  padding: 4px 18px 18px;
+  border-top: 1px solid var(--ff-border);
+}
+
+/* K/D-over-time line chart (reuses ff-owchart line/area classes). */
+.ff-scoutchart__svg {
+  width: 100%;
+  height: 120px;
+}
+.ff-scoutchart__trend {
+  fill: none;
+  stroke: var(--ff-text-dim);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 4;
+  opacity: 0.8;
+}
+
+/* Win/loss strip. */
+.ff-scoutstrip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+}
+.ff-scoutstrip__cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ff-scoutstrip__cell {
+  width: 16px;
+  height: 22px;
+  border-radius: 3px;
+  background: var(--ff-surface-2);
+}
+.ff-scoutstrip__cell--win {
+  background: #6ee7a0;
+}
+.ff-scoutstrip__cell--loss {
+  background: #f08a8a;
+}
+.ff-scoutstrip__cell--draw {
+  background: var(--ff-text-dim);
+}
+.ff-scoutstrip__legend {
+  display: flex;
+  gap: 14px;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-scoutstrip__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ff-scoutstrip__key::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--ff-surface-2);
+}
+.ff-scoutstrip__key--win::before { background: #6ee7a0; }
+.ff-scoutstrip__key--loss::before { background: #f08a8a; }
+.ff-scoutstrip__key--draw::before { background: var(--ff-text-dim); }
+
+/* Damage vs healing paired bars. */
+.ff-scoutdh {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+}
+.ff-scoutdh__bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 110px;
+}
+.ff-scoutdh__col {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+}
+.ff-scoutdh__bar {
+  width: 6px;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+}
+.ff-scoutdh__bar--dmg { background: #e0a04a; }
+.ff-scoutdh__bar--heal { background: #5ec7a0; }
+.ff-scoutdh__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-scoutdh__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ff-scoutdh__key::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.ff-scoutdh__key--dmg::before { background: #e0a04a; }
+.ff-scoutdh__key--heal::before { background: #5ec7a0; }
+
+/* Performance anomalies list. */
+.ff-scoutanom {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ff-scoutanom__row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto auto;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-scoutanom__dir--up { color: #6ee7a0; }
+.ff-scoutanom__dir--down { color: #f08a8a; }
+.ff-scoutanom__metric {
+  font-weight: 700;
+}
+.ff-scoutanom__val {
+  font-variant-numeric: tabular-nums;
+}
+.ff-scoutanom__map {
+  color: var(--ff-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.ff-scoutanom__z {
+  font-variant-numeric: tabular-nums;
+  color: var(--ff-text-dim);
+}
+.ff-scoutanom__when {
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-xs);
+}
+
+/* Consistency (CV) bars. */
+.ff-scoutcv {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+}
+.ff-scoutcv__row {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 12px;
+}
+.ff-scoutcv__label {
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+}
+.ff-scoutcv__track {
+  height: 8px;
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-surface-2);
+  overflow: hidden;
+}
+.ff-scoutcv__bar {
+  display: block;
+  height: 100%;
+  border-radius: var(--ff-radius-pill);
+  background: linear-gradient(90deg, var(--ff-blue), var(--ff-accent));
+}
+.ff-scoutcv__val {
+  text-align: right;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Matches tab: expandable match rows ---------------------------------- */
+.ff-scoutmatches {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ff-scoutmatch {
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-surface-2);
+  overflow: hidden;
+}
+.ff-scoutmatch--open {
+  border-color: rgba(255, 255, 255, 0.24);
+}
+.ff-scoutmatch__summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ff-scoutmatch__summary:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.ff-scoutmatch__res {
+  flex: none;
+  width: 44px;
+  text-align: center;
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 4px 0;
+  border-radius: var(--ff-radius-pill);
+  border: 1px solid var(--ff-border);
+}
+.ff-scoutmatch__res--win { color: #6ee7a0; border-color: rgba(110, 231, 160, 0.4); }
+.ff-scoutmatch__res--loss { color: #f08a8a; border-color: rgba(240, 138, 138, 0.4); }
+.ff-scoutmatch__res--draw,
+.ff-scoutmatch__res--none { color: var(--ff-text-dim); }
+.ff-scoutmatch__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.ff-scoutmatch__map {
+  font-weight: 700;
+  font-size: var(--ff-dash-text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ff-scoutmatch__meta {
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-scoutmatch__score {
+  flex: none;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.ff-scoutmatch__kda {
+  flex: none;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.ff-scoutmatch__when {
+  flex: none;
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-scoutmatch__chev {
+  flex: none;
+  color: var(--ff-text-dim);
+  display: inline-flex;
+  transition: transform var(--ff-transition);
+}
+.ff-scoutmatch--open .ff-scoutmatch__chev {
+  transform: rotate(180deg);
+}
+.ff-scoutmatch__body {
+  padding: 4px 16px 16px;
+  border-top: 1px solid var(--ff-border);
+}
+@media (max-width: 620px) {
+  .ff-scoutmatch__kda,
+  .ff-scoutmatch__when {
+    display: none;
+  }
+}
+
+/* --- Match scoreboard (both teams + per-round tabs + overview) ------------ */
+.ff-sb {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 12px;
+}
+.ff-sb__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ff-sb__tab {
+  padding: 5px 14px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-pill);
+  background: transparent;
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+.ff-sb__tab--on {
+  background: var(--ff-accent);
+  color: #12151b;
+  border-color: transparent;
+}
+.ff-sb__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .ff-sb__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.ff-sb__teams {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.ff-sb__team {
+  min-width: 0;
+  overflow-x: auto;
+}
+.ff-sb__teamhead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.ff-sb__teamname {
+  font-weight: 800;
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-sb__teamres {
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.ff-sb__teamres--win { color: #6ee7a0; }
+.ff-sb__teamres--loss { color: #f08a8a; }
+.ff-sb__teamres--draw { color: var(--ff-text-dim); }
+.ff-sb__teamscore {
+  margin-left: auto;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.ff-sb__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-sb__th {
+  text-align: right;
+  padding: 4px 8px;
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ff-text-dim);
+  border-bottom: 1px solid var(--ff-border);
+  white-space: nowrap;
+}
+.ff-sb__th--player {
+  text-align: left;
+}
+.ff-sb__row {
+  border-bottom: 1px solid var(--ff-border);
+}
+.ff-sb__row--scouted {
+  background: rgba(255, 238, 88, 0.08);
+}
+.ff-sb__player {
+  padding: 6px 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.ff-sb__nick {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ff-sb__role {
+  font-size: var(--ff-dash-text-xs);
+  color: var(--ff-text-dim);
+}
+.ff-sb__cell {
+  padding: 6px 8px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ff-sb__cell--empty {
+  text-align: center;
+  color: var(--ff-text-dim);
+}
+.ff-sb__kd--pos { color: #6ee7a0; }
+.ff-sb__kd--neg { color: #f08a8a; }
+.ff-sb__side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.ff-sb__panel {
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.ff-sb__paneltitle {
+  margin: 0 0 8px;
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ff-text-dim);
+}
+.ff-sb__bans {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ff-sb__ban {
+  padding: 3px 10px;
+  border-radius: var(--ff-radius-pill);
+  border: 1px solid var(--ff-danger-border);
+  background: var(--ff-danger-bg);
+  color: var(--ff-danger-text);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
 }
 
 /* =====================================================

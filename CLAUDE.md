@@ -1063,10 +1063,25 @@ documented in [db/README.md](db/README.md)); the same `ow-data` Worker crons it.
 
 The **Scouting** tab (`/scouting/`, a sub-tab of the **Experimental** rail group)
 looks up **any** FACEIT Overwatch player by nickname — opponents, not the linked
-member — and shows their **win rate on each map** over their collected match
-history. It lives in the **same third D1** (`ow-player-data`) as the `ow_*`/`pd_*`
-tables, in tables prefixed `faceit_*`, but the ownership is **the reverse of
-everything else here**.
+member — and renders a **tournament-view-style profile** of them: a hero header,
+**Overview / Matches** tabs, a two-column Overview (analytics graph cards + win
+rate by map on the left, a Details facts rail on the right), and an expandable
+match history with per-round scoreboards. It lives in the **same third D1**
+(`ow-player-data`) as the `ow_*`/`pd_*` tables, in tables prefixed `faceit_*`, but
+the ownership is **the reverse of everything else here**.
+
+- **Two search depths (Quick / Deep).** A **quick** search pulls the recent ~50
+  games fast (approximate, shown as they land); a **deep** search opens a load
+  screen and waits until the player's **whole** history is collected, so the stats
+  are exact. Because a Worker can't collect a veteran's thousands of matches (two
+  API calls each) in one request, deep is **driven to completion by the Commons**:
+  after the trigger it loops `POST /api/scouting/advance` (each call advances the
+  Worker's bounded, resumable collection by one synchronous chunk and returns
+  progress counts) until the history is fully detailed **or a client safety cap**
+  (`MAX_ADVANCE` / `DEEP_CAP_MATCHES` in `ScoutingView`). The load bar shows real
+  progress (`detailed / total`). The switch sits left of the Scout button
+  (`ScoutModeToggle`); a quick result also offers a "Deep scan" upgrade in the
+  header.
 
 - **The ow-data Worker OWNS the `faceit_*` schema + migrations**, not the Commons.
   Unlike `ow_*`/`pd_*` (Commons-owned, migrated via `drizzle.ow.config.ts`), the
@@ -1086,43 +1101,70 @@ everything else here**.
   (`faceit-collect.ts`, three Data API calls per match: history LIST →
   `/matches/{id}` overview → `/matches/{id}/stats` scoreboard) exists ONLY on the
   ow-data Worker. So a search is an authenticated server-to-server POST to that
-  Worker's `/faceit/search` (`requestFaceitSearch`, mirroring
-  [lib/external-refresh.ts](lib/external-refresh.ts) — best-effort, scheme-
-  tolerant, bounded timeout), gated by the shared **`OW_POLLER_SECRET`** with the
-  Worker base at **`OW_DATA_URL`**. Both unset → the tab still reads already-cached
-  players but can't collect a new one; the search box shows a soft note.
-- **The read/trigger split → two API routes.** `POST /api/scouting/search`
-  (session + same-origin, since it triggers the outbound call) asks the Worker to
-  collect, then reads the freshened cache back;
-  `GET /api/scouting/player?nickname=|player_id=` (session) is a cache-only read,
-  used by the "Refresh" control and the bounded background poll. Both return one
-  `ScoutResponse` shape from `getScoutingData`, degrading to a member-visible
-  status (`collecting` | `ready` | `not_found` | `error` | `not_configured`) the
-  same way the Match Data tab surfaces `pd_sync.status`.
+  Worker's `/faceit/search` (`requestFaceitSearch`), and a deep search's
+  continuation is `POST /faceit/advance` (`advanceFaceitSearch` — same shape, a
+  bounded synchronous chunk per call), both mirroring
+  [lib/external-refresh.ts](lib/external-refresh.ts) (best-effort, scheme-tolerant,
+  bounded timeout) and gated by the shared **`OW_POLLER_SECRET`** with the Worker
+  base at **`OW_DATA_URL`**. Both unset → the tab still reads already-cached players
+  but can't collect a new one (and can't deepen); the search box shows a soft note.
+  **`/faceit/advance` is worker-owned like the schema** — the endpoint + the
+  quick/deep budgets live in the ow-data repo's `src/index.ts`; adding one there
+  means a redeploy of `ow-data`, never a Commons migration.
+- **Accuracy comes from SQL aggregates, not the row window.** `getScoutingData`
+  pulls a bounded window (~300 newest) of full match rows for the graphs + list,
+  but computes the **overall record, win rate, and per-map win rates via SQL
+  `COUNT`/`GROUP BY` over EVERY collected match** — so a Deep result is exact no
+  matter how deep the history runs. `detailed` (rows with a synced scoreboard) also
+  drives the deep progress bar, and a **quick** search is reported "ready" for
+  display once its recent window (`QUICK_READY_MATCHES`) is detailed, rather than
+  waiting on a full backfill it never asked for.
+- **The read/trigger split → four API routes**, all returning one `ScoutResponse`
+  (or `ScoutMatchDetail`) and degrading to a member-visible status
+  (`collecting` | `ready` | `not_found` | `error` | `not_configured`) like the
+  Match Data tab. `POST /api/scouting/search` (session + same-origin) triggers a
+  collection and reads back; `POST /api/scouting/advance` (session + same-origin)
+  is the deep loop's per-chunk driver; `GET /api/scouting/player` is the cache-only
+  read (Refresh + background poll); `GET /api/scouting/match?match_id=&player=` is
+  the **on-demand match detail** a match row fetches when it expands (both teams'
+  scoreboards + overview — a pure read of rows the Worker already wrote, so no
+  outbound trigger).
 - **The view** ([ScoutingView](components/dashboard/scouting/ScoutingView.tsx),
-  client) mirrors the Statistics tab's client-loaded-behind-a-loading-bar pattern
-  (`StatLoading`, a sessionStorage stale-while-revalidate cache, `usePersistentState`
-  for the remembered query). Opening the tab does a **cache-only read** of the
-  seeded query (the member's own linked FACEIT handle, or `?q=`) — it never kicks
-  off a collection without an explicit search. While the Worker is still
-  `collecting`, the view **re-reads a few times** (`POLL_MS`/`MAX_POLLS`) so maps
-  and scoreboards appear without hunting for the refresh button. The client-safe
-  half — types, the `computeMapWinrates`/`computeSummary` pure derivations, and
-  formatters — is [lib/faceit-scouting-shared.ts](lib/faceit-scouting-shared.ts).
-- **The headline graphic** is
-  [MapWinrateChart](components/dashboard/scouting/MapWinrateChart.tsx): a **thin
-  horizontal bar per map**, sorted by win rate, the bar width tracking win rate
-  against a 0–100% scale (inline CSS-track bars, no chart lib — the OW dashboard's
-  meter idiom). Only matches whose overview has landed (a known `map_name` from
-  the DETAIL phase) count, and low-sample maps (`< LOW_SAMPLE` games) are muted so
-  one lucky game doesn't read as loud as a 40-game trend.
-  [FaceitMatchList](components/dashboard/scouting/FaceitMatchList.tsx) shows the
-  recent matches (map, score, the player's own K/D/A) beneath it, close to the
-  `pd_*` `MatchList` idiom. **Deferred** (the user flagged the approach as open):
-  the richer analytics from the mockup — K/D-over-time regression, consistency
-  (CV/stdev), performance anomalies (>2 SD), damage-vs-healing, role distribution
-  — are not built yet; the collected `stats_json` scoreboard blobs carry the data
-  for them.
+  client) mirrors `ExternalTournamentView`: a hero header, `ff-owtabs`
+  Overview/Matches tabs, and an `ff-toverview` two-column Overview. Opening the tab
+  does **no network read** — it repaints any sessionStorage-cached result and only
+  collects on an explicit search. A quick search re-reads a few times
+  (`POLL_MS`/`MAX_POLLS`) as detail lands; a deep search stays behind
+  `ScoutDeepLoading` until the loop finishes. `usePersistentState` remembers the
+  query, the **depth**, and the active tab. The client-safe half —
+  types, the pure analytics derivations, and formatters — is
+  [lib/faceit-scouting-shared.ts](lib/faceit-scouting-shared.ts).
+- **Overview left column — analytics graph cards** ([ScoutAnalytics](components/dashboard/scouting/ScoutAnalytics.tsx),
+  a stack of collapsible [ScoutGraphCard](components/dashboard/scouting/ScoutGraphCard.tsx)
+  `<details>` cards): **K/D over time** (line + least-squares trend), **win/loss
+  strip** (+ current streak), **damage vs healing** (paired bars), **performance
+  anomalies** (matches ≥2 SD from the player's own mean), **consistency by stat**
+  (CV, lower is steadier). All are **pure derivations** in the shared module
+  (`computeKdOverTime`/`computeWinLossStrip`/`computeDamageHealing`/
+  `computePerformanceAnomalies`/`computeConsistency` + `mean`/`stddev`/
+  `linearRegression`) over the windowed matches, rendered as inline-SVG/CSS-track
+  charts (no chart lib — the `ff-owchart*` idiom). Beneath them sits
+  [MapWinrateChart](components/dashboard/scouting/MapWinrateChart.tsx) (the
+  win-rate-by-map bars). The **right rail** is
+  [ScoutFacts](components/dashboard/scouting/ScoutFacts.tsx) — the `ff-tfacts`
+  Details panel carrying Win Rate, Record, Matches, ELO and **Blizzard ID**
+  (`game_player_name`).
+- **Matches tab — expandable rows.** [FaceitMatchList](components/dashboard/scouting/FaceitMatchList.tsx)
+  renders [ScoutMatchRow](components/dashboard/scouting/ScoutMatchRow.tsx): a
+  summary row (result, map, score, own K/D/A, date) that opens to
+  [ScoutMatchScoreboard](components/dashboard/scouting/ScoutMatchScoreboard.tsx) —
+  **both teams' scoreboards** (K/D/A, KD, DMG, HEAL, MIT; the scouted player
+  highlighted) + a match-overview panel + hero bans. When a match carries more than
+  one FACEIT round (a control map / Bo>1 collected as one match), **per-round tabs**
+  (`Overall` + `Round N`) switch the scoreboard — parsed from each participant's
+  `stats_json`. Detail is fetched lazily on first expand (client-controlled open,
+  not native `<details>`), so a long list carries no per-player payload up front; an
+  undetailed match (common on Quick) prompts a Deep scan.
 
 ### Styling
 

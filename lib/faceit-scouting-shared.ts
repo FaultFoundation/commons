@@ -55,6 +55,10 @@ export type ScoutPlayer = {
   matchCount: number;
   listDone: boolean;
   detailDone: boolean;
+  /** 'quick' | 'deep' | null — how this player was last searched. Drives the
+   *  display-readiness rule (quick is "ready" once the recent window is detailed;
+   *  deep only once the whole history is). */
+  searchMode: string | null;
 };
 
 /** 'win' | 'loss' | 'draw' from the scouted player's perspective. */
@@ -122,8 +126,87 @@ export type ScoutResponse = {
   status: ScoutStatus;
   player: ScoutPlayer | null;
   data: ScoutData | null;
+  /** Collection progress, for the Deep search's loading bar. `total` is every
+   *  match known for the player; `detailed` is how many carry a synced
+   *  scoreboard. Present on deep-advance reads. */
+  progress?: { total: number; detailed: number };
   /** Human-readable detail for a non-ready status (else undefined). */
   message?: string;
+};
+
+// --- Match detail (the expandable match dropdown) ---------------------------
+// Fetched on demand (GET /api/scouting/match) when a match row expands, so the
+// heavy per-participant scoreboard isn't carried in the main list payload. Every
+// participant's scoreboard is already collected during the DETAIL phase, so this
+// is a pure read of rows the ow-data Worker wrote.
+
+/** One player's stats for a single FACEIT round (a control-map point, or the
+ *  lone round of a Bo1). `raw` keeps the untouched stat map for extra columns. */
+export type ScoutRoundStats = {
+  /** 1-based round index, or null for the match-level aggregate. */
+  round: number | null;
+  eliminations: number | null;
+  deaths: number | null;
+  assists: number | null;
+  kdRatio: number | null;
+  damageDealt: number | null;
+  healingDone: number | null;
+  damageMitigated: number | null;
+  raw: Record<string, string>;
+};
+
+/** One row in a match scoreboard — a participant, with the aggregate scalars and
+ *  the per-round breakdown. */
+export type ScoutScoreboardPlayer = {
+  playerId: string;
+  nickname: string | null;
+  faction: string | null;
+  result: ScoutResult | null;
+  role: string | null;
+  /** Whether this is the scouted player (highlighted in the scoreboard). */
+  isScouted: boolean;
+  eliminations: number | null;
+  deaths: number | null;
+  assists: number | null;
+  kdRatio: number | null;
+  damageDealt: number | null;
+  healingDone: number | null;
+  damageMitigated: number | null;
+  finalBlows: number | null;
+  soloKills: number | null;
+  rounds: ScoutRoundStats[];
+};
+
+/** One team (faction) block in a match scoreboard. */
+export type ScoutScoreboardTeam = {
+  faction: string;
+  name: string | null;
+  score: number | null;
+  result: ScoutResult | null;
+  players: ScoutScoreboardPlayer[];
+};
+
+/** The fully-expanded detail for one match: overview + both teams' scoreboards. */
+export type ScoutMatchDetail = {
+  matchId: string;
+  competitionName: string | null;
+  competitionType: string | null;
+  serverName: string | null;
+  mapName: string | null;
+  mapMode: string | null;
+  round: number | null;
+  groupNum: number | null;
+  bestOf: number | null;
+  status: string;
+  startedAt: number | null;
+  faceitUrl: string | null;
+  replayCodes: string[];
+  heroBans: string[];
+  teams: ScoutScoreboardTeam[];
+  /** Max number of rounds across participants (>1 → per-round tabs). */
+  roundCount: number;
+  /** True once the scoreboard has been synced; false → nothing to show yet. */
+  detailed: boolean;
 };
 
 // --- Pure derivations -------------------------------------------------------
@@ -215,4 +298,216 @@ export function normalizeNickname(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed || trimmed.length > 64) return null;
   return trimmed;
+}
+
+/** A K/D ratio to two places; dash when null. */
+export function formatKd(kd: number | null): string {
+  return kd == null ? "—" : kd.toFixed(2);
+}
+
+/** A large scalar compactly ("10.8k"); dash when null. */
+export function formatCompact(n: number | null): string {
+  if (n == null) return "—";
+  if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(Math.round(n));
+}
+
+// --- Analytics derivations (the Overview graph dropdowns) --------------------
+// All pure, computed from the windowed ScoutMatch[] the reader returns (newest
+// first). Only matches carrying the relevant scoreboard scalar are counted, so a
+// still-collecting quick search simply shows a smaller window. These are exactly
+// the analytics deferred at MVP — the data is already on each ScoutMatch.
+
+export function mean(xs: number[]): number | null {
+  if (!xs.length) return null;
+  return xs.reduce((a, b) => a + b, 0) / xs.length;
+}
+
+/** Sample standard deviation (n−1); null for fewer than 2 points. */
+export function stddev(xs: number[]): number | null {
+  if (xs.length < 2) return null;
+  const m = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const v = xs.reduce((a, b) => a + (b - m) ** 2, 0) / (xs.length - 1);
+  return Math.sqrt(v);
+}
+
+/** Least-squares slope/intercept of y over its own index (0..n−1). */
+export function linearRegression(
+  ys: number[],
+): { slope: number; intercept: number } | null {
+  const n = ys.length;
+  if (n < 2) return null;
+  const xm = (n - 1) / 2;
+  const ym = ys.reduce((a, b) => a + b, 0) / n;
+  let num = 0;
+  let den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (i - xm) * (ys[i] - ym);
+    den += (i - xm) ** 2;
+  }
+  if (den === 0) return null;
+  const slope = num / den;
+  return { slope, intercept: ym - slope * xm };
+}
+
+export type KdPoint = { at: number | null; kd: number };
+export type KdOverTime = {
+  /** Oldest → newest (left-to-right in time), the plotted window. */
+  points: KdPoint[];
+  avg: number | null;
+  trend: { slope: number; intercept: number } | null;
+  window: number;
+};
+
+/** K/D over the newest `window` decided-enough matches, plotted oldest→newest. */
+export function computeKdOverTime(matches: ScoutMatch[], window = 20): KdOverTime {
+  const withKd = matches.filter(
+    (m): m is ScoutMatch & { kdRatio: number } => m.kdRatio != null,
+  );
+  const recent = withKd.slice(0, window).reverse();
+  const points: KdPoint[] = recent.map((m) => ({ at: m.startedAt, kd: m.kdRatio }));
+  const kds = points.map((p) => p.kd);
+  return { points, avg: mean(kds), trend: linearRegression(kds), window: points.length };
+}
+
+export type WinLossStrip = {
+  /** Newest-first, capped. */
+  results: ScoutResult[];
+  /** Consecutive same result from the most recent match. */
+  streak: { type: ScoutResult; count: number } | null;
+};
+
+export function computeWinLossStrip(matches: ScoutMatch[], cap = 24): WinLossStrip {
+  const decided = matches
+    .map((m) => m.result)
+    .filter((r): r is ScoutResult => r != null);
+  let streak: WinLossStrip["streak"] = null;
+  if (decided.length) {
+    const type = decided[0];
+    let count = 0;
+    for (const r of decided) {
+      if (r === type) count++;
+      else break;
+    }
+    streak = { type, count };
+  }
+  return { results: decided.slice(0, cap), streak };
+}
+
+export type DamageHealingPoint = { at: number | null; damage: number; healing: number };
+export type DamageHealing = {
+  /** Oldest → newest, the plotted window. */
+  points: DamageHealingPoint[];
+  avgDamage: number | null;
+  avgHealing: number | null;
+  detailedCount: number;
+};
+
+export function computeDamageHealing(
+  matches: ScoutMatch[],
+  window = 20,
+): DamageHealing {
+  const detailed = matches.filter(
+    (m) => m.damageDealt != null || m.healingDone != null,
+  );
+  const recent = detailed.slice(0, window).reverse();
+  return {
+    points: recent.map((m) => ({
+      at: m.startedAt,
+      damage: m.damageDealt ?? 0,
+      healing: m.healingDone ?? 0,
+    })),
+    avgDamage: mean(
+      detailed.map((m) => m.damageDealt).filter((n): n is number => n != null),
+    ),
+    avgHealing: mean(
+      detailed.map((m) => m.healingDone).filter((n): n is number => n != null),
+    ),
+    detailedCount: detailed.length,
+  };
+}
+
+export type AnomalyMetric = "kd" | "damage" | "healing";
+export type Anomaly = {
+  matchId: string;
+  at: number | null;
+  mapName: string | null;
+  metric: AnomalyMetric;
+  value: number;
+  /** Signed z-score against that metric's mean. */
+  z: number;
+};
+export type PerformanceAnomalies = { flagged: Anomaly[]; sampleSize: number };
+
+const ANOMALY_METRICS: {
+  key: AnomalyMetric;
+  pick: (m: ScoutMatch) => number | null;
+}[] = [
+  { key: "kd", pick: (m) => m.kdRatio },
+  { key: "damage", pick: (m) => m.damageDealt },
+  { key: "healing", pick: (m) => m.healingDone },
+];
+
+/** Matches whose K/D, damage or healing sits ≥ `threshold` SD from the player's
+ *  own mean — outlier games, most extreme first. */
+export function computePerformanceAnomalies(
+  matches: ScoutMatch[],
+  threshold = 2,
+): PerformanceAnomalies {
+  const flagged: Anomaly[] = [];
+  let sampleSize = 0;
+  for (const { key, pick } of ANOMALY_METRICS) {
+    const rows = matches
+      .map((m) => ({ m, v: pick(m) }))
+      .filter((r): r is { m: ScoutMatch; v: number } => r.v != null);
+    sampleSize = Math.max(sampleSize, rows.length);
+    const mu = mean(rows.map((r) => r.v));
+    const sd = stddev(rows.map((r) => r.v));
+    if (mu == null || sd == null || sd === 0) continue;
+    for (const { m, v } of rows) {
+      const z = (v - mu) / sd;
+      if (Math.abs(z) >= threshold) {
+        flagged.push({
+          matchId: m.matchId,
+          at: m.startedAt,
+          mapName: m.mapName,
+          metric: key,
+          value: v,
+          z,
+        });
+      }
+    }
+  }
+  flagged.sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
+  return { flagged, sampleSize };
+}
+
+export type ConsistencyStat = {
+  key: string;
+  stat: string;
+  mean: number | null;
+  stddev: number | null;
+  /** Coefficient of variation (stddev / |mean|); lower is steadier. */
+  cv: number | null;
+};
+
+const CONSISTENCY_STATS: {
+  key: string;
+  label: string;
+  pick: (m: ScoutMatch) => number | null;
+}[] = [
+  { key: "kd", label: "K/D", pick: (m) => m.kdRatio },
+  { key: "damage", label: "Damage", pick: (m) => m.damageDealt },
+  { key: "healing", label: "Healing", pick: (m) => m.healingDone },
+  { key: "mitigation", label: "Mitigation", pick: (m) => m.damageMitigated },
+];
+
+export function computeConsistency(matches: ScoutMatch[]): ConsistencyStat[] {
+  return CONSISTENCY_STATS.map(({ key, label, pick }) => {
+    const vals = matches.map(pick).filter((n): n is number => n != null);
+    const mu = mean(vals);
+    const sd = stddev(vals);
+    const cv = mu != null && sd != null && mu !== 0 ? sd / Math.abs(mu) : null;
+    return { key, stat: label, mean: mu, stddev: sd, cv };
+  }).filter((s) => s.cv != null);
 }

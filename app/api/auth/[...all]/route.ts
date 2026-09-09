@@ -1,4 +1,5 @@
 import { getAuth } from "@/lib/auth";
+import { clearLegacySessionCookies, migrateSessionCookies } from "@/lib/session-cookie-migration";
 
 /**
  * Better Auth's router, plus CORS for the marketing site.
@@ -40,7 +41,25 @@ function corsHeaders(request: Request): Headers {
 }
 
 async function handler(request: Request) {
-  const response = await getAuth().handler(request);
+  const auth = getAuth();
+  const migration = await migrateSessionCookies(request.headers, auth);
+  // NextRequest and workerd's Request are different implementations; cloning
+  // with new Request(request) fails in production. Copy URL/body explicitly,
+  // and leave the normal single-cookie request untouched.
+  const authRequest = migration.headers === request.headers ? request : new Request(request.url, {
+    method: request.method,
+    headers: migration.headers,
+    ...(request.method === "GET" || request.method === "HEAD" ? {} : { body: await request.arrayBuffer() }),
+  });
+  const response = await auth.handler(authRequest);
+  // Preserve explicit sign-out/challenge expirations and real login renewals.
+  // Otherwise promote the validated survivor before removing the old host cookie.
+  if (response.ok && migration.replacement && !response.headers.getSetCookie().some(cookie =>
+    cookie.startsWith("__Secure-better-auth.session_token="))) {
+    response.headers.append("Set-Cookie", migration.replacement);
+  }
+  clearLegacySessionCookies(request, response);
+  response.headers.set("Cache-Control", "private, no-store");
   const cors = corsHeaders(request);
   // Copy onto the existing response so Better Auth's own Set-Cookie headers
   // survive — building a new Response from `response.headers` would work too,

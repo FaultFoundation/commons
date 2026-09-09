@@ -121,6 +121,16 @@ Cloudflare bindings (`DB`, `CEN`, `OW`, `AVATARS`) and secrets only exist on the
   they cannot send Set-Cookie, so renewing D1 there strands the browser on its
   original expiry. HeaderAuthButton's browser session request renews both; the
   last auth plugin, nextCookies(), forwards cookies from server actions.
+  The September host-only → `.fault.foundation` cookie migration needs explicit
+  cleanup: browsers can send both same-name tokens, and Better Auth picks the
+  first while its 60-second cache can temporarily mask a revoked token.
+  `session-cookie-migration.ts` validates duplicate candidates through Better
+  Auth with the cache/renewal disabled and selects the newest live session.
+  Both shared page reads and the auth router normalize these headers; the router
+  preserves the validated parent-domain token and expires old host-only cookies
+  when issuing a replacement or explicitly signing out/starting a 2FA challenge.
+  No token values are logged, and normal
+  single-cookie requests keep the fast path. Auth responses are private/no-store.
   That cache is only identity/session convenience, never
   a substitute for the D1-backed staff capability checks or admin unlock gate.
 - **CPU budget still matters, but we're on Workers _Paid_ now.** Paid raises the

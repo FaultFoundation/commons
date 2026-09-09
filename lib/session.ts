@@ -2,6 +2,7 @@ import { cache } from "react";
 import { headers } from "next/headers";
 
 import { getAuth } from "@/lib/auth";
+import { migrateSessionHeaders } from "@/lib/session-cookie-migration";
 
 /**
  * The current session, memoized for the request with React's `cache`. Several
@@ -13,8 +14,9 @@ import { getAuth } from "@/lib/auth";
 export const getSessionCached = cache(async () => {
   // Server rendering cannot deliver Set-Cookie. Leave renewal to the browser's
   // /api/auth/get-session request so D1 and browser expiry advance together.
-  return getAuth().api.getSession({
-    headers: await headers(),
+  const auth = getAuth();
+  return auth.api.getSession({
+    headers: await migrateSessionHeaders(await headers(), auth),
     query: { disableRefresh: true },
   });
 });

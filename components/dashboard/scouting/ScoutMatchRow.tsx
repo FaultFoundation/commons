@@ -41,14 +41,14 @@ export function ScoutMatchRow({
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<ScoutMatchDetail | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const toggle = useCallback(async () => {
     const next = !open;
     setOpen(next);
     if (!next || detail || loading) return;
     setLoading(true);
-    setError(false);
+    setError(null);
     try {
       const params = new URLSearchParams({
         match_id: match.matchId,
@@ -58,9 +58,11 @@ export function ScoutMatchRow({
         cache: "no-store",
       });
       if (res.ok) setDetail((await res.json()) as ScoutMatchDetail);
-      else setError(true);
+      else setError(res.status === 401
+        ? "Your sign-in could not be verified. Sign in again to load matches."
+        : "Couldn’t load this match. Close and reopen it to retry.");
     } catch {
-      setError(true);
+      setError("Couldn’t load this match. Close and reopen it to retry.");
     } finally {
       setLoading(false);
     }
@@ -122,7 +124,7 @@ export function ScoutMatchRow({
           {loading ? (
             <p className="ff-bubble__note">Loading match…</p>
           ) : error ? (
-            <p className="ff-bubble__note">Couldn&apos;t load this match — try again.</p>
+            <p className="ff-bubble__note">{error}</p>
           ) : detail ? (
             <ScoutMatchScoreboard detail={detail} />
           ) : null}

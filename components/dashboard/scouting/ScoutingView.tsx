@@ -20,6 +20,7 @@ import {
   type ScoutMode,
   type ScoutResponse,
 } from "@/lib/faceit-scouting-shared";
+import { finishDeepScout, scoutRequest } from "@/lib/scouting-request";
 import { usePersistentState } from "@/lib/view-state";
 
 // The whole Scouting surface (Experimental → Scouting). Search ANY FACEIT
@@ -31,7 +32,7 @@ import { usePersistentState } from "@/lib/view-state";
 // fast and shows results as they land. A DEEP search opens a load screen and
 // drives the ow-data Worker's bounded, resumable collection to completion (a loop
 // of POST /api/scouting/advance, reading real progress), so the stats are exact —
-// with a safety cap for extreme accounts.
+// without returning a partial collection as a completed search.
 //
 // Three calls behind it all: a READ (GET /api/scouting/player) hydrates from the
 // cache without triggering anything; a SEARCH (POST /api/scouting/search) asks the
@@ -47,15 +48,9 @@ import { usePersistentState } from "@/lib/view-state";
 
 // Bumped when the cached payload's shape changes; a stale entry from the
 // pre-filter shape would otherwise be shown under a format it never respected.
-const CACHE_KEY = "ff-scouting-v2";
+const CACHE_KEY = "ff-scouting-v3";
 const POLL_MS = 4000;
 const MAX_POLLS = 4;
-
-// Deep drive-to-completion bounds (the safety cap the user signed off on).
-const MAX_ADVANCE = 80;
-const DEEP_CAP_MATCHES = 2000;
-const ADVANCE_RETRY_MS = 2500;
-const MAX_ADVANCE_FAILS = 5;
 
 /** How many rows the Matches tab shows before "Show more". */
 const PAGE = 20;
@@ -80,8 +75,6 @@ function writeCache(nickname: string, gameMode: ScoutGameMode, resp: ScoutRespon
     // Caching is an optimization, never a must.
   }
 }
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function ScoutingView({ initialQuery }: { initialQuery: string }) {
   // The search box + depth remember the last choice across visits; ?q= / the
@@ -116,7 +109,6 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [deep, setDeep] = useState<DeepState>({ active: false, total: null, detailed: null });
-  const [deepCapped, setDeepCapped] = useState(false);
   const [shown, setShown] = useState(PAGE);
 
   const alive = useRef(true);
@@ -162,15 +154,7 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
       const params = new URLSearchParams({ game_mode: mode });
       if (playerId) params.set("player_id", playerId);
       else params.set("nickname", nickname);
-      try {
-        const res = await fetch(`/api/scouting/player?${params.toString()}`, {
-          cache: "no-store",
-        });
-        if (!res.ok) return null;
-        return (await res.json()) as ScoutResponse;
-      } catch {
-        return null;
-      }
+      return scoutRequest(`/api/scouting/player?${params.toString()}`);
     },
     [],
   );
@@ -208,16 +192,13 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
       clearPoll();
       setLoading(true);
       setResp(null);
-      setDeepCapped(false);
       try {
-        const res = await fetch("/api/scouting/search", {
+        const response = await scoutRequest("/api/scouting/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ nickname, mode: "quick", game_mode: gm }),
         });
-        const data = res.ok
-          ? ((await res.json()) as ScoutResponse)
-          : ({ status: "error", player: null, data: null } as ScoutResponse);
+        const data = response ?? ({ status: "error", player: null, data: null } as ScoutResponse);
         if (!alive.current) return;
         applyResp(nickname, data, gm);
         if (data.status === "collecting") {
@@ -233,7 +214,7 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
   );
 
   // A deep search: register + first page, then loop /advance behind the load
-  // screen until the whole history is collected (status "ready") or a safety cap.
+  // screen until the whole history is collected, or an explicit failure occurs.
   const runDeep = useCallback(
     async (raw: string, gm: ScoutGameMode) => {
       const nickname = normalizeNickname(raw);
@@ -241,24 +222,16 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
       clearPoll();
       setLoading(false);
       setResp(null);
-      setDeepCapped(false);
       setDeep({ active: true, total: null, detailed: null });
 
-      const post = async (path: string, body: unknown): Promise<ScoutResponse | null> => {
-        try {
-          const res = await fetch(path, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-          return res.ok ? ((await res.json()) as ScoutResponse) : null;
-        } catch {
-          return null;
-        }
-      };
+      const post = (path: string, body: unknown) => scoutRequest(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
 
       // 1. Register the deep search + do the first page.
-      let current =
+      const current =
         (await post("/api/scouting/search", {
           nickname,
           mode: "deep",
@@ -275,46 +248,18 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
       }
 
       const playerId = current.player.playerId;
-      let total = current.progress?.total ?? null;
-      let detailed = current.progress?.detailed ?? null;
-      setDeep({ active: true, total, detailed });
-
-      // 2. Drive to completion (unless the trigger already reported it done).
-      let fails = 0;
-      let capped = false;
-      for (let i = 0; current.status !== "ready" && i < MAX_ADVANCE; i++) {
-        if (!alive.current) return;
-        const adv = await post("/api/scouting/advance", {
-          player_id: playerId,
-          mode: "deep",
-          game_mode: gm,
-        });
-        if (!alive.current) return;
-        if (!adv) {
-          if (++fails >= MAX_ADVANCE_FAILS) break;
-          await sleep(ADVANCE_RETRY_MS);
-          continue;
-        }
-        fails = 0;
-        current = adv;
-        // A terminal non-collecting status (e.g. the Worker went unreachable) —
-        // stop rather than spin out the whole budget.
-        if (adv.status === "not_found" || adv.status === "not_configured") break;
-        total = adv.progress?.total ?? total;
-        detailed = adv.progress?.detailed ?? detailed;
-        setDeep({ active: true, total, detailed });
-        if (adv.status === "ready") break;
-        if ((total ?? 0) >= DEEP_CAP_MATCHES) {
-          capped = true;
-          break;
-        }
-      }
-
-      // 3. Done — drop the load screen and show the collected profile.
-      if (!alive.current) return;
+      const updateProgress = (response: ScoutResponse) => setDeep({
+        active: true,
+        total: response.progress?.total ?? null,
+        detailed: response.progress?.detailed ?? null,
+      });
+      updateProgress(current);
+      const completed = await finishDeepScout(current, () => post("/api/scouting/advance", {
+        player_id: playerId, mode: "deep", game_mode: gm,
+      }), updateProgress, () => alive.current);
+      if (!completed || !alive.current) return;
       setDeep({ active: false, total: null, detailed: null });
-      setDeepCapped(capped || (current.status !== "ready" && (total ?? 0) > 0));
-      applyResp(nickname, current, gm);
+      applyResp(nickname, completed, gm);
     },
     [applyResp, clearPoll],
   );
@@ -463,7 +408,7 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
         <ScoutDeepLoading total={deep.total} detailed={deep.detailed} />
       ) : loading ? (
         <StatLoading />
-      ) : status === "not_found" || status === "error" || status === "not_configured" ? (
+      ) : status === "not_found" || status === "error" || status === "unauthorized" || status === "not_configured" ? (
         <Bubble title="Scouting" span="full">
           <p className="ff-bubble__lede">{SCOUT_STATUS_MESSAGES[status]}</p>
         </Bubble>
@@ -476,13 +421,6 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
             onDeep={() => runDeep(activeNick.current ?? query, gameMode)}
           />
 
-          {deepCapped ? (
-            <p className="ff-scoutcap">
-              Showing the most recent {DEEP_CAP_MATCHES.toLocaleString()}+ matches —
-              this account&apos;s history is large, so the deep scan stopped at the
-              safety cap. The stats above reflect what was collected.
-            </p>
-          ) : null}
 
           {/* Both tabs would be empty in a format the player never played, so the
               strip goes with them rather than offering a dead choice. */}

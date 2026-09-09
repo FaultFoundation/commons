@@ -240,6 +240,10 @@ export async function getScoutingData(
     const [agg] = await db
       .select({
         totalAll: sql<number>`count(*)`,
+        completeAll: sql<number>`sum(case when ${faceitMatches.detailSyncedAt} is not null
+          and ${faceitMatches.statsSyncedAt} is not null
+          and ${faceitMatches.roundsSyncedAt} is not null
+          and ${faceitMatches.votingSyncedAt} is not null then 1 else 0 end)`,
         detailedAll: sql<number>`sum(case when ${faceitMatchPlayers.statsSyncedAt} is not null then 1 else 0 end)`,
         total: sql<number>`sum(case when ${inMode} then 1 else 0 end)`,
         wins: sql<number>`sum(case when ${inMode} and ${faceitMatchPlayers.result} = 'win' then 1 else 0 end)`,
@@ -361,7 +365,7 @@ export async function getScoutingData(
     // waiting on a full backfill it never asked for. Both read the UNFILTERED
     // counts — readiness is a property of the collection, not of the format the
     // viewer happens to be looking at.
-    const fullyReady = row.listDone && row.detailDone;
+    const fullyReady = row.listDone && row.detailDone && Number(agg?.completeAll ?? 0) === totalAll;
     const quickReady =
       row.searchMode === "quick" &&
       totalAll > 0 &&
@@ -379,7 +383,7 @@ export async function getScoutingData(
       status,
       player,
       data: { summary, mapWinrates, matches, gameMode },
-      progress: { total: totalAll, detailed: detailedAll },
+      progress: { total: totalAll, detailed: Number(agg?.completeAll ?? 0) },
     };
   } catch (error) {
     console.error("scouting: read failed", error);
@@ -458,7 +462,7 @@ export async function requestFaceitSearch(
 // window). A deep search asks the Commons to keep advancing the Worker's bounded,
 // resumable collection until the whole history is in — so the Commons loops this
 // (POST /faceit/advance) behind a load screen, reading the returned progress
-// counts, until listDone && undetailed === 0 (or a client safety cap). No profile
+// counts, until listDone && undetailed === 0 (or repeated failures interrupt collection). No profile
 // resolution here (the trigger already registered the player), so a deep loop
 // costs no extra FACEIT search calls. Best-effort like the trigger.
 // ---------------------------------------------------------------------------

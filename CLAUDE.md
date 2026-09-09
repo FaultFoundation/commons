@@ -1082,9 +1082,12 @@ the ownership is **the reverse of everything else here**.
   API calls each) in one request, deep is **driven to completion by the Commons**:
   after the trigger it loops `POST /api/scouting/advance` (each call advances the
   Worker's bounded, resumable collection by one synchronous chunk and returns
-  progress counts) until the history is fully detailed **or a client safety cap**
-  (`MAX_ADVANCE` / `DEEP_CAP_MATCHES` in `ScoutingView`). The load bar shows real
-  progress (`detailed / total`). The switch sits left of the Scout button
+  progress counts) until the history is fully detailed. `finishDeepScout` in
+  `lib/scouting-request.ts` retries transient failures and interrupts repeated
+  failures or stalled progress; successful chunks have no history/request cap.
+  HTTP 401 is shown as a sign-in failure, never as FACEIT unavailability. Failed
+  advances return 503 so the retry budget sees them. The load bar counts fully
+  collected matches (overview, scoreboard, rounds, and voting), not just stats. The switch sits left of the Scout button
   (`ScoutModeToggle`); a quick result also offers a "Deep scan" upgrade in the
   header.
 

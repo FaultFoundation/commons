@@ -20,6 +20,7 @@ export type ScoutStatus =
   | "collecting"
   | "ready"
   | "not_found"
+  | "unauthorized"
   | "error"
   | "not_configured";
 
@@ -64,8 +65,10 @@ export const SCOUT_STATUS_MESSAGES: Record<
     "No matches in this format for this player. Their history is collected — try another format above.",
   not_found:
     "No FACEIT Overwatch player found with that name. Check the exact FACEIT nickname (not their BattleTag) and try again.",
+  unauthorized:
+    "Your sign-in could not be verified. Sign in again to continue scouting; collected matches are saved.",
   error:
-    "We couldn't reach FACEIT just now. This is usually temporary — try again in a moment.",
+    "The scouting request was interrupted. Collected matches are saved — try the search again to continue.",
   not_configured:
     "Scouting isn't configured on this environment yet (the FACEIT search service is unavailable).",
 };

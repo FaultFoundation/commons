@@ -95,8 +95,8 @@ function fixture() {
   for (const [i, m] of SERIES.entries()) {
     sqlite.prepare(`INSERT INTO faceit_matches
       (match_id,competition_name,game_mode,best_of,status,factions_json,started_at,
-       detail_synced_at,stats_synced_at,rounds_synced_at,created_at,updated_at)
-      VALUES (?,'Season 9',?,?, 'finished',?,?,1,1,1,0,0)`).run(
+       detail_synced_at,stats_synced_at,rounds_synced_at,voting_synced_at,created_at,updated_at)
+      VALUES (?,'Season 9',?,?, 'finished',?,?,1,1,1,1,0,0)`).run(
       m.id, m.mode, m.rounds.length || null,
       JSON.stringify({ faction1: { nickname: 'Us', score: 3 }, faction2: { nickname: 'Them', score: 2 } }),
       1000 - i);
@@ -281,4 +281,15 @@ test('collection progress and readiness ignore the format filter', async () => {
       assert.equal(res.status, 'ready');
     }
   } finally { f.sqlite.close(); }
+});
+
+
+test('deep readiness and progress include voting backfill', async () => {
+ const f = fixture();
+ try {
+  f.sqlite.exec("UPDATE faceit_matches SET voting_synced_at = NULL WHERE match_id = 'm1'");
+  const result = await f.load('@/lib/faceit-scouting').getScoutingData({ playerId: 'p1' });
+  assert.equal(result.status, 'collecting');
+  assert.equal(result.progress.detailed, 3);
+ } finally { f.sqlite.close(); }
 });

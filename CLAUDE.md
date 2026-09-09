@@ -117,7 +117,11 @@ Cloudflare bindings (`DB`, `CEN`, `OW`, `AVATARS`) and secrets only exist on the
   `getSessionCached()`, never `getAuth().api.getSession()`** in a page/component —
   a page that reads it directly re-validates the session a second time on top of
   the shell's read. Better Auth's signed cookie cache keeps repeat validations
-  off D1 for 60 seconds; that cache is only identity/session convenience, never
+  off D1 for 60 seconds. Server-component reads explicitly disable renewal:
+  they cannot send Set-Cookie, so renewing D1 there strands the browser on its
+  original expiry. HeaderAuthButton's browser session request renews both; the
+  last auth plugin, nextCookies(), forwards cookies from server actions.
+  That cache is only identity/session convenience, never
   a substitute for the D1-backed staff capability checks or admin unlock gate.
 - **CPU budget still matters, but we're on Workers _Paid_ now.** Paid raises the
   CPU ceiling to **30 s/request** (from Free's 10 ms) and removes the

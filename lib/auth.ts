@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { betterAuth } from "better-auth";
+import { nextCookies } from "better-auth/next-js";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import {
   genericOAuth,
@@ -598,7 +599,8 @@ export const getAuth = cache(function getAuth() {
             },
           }
         : undefined,
-    plugins,
+    // Server actions must forward refreshed cookies to the browser. Keep last.
+    plugins: [...plugins, nextCookies()],
   });
 });
 

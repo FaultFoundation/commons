@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, eq, isNull } from "drizzle-orm";
 
@@ -10,7 +9,7 @@ import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { JoinTeamButton } from "@/components/dashboard/teams/JoinTeamButton";
 import { colleges, teams, user } from "@/db/schema";
-import { getAuth } from "@/lib/auth";
+import { getSessionCached } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { withNext } from "@/lib/next-path";
 import {
@@ -92,7 +91,7 @@ export default async function JoinPage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  const session = await getSessionCached();
   const signedIn = Boolean(session);
 
   const invite = await getInviteByToken(token);

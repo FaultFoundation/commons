@@ -1,10 +1,10 @@
+import { getSessionCached } from "@/lib/session";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { AuthForm } from "@/components/auth/AuthForm";
-import { getAuth, discordAuthEnabled } from "@/lib/auth";
+import { discordAuthEnabled } from "@/lib/auth";
 import { sanitizeNextPath, withNext } from "@/lib/next-path";
 
 // Rendered per request: reads the session and the Cloudflare env (Discord
@@ -23,7 +23,7 @@ export default async function LoginPage({
       out still lands where it meant to. */
   searchParams: Promise<{ next?: string }>;
 }) {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  const session = await getSessionCached();
   const next = sanitizeNextPath((await searchParams).next);
   if (session) {
     redirect(next ?? "/home/");

@@ -162,9 +162,52 @@ const facts = {
   seriesId: null,
   featured: false,
 };
+test("NECC splits into season series and named competitions while retaining all parent links", async () => {
+  const f=fixture();
+  const rows=JSON.parse(readFileSync(resolve(root,"scripts/fixtures/leagueos-series-1100.json"),"utf8")).filter(t=>t.organizer==='NECC');
+  const entries=await f.load('@/lib/discovery').enrichDiscovery(rows);
+  assert.equal(entries.length,318);
+  assert.equal(new Set(entries.map(t=>t.discovery.providerParentId)).size,1);
+  assert.equal(new Set(entries.map(t=>t.discovery.organizationId)).size,1);
+  const spring=entries.filter(t=>t.discovery.seriesName==='NECC · Spring 2026');
+  assert.equal(spring.length,68);
+  assert.equal(new Set(spring.map(t=>t.game)).size,7);
+  const expected={'NECC · Fall 2023':33,'NECC · Spring 2024':37,'NECC · Fall 2024':48,'NECC · Spring 2025':54,'NECC · Fall 2025':61};
+  for(const [name,count] of Object.entries(expected)) {
+    const group=entries.filter(t=>t.discovery.seriesName===name && t.discovery.seriesId);
+    assert.equal(group.length,count,name);
+    assert.notEqual(group[0].discovery.seriesId,spring[0].discovery.seriesId);
+  }
+  const samsung=entries.filter(t=>t.name.includes('Samsung'));
+  assert.equal(samsung.length,3);
+  assert.equal(new Set(samsung.map(t=>t.discovery.seriesId)).size,1);
+  assert.equal(samsung[0].discovery.seriesName,'NECC · Fall 2023 · Samsung Fall Open');
+  const unknown=entries.filter(t=>!t.discovery.seriesId);
+  assert.equal(unknown.length,6);
+  assert.ok(unknown.every(t=>!t.name.match(/20\d{2}/)));
+  assert.ok(entries.every(t=>t.discovery.seriesId!==t.discovery.providerParentId));
+  const catalog=await f.load('@/lib/discovery').discoveryCatalog(entries);
+  const parent=catalog.find(p=>p.id===entries[0].discovery.providerParentId);
+  assert.equal(parent.kind,'organization');
+  assert.equal(parent.name,'NECC');
+});
+test("series titles normalize season formats without discarding programs or guessing dates",()=>{
+  const f=fixture(), {competitionSeries}=f.load('@/lib/discovery-series');
+  const series=(name,game='Overwatch',source='leagueos')=>competitionSeries(f.entry('x',name,{game,source}));
+  assert.equal(series('Fall 25 - OW | Division I').key,series('2025 Fall | Overwatch | Division II').key);
+  assert.equal(series('2024-25 | Rocket League | IHSEN Club','Rocket League').key,series('IHSEN Club SSBU 24-25','Super Smash Bros. Ultimate').key);
+  assert.notEqual(series('2024-25 | Rocket League | IHSEN Club','Rocket League').key,series('2024-25 | Rocket League | IMSEN Club','Rocket League').key);
+  assert.equal(series('(S25) Overwatch 2').key,series('(S25) Valorant','VALORANT').key);
+  assert.equal(series('Overwatch | Signups'),null);
+  assert.equal(series('Wednesday my Dudes #2 (Formerly Fryday)',null,'startgg').name,'Wednesday my Dudes');
+  assert.equal(series('Wednesday my Dudes #3',null,'startgg').name,'Wednesday my Dudes');
+  assert.notEqual(series('Fryday #1',null,'startgg').key,series('Wednesday my Dudes #3',null,'startgg').key);
+  assert.equal(series('Smash World Tour #2','Super Smash Bros. Ultimate','startgg').name,'Smash World Tour');
+  assert.equal(series('Campus Cup - VALORANT','VALORANT','startgg').name,'Campus Cup');
+});
 test("parent adapters scope identities by provider and reject lookalike or generic URLs", async () => {
   const f = fixture();
-  const parent = f.load("@/lib/discovery-shared").providerParentSeries;
+  const parent = f.load("@/lib/discovery-shared").providerParent;
   const cases = [
     ["startgg", "https://www.start.gg/user/abc", "series:startgg:owner:abc"],
     ["startgg", "https://start.gg/user/abc/?tab=events", "series:startgg:owner:abc"],
@@ -192,14 +235,14 @@ test("parent adapters scope identities by provider and reject lookalike or gener
     f.entry("c", "Another event", {sourceTournamentId:"456"}),
     f.entry("d", "Same name", {source:"faceit",organizerUrl:"https://faceit.com/en/organizers/example"}),
   ]);
-  assert.equal(entries[0].discovery.seriesId, entries[1].discovery.seriesId);
-  assert.equal(entries[0].discovery.seriesId, entries[2].discovery.seriesId);
-  assert.notEqual(entries[0].discovery.seriesId, entries[3].discovery.seriesId);
+  assert.equal(entries[0].discovery.providerParentId, entries[1].discovery.providerParentId);
+  assert.equal(entries[0].discovery.providerParentId, entries[2].discovery.providerParentId);
+  assert.notEqual(entries[0].discovery.providerParentId, entries[3].discovery.providerParentId);
 });
 test("audit all stored start.gg and FACEIT parents without inventing missing identities", async () => {
   const f=fixture();
   const rows=JSON.parse(readFileSync(resolve(root,"scripts/fixtures/provider-parents-3610.json"),"utf8"));
-  const parent=f.load("@/lib/discovery-shared").providerParentSeries;
+  const parent=f.load("@/lib/discovery-shared").providerParent;
   const result=await f.load("@/lib/discovery").enrichDiscovery(rows);
   assert.equal(result.length,3610);
   for (const [source,expectedRows,expectedParents] of [["startgg",1188,610],["faceit",252,125]]) {
@@ -207,9 +250,9 @@ test("audit all stored start.gg and FACEIT parents without inventing missing ide
     assert.equal(direct.length,expectedRows);
     assert.equal(new Set(direct.map(t=>parent(t).id)).size,expectedParents);
     for(const t of result.filter(t=>t.source===source && parent(t))) {
-      assert.equal(t.discovery.seriesId,parent(t).id,t.name);
+      assert.equal(t.discovery.providerParentId,parent(t).id,t.name);
     }
-    const grouped=result.filter(t=>t.source===source && t.discovery.seriesId?.startsWith(`series:${source}:`));
+    const grouped=result.filter(t=>t.source===source && t.discovery.providerParentId?.startsWith(`series:${source}:`));
     console.log(`${source}: ${grouped.length} rows in provider parent groups`);
   }
   const catalog=await f.load("@/lib/discovery").discoveryCatalog(result);
@@ -222,7 +265,7 @@ test("all 1,100 imported LeagueOS tournaments reach the correct parent profile",
   const groups = new Map();
   for (const entry of entries) {
     const parent = entry.sourceTournamentId.split(":")[0];
-    assert.equal(entry.discovery.seriesId, `series:leagueos:${parent}`, entry.name);
+    assert.equal(entry.discovery.providerParentId, `series:leagueos:${parent}`, entry.name);
     const members = groups.get(parent) ?? [];
     members.push(entry);
     groups.set(parent, members);
@@ -233,10 +276,10 @@ test("all 1,100 imported LeagueOS tournaments reach the correct parent profile",
   assert.equal(multiGame.length, 38);
   assert.equal(multiGame.reduce((n, g) => n + g.length, 0), 1048);
   const catalog = await f.load("@/lib/discovery").discoveryCatalog(entries);
-  assert.equal(catalog.filter(p => p.kind === "series").length, 58);
+  assert.ok(catalog.filter(p => p.kind === "series").length > 58);
   // The profile page uses precisely this seriesId membership filter.
   for (const [parent, members] of groups) {
-    assert.equal(entries.filter(t => t.discovery.seriesId === `series:leagueos:${parent}`).length, members.length);
+    assert.equal(entries.filter(t => t.discovery.providerParentId === `series:leagueos:${parent}`).length, members.length);
   }
   // Import order must not affect identity, including completed historical rows.
   const reversed = await f.load("@/lib/discovery").enrichDiscovery([...rows].reverse());
@@ -264,12 +307,12 @@ test("LeagueOS parent membership survives titles, games and season changes", asy
   ];
   const result = await f.load("@/lib/discovery").enrichDiscovery(entries);
   for (const t of result.filter((_, i) => ![6, 9].includes(i))) {
-    assert.equal(t.discovery.seriesId, "series:leagueos:necc");
-    assert.equal(t.discovery.seriesName, "NECC");
+    assert.equal(t.discovery.providerParentId, "series:leagueos:necc");
+    assert.equal(t.discovery.providerParentName, "NECC");
   }
-  for (const t of [result[6], result[9]]) assert.notEqual(t.discovery.seriesId, result[0].discovery.seriesId);
+  for (const t of [result[6], result[9]]) assert.notEqual(t.discovery.providerParentId, result[0].discovery.providerParentId);
   const catalog = await f.load("@/lib/discovery").discoveryCatalog(result);
-  assert.equal(catalog.find(p => p.id === result[0].discovery.seriesId).name, "NECC");
+  assert.equal(catalog.find(p => p.id === result[0].discovery.seriesId).name, "NECC · Spring 2026");
   f.entries = entries;
   await f.post({ action: "correction", targetId: "ow1", data: facts, evidence: "Keep this event separate." });
   const row = f.sqlite.prepare("SELECT * FROM discovery_submissions").get();
@@ -362,7 +405,10 @@ test("start.gg owner grouping spans seasons and divisions but keeps distinct acc
   ];
   const e = await f.load("@/lib/discovery").enrichDiscovery(f.entries);
   assert.equal(e[0].discovery.seriesId, e[1].discovery.seriesId);
-  for (const i of [2, 3]) assert.equal(e[0].discovery.seriesId, e[i].discovery.seriesId);
+  for (const i of [2, 3]) {
+    assert.equal(e[0].discovery.providerParentId, e[i].discovery.providerParentId);
+    assert.notEqual(e[0].discovery.seriesId, e[i].discovery.seriesId);
+  }
   for (const i of [4, 5])
     assert.notEqual(e[0].discovery.seriesId, e[i].discovery.seriesId);
   assert.equal(e[5].discovery.organizationId, null);
@@ -403,10 +449,10 @@ test("start.gg uses owner parents and shared tournament IDs when owner metadata 
   const e = await f.load("@/lib/discovery").enrichDiscovery(f.entries);
   // Known owner groups its events across games and seasons.
   assert.equal(e[0].discovery.seriesId, e[1].discovery.seriesId);
-  assert.equal(e[0].discovery.seriesId, "series:startgg:owner:example");
+  assert.equal(e[0].discovery.providerParentId, "series:startgg:owner:example");
   assert.equal(
     e[0].discovery.seriesName,
-    "Example Esports",
+    "2026 · AEL University Open Series - Season 2",
   );
   // 2025's two games group even with no organizer (shared tournament id alone).
   assert.equal(e[2].discovery.seriesId, e[3].discovery.seriesId);

@@ -56,7 +56,7 @@ export default async function DiscoveryProfilePage({
   const follows = await discoveryFollowIds(session.user.id);
   const tournaments = entries.filter((t) =>
     profile.kind === "organization"
-      ? t.discovery?.organizationId === id
+      ? t.discovery?.organizationId === id || t.discovery?.providerParentId === id
       : t.discovery?.seriesId === id,
   );
 

@@ -1,3 +1,4 @@
+import { competitionSeries } from "@/lib/discovery-series";
 import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
@@ -12,7 +13,7 @@ import {
   inferFacts,
   organizerIdentity,
   seriesName,
-  providerParentSeries,
+  providerParent,
   validFacts,
   type DiscoveryProfile,
 } from "@/lib/discovery-shared";
@@ -91,18 +92,39 @@ export async function enrichDiscovery(
   });
   // Per-game projections can have uneven metadata. An unambiguous parent on
   // one sibling applies to every row of that same provider tournament.
-  const tournamentParents = new Map<string, NonNullable<ReturnType<typeof providerParentSeries>>>();
+  const tournamentParents = new Map<string, NonNullable<ReturnType<typeof providerParent>>>();
   for (const [key, group] of tournamentGroups) {
-    const parents = group.map(providerParentSeries).filter((p) => p != null);
+    const parents = group.map(providerParent).filter((p) => p != null);
     if (new Set(parents.map(p => p.id)).size === 1) {
       tournamentParents.set(key, parents[0]);
     }
   }
+  const parentNames = new Map<string, string>();
+  for (const t of [...entries].sort((a,b) => a.id.localeCompare(b.id))) {
+    const parent = providerParent(t);
+    if (parent && t.organizer?.trim() && !parentNames.has(parent.id)) parentNames.set(parent.id, t.organizer.trim());
+  }
+  const providerDetails = new Map(enriched.map(t => {
+    const parent = (t.tournamentKey ? tournamentParents.get(t.tournamentKey) : null) ?? providerParent(t);
+    const competition = parent ? competitionSeries(t) : null;
+    const key = parent && competition ? `series:competition:${JSON.stringify([parent.id, competition.key])}` : null;
+    return [t.id, {parent, competition, key}];
+  }));
+  const providerCounts = new Map<string, number>();
+  for (const {key} of providerDetails.values()) if (key) providerCounts.set(key, (providerCounts.get(key) ?? 0) + 1);
   return enriched.map(({ candidateKey, tournamentKey, ...t }) => {
-    const linkedSeries = (tournamentKey ? tournamentParents.get(tournamentKey) : null) ?? providerParentSeries(t);
-    if (linkedSeries) {
-      t.discovery.seriesId = linkedSeries.id;
-      t.discovery.reasons.push(linkedSeries.reason);
+    const {parent, competition, key} = providerDetails.get(t.id)!;
+    let linkedSeriesName: string | undefined;
+    if (parent) {
+      // Keep the organizer-level link even when no competition can be inferred.
+      t.discovery.organizationId ??= parent.id.replace(/^series:/, "organization:");
+      if (competition && key && ((providerCounts.get(key) ?? 0) > 1 || /\b(?:20\d{2}|season\s+\w+)\b/i.test(competition.name))) {
+        t.discovery.seriesId = key;
+        const parentName = parentNames.get(parent.id) ?? parent.name;
+        linkedSeriesName = t.source === "leagueos" && t.organizer?.trim()
+          ? `${parentName} · ${competition.name}` : competition.name;
+        t.discovery.reasons.push("Competition title groups games and installments within the source organizer; season and program retained");
+      }
     }
     // Highest confidence: this tournament runs several games (its per-game rows
     // share one source tournament id). That IS a series — group its games under
@@ -113,7 +135,7 @@ export async function enrichDiscovery(
         "One source tournament runs multiple games at once",
       );
     }
-    if (!t.discovery.seriesId && candidateKey) {
+    if (!parent && !t.discovery.seriesId && candidateKey) {
       const group = candidates.get(candidateKey)!;
       // A named league/season can stand alone; recurrence needs at least two
       // tournaments AND an explicit installment marker, not merely equal names.
@@ -127,7 +149,7 @@ export async function enrichDiscovery(
         );
       }
     }
-    if (!t.discovery.seriesId && /\b(?:league|season|series)\b/i.test(t.name)) {
+    if (!parent && !t.discovery.seriesId && /\b(?:league|season|series)\b/i.test(t.name)) {
       t.discovery.seriesId = discoveryId("series", `tournament:${t.id}`);
       t.discovery.reasons.push(
         "Single source tournament describes a league, season or series",
@@ -147,13 +169,17 @@ export async function enrichDiscovery(
         /* invalid overlay cannot corrupt source */
       }
     }
+    if (parent) {
+      t.discovery.providerParentId = parent.id;
+      t.discovery.providerParentName = parentNames.get(parent.id) ?? parent.name;
+    }
     t.discovery.organizationName =
       overlay.profiles.find((p) => p.id === t.discovery.organizationId)?.name ??
       t.organizer ??
-      undefined;
+      t.discovery.providerParentName;
     t.discovery.seriesName =
       overlay.profiles.find((p) => p.id === t.discovery.seriesId)?.name ??
-      (linkedSeries?.id === t.discovery.seriesId ? linkedSeries?.name : undefined) ??
+      (key === t.discovery.seriesId ? linkedSeriesName : undefined) ??
       // A single-tournament series (whether it's a lone named event or a
       // multi-game tournament) is named for the tournament itself; an inferred
       // cross-tournament series uses the season/series name.
@@ -172,6 +198,21 @@ export async function discoveryCatalog(
     overlay.profiles.map((p) => [p.id, p]),
   );
   for (const t of entries) {
+    const parentId = t.discovery?.providerParentId;
+    if (parentId) {
+      // Historical parent links/follows still resolve, now as organizer pages.
+      // They are not memberships in the Series list anymore.
+      const existing = profiles.get(parentId);
+      profiles.set(parentId, {
+        id: parentId,
+        name: t.discovery?.providerParentName ?? "Organizer name unavailable",
+        description: "",
+        website: t.organizerUrl ?? null,
+        ownerId: null,
+        ...existing,
+        kind: "organization",
+      });
+    }
     for (const kind of ["organization", "series"] as const) {
       const id =
         kind === "organization"
@@ -183,7 +224,7 @@ export async function discoveryCatalog(
         kind,
         name:
           kind === "organization"
-            ? (t.organizer ?? "Unconfirmed Organization")
+            ? (t.discovery?.organizationName ?? t.organizer ?? "Organizer name unavailable")
             : t.discovery?.seriesName ?? seriesName(t.name),
         description: "",
         website: kind === "organization" ? (t.organizerUrl ?? null) : null,

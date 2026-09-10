@@ -11,6 +11,10 @@ export type DiscoveryFacts = {
 };
 export type DiscoveryMetadata = DiscoveryFacts & {
   organizationName?: string;
+  /** Stable provider parent retained separately from competitive series.
+   * Historical parent IDs retain their series: prefix for compatibility. */
+  providerParentId?: string;
+  providerParentName?: string;
   seriesName?: string;
   reasons: string[];
   reviewed: boolean;
@@ -85,25 +89,25 @@ export function seriesName(name: string): string {
 /** Every LeagueOS tournament carries its authoritative parent league id.
  * League membership spans games, divisions and seasons; titles and dates describe
  * the children, not the identity of their parent. */
-export function leagueosSeries(t: DiscoverySource & { sourceTournamentId?: string | null }):
+export function leagueosParent(t: DiscoverySource & { sourceTournamentId?: string | null }):
   { id: string; name: string } | null {
   if (t.source !== "leagueos") return null;
   const identity = /^([a-z0-9]+):[a-z0-9]+$/i.exec(t.sourceTournamentId ?? "");
   if (!identity) return null;
   return {
     id: discoveryId("series", `leagueos:${identity[1]}`),
-    name: t.organizer?.trim() || `LeagueOS league ${identity[1]}`,
+    name: t.organizer?.trim() || "LeagueOS organizer",
   };
 }
 
 /** Provider-scoped parent membership, deliberately independent of seasons and
  * title similarity. Owner/community groups are broad catalogs, not proof that
  * every child belongs to the same competitive season. */
-export function providerParentSeries(t: DiscoverySource & {
+export function providerParent(t: DiscoverySource & {
   sourceTournamentId?: string | null;
   externalUrl?: string | null;
 }): { id: string; name: string; reason: string } | null {
-  const league = leagueosSeries(t);
+  const league = leagueosParent(t);
   if (league) return { ...league, reason: "LeagueOS parent league identity links tournaments across games, divisions and seasons" };
   const raw = t.source === "startgg" || t.source === "faceit"
     ? t.organizerUrl : (!t.source || t.source === "challonge") ? t.externalUrl : null;
@@ -115,10 +119,10 @@ export function providerParentSeries(t: DiscoverySource & {
   let label: string | undefined;
   if (t.source === "startgg" && ["start.gg", "www.start.gg"].includes(url.hostname)) {
     const match = /^\/user\/([a-zA-Z0-9_-]+)\/?$/.exec(url.pathname);
-    if (match) { key = `startgg:owner:${match[1]}`; label = `start.gg organizer ${match[1]}`; }
+    if (match) { key = `startgg:owner:${match[1]}`; label = "Organizer name unavailable"; }
   } else if (t.source === "faceit" && ["faceit.com", "www.faceit.com"].includes(url.hostname)) {
     const match = /^\/(?:[a-z]{2}\/)?organizers\/([a-zA-Z0-9_-]+)(?:\/[^/]+)?\/?$/.exec(url.pathname);
-    if (match && match[1] !== "faceit") { key = `faceit:organizer:${match[1]}`; label = `FACEIT organizer ${match[1]}`; }
+    if (match && match[1] !== "faceit") { key = `faceit:organizer:${match[1]}`; label = "Organizer name unavailable"; }
   } else if (!t.source || t.source === "challonge") {
     const match = /^([a-z0-9-]+)\.challonge\.com$/.exec(url.hostname);
     if (match && !["www", "api", "connect", "community", "kb", "feedback", "blog", "feedback2", "support"].includes(match[1])) {
@@ -129,9 +133,6 @@ export function providerParentSeries(t: DiscoverySource & {
     reason: "Shared provider owner or community identity links tournaments across games and seasons" } : null;
 }
 
-export function isProviderParentSeriesId(id: string): boolean {
-  return /^series:(?:leagueos:[a-z0-9]+|startgg:owner:[a-zA-Z0-9_-]+|faceit:organizer:[a-zA-Z0-9_-]+|challonge:community:[a-z0-9-]+)$/.test(id);
-}
 export function inferFacts(t: DiscoverySource): DiscoveryMetadata {
   const text = `${t.name}\n${(t.description ?? "").slice(0, 20000)}`;
   const audience = inferAudience(t);

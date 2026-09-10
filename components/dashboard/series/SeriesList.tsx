@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { profilePath, seriesName, isProviderParentSeriesId } from "@/lib/discovery-shared";
+import { profilePath, seriesName } from "@/lib/discovery-shared";
 import type { TournamentListEntry } from "@/components/dashboard/tournaments/TournamentList";
 
 const CONCLUDED = new Set(["completed", "cancelled"]);
@@ -30,8 +30,8 @@ function dateRange(events: TournamentListEntry[]): string | null {
   return lo === hi ? lo : `${lo} – ${hi}`;
 }
 
-/** Source-backed leagues remain visible even with one recorded tournament.
- * Inferred series need multiple members. Concluded groups stay browsable. */
+/** Named seasons can stand alone; other inferred series need multiple members.
+ * Organizer membership alone never creates a series. Concluded groups remain. */
 export function SeriesList({
   tournaments,
 }: {
@@ -60,7 +60,7 @@ export function SeriesList({
 
   const series = [...groups.values()]
     // Only surface a group that actually gathers several shown tournaments.
-    .filter((g) => g.events.length > 1 || isProviderParentSeriesId(g.id))
+    .filter((g) => g.events.length > 1 || (g.id.startsWith("series:competition:") && g.events.some(t => /\b(?:20\d{2}|season\s+\w+)\b/i.test(t.discovery?.seriesName ?? ""))))
     .sort(
       (a, b) =>
         Number(a.events.every((t) => CONCLUDED.has(t.status))) -

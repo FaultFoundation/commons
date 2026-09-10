@@ -274,17 +274,40 @@ test('missing session cookies redirect before protected rendering; cookie hints 
   } finally { f.sqlite.close(); }
 });
 
-test('tournament list cache reads both existing and compact payloads', async () => {
+test('Challonge community links survive the database-to-discovery path without changing internal routing', async () => {
+  const f=fixture();
+  try {
+    for (const [id,url] of [['a','https://campus.challonge.com/fall'],['b','https://campus.challonge.com/spring'],['c','https://other.challonge.com/fall']]) {
+      f.sqlite.prepare(`INSERT INTO tournaments (id,program_id,source,external_id,external_url,name,format,status,created_at,updated_at)
+        VALUES (?,'program','challonge',?,?,'Event','single_elim','completed',0,0)`).run(id,id,url);
+    }
+    const entries=await f.load('@/lib/tournament-entries').loadTournamentEntries();
+    const a=entries.find(t=>t.id==='a'), b=entries.find(t=>t.id==='b'), c=entries.find(t=>t.id==='c');
+    assert.equal(a.discovery.seriesId,'series:challonge:community:campus');
+    assert.equal(a.discovery.seriesId,b.discovery.seriesId);
+    assert.notEqual(a.discovery.seriesId,c.discovery.seriesId);
+    assert.equal(a.source,undefined);
+    assert.equal(a.externalUrl,'https://campus.challonge.com/fall');
+  } finally {f.sqlite.close();}
+});
+
+test('tournament list cache rebuilds old discovery versions and reuses current snapshots', async () => {
   const f = fixture();
   try {
     const { loadTournamentEntries } = f.load('@/lib/tournament-entries');
     const { packTournamentEntries } = f.load('@/lib/tournament-wire');
-    const entries = [{ id: 'public:1', name: 'Event', status: 'active', startsAt: null, featured: false }];
+    const entries = [{ id: 'public:1', name: 'Old grouping', status: 'active', startsAt: null, featured: false }];
     f.sqlite.prepare('INSERT INTO tournament_list_cache (id,payload,built_at) VALUES (?,?,?)')
       .run('default', JSON.stringify(entries), Date.now());
-    assert.deepEqual(JSON.parse(JSON.stringify(await loadTournamentEntries())), entries);
+    for (const old of [entries, { version: 1, data: packTournamentEntries(entries) }, { version: 2, data: packTournamentEntries(entries) }]) {
+      f.sqlite.prepare('UPDATE tournament_list_cache SET payload = ?, built_at = ?, lease_until = NULL WHERE id = ?')
+        .run(JSON.stringify(old), Date.now(), 'default');
+      assert.deepEqual(JSON.parse(JSON.stringify(await loadTournamentEntries())), []);
+      const saved = JSON.parse(f.sqlite.prepare("SELECT payload FROM tournament_list_cache WHERE id = 'default'").get().payload);
+      assert.equal(saved.version, 3);
+    }
     f.sqlite.prepare('UPDATE tournament_list_cache SET payload = ? WHERE id = ?')
-      .run(JSON.stringify({ version: 1, data: packTournamentEntries(entries) }), 'default');
+      .run(JSON.stringify({ version: 3, data: packTournamentEntries(entries) }), 'default');
     assert.deepEqual(JSON.parse(JSON.stringify(await loadTournamentEntries())), entries);
   } finally { f.sqlite.close(); }
 });

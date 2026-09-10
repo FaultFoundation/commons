@@ -60,7 +60,7 @@ export default async function DiscoveryProfilePage({
       : t.discovery?.seriesId === id,
   );
 
-  const isLeague = tournaments.some((t) => t.discovery?.competition === "league");
+  const isLeague = id.startsWith("series:leagueos:") || tournaments.some((t) => t.discovery?.competition === "league");
   const live = tournaments.some((t) => t.status === "active");
   const registering = tournaments.some((t) => t.status === "registration");
   const kindLabel =
@@ -126,6 +126,8 @@ export default async function DiscoveryProfilePage({
               <span className="ff-serieslist__status ff-serieslist__status--live">
                 Live
               </span>
+            ) : done === tournaments.length ? (
+              <span className="ff-serieslist__status">Concluded</span>
             ) : registering ? (
               <span className="ff-serieslist__status">Registration open</span>
             ) : null}

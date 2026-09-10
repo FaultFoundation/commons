@@ -40,6 +40,7 @@ async function buildTournamentEntries(): Promise<TournamentListEntry[]> {
 
   const internalEntries: TournamentListEntry[] = internal.map((t) => ({
     id: t.id,
+    externalUrl: t.externalUrl,
     name: t.name,
     format: t.format,
     status: t.status,
@@ -96,8 +97,8 @@ async function buildTournamentEntries(): Promise<TournamentListEntry[]> {
 function parseCached(payload: string): TournamentListEntry[] | null {
   try {
     const parsed: unknown = JSON.parse(payload);
-    if (Array.isArray(parsed)) return parsed as TournamentListEntry[]; // older cache
-    if (parsed && typeof parsed === "object" && "version" in parsed && parsed.version === 1 && "data" in parsed) {
+    // Earlier snapshots predate provider-parent grouping; rebuild them.
+    if (parsed && typeof parsed === "object" && "version" in parsed && parsed.version === 3 && "data" in parsed) {
       return unpackTournamentEntries(parsed.data as PackedTournamentEntries);
     }
     return null;
@@ -185,7 +186,7 @@ export const loadTournamentEntries = cache(
     // Best-effort write-back: a cache we failed to store is a slow next request,
     // never a failed one.
     try {
-      const payload = JSON.stringify({ version: 1, data: packTournamentEntries(entries) });
+      const payload = JSON.stringify({ version: 3, data: packTournamentEntries(entries) });
       await getDb()
         .insert(tournamentListCache)
         .values({

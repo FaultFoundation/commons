@@ -12,7 +12,7 @@ import {
   inferFacts,
   organizerIdentity,
   seriesName,
-  leagueosSeries,
+  providerParentSeries,
   validFacts,
   type DiscoveryProfile,
 } from "@/lib/discovery-shared";
@@ -89,11 +89,20 @@ export async function enrichDiscovery(
     }
     return { ...t, discovery: d, candidateKey: key, tournamentKey };
   });
+  // Per-game projections can have uneven metadata. An unambiguous parent on
+  // one sibling applies to every row of that same provider tournament.
+  const tournamentParents = new Map<string, NonNullable<ReturnType<typeof providerParentSeries>>>();
+  for (const [key, group] of tournamentGroups) {
+    const parents = group.map(providerParentSeries).filter((p) => p != null);
+    if (new Set(parents.map(p => p.id)).size === 1) {
+      tournamentParents.set(key, parents[0]);
+    }
+  }
   return enriched.map(({ candidateKey, tournamentKey, ...t }) => {
-    const linkedSeries = leagueosSeries(t);
+    const linkedSeries = (tournamentKey ? tournamentParents.get(tournamentKey) : null) ?? providerParentSeries(t);
     if (linkedSeries) {
       t.discovery.seriesId = linkedSeries.id;
-      t.discovery.reasons.push("LeagueOS league identity and explicit season title link games and divisions");
+      t.discovery.reasons.push(linkedSeries.reason);
     }
     // Highest confidence: this tournament runs several games (its per-game rows
     // share one source tournament id). That IS a series — group its games under

@@ -125,6 +125,7 @@ export async function reserveTournamentId(): Promise<string | null> {
 // ---------------------------------------------------------------------------
 
 export type TournamentListItem = {
+  externalUrl: string | null;
   description: string | null;
   registrationClosesAt: Date | null;
   academicVerificationRequired: boolean;
@@ -334,6 +335,7 @@ export async function listTournaments(opts?: {
   const rows = await db
     .select({
       id: tournaments.id,
+      externalUrl: tournaments.externalUrl,
       name: tournaments.name,
       format: tournaments.format,
       status: tournaments.status,

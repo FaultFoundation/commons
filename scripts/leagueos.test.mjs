@@ -9,7 +9,60 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 const require=createRequire(import.meta.url), root=resolve(import.meta.dirname,'..');
 const cache=new Map();
-test('LeagueOS season renders as one series with a profile link',()=>{
+const mocks=new Map();
+test('Series page passes LeagueOS imports into its grouped list',async()=>{
+ const {leagueosSeries}=load('@/lib/discovery-shared');
+ const rows=JSON.parse(readFileSync(resolve(root,'scripts/fixtures/leagueos-series-1100.json'),'utf8'));
+ const entries=rows.map(t=>{
+  const parent=leagueosSeries(t);
+  return {...t,status:'completed',discovery:{seriesId:parent.id,seriesName:parent.name}};
+ });
+ const wrapper=({children})=>React.createElement('div',null,children);
+ mocks.set('@/lib/session',{getSessionCached:async()=>({user:{id:'test'}})});
+ mocks.set('@/lib/tournament-entries',{loadTournamentEntries:async()=>entries});
+ mocks.set('@/components/dashboard/DashboardShell',{DashboardShell:wrapper});
+ mocks.set('@/components/dashboard/bubbles/Bubble',{Bubble:wrapper});
+ mocks.set('@/components/dashboard/tournaments/TournamentList',{TournamentCards:()=>null});
+ try {
+  const page=await load('@/app/series/page').default();
+  const html=renderToStaticMarkup(page);
+  assert.equal((html.match(/class="ff-serieslist__row"/g)??[]).length,58);
+  assert.equal((html.match(/>Concluded</g)??[]).length,58);
+ } finally {mocks.clear();}
+});
+test('the entire imported corpus remains browsable when every league is concluded',()=>{
+ const {leagueosSeries}=load('@/lib/discovery-shared');
+ const {SeriesList}=load('@/components/dashboard/series/SeriesList');
+ const rows=JSON.parse(readFileSync(resolve(root,'scripts/fixtures/leagueos-series-1100.json'),'utf8'));
+ const tournaments=rows.map(t=>{
+  const parent=leagueosSeries(t);
+  return {...t,status:'completed',discovery:{seriesId:parent.id,seriesName:parent.name}};
+ });
+ const html=renderToStaticMarkup(React.createElement(SeriesList,{tournaments}));
+ assert.equal((html.match(/class="ff-serieslist__row"/g)??[]).length,58);
+ assert.equal((html.match(/>Concluded</g)??[]).length,58);
+ assert.doesNotMatch(html,/>Upcoming</);
+ assert.match(html,/318 tournaments/);
+ const parents=new Set(tournaments.map(t=>t.discovery.seriesId));
+ for(const id of parents) assert.ok(html.includes(encodeURIComponent(id)),id);
+});
+test('active leagues sort ahead of concluded groups and inferred singletons stay hidden',()=>{
+ const {SeriesList}=load('@/components/dashboard/series/SeriesList');
+ const t=(id,name,status)=>({id,name,status,startsAt:null,endsAt:null,discovery:{seriesId:id,seriesName:name}});
+ const html=renderToStaticMarkup(React.createElement(SeriesList,{tournaments:[
+  t('series:leagueos:old','A concluded league','cancelled'),
+  t('series:leagueos:new','Z active league','active'),
+  t('series:startgg:owner:example','start.gg owner archive','completed'),
+  t('series:faceit:organizer:example','FACEIT organizer archive','completed'),
+  t('series:challonge:community:example','Challonge community archive','completed'),
+  t('series:tournament:solo','Inferred singleton','completed'),
+ ]}));
+ assert.ok(html.indexOf('Z active league')<html.indexOf('A concluded league'));
+ assert.match(html,/>Concluded</);
+ assert.equal((html.match(/class="ff-serieslist__row"/g)??[]).length,5);
+ assert.doesNotMatch(html,/Inferred singleton/);
+});
+test('LeagueOS parent renders as one league with a profile link',()=>{
  const {leagueosSeries}=load('@/lib/discovery-shared');
  const {SeriesList}=load('@/components/dashboard/series/SeriesList');
  const tournaments=['OW','VAL'].map((game,i)=>{
@@ -18,13 +71,14 @@ test('LeagueOS season renders as one series with a profile link',()=>{
   return {...t,discovery:{seriesId:series.id,seriesName:series.name}};
  });
  const html=renderToStaticMarkup(React.createElement(SeriesList,{tournaments}));
- assert.match(html,/NECC · Spring 2026/);
- assert.match(html,/1 running now/);
- assert.match(html,/series%3Aleagueos%3Anecc%3Aspring%202026/);
+ assert.match(html,/NECC/);
+ assert.match(html,/1 leagues &amp; series/);
+ assert.match(html,/series%3Aleagueos%3Anecc/);
  assert.match(html,/Overwatch/);
  assert.match(html,/VALORANT/);
 });
 function load(name, parent=root) {
+ if(mocks.has(name)) return mocks.get(name);
  if(name==='next/navigation') return {useRouter:()=>({refresh(){}}),usePathname:()=>'/series/',useSearchParams:()=>new URLSearchParams()};
  if(!name.startsWith('@/') && !name.startsWith('.')) return require(name);
  const base=name.startsWith('@/') ? resolve(root,name.slice(2)) : resolve(parent,name);

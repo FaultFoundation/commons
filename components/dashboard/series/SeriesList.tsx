@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { profilePath, seriesName } from "@/lib/discovery-shared";
+import { profilePath, seriesName, isProviderParentSeriesId } from "@/lib/discovery-shared";
 import type { TournamentListEntry } from "@/components/dashboard/tournaments/TournamentList";
 
 const CONCLUDED = new Set(["completed", "cancelled"]);
@@ -30,17 +30,8 @@ function dateRange(events: TournamentListEntry[]): string | null {
   return lo === hi ? lo : `${lo} – ${hi}`;
 }
 
-/**
- * "Series & Leagues" — the Series tab's grouped-tournament list. A group only
- * appears when **more than one** tournament belongs to it (a lone tournament is
- * just a card, not a series), and only while at least one of its tournaments is
- * still active or upcoming. Each row links to the series page.
- *
- * This was the rail above the /tournaments/ list. It is now the Series tab's
- * own content, which changes two things: there is no 8-row cap (the page IS the
- * list), and an empty result renders a message rather than nothing — a blank
- * tab reads as broken where a missing rail read as "no series right now".
- */
+/** Source-backed leagues remain visible even with one recorded tournament.
+ * Inferred series need multiple members. Concluded groups stay browsable. */
 export function SeriesList({
   tournaments,
 }: {
@@ -69,10 +60,11 @@ export function SeriesList({
 
   const series = [...groups.values()]
     // Only surface a group that actually gathers several shown tournaments.
-    .filter((g) => g.events.length > 1)
-    .filter((g) => g.events.some((t) => !CONCLUDED.has(t.status)))
+    .filter((g) => g.events.length > 1 || isProviderParentSeriesId(g.id))
     .sort(
       (a, b) =>
+        Number(a.events.every((t) => CONCLUDED.has(t.status))) -
+          Number(b.events.every((t) => CONCLUDED.has(t.status))) ||
         Number(
           b.events.some((t) => t.discovery?.audience === "collegiate"),
         ) -
@@ -88,25 +80,26 @@ export function SeriesList({
           sections cannot drift apart. */}
       <div className="ff-list-heading">
         <h2>Series &amp; Leagues</h2>
-        <span className="ff-list-count">{series.length} running now</span>
+        <span className="ff-list-count">{series.length} leagues &amp; series</span>
       </div>
       {series.length === 0 ? (
         <p className="ff-ticket-empty">
-          No series or leagues are running right now. A group appears here once
-          more than one recorded tournament belongs to it.
+          No leagues or series have been recorded yet.
         </p>
       ) : null}
       <div className="ff-serieslist__rows">
         {series.map((g) => {
           const done = g.events.filter((t) => CONCLUDED.has(t.status)).length;
-          const isLeague = g.events.some(
+          const isLeague = g.id.startsWith("series:leagueos:") || g.events.some(
             (t) => t.discovery?.competition === "league",
           );
           const live = g.events.some((t) => t.status === "active");
           const registering = g.events.some(
             (t) => t.status === "registration",
           );
-          const status = live
+          const status = done === g.events.length
+            ? "Concluded"
+            : live
             ? "Live"
             : registering
               ? "Registration open"

@@ -12,7 +12,7 @@ import { getSessionCached } from "@/lib/session";
 // bounded, resumable collection by one chunk (POST /faceit/advance), then reads
 // the freshened cache back and returns the derived profile (with progress). The
 // client calls this repeatedly behind the load screen until status is "ready" or
-// a repeated failure interrupts collection. Member-gated + same-origin (it triggers an outbound
+// a definitive non-result ends collection. Member-gated + same-origin (it triggers an outbound
 // authenticated call). Reads request-scoped env/D1, so force-dynamic.
 export const dynamic = "force-dynamic";
 
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     return Response.json(payload);
   }
 
-  // A failed advance must reach the client's retry budget. Returning a cached
+  // A failed advance must reach the client's retry loop. Returning a cached
   // "collecting" response here hides timeouts and looks like successful work.
   if (!advanced.ok) {
     return Response.json({ status: "error", player: null, data: null } satisfies ScoutResponse, { status: 503 });

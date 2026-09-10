@@ -230,33 +230,24 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
         body: JSON.stringify(body),
       });
 
-      // 1. Register the deep search + do the first page.
-      const current =
-        (await post("/api/scouting/search", {
-          nickname,
-          mode: "deep",
-          game_mode: gm,
-        })) ?? ({ status: "error", player: null, data: null } as ScoutResponse);
-      if (!alive.current) return;
-
-      // A definitive non-result (not found / unconfigured / error with no player)
-      // ends here — nothing to advance.
-      if (!current.player) {
-        setDeep({ active: false, total: null, detailed: null });
-        applyResp(nickname, current, gm);
-        return;
-      }
-
-      const playerId = current.player.playerId;
+      let playerId: string | undefined;
       const updateProgress = (response: ScoutResponse) => setDeep({
         active: true,
         total: response.progress?.total ?? null,
         detailed: response.progress?.detailed ?? null,
       });
-      updateProgress(current);
-      const completed = await finishDeepScout(current, () => post("/api/scouting/advance", {
-        player_id: playerId, mode: "deep", game_mode: gm,
-      }), updateProgress, () => alive.current);
+      const completed = await finishDeepScout(
+        { status: "collecting", player: null, data: null },
+        async () => {
+          const response = await (playerId
+            ? post("/api/scouting/advance", { player_id: playerId, mode: "deep", game_mode: gm })
+            : post("/api/scouting/search", { nickname, mode: "deep", game_mode: gm }));
+          if (response?.player) playerId = response.player.playerId;
+          return response;
+        },
+        updateProgress,
+        () => alive.current,
+      );
       if (!completed || !alive.current) return;
       setDeep({ active: false, total: null, detailed: null });
       applyResp(nickname, completed, gm);

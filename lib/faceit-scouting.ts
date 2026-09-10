@@ -462,7 +462,7 @@ export async function requestFaceitSearch(
 // window). A deep search asks the Commons to keep advancing the Worker's bounded,
 // resumable collection until the whole history is in — so the Commons loops this
 // (POST /faceit/advance) behind a load screen, reading the returned progress
-// counts, until listDone && undetailed === 0 (or repeated failures interrupt collection). No profile
+// counts, until listDone && undetailed === 0 (or a definitive non-result ends collection). No profile
 // resolution here (the trigger already registered the player), so a deep loop
 // costs no extra FACEIT search calls. Best-effort like the trigger.
 // ---------------------------------------------------------------------------

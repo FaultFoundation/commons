@@ -162,6 +162,42 @@ const facts = {
   seriesId: null,
   featured: false,
 };
+test("LeagueOS links games and divisions by league and explicit season", async () => {
+  const f = fixture();
+  const entry = (id, name, extra = {}) => f.entry(id, name, {
+    source: "leagueos", sourceTournamentId: `necc:${id}`,
+    organizer: "NECC", organizerUrl: "https://necc.leagueos.gg",
+    game: "Overwatch", ...extra,
+  });
+  const entries = [
+    entry("ow1", "Spring 2026 - OW | Division I"),
+    entry("ow2", "Spring 2026 - OW | Division II"),
+    entry("val", "Spring 2026 - VAL | Signups", { game: "VALORANT" }),
+    entry("rl", "Spring 2026 - RL | Nationals", { game: "Rocket League" }),
+    entry("fall", "Fall 2026 - OW | Division I"),
+    entry("old", "Spring 2025 - OW | Division I"),
+    entry("other", "Spring 2026 - OW | Division I", { sourceTournamentId: "other:event" }),
+    entry("cup", "Spring 2026 - OW | Invitational"),
+    entry("undated", "Overwatch | Signups"),
+    entry("missing", "Spring 2026 - OW | Division I", { sourceTournamentId: null }),
+    entry("wronggame", "Spring 2026 - VAL | Division I"),
+  ];
+  const result = await f.load("@/lib/discovery").enrichDiscovery(entries);
+  for (const t of result.slice(0, 4)) {
+    assert.equal(t.discovery.seriesId, "series:leagueos:necc:spring 2026");
+    assert.equal(t.discovery.seriesName, "NECC · Spring 2026");
+  }
+  for (const t of result.slice(4)) assert.notEqual(t.discovery.seriesId, result[0].discovery.seriesId);
+  const catalog = await f.load("@/lib/discovery").discoveryCatalog(result);
+  assert.equal(catalog.find(p => p.id === result[0].discovery.seriesId).name, "NECC · Spring 2026");
+  f.entries = entries;
+  await f.post({ action: "correction", targetId: "ow1", data: facts, evidence: "Keep this event separate." });
+  const row = f.sqlite.prepare("SELECT * FROM discovery_submissions").get();
+  assert.equal((await f.post({ action: "review", id: row.id, decision: "approve" })).status, 200);
+  const corrected = (await f.load("@/lib/discovery").enrichDiscovery(entries))[0];
+  assert.equal(corrected.discovery.seriesId, null);
+  assert.equal(corrected.discovery.reviewed, true);
+});
 test("unknown metadata stays unknown; logos, counts and country do not imply eligibility or venue", () => {
   const f = fixture(),
     s = f.load("@/lib/discovery-shared");

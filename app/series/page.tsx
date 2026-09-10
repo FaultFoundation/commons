@@ -50,7 +50,7 @@ export default async function SeriesPage() {
             .ff-list-heading (name + dim count), the shape the tournaments grid
             uses, so the card carries one heading rather than two. */}
         <Bubble title="Series & Leagues" titleHidden span="full">
-          <SeriesList tournaments={tournaments.filter(t => t.source !== "leagueos")} />
+          <SeriesList tournaments={tournaments} />
         </Bubble>
 
         <Bubble title="LeagueOS" titleHidden span="full">

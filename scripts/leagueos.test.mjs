@@ -9,6 +9,21 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 const require=createRequire(import.meta.url), root=resolve(import.meta.dirname,'..');
 const cache=new Map();
+test('LeagueOS season renders as one series with a profile link',()=>{
+ const {leagueosSeries}=load('@/lib/discovery-shared');
+ const {SeriesList}=load('@/components/dashboard/series/SeriesList');
+ const tournaments=['OW','VAL'].map((game,i)=>{
+  const t={id:`leagueos:necc:event${i}`,source:'leagueos',sourceTournamentId:`necc:event${i}`,name:`Spring 2026 - ${game} | Division I`,game:i?'VALORANT':'Overwatch',organizer:'NECC',startsAt:1770000000000,endsAt:null,featured:false,status:'active'};
+  const series=leagueosSeries(t);
+  return {...t,discovery:{seriesId:series.id,seriesName:series.name}};
+ });
+ const html=renderToStaticMarkup(React.createElement(SeriesList,{tournaments}));
+ assert.match(html,/NECC · Spring 2026/);
+ assert.match(html,/1 running now/);
+ assert.match(html,/series%3Aleagueos%3Anecc%3Aspring%202026/);
+ assert.match(html,/Overwatch/);
+ assert.match(html,/VALORANT/);
+});
 function load(name, parent=root) {
  if(name==='next/navigation') return {useRouter:()=>({refresh(){}}),usePathname:()=>'/series/',useSearchParams:()=>new URLSearchParams()};
  if(!name.startsWith('@/') && !name.startsWith('.')) return require(name);

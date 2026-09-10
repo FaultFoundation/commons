@@ -12,6 +12,7 @@ import {
   inferFacts,
   organizerIdentity,
   seriesName,
+  leagueosSeries,
   validFacts,
   type DiscoveryProfile,
 } from "@/lib/discovery-shared";
@@ -89,10 +90,15 @@ export async function enrichDiscovery(
     return { ...t, discovery: d, candidateKey: key, tournamentKey };
   });
   return enriched.map(({ candidateKey, tournamentKey, ...t }) => {
+    const linkedSeries = leagueosSeries(t);
+    if (linkedSeries) {
+      t.discovery.seriesId = linkedSeries.id;
+      t.discovery.reasons.push("LeagueOS league identity and explicit season title link games and divisions");
+    }
     // Highest confidence: this tournament runs several games (its per-game rows
     // share one source tournament id). That IS a series — group its games under
     // one bubble regardless of what the name or organizer say.
-    if (tournamentKey && (tournamentGroups.get(tournamentKey)?.length ?? 0) > 1) {
+    if (!t.discovery.seriesId && tournamentKey && (tournamentGroups.get(tournamentKey)?.length ?? 0) > 1) {
       t.discovery.seriesId = discoveryId("series", `multigame:${tournamentKey}`);
       t.discovery.reasons.push(
         "One source tournament runs multiple games at once",
@@ -138,6 +144,7 @@ export async function enrichDiscovery(
       undefined;
     t.discovery.seriesName =
       overlay.profiles.find((p) => p.id === t.discovery.seriesId)?.name ??
+      (linkedSeries?.id === t.discovery.seriesId ? linkedSeries?.name : undefined) ??
       // A single-tournament series (whether it's a lone named event or a
       // multi-game tournament) is named for the tournament itself; an inferred
       // cross-tournament series uses the season/series name.

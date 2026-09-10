@@ -81,6 +81,39 @@ export function seriesName(name: string): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+/** LeagueOS projects each game/division as a separate event. The league id is
+ * authoritative; the season is inferred from an explicit title, never dates or
+ * categoryId (LeagueOS categories can span years). Unrecognized titles retain
+ * the normal discovery rules instead of merging every event in a portal. */
+export function leagueosSeries(t: DiscoverySource & { sourceTournamentId?: string | null }):
+  { id: string; name: string } | null {
+  if (t.source !== "leagueos" || !t.game) return null;
+  const identity = /^([a-z0-9]+):[a-z0-9]+$/i.exec(t.sourceTournamentId ?? "");
+  if (!identity) return null;
+  const parts = t.name.split(/\s*[-–—|:]\s*/);
+  const season = parts.shift()?.trim();
+  if (!season || !/^(?:spring|summer|fall|autumn|winter)\s+20\d{2}$/i.test(season)) return null;
+  const aliases: Record<string, string[]> = {
+    overwatch: ["ow", "ow2", "overwatch 2"],
+    "overwatch 2": ["ow", "ow2", "overwatch"],
+    valorant: ["val"],
+    "rocket league": ["rl"],
+    "league of legends": ["lol"],
+    "counter-strike 2": ["cs2", "counter strike 2"],
+    "marvel rivals": ["mr"],
+    "rainbow six siege": ["r6", "r6 siege", "r6s"],
+  };
+  const game = t.game.trim().toLowerCase();
+  const titleGame = parts.shift()?.trim().toLowerCase();
+  if (!titleGame || ![game, ...(aliases[game] ?? [])].includes(titleGame)) return null;
+  // Only known season components collapse; independently branded cups and
+  // invitationals keep their own identity through the fallback rules.
+  if (parts.some(part => !/^(?:division\s+(?:[ivxlcdm]+|\d+)|signups?|registration|nationals|regular season|playoffs?|finals?|qualifiers?)$/i.test(part))) return null;
+  const name = season.replace(/\s+/g, " ");
+  return { id: discoveryId("series", `leagueos:${identity[1]}:${name.toLowerCase()}`),
+    name: `${t.organizer?.trim() ? `${t.organizer.trim()} · ` : ""}${name}` };
+}
 export function inferFacts(t: DiscoverySource): DiscoveryMetadata {
   const text = `${t.name}\n${(t.description ?? "").slice(0, 20000)}`;
   const audience = inferAudience(t);

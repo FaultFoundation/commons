@@ -10,12 +10,14 @@ import { ChallongeMark, FaceitMark, StartggMark, DiscordSourceMark } from "@/com
 // network fetch and can't render broken. The Commons mark is the one exception:
 // it's real org art at `public/brand/sources/commons.svg`, loaded as an <img>.
 
-export type TournamentSource = "commons" | "challonge" | "startgg" | "faceit" | "discord";
+export type TournamentSource = "commons" | "challonge" | "startgg" | "faceit" | "discord" | "leagueos";
 
 /** Normalize a list entry's `source` to a logo key. Internal Commons
     tournaments carry no source; external ones carry "startgg" | "faceit". */
 export function sourceKey(source: string | null | undefined): TournamentSource {
   switch (source) {
+    case "leagueos":
+      return "leagueos";
     case "discord":
       return "discord";
     case "startgg":
@@ -30,6 +32,7 @@ export function sourceKey(source: string | null | undefined): TournamentSource {
 }
 
 const SOURCE_NAMES: Record<TournamentSource, string> = {
+  leagueos: "LeagueOS",
   discord: "Discord",
   commons: "The Fault Foundation",
   challonge: "Challonge",
@@ -51,7 +54,7 @@ export function SourceLogo({ source }: { source: TournamentSource }) {
       title={label}
       aria-label={label}
     >
-      {source === "discord" ? <DiscordSourceMark /> : source === "faceit" ? (
+      {source === "leagueos" ? <img src="/brand/sources/leagueos.svg" alt="" /> : source === "discord" ? <DiscordSourceMark /> : source === "faceit" ? (
         <FaceitMark />
       ) : source === "commons" ? (
         <CommonsMark />

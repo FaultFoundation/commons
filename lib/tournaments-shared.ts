@@ -360,9 +360,10 @@ export function isDiscordSourced(t: { source?: string | null }): boolean {
   return t.source === DISCORD_SOURCE;
 }
 
-/** The general list's view of a set of tournaments: everything but Discord. */
+/** General surfaces exclude experimental Discord and LeagueOS providers.
+ * Keep this compatibility name so every existing caller shares the same rule. */
 export function withoutDiscordSourced<T extends { source?: string | null }>(
   tournaments: T[],
 ): T[] {
-  return tournaments.filter((t) => !isDiscordSourced(t));
+  return tournaments.filter((t) => !isDiscordSourced(t) && t.source !== "leagueos");
 }

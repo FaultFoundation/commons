@@ -49,6 +49,7 @@ import type {
 // on top, the on-demand refresh in ExternalTournamentRefresh).
 
 const SOURCE_LABELS: Record<string, string> = {
+  leagueos: "LeagueOS",
   discord: "Discord",
   startgg: "start.gg",
   faceit: "FACEIT",
@@ -776,7 +777,9 @@ export function ExternalTournamentView({
   // stop at the About bubble's bottom, its list scrolling inside.
   const overview = (
     <div className="ff-tpanel">
-      <TopFinishers finishers={finishers} />
+      {/* LeagueOS positions are stage-local source standings, not an overall
+          podium across independent divisions (and may lag match results). */}
+      {tournament.source !== "leagueos" ? <TopFinishers finishers={finishers} /> : null}
       <TournamentOverview
         about={aboutBubble}
         details={detailsBubble}
@@ -847,7 +850,7 @@ export function ExternalTournamentView({
 
   const standings = (
     <Bubble
-      title={isRoundRobin ? "Standings" : hasDisplayedPlacements ? "Final Standings" : "Entrants"}
+      title={isRoundRobin || tournament.source === "leagueos" ? "Standings" : hasDisplayedPlacements ? "Final Standings" : "Entrants"}
       span="full"
     >
       {isRoundRobin && !hasPlacedStandings ? (

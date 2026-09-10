@@ -135,3 +135,5 @@ Tournament discovery now includes collegiate/venue/league/series filters,
 featured discovery, organization and series profiles, follows, and reviewed
 corrections/claims. See the [architecture, data audit, and test checklist](docs/dashboard-guide.md#tournament-discovery).
 Apply migration `0023_pale_hex.sql` to website-sql before deploying this change.
+
+LeagueOS is an experimental aggregate provider on `/series/`, with the supplied provider logo and the existing external tournament refresh flow. Its collector lives in `../cen-news-notifications`; see that repo's `docs/LEAGUEOS.md` for setup, limits and the data-coverage report. Regression checks: `node --test scripts/leagueos.test.mjs scripts/statistics-formats.test.mjs`.

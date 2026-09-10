@@ -36,3 +36,12 @@ test('LeagueOS overview keeps stage positions out of the overall podium and moun
  assert.match(html,/View on LeagueOS/);assert.match(html,/Updating…/);assert.match(html,/About the event/);
  assert.doesNotMatch(html,/aria-label="Top finishers"/);
 });
+test('LeagueOS artwork repairs cached league URLs and preserves other artwork',()=>{
+ const {normalizeTournamentArtwork,TournamentBannerImage}=load('@/components/dashboard/tournaments/TournamentBannerImage');
+ const old='https://images.leagueos.gg/leagues/9j5dg7arx9duozny51fhx1p9r/6514260f75e117fcf6f5b429';
+ const fixed=old.replace('/leagues/','/league/');
+ assert.equal(normalizeTournamentArtwork(old),fixed);
+ for(const url of [fixed,'https://images.leagueos.gg/seasons/event/banner','https://example.com/leagues/a/b']) assert.equal(normalizeTournamentArtwork(url),url);
+ assert.match(renderToStaticMarkup(React.createElement(TournamentBannerImage,{url:old})),/src="https:\/\/images.leagueos.gg\/league\//);
+ assert.equal(renderToStaticMarkup(React.createElement(TournamentBannerImage,{url:null})), '');
+});

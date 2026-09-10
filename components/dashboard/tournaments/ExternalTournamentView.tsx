@@ -1,3 +1,4 @@
+import { TournamentBannerImage } from "./TournamentBannerImage";
 import { TOURNAMENT_FORMAT_LABELS } from "@/lib/tournaments-shared";
 import { Fragment, type ReactNode } from "react";
 
@@ -680,15 +681,7 @@ export function ExternalTournamentView({
   const header = (
     <section className="ff-thero">
       <div className="ff-thero__banner">
-        {tournament.bannerUrl ? (
-          <img
-            className="ff-thero__banner-img"
-            src={tournament.bannerUrl}
-            alt=""
-            loading="eager"
-            decoding="async"
-          />
-        ) : null}
+        <TournamentBannerImage url={tournament.bannerUrl} className="ff-thero__banner-img" eager />
         <div className="ff-thero__head">
           <span
             className={`ff-thero__status${live ? " ff-thero__status--live" : ""}`}

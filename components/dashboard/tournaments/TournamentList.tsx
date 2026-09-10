@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { TournamentBannerImage as BannerImage } from "./TournamentBannerImage";
 import { DiscoveryFilters } from "./DiscoveryFilters";
 import {
   EMPTY_FILTERS,
@@ -649,28 +650,6 @@ function BrandMarks({ t }: { t: TournamentListEntry }) {
       <span className="ff-tcard__brandsep" aria-hidden="true" />
       <GameLogo name={t.game} logoUrl={t.gameLogoUrl} />
     </span>
-  );
-}
-
-function BannerImage({
-  url,
-  eager = false,
-}: {
-  url: string | null;
-  eager?: boolean;
-}) {
-  if (!url) return null;
-  return (
-    <img
-      className="ff-tcard__banner-img"
-      src={url}
-      alt=""
-      width={1280}
-      height={720}
-      loading={eager ? "eager" : "lazy"}
-      fetchPriority={eager ? "high" : undefined}
-      decoding="async"
-    />
   );
 }
 

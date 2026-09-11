@@ -8,6 +8,7 @@ import {
   asDiscoveryFilters,
   matchesDiscovery,
   discoveryScore,
+  activeFilterCount,
   type DiscoveryFilters as Filters,
 } from "@/lib/discovery-shared";
 import { CorrectionDialog } from "./DiscoveryActions";
@@ -412,7 +413,7 @@ export function TournamentList({
         </span>
       </div>
       {isEmpty ? (
-        <p className="ff-ticket-empty">{Object.values(filters).some(Boolean) || selectedGames.size ? "No tournaments match these filters. Try clearing a filter or choosing All." : emptyMessage}</p>
+        <p className="ff-ticket-empty">{activeFilterCount(filters) > 0 || filters.query || selectedGames.size ? "No tournaments match these filters. Try clearing a filter or choosing All." : emptyMessage}</p>
       ) : (
         <>
           {showFeatured && featured ? (

@@ -8443,6 +8443,38 @@ button.ff-dash__link:hover {
 }
 .ff-filtermenu__foot { display: flex; justify-content: space-between; gap: 10px; padding-top: 12px; border-top: 1px solid var(--ff-border); }
 
+/* Multi-select dropdown for the Games and Region facets inside the filter
+   popover. An in-flow accordion (not an absolute overlay) so the popover's own
+   scroll can't clip it: the trigger mirrors the `.ff-discovery-field select`
+   box, the menu is a bordered, scrollable checklist that grows the popover. */
+.ff-msel { position: relative; }
+.ff-msel__toggle {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; padding: 8px 10px; color: inherit; text-align: left; cursor: pointer;
+  background: var(--ff-navy-900); border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md); font: inherit; font-size: var(--ff-dash-text-sm);
+}
+.ff-msel__toggle:hover { border-color: var(--ff-accent); }
+.ff-msel__summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ff-msel__summary[data-empty="true"] { color: var(--ff-text-dim); }
+.ff-msel__menu {
+  display: flex; flex-direction: column; gap: 2px;
+  margin-top: 6px; max-height: 200px; overflow-y: auto; padding: 6px;
+  background: var(--ff-navy-900); border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+}
+.ff-msel__opt {
+  display: flex; align-items: center; gap: 8px; padding: 5px 6px;
+  border-radius: 8px; cursor: pointer; font-size: var(--ff-dash-text-sm);
+}
+.ff-msel__opt:hover { background: var(--ff-surface-2); }
+.ff-msel__opt input { flex: none; margin: 0; }
+.ff-msel__clear {
+  align-self: flex-start; margin-bottom: 2px; padding: 2px 4px;
+  background: none; border: 0; cursor: pointer; color: var(--ff-accent);
+  font: inherit; font-size: var(--ff-dash-text-xs); font-weight: 700;
+}
+
 /* The bottom-right corner cluster on each card: the source + game marks and the
    white-outlined "?" correction button, grouped so they align in the body's
    reserved gutter. The wrapper is a flex box and the card fills it, so every card

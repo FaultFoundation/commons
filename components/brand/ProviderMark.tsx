@@ -28,6 +28,13 @@ export function DiscordSourceMark() {
   return <img src="/brand/sources/discord-blurple.svg" alt="" />;
 }
 
+/** Supplied LeagueOS source artwork (a gradient glyph), in its original brand
+    color — the same asset SourceLogo renders on tournament cards. Plain <img>
+    like the FACEIT/Commons marks (next.config sets images.unoptimized). */
+export function LeagueOSMark() {
+  return <img src="/brand/sources/leagueos.svg" alt="" />;
+}
+
 /** Official FACEIT mark, supplied by the org as a square PNG-in-SVG lockup
     (not a single-path glyph, so unlike the marks here it can't adopt
     `currentColor` — it carries its own white background). Plain <img> to

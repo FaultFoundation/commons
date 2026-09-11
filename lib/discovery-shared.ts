@@ -186,7 +186,11 @@ export type DiscoveryFilters = {
   venue: string;
   competition: string;
   source: string;
-  country: string;
+  /** Region is multi-select: an empty list means "any region", otherwise a
+   * tournament matches when its `country` is one of these. Persisted as an array
+   * so it round-trips through localStorage; the popover renders it as a
+   * multi-select dropdown. */
+  countries: string[];
   registration: string;
   days: string;
   following: boolean;
@@ -203,6 +207,7 @@ export const DISCOVERY_SOURCE_FILTERS: { value: string; label: string }[] = [
   { value: "startgg", label: "start.gg" },
   { value: "faceit", label: "FACEIT" },
   { value: "challonge", label: "Challonge" },
+  { value: "leagueos", label: "LeagueOS" },
 ];
 
 export const EMPTY_FILTERS: DiscoveryFilters = {
@@ -211,11 +216,29 @@ export const EMPTY_FILTERS: DiscoveryFilters = {
   venue: "",
   competition: "",
   source: "",
-  country: "",
+  countries: [],
   registration: "",
   days: "",
   following: false,
 };
+
+/**
+ * How many facets are actively narrowing the list — the count shown on the
+ * Filter button and used to decide the "no matches" copy. Deliberately excludes
+ * `query` (the head-bar search box lives outside the popover) and games (those
+ * live in `ListState`, not this filter blob). One helper so the button badge and
+ * the empty-state message can't drift, and so `countries: []` (a truthy empty
+ * array) is never mistaken for an active filter.
+ */
+export function activeFilterCount(f: DiscoveryFilters): number {
+  return (
+    [f.audience, f.venue, f.competition, f.source, f.days, f.registration].filter(
+      Boolean,
+    ).length +
+    f.countries.length +
+    (f.following ? 1 : 0)
+  );
+}
 /**
  * Revive a persisted (or otherwise untrusted) filter blob into a known-good set.
  * Unknown keys are dropped and a wrong-typed or oversized field falls back to
@@ -234,6 +257,16 @@ export function asDiscoveryFilters(raw: unknown): DiscoveryFilters {
   // otherwise strand its owner on a permanently empty list, with no switch left
   // in the popover to turn it back off.
   const source = str("source");
+  // Region is an array now. A blob written while it was a single `country`
+  // string is migrated into a one-element list rather than silently dropped, so
+  // a member's saved region survives the change.
+  const countries = Array.isArray(v.countries)
+    ? v.countries
+        .filter((c): c is string => typeof c === "string" && c.length <= 200)
+        .slice(0, 50)
+    : typeof v.country === "string" && v.country
+      ? [v.country.slice(0, 200)]
+      : [];
   return {
     query: str("query"),
     audience: str("audience"),
@@ -242,7 +275,7 @@ export function asDiscoveryFilters(raw: unknown): DiscoveryFilters {
     source: DISCOVERY_SOURCE_FILTERS.some((o) => o.value === source)
       ? source
       : "",
-    country: str("country"),
+    countries,
     registration: str("registration"),
     days: str("days"),
     following: v.following === true,
@@ -278,7 +311,8 @@ export function matchesDiscovery(
     if (d.competition === "league") return false;
   }
   if (f.source && (t.source ?? "challonge") !== f.source) return false;
-  if (f.country && t.country !== f.country) return false;
+  if (f.countries.length && (t.country == null || !f.countries.includes(t.country)))
+    return false;
   if (
     f.registration &&
     !(

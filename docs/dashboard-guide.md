@@ -967,13 +967,21 @@ Inspect local D1 with
 `/tournaments/` keeps the card/compact list. The head row is **view pills
 (All / Active / Concluded) · a divider · a `Filter` button**, then a **search
 box** that stretches to the layout toggle. `Filter` (`DiscoveryFilters`) opens a
-popover of **pill switches** — the same `.ff-segment` control the Account density
-row uses (`Segmented` lives in `DiscoveryActions`, imported by the filter and the
-correction form so both read as switches, not `<select>` dropdowns): Games
-(multi), Type (Tournament / League), Audience (Collegiate / Open), Venue
-(In-person / Online / Hybrid), Platform, "Starts within", Region, and "Closing
-soon" / "Only followed" toggles. The button shows a count badge of active facets;
-search is the one filter that lives outside the popover, in the head bar. Filters
+popover of mostly **pill switches** — the same `.ff-segment` control the Account
+density row uses (`Segmented` lives in `DiscoveryActions`, imported by the filter
+and the correction form so both read as switches, not `<select>` dropdowns): Type
+(Tournament / League), Audience (Collegiate / Open), Venue (In-person / Online /
+Hybrid), Platform (start.gg / FACEIT / Challonge / **LeagueOS**), and "Starts
+within". **Games and Region are the two multi-select facets** — both can grow
+long, so they render as `MultiSelectDropdown` checklists (an in-flow accordion,
+`.ff-msel`, kept in-flow rather than an absolute overlay so the popover's own
+scroll can't clip it) instead of pill rows. Region is a list now (`countries` in
+`DiscoveryFilters`, an empty list = any region); a member's older single-`country`
+blob migrates to a one-element list in `asDiscoveryFilters`. Then the "Closing
+soon" / "Only followed" toggles. `activeFilterCount` (in `lib/discovery-shared.ts`)
+owns the button's count badge and the list's "no matches" copy, so the empty
+`countries: []` array is never mistaken for an active filter. Search is the one
+filter that lives outside the popover, in the head bar. Filters
 combine with AND, reset pagination, and drive the featured hero. They do NOT
 reach the Series tab, which groups every recorded tournament. **Type's
 "Tournament" means "not a league"** (in `matchesDiscovery`) so inferred

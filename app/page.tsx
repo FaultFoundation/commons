@@ -5,6 +5,7 @@ import {
   ChallongeMark,
   DiscordSourceMark,
   FaceitMark,
+  LeagueOSMark,
   StartggMark,
 } from "@/components/brand/ProviderMark";
 
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
   // segment in current Next.
   title: { absolute: "Commons - The Fault Foundation" },
   description:
-    "The Commons Project reads Challonge, FACEIT, start.gg, and Discord into one feed. Your matches, your record, and your team's schedule live in one place.",
+    "The Commons Project reads Challonge, FACEIT, start.gg, LeagueOS, and Discord into one feed. Your matches, your record, and your team's schedule live in one place.",
   alternates: { canonical: "/" },
 };
 
@@ -67,6 +68,7 @@ const SOURCES: { key: string; name: string; Mark: () => React.ReactNode }[] = [
   { key: "challonge", name: "Challonge", Mark: ChallongeMark },
   { key: "faceit", name: "FACEIT", Mark: FaceitMark },
   { key: "startgg", name: "start.gg", Mark: StartggMark },
+  { key: "leagueos", name: "LeagueOS", Mark: LeagueOSMark },
   { key: "discord", name: "Discord", Mark: DiscordSourceMark },
 ];
 
@@ -156,10 +158,10 @@ export default function CommonsPage() {
               <span className="ff-home-accent">every bracket</span>
             </h1>
             <p className="ff-home-hero__lede">
-              The Commons Project reads Challonge, FACEIT, start.gg, and Discord into one
-              feed, so your matches, your record, and your team&rsquo;s schedule
-              live together with no tabs, no spreadsheets, and no missed
-              check-ins.
+              The Commons Project reads Challonge, FACEIT, start.gg, LeagueOS, and
+              Discord into one feed, so your matches, your record, and your
+              team&rsquo;s schedule live together with no tabs, no spreadsheets,
+              and no missed check-ins.
             </p>
 
             <div className="ff-home-hero__cta ff-auth-when-out">

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   DISCOVERY_SOURCE_FILTERS,
   EMPTY_FILTERS,
+  activeFilterCount,
   type DiscoveryFilters as Filters,
 } from "@/lib/discovery-shared";
 import { Segmented } from "./DiscoveryActions";
@@ -52,22 +53,22 @@ export function DiscoveryFilters({
     };
   }, [open]);
 
-  const facetCount =
-    [
-      value.audience,
-      value.venue,
-      value.competition,
-      value.source,
-      value.country,
-      value.days,
-      value.registration,
-    ].filter(Boolean).length +
-    (value.following ? 1 : 0) +
-    selectedGames.size;
+  // activeFilterCount owns the discovery facets (region included, without
+  // mistaking its empty array for an active one); games live outside the blob.
+  const facetCount = activeFilterCount(value) + selectedGames.size;
 
   function clearAll() {
     onChange({ ...EMPTY_FILTERS, query: value.query });
     onClearGames();
+  }
+
+  function toggleCountry(country: string) {
+    onChange({
+      ...value,
+      countries: value.countries.includes(country)
+        ? value.countries.filter((c) => c !== country)
+        : [...value.countries, country],
+    });
   }
 
   return (
@@ -88,22 +89,14 @@ export function DiscoveryFilters({
       {open ? (
         <div className="ff-filter__panel ff-filtermenu" role="dialog" aria-label="Filters">
           {games.length > 0 ? (
-            <div className="ff-discovery-field">
-              <span className="ff-discovery-field__label">Games</span>
-              <div className="ff-segment ff-segment--wrap">
-                {games.map((game) => (
-                  <button
-                    key={game}
-                    type="button"
-                    className="ff-segment__btn"
-                    aria-pressed={selectedGames.has(game)}
-                    onClick={() => onToggleGame(game)}
-                  >
-                    {game}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <MultiSelectDropdown
+              label="Games"
+              allLabel="All games"
+              options={games.map((game) => ({ value: game, label: game }))}
+              selected={[...selectedGames]}
+              onToggle={onToggleGame}
+              onClear={onClearGames}
+            />
           ) : null}
 
           <Segmented
@@ -158,14 +151,13 @@ export function DiscoveryFilters({
             onChange={(days) => onChange({ ...value, days })}
           />
           {countries.length > 0 ? (
-            <Segmented
+            <MultiSelectDropdown
               label="Region"
-              value={value.country}
-              options={[
-                { value: "", label: "Any" },
-                ...countries.map((c) => ({ value: c, label: c })),
-              ]}
-              onChange={(country) => onChange({ ...value, country })}
+              allLabel="All regions"
+              options={countries.map((c) => ({ value: c, label: c }))}
+              selected={value.countries}
+              onToggle={toggleCountry}
+              onClear={() => onChange({ ...value, countries: [] })}
             />
           ) : null}
 
@@ -218,6 +210,98 @@ export function DiscoveryFilters({
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * A labelled multi-select dropdown for the Games and Region facets. It renders
+ * as an in-flow accordion rather than an absolutely-positioned overlay on
+ * purpose: the filter popover (`.ff-filtermenu`) scrolls its own overflow, and
+ * an absolute menu would be clipped by that scroll. The checklist opens below
+ * the trigger and the popover grows/scrolls to fit.
+ *
+ * Its own outside-click listener closes just this dropdown (leaving the popover
+ * open) when the pointer lands elsewhere inside the popover — a click on a
+ * checkbox stays inside `rootRef`, so multi-select keeps the menu open.
+ */
+function MultiSelectDropdown({
+  label,
+  allLabel,
+  options,
+  selected,
+  onToggle,
+  onClear,
+}: {
+  label: string;
+  allLabel: string;
+  options: { value: string; label: string }[];
+  selected: string[];
+  onToggle: (value: string) => void;
+  onClear: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selectedSet = new Set(selected);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [open]);
+
+  const summary =
+    selected.length === 0
+      ? allLabel
+      : selected.length === 1
+        ? (options.find((o) => o.value === selected[0])?.label ?? selected[0])
+        : `${selected.length} selected`;
+
+  return (
+    <div className="ff-discovery-field">
+      <span className="ff-discovery-field__label">{label}</span>
+      <div className="ff-msel" ref={rootRef}>
+        <button
+          type="button"
+          className="ff-msel__toggle"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <span className="ff-msel__summary" data-empty={selected.length === 0}>
+            {summary}
+          </span>
+          <Chevron open={open} />
+        </button>
+        {open ? (
+          <div className="ff-msel__menu" role="group" aria-label={label}>
+            {selected.length > 0 ? (
+              <button
+                type="button"
+                className="ff-msel__clear"
+                onClick={onClear}
+              >
+                Clear
+              </button>
+            ) : null}
+            {options.map((o) => (
+              <label key={o.value} className="ff-msel__opt">
+                <input
+                  type="checkbox"
+                  checked={selectedSet.has(o.value)}
+                  onChange={() => onToggle(o.value)}
+                />
+                <span>{o.label}</span>
+              </label>
+            ))}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

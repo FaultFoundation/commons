@@ -7,7 +7,6 @@ import {
   type MapWinrate,
 } from "@/lib/faceit-scouting-shared";
 
-const MIN_PLAYS = 7;
 type MapOrder = "mode" | "winrate" | "played";
 const MODES = ["Control", "Escort", "Hybrid", "Push", "Flashpoint", "Clash"];
 
@@ -72,7 +71,6 @@ export function MapWinrateChart({ rows }: { rows: MapWinrate[] }) {
     || b.total - a.total
     || a.map.localeCompare(b.map),
   );
-  const established = sorted.filter((row) => row.total >= MIN_PLAYS);
   return (
     <div className="ff-scoutmap" role="region" aria-label="Map Profile">
       <label className="ff-scoutmap__sort" htmlFor={selectId}>
@@ -83,7 +81,7 @@ export function MapWinrateChart({ rows }: { rows: MapWinrate[] }) {
           <option value="played">Most played</option>
         </select>
       </label>
-      <MapSection rows={established} order={order} />
+      <MapSection rows={sorted} order={order} />
       <p className="ff-scoutmap__note">Win rate excludes draws. Group totals cover the maps shown in each group.</p>
     </div>
   );

@@ -2,9 +2,12 @@
 // the Suspense fallback while the page's server component resolves its D1 +
 // cen-sql reads — so navigating in (or reloading while the projection is being
 // rewritten) shows a skeleton grid, never a blank frame.
+import { PageLoading } from "@/components/PageLoading";
+
 export default function Loading() {
   return (
     <div className="ff-bubble-grid" aria-busy="true" aria-label="Loading tournaments">
+      <PageLoading label="Loading Tournaments" />
       <div className="ff-skel ff-skel-hero" />
       <div className="ff-tcard-grid">
         {Array.from({ length: 6 }).map((_, i) => (

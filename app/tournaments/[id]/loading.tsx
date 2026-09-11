@@ -2,9 +2,12 @@
 // external view). Shown while the page resolves its reads — including the
 // atomic cen-sql snapshot batch for external tournaments — so opening one never
 // flashes an empty page.
+import { PageLoading } from "@/components/PageLoading";
+
 export default function Loading() {
   return (
     <div className="ff-bubble-grid" aria-busy="true" aria-label="Loading tournament">
+      <PageLoading label="Loading Tournament" />
       <div className="ff-skel ff-skel-hero" />
       <div className="ff-skel-bubble">
         <div className="ff-skel ff-skel-line ff-skel-line--head" />

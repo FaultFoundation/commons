@@ -30,6 +30,13 @@ now 308s via `middleware.ts`). `/` stays the public Commons landing page.
 
 Sign-up lands on `/account/setup/`; sign-in lands on `/home/`.
 
+`app/loading.tsx` provides a shared loading screen during server page and nested
+layout reads, keeping the root header and footer visible. `PageLoading` reuses
+the existing indeterminate stats bar with a plain-language wait message and
+reduced-motion support. Tournament route loaders retain their skeletons and
+include the same status. Client-side data requests still own their existing
+loaders; the route fallback ends when the server page is ready.
+
 The core ideas:
 
 - **Everything is a bubble.** Tabs have no page titles — each tab is a

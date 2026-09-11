@@ -7175,6 +7175,41 @@ button.ff-dash__link:hover {
   background: linear-gradient(90deg, #ff9d4d, #ff7a00);
 }
 
+/* Route fallback also renders outside the dashboard while its shell loads. */
+.ff-page-loading-shell {
+  min-height: 60vh;
+  display: grid;
+  place-items: center;
+  padding: clamp(24px, 5vw, 64px) 20px;
+}
+.ff-page-loading {
+  grid-column: 1 / -1;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 520px;
+  margin-inline: auto;
+  padding: var(--ff-bubble-pad, 24px);
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-lg);
+  background: var(--ff-surface-1);
+  text-align: center;
+}
+.ff-page-loading__title {
+  margin: 0 0 12px;
+  font-size: var(--ff-dash-text-xl, 1.375rem);
+}
+.ff-page-loading__hint {
+  margin: 0 0 20px;
+  font-size: var(--ff-dash-text-md, 0.9375rem);
+  color: var(--ff-text-dim);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ff-page-loading .ff-owload__bar {
+    animation: none;
+    margin-inline: auto;
+  }
+}
+
 /* Loading bar (while the API collects from OverFast). */
 .ff-owload {
   display: flex;

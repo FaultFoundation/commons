@@ -31,3 +31,14 @@ Two older seasons (`03ngd4f5e1ohkrnb95njxqq73` and
 `13bzve2a3mnci8ykjvs19ii1k`) were also checked through the public extended endpoint;
 both have the same two one-round preseason stages without groups. This is a
 source-level spot check, not an audit of the entire production database.
+
+## WRMSEC SSBU formats (2026-09-10)
+
+`wrmsec-ssbu.json` contains normalized public stages from LeagueOS season
+`eni7eeafuikb0oyg73t74kj6u`: Preseason Week 2 (39 matches), Season (222 matches,
+6 rounds), and Playoff Bracket (16 matches). The first two stages explicitly use
+method 0 (round robin); playoffs use method 1 (single elimination). The 16th
+playoff match takes position 2 from both semifinals: it is the third-place match,
+not another pool. Draft Preseason Week 1 is excluded by the existing public-stage
+filter. The raw source listed Season, Playoffs, then preseason; the collector now
+orders stages by start date. Only normalized tournament display fields are kept.

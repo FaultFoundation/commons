@@ -581,6 +581,12 @@ export function ExternalTournamentView({
     !hasPlacedStandings && (format === "single_elim" || format === "double_elim")
       ? deriveBracketResults(tournament.events, tournament.status)
       : null;
+  // LeagueOS standings belong to individual stages, not an overall podium.
+  const leagueosRankings = tournament.source === "leagueos"
+    ? externalFormatStages(tournament.events).flatMap(stage => stage.events
+        .filter(event => event.standings.some(row => row.placement != null && row.placement > 0))
+        .map(event => ({ name: stage.name ?? event.name ?? "Stage", finishers: buildFinishers([event]) })))
+    : [];
   const finishers: FinisherEntry[] = hasPlacedStandings
     ? buildFinishers(tournament.events)
     : isRoundRobin
@@ -607,6 +613,11 @@ export function ExternalTournamentView({
     .filter(Boolean)
     .join(", ");
   const stageFormats = externalFormatStages(tournament.events);
+  if (tournament.source === "leagueos") {
+    const firstMatch = (stage: typeof stageFormats[number]) => Math.min(...stage.events.flatMap(e => e.matches)
+      .map(m => m.scheduledAt?.getTime()).filter((date): date is number => date != null && Number.isFinite(date)));
+    stageFormats.sort((a, b) => firstMatch(a) - firstMatch(b));
+  }
   const details: { label: string; node: ReactNode }[] = [{
     label: "Format",
     node: format ? TOURNAMENT_FORMAT_LABELS[format] : stageFormats.length > 1
@@ -772,7 +783,9 @@ export function ExternalTournamentView({
     <div className="ff-tpanel">
       {/* LeagueOS positions are stage-local source standings, not an overall
           podium across independent divisions (and may lag match results). */}
-      {tournament.source !== "leagueos" ? <TopFinishers finishers={finishers} /> : null}
+      {tournament.source === "leagueos"
+        ? leagueosRankings.map((stage, index) => <TopFinishers key={index} finishers={stage.finishers} label={`${stage.name} · Top standings`} />)
+        : <TopFinishers finishers={finishers} />}
       <TournamentOverview
         about={aboutBubble}
         details={detailsBubble}
@@ -814,7 +827,7 @@ export function ExternalTournamentView({
         pending: !stage.events.some(event => event.matches.length),
         label: stageName ?? "Rounds",
         node: (
-          <Bubble title="Rounds" span="full">
+          <Bubble title={fmt === "swiss" ? "Swiss · Rounds and Matches" : "Rounds and Matches · Format unconfirmed"} span="full">
             <RoundRobinRounds groups={rrGroupsFromExternal(stage.events, false)} />
           </Bubble>
         ),

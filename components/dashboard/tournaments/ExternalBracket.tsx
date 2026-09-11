@@ -435,7 +435,11 @@ export function ExternalBracket({
     const phases = groupByPhase(allMatches);
     const multiPhase = phases.length > 1;
     return phases.flatMap((phase, phaseIndex) => {
-      const pools = splitPools(phase.matches);
+      // LeagueOS stages are individual brackets. A consolation match can
+      // have only loser feeds, which the legacy projection does not carry.
+      const pools = source === "leagueos" && !phase.matches.some(m => m.phaseGroupId != null)
+        ? [{ id: "stage", name: null, matches: phase.matches }]
+        : splitPools(phase.matches);
       const multiPool = pools.length > 1;
       const phaseLabel = phase.name ?? `Bracket ${phaseIndex + 1}`;
       return pools.map((pool, poolIndex) => {
@@ -454,7 +458,7 @@ export function ExternalBracket({
         };
       });
     });
-  }, [allMatches]);
+  }, [allMatches, source]);
   // Remembered by sub-bracket KEY, not index (lib/view-state.ts): a re-scrape
   // can add or reorder pools, and a stored index would then select a different
   // bracket than the member left open.

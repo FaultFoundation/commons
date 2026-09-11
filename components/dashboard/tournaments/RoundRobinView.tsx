@@ -106,7 +106,7 @@ function ResultsMatrix({
   );
 
   return (
-    <div className="ff-rr-matrix-wrap">
+    <div className={`ff-rr-matrix-wrap${entrants.length > 12 ? " ff-rr-matrix-wrap--large" : ""}`}>
       <table className="ff-rr-matrix">
         <thead>
           <tr>
@@ -469,7 +469,8 @@ export function RoundRobinView({ groups }: { groups: RRGroup[] }) {
   const groupIndex = Math.min(activeGroup, usable.length - 1);
   const group = usable[groupIndex];
   const byId = new Map(group.entrants.map((e) => [e.id, e]));
-  const showMatrix = hasCompactRoundRobinMatrix(group);
+  const showMatrix = group.entrants.length >= 2;
+  const showGraph = hasCompactRoundRobinMatrix(group);
 
   return (
     <div className="ff-rr">
@@ -494,11 +495,11 @@ export function RoundRobinView({ groups }: { groups: RRGroup[] }) {
         <ResultsMatrix group={group} onSelect={setDetail} />
       </Bubble> : null}
 
-      <div className={showMatrix ? "ff-rr__lower" : undefined}>
-        {showMatrix ? <Bubble title="Matchups" className="ff-bubble--divided">
+      <div className={showGraph ? "ff-rr__lower" : undefined}>
+        {showGraph ? <Bubble title="Matchups" className="ff-bubble--divided">
           <MatchupGraph group={group} />
         </Bubble> : null}
-        <Bubble title="Rounds and Matches">
+        <Bubble title="Round Robin · Rounds and Matches">
           {!showMatrix ? <p className="ff-ticket-empty">{group.entrants.length} teams · {group.matches.length} matches</p> : null}
           <RoundSchedule group={group} onSelect={setDetail} />
         </Bubble>

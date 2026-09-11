@@ -8536,3 +8536,29 @@ button.ff-dash__link:hover {
 .ff-seriesfacts__item dd { margin: 3px 0 0; font-size: var(--ff-dash-text-sm); font-weight: 600; }
 .ff-serieshero__actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 4px; }
 .ff-serieshero__note { margin: 4px 0 0; color: var(--ff-text-dim); font-size: var(--ff-dash-text-xs); }
+
+/* Keep large league matrices navigable without pushing the schedule off-page. */
+.ff-rr-matrix-wrap--large {
+  max-height: 65vh;
+  overflow: auto;
+}
+.ff-rr-matrix-wrap--large .ff-rr-matrix__colhead,
+.ff-rr-matrix-wrap--large .ff-rr-matrix__corner {
+  position: sticky;
+  top: 0;
+  background: var(--ff-surface-2, #173c66);
+  z-index: 2;
+}
+.ff-rr-matrix-wrap--large .ff-rr-matrix__corner { z-index: 3; }
+.ff-rr-matrix-wrap--large .ff-rr-matrix__rowhead {
+  background: var(--ff-surface-2, #173c66);
+}
+.ff-rr-matrix-wrap--large .ff-rr-matrix__rowname {
+  display: inline-block;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 640px) {
+  .ff-rr-matrix-wrap--large .ff-rr-matrix__rowname { max-width: 120px; }
+}

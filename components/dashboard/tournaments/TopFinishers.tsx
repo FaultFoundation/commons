@@ -12,7 +12,7 @@ import type { FinisherEntry } from "@/components/dashboard/tournaments/tournamen
 // because it switches tabs through the TournamentChrome context). Renders
 // nothing when there are no placed finishers yet.
 
-export function TopFinishers({ finishers }: { finishers: FinisherEntry[] }) {
+export function TopFinishers({ finishers, label }: { finishers: FinisherEntry[]; label?: string }) {
   const tabs = useTournamentTabs();
   const isPools = finishers.some((f) => f.poolLabel);
   // Pool mode: already ordered by pool (place is within-pool) — show all.
@@ -26,8 +26,8 @@ export function TopFinishers({ finishers }: { finishers: FinisherEntry[] }) {
   if (shown.length === 0) return null;
 
   return (
-    <div className="ff-tfin" aria-label={isPools ? "Advancing" : "Top finishers"}>
-      <span className="ff-tfin__label">{isPools ? "Advancing" : "Top Finishers"}</span>
+    <div className="ff-tfin" aria-label={label ?? (isPools ? "Advancing" : "Top finishers")}>
+      <span className="ff-tfin__label">{label ?? (isPools ? "Advancing" : "Top Finishers")}</span>
       <ol className="ff-tfin__list">
         {shown.map((f, index) => (
           <li

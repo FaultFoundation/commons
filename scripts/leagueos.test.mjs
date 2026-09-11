@@ -107,7 +107,7 @@ test('LeagueOS artwork repairs cached league URLs and preserves other artwork',(
  assert.match(renderToStaticMarkup(React.createElement(TournamentBannerImage,{url:old})),/src="https:\/\/images.leagueos.gg\/league\//);
  assert.equal(renderToStaticMarkup(React.createElement(TournamentBannerImage,{url:null})), '');
 });
-test('sparse LeagueOS schedule renders named stages without singleton matrices',()=>{
+test('sparse LeagueOS round robin keeps its matrix without inventing pools',()=>{
  const fixture=JSON.parse(readFileSync(resolve(root,'scripts/fixtures/wrmsec-preseason.json'),'utf8'));
  const {RoundRobinView}=load('@/components/dashboard/tournaments/RoundRobinView');
  const {StageTabs}=load('@/components/dashboard/tournaments/StageTabs');
@@ -116,9 +116,9 @@ test('sparse LeagueOS schedule renders named stages without singleton matrices',
  const tabs=events.map(e=>({key:e.id,label:e.name,node:React.createElement(RoundRobinView,{groups:rrGroupsFromExternal([e])})}));
  const html=renderToStaticMarkup(React.createElement(StageTabs,{tabs}));
  for(const e of events) assert.ok(html.includes(e.name));
- assert.match(html,/20 teams · 11 matches/);
+ assert.match(html,/Round Robin Matrix/);
  assert.match(html,/Truman Middle School \(black\)/);
- assert.doesNotMatch(html,/Round Robin Matrix|Complete Graph|Pool 1/);
+ assert.doesNotMatch(html,/Complete Graph|Pool 1/);
  const many=renderToStaticMarkup(React.createElement(StageTabs,{tabs:Array.from({length:12},(_,i)=>({key:String(i),label:`Division ${i+1}`,node:null}))}));
  assert.match(many,/<select/);assert.equal((many.match(/<option/g)??[]).length,12);
 });
@@ -134,7 +134,39 @@ test('external tournament host preserves all five WRMSEC stage names',()=>{
   const html=renderToStaticMarkup(React.createElement(ExternalTournamentView,{tournament,shareUrl:'https://example.test',shareMessage:fixture.name}));
   for (const e of events) assert.ok(html.includes(e.name),e.name);
   assert.equal((html.match(/role="tab"/g)??[]).length,5);
-  assert.match(html,/20 teams · 11 matches/);
-  assert.doesNotMatch(html,/Round Robin Matrix|Pool 1/);
+  assert.match(html,/Round Robin Matrix/);
+  assert.doesNotMatch(html,/Pool 1/);
  } finally { mocks.clear();cache.delete(modulePath); }
+});
+test('SSBU retains 277 public matches, one playoff bracket and chronological stage order',()=>{
+ const fixture=JSON.parse(readFileSync(resolve(root,'scripts/fixtures/wrmsec-ssbu.json'),'utf8'));
+ const events=fixture.events.map(e=>({...e,matches:e.matches.map(m=>({...m,scheduledAt:m.scheduledAt?new Date(m.scheduledAt):null}))}));
+ assert.equal(events.reduce((n,e)=>n+e.matches.length,0),277);
+ const playoffs=events.find(e=>e.name==='Playoff Bracket');
+ assert.equal(playoffs.matches.filter(m=>m.round==='Third-place match').length,1);
+ const {ExternalBracket}=load('@/components/dashboard/tournaments/ExternalBracket');
+ const bracket=renderToStaticMarkup(React.createElement(ExternalBracket,{events:[playoffs],source:'leagueos'}));
+ assert.doesNotMatch(bracket,/Pool 1|Pool 2/);assert.match(bracket,/Third-place match/);
+ const modulePath=resolve(root,'components/dashboard/tournaments/ExternalTournamentView.tsx');
+ const tournament={id:'ssbu-test',source:'leagueos',name:fixture.name,game:'Super Smash Bros. Ultimate',status:'completed',startAt:null,endAt:null,numAttendees:79,bannerUrl:null,url:'https://wrmsec.leagueos.gg',description:null,links:[],images:[],aboutLayout:[],events:[events[1],events[2],events[0]]};
+ for(const tab of ['overview','bracket']) {
+  cache.delete(modulePath);
+  mocks.set('@/components/dashboard/tournaments/TournamentChrome',{TournamentChrome:({tabs})=>tabs.find(t=>t.id===tab).node,useTournamentTabs:()=>null});
+  try {
+   const {ExternalTournamentView}=load('@/components/dashboard/tournaments/ExternalTournamentView');
+   const html=renderToStaticMarkup(React.createElement(ExternalTournamentView,{tournament,shareUrl:'https://example.test',shareMessage:fixture.name}));
+   if(tab==='overview') {assert.match(html,/Playoff Bracket · Top standings/);assert.match(html,/Season · Top standings/);}
+   else {assert.ok(html.indexOf('>Preseason Week 2<')<html.indexOf('>Season<'));assert.ok(html.indexOf('>Season<')<html.indexOf('>Finals<'));}
+  } finally { mocks.clear();cache.delete(modulePath); }
+ }
+});
+test('Swiss metadata keeps the rounds view and visibly identifies Swiss',()=>{
+ const modulePath=resolve(root,'components/dashboard/tournaments/ExternalTournamentView.tsx');cache.delete(modulePath);
+ mocks.set('@/components/dashboard/tournaments/TournamentChrome',{TournamentChrome:({tabs})=>tabs.find(t=>t.id==='bracket').node});
+ try {
+  const {ExternalTournamentView}=load('@/components/dashboard/tournaments/ExternalTournamentView');
+  const tournament={id:'swiss-test',source:'leagueos',name:'Swiss test',game:'Rocket League',status:'active',startAt:null,endAt:null,url:'https://example.test',links:[],images:[],aboutLayout:[],events:[{id:'swiss',name:'Season',standings:[],phases:[{id:'swiss',name:'Season',bracketType:'SWISS'}],matches:[{id:'m',phaseId:'swiss',bracketType:'SWISS',entrant1Name:'A',entrant2Name:'B',scheduledAt:null}]}]};
+  const html=renderToStaticMarkup(React.createElement(ExternalTournamentView,{tournament,shareUrl:'https://example.test',shareMessage:'Swiss'}));
+  assert.match(html,/Swiss · Rounds and Matches/);assert.doesNotMatch(html,/Round Robin Matrix/);
+ } finally {mocks.clear();cache.delete(modulePath);}
 });

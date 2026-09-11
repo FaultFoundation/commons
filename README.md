@@ -31,8 +31,8 @@ Ships to `commons.fault.foundation`. The public marketing site is a
 |---|---|
 | `app/page.tsx` | The Commons landing page — one bubble per section, with real product screenshots from `public/screenshots/`; fully static (styling is §15 of `styles/theme.css`) |
 | `app/{login,signup}/` | Auth pages (honor `?next=` after signing in) |
-| `app/{home,schedule,tournaments,statistics,teams,account}/` | Session-gated member portal tabs |
-| `app/teams/[teamId]/`, `app/join/[token]/` | Team management and the invite landing |
+| `app/(dashboard)/` | Session-gated member portal tabs with a persistent sidebar and content loading skeletons |
+| `app/(dashboard)/teams/[teamId]/`, `app/join/[token]/` | Team management and the invite landing |
 | `app/api/auth/[...all]/` | Better Auth route handler |
 | `components/` | Site chrome (`SiteHeader`/`SiteFooter`/`MainNav`) + `auth/` + `dashboard/` |
 | `lib/auth.ts`, `lib/db.ts` | Per-request Better Auth / Drizzle-D1 instances (bindings only exist on the request context) |

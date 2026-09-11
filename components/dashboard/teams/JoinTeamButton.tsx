@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { redeemInvite } from "@/app/teams/actions";
+import { redeemInvite } from "@/app/(dashboard)/teams/actions";
 
 /** The single control on the invite landing page. */
 export function JoinTeamButton({

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { getUnlockPrompt, type UnlockPrompt } from "@/app/admin/actions";
+import { getUnlockPrompt, type UnlockPrompt } from "@/app/(dashboard)/admin/actions";
 import { AdminUnlock } from "@/components/dashboard/admin/AdminUnlock";
 
 /**

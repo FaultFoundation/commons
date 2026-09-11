@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 
-import { addStaffRole, removeStaffRole } from "@/app/admin/staff/actions";
+import { addStaffRole, removeStaffRole } from "@/app/(dashboard)/admin/staff/actions";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { ConfirmDialog } from "@/components/dashboard/bubbles/ConfirmDialog";

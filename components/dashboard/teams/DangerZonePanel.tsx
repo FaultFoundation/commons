@@ -8,7 +8,7 @@ import {
   leaveTeam,
   requestTeamDelete,
   voteTeamDelete,
-} from "@/app/teams/actions";
+} from "@/app/(dashboard)/teams/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { ConfirmDialog } from "@/components/dashboard/bubbles/ConfirmDialog";
 import { can, type TeamRole } from "@/lib/teams-shared";

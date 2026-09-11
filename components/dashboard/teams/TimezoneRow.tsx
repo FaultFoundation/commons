@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
-import { updateTeamSettings } from "@/app/teams/actions";
+import { updateTeamSettings } from "@/app/(dashboard)/teams/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 
 /** The viewer's own IANA zone, or "" where the runtime won't say. */

@@ -6,7 +6,7 @@ import {
   adminRemoveTeamLogo,
   adminSetTeamLogo,
   adminUpdateTeamSettings,
-} from "@/app/admin/teams/actions";
+} from "@/app/(dashboard)/admin/teams/actions";
 import { AvatarUploadRow } from "@/components/dashboard/accounts/AvatarUploadRow";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { FieldRow } from "@/components/dashboard/bubbles/FieldRow";

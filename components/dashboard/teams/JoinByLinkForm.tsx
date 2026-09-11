@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 
-import { redeemInvite } from "@/app/teams/actions";
+import { redeemInvite } from "@/app/(dashboard)/teams/actions";
 
 /**
  * Join from a pasted invite. Accepts the whole link or just the token, because

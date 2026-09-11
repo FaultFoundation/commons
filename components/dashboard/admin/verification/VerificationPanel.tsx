@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { markIneligible, markVerified } from "@/app/admin/verification/actions";
+import { markIneligible, markVerified } from "@/app/(dashboard)/admin/verification/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { ConfirmDialog } from "@/components/dashboard/bubbles/ConfirmDialog";
 

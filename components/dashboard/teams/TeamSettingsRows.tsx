@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { removeTeamLogo, setTeamLogo, updateTeamSettings } from "@/app/teams/actions";
+import { removeTeamLogo, setTeamLogo, updateTeamSettings } from "@/app/(dashboard)/teams/actions";
 import { AvatarUploadRow } from "@/components/dashboard/accounts/AvatarUploadRow";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { FieldRow } from "@/components/dashboard/bubbles/FieldRow";

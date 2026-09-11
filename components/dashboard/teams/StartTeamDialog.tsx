@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
-import { createTeam } from "@/app/teams/actions";
+import { createTeam } from "@/app/(dashboard)/teams/actions";
 import {
   CopyInviteButton,
   inviteUrl,

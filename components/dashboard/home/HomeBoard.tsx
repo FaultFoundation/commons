@@ -7,7 +7,7 @@ import {
   type PackedTournamentEntries,
 } from "@/lib/tournament-wire";
 
-import { setHomeLayout } from "@/app/home/actions";
+import { setHomeLayout } from "@/app/(dashboard)/home/actions";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { DragGrip } from "@/components/dashboard/bubbles/DragGrip";
 import { useReorderableGrid } from "@/components/dashboard/bubbles/useReorderableGrid";

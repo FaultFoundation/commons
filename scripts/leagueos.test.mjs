@@ -21,11 +21,11 @@ test('Experimental Series page excludes LeagueOS',async()=>{
  const wrapper=({children})=>React.createElement('div',null,children);
  mocks.set('@/lib/session',{getSessionCached:async()=>({user:{id:'test'}})});
  mocks.set('@/lib/tournament-entries',{loadTournamentEntries:async()=>entries});
- mocks.set('@/components/dashboard/DashboardShell',{DashboardShell:wrapper});
+ mocks.set('@/components/dashboard/SetupBanner',{SetupBanner:()=>null});
  mocks.set('@/components/dashboard/bubbles/Bubble',{Bubble:wrapper});
  mocks.set('@/components/dashboard/tournaments/TournamentList',{TournamentCards:()=>null});
  try {
-  const page=await load('@/app/series/page').default();
+  const page=await load('@/app/(dashboard)/series/page').default();
   const html=renderToStaticMarkup(page);
   assert.equal((html.match(/class="ff-serieslist__row"/g)??[]).length,0);
   assert.equal((html.match(/>Concluded</g)??[]).length,0);

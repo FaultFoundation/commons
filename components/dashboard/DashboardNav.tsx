@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { sanitizeNextPath } from "@/lib/next-path";
 
@@ -65,8 +65,8 @@ function Chevron() {
 
 export function DashboardNav({
   items,
-  active,
-  activeChild,
+  active: explicitActive,
+  activeChild: explicitActiveChild,
   adminLocked,
 }: {
   items: NavItem[];
@@ -77,6 +77,16 @@ export function DashboardNav({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const matches = (href: string) => {
+    const base = href.replace(/\/$/, "");
+    return pathname === base || pathname.startsWith(`${base}/`);
+  };
+  const currentItem = items.find((item) =>
+    item.href ? matches(item.href) : item.children?.some((child) => matches(child.href)),
+  );
+  const active = explicitActive ?? currentItem?.key;
+  const activeChild = explicitActiveChild ?? currentItem?.children?.find((child) => matches(child.href))?.key;
 
   // Land with the active group already expanded, so navigating between its
   // sub-pages never collapses the menu the member is working inside. Groups
@@ -88,6 +98,12 @@ export function DashboardNav({
       .map((item) => item.key),
   );
   const [unlockOpen, setUnlockOpen] = useState(false);
+  // Browser back/forward or a card link can enter a different nav group while
+  // this component stays mounted. Reveal the destination without closing others.
+  useEffect(() => {
+    if (!active || !items.some((item) => item.key === active && item.children?.length)) return;
+    setOpenKeys((keys) => keys.includes(active) ? keys : [...keys, active]);
+  }, [active, items]);
   // The group to expand once the unlock succeeds, and the admin URL the member
   // was originally after (only set when AdminGate bounced them).
   const pendingGroup = useRef<string | null>(null);
@@ -100,8 +116,11 @@ export function DashboardNav({
   // so a crafted link can't bounce anyone off-site after unlocking.
   const handledDeepLink = useRef(false);
   useEffect(() => {
+    if (searchParams.get("unlock") !== "1") {
+      handledDeepLink.current = false;
+      return;
+    }
     if (handledDeepLink.current) return;
-    if (searchParams.get("unlock") !== "1") return;
     handledDeepLink.current = true;
 
     resumeTo.current = sanitizeNextPath(searchParams.get("next"));
@@ -185,7 +204,6 @@ export function DashboardNav({
                           key={child.key}
                           className="ff-dash__link ff-dash__link--child"
                           href={child.href}
-                          prefetch={false}
                           aria-current={
                             active === item.key && activeChild === child.key
                               ? "page"
@@ -206,7 +224,6 @@ export function DashboardNav({
               key={item.key}
               className="ff-dash__link"
               href={item.href}
-              prefetch={false}
               aria-current={item.key === active ? "page" : undefined}
             >
               {item.label}

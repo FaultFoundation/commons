@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { setTournamentStatus } from "@/app/admin/tournaments/actions";
+import { setTournamentStatus } from "@/app/(dashboard)/admin/tournaments/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import {
   TOURNAMENT_STATUS_LABELS,

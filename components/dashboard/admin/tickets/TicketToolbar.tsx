@@ -7,7 +7,7 @@ import {
   assignTicket,
   closeTicket,
   setTicketPriority,
-} from "@/app/admin/tickets/actions";
+} from "@/app/(dashboard)/admin/tickets/actions";
 import { ConfirmDialog } from "@/components/dashboard/bubbles/ConfirmDialog";
 import {
   TICKET_PRIORITIES,

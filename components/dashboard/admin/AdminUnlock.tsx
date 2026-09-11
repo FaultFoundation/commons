@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
-import { unlockAdmin } from "@/app/admin/actions";
+import { unlockAdmin } from "@/app/(dashboard)/admin/actions";
 import { authClient } from "@/lib/auth-client";
 import { twoFactorError } from "@/lib/two-factor";
 

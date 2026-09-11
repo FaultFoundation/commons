@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { enterTournament, withdrawFromTournament } from "@/app/teams/actions";
+import { enterTournament, withdrawFromTournament } from "@/app/(dashboard)/teams/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { ConfirmDialog } from "@/components/dashboard/bubbles/ConfirmDialog";
 import { can, type TeamRole } from "@/lib/teams-shared";

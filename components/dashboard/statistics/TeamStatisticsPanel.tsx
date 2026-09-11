@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { updateStatisticsTeamLink, reportStatisticsMatchTime } from "@/app/statistics/actions";
+import { updateStatisticsTeamLink, reportStatisticsMatchTime } from "@/app/(dashboard)/statistics/actions";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { MatchList } from "@/components/dashboard/statistics/MatchList";
 import { StatLoading } from "@/components/dashboard/statistics/StatLoading";

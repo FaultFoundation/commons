@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { recheckConnections } from "@/app/account/actions";
+import { recheckConnections } from "@/app/(dashboard)/account/actions";
 
 /**
  * The reload control in the Integrations bubble header. Forces a fresh

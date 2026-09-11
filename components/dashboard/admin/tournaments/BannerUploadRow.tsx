@@ -6,7 +6,7 @@ import { useRef, useState, type ChangeEvent } from "react";
 import {
   removeTournamentBanner,
   uploadTournamentBanner,
-} from "@/app/admin/tournaments/actions";
+} from "@/app/(dashboard)/admin/tournaments/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { AVATAR_ACCEPT, AVATAR_MAX_SOURCE_BYTES } from "@/lib/avatars";
 

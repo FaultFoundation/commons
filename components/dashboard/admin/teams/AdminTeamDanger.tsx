@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import {
   adminDisbandTeam,
   adminRestoreTeam,
-} from "@/app/admin/teams/actions";
+} from "@/app/(dashboard)/admin/teams/actions";
 import { ConfirmDialog } from "@/components/dashboard/bubbles/ConfirmDialog";
 
 type Outcome = { ok: true } | { ok: false; error: string };

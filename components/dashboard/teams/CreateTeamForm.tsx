@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 
-import { createTeam } from "@/app/teams/actions";
+import { createTeam } from "@/app/(dashboard)/teams/actions";
 import { GameSelect } from "@/components/dashboard/teams/GameSelect";
 import { TeamColorPicker } from "@/components/dashboard/teams/TeamColorPicker";
 import { browserTimezone } from "@/components/dashboard/teams/TimezoneRow";

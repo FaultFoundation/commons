@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { ComponentPropsWithoutRef, CSSProperties, ReactNode } from "react";
 
-import { reorderMyTeams } from "@/app/teams/actions";
+import { reorderMyTeams } from "@/app/(dashboard)/teams/actions";
 import { GameLogo } from "@/components/brand/GameLogo";
 import {
   ChallongeMark,

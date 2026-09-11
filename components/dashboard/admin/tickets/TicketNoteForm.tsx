@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
-import { addNote } from "@/app/admin/tickets/actions";
+import { addNote } from "@/app/(dashboard)/admin/tickets/actions";
 import { TICKET_NOTE_MAX } from "@/lib/tickets-shared";
 
 /** Internal-note composer. Notes never reach the member or Discord. */

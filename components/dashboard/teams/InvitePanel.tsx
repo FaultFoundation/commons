@@ -7,7 +7,7 @@ import {
   createTargetedInvite,
   revokeInvite,
   rotateInviteLink,
-} from "@/app/teams/actions";
+} from "@/app/(dashboard)/teams/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { Disclosure } from "@/components/dashboard/bubbles/Disclosure";
 import {

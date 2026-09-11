@@ -15,7 +15,7 @@ import { getDb } from "@/lib/db";
 import { PROGRAM_COLLEGIATE_ID } from "@/lib/programs";
 
 /**
- * The amber "action required" bar the DashboardShell renders above every
+ * The amber "action required" bar member pages render below the shared shell, above their
  * tab's bubbles. Exactly one prompt shows at a time, in priority order:
  *
  *   1. setup unfinished (academic email not verified, or Discord unlinked)

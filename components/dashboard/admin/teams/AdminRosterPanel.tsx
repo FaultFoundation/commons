@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import {
   adminChangeMemberRole,
   adminRemoveMember,
-} from "@/app/admin/teams/actions";
+} from "@/app/(dashboard)/admin/teams/actions";
 import { Avatar } from "@/components/dashboard/Avatar";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { ConfirmDialog } from "@/components/dashboard/bubbles/ConfirmDialog";

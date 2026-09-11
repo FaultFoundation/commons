@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { saveSeeds } from "@/app/admin/tournaments/actions";
+import { saveSeeds } from "@/app/(dashboard)/admin/tournaments/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 
 export type SeedEntry = { id: string; label: string };

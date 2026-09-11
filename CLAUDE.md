@@ -20,6 +20,12 @@ cover rather than re-deriving:
 - [db/README.md](db/README.md) — full data model, table-by-table
 - [docs/cloudflare-setup.md](docs/cloudflare-setup.md), [docs/oauth-setup.md](docs/oauth-setup.md) — account-side setup
 
+Member routes and their actions live under `app/(dashboard)/`; the route group
+preserves public URLs. Its layout owns the persistent `DashboardShell` and its
+loading boundary replaces only the right-hand content. Keep slow page reads
+and setup prompts below that boundary. Onboarding remains in `app/account/setup/`
+with its standalone shell. See the dashboard guide for navigation conventions.
+
 ## Keeping the docs current
 
 **Documentation updates are part of the change, not a follow-up.** Any change

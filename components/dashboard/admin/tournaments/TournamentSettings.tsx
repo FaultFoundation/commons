@@ -6,7 +6,7 @@ import { useState, useTransition, type ReactNode } from "react";
 import {
   setTournamentFeatured,
   updateTournamentSettings,
-} from "@/app/admin/tournaments/actions";
+} from "@/app/(dashboard)/admin/tournaments/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { Disclosure } from "@/components/dashboard/bubbles/Disclosure";
 import { FieldRow } from "@/components/dashboard/bubbles/FieldRow";

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
-import { reportResult, startTournament } from "@/app/admin/tournaments/actions";
+import { reportResult, startTournament } from "@/app/(dashboard)/admin/tournaments/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import type {
   SnapshotMatch,

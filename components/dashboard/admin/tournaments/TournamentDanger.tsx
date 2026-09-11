@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { deleteTournament, resetBracket } from "@/app/admin/tournaments/actions";
+import { deleteTournament, resetBracket } from "@/app/(dashboard)/admin/tournaments/actions";
 import { ConfirmDialog } from "@/components/dashboard/bubbles/ConfirmDialog";
 
 /**

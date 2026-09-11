@@ -8,6 +8,7 @@ import {
   type NavItem,
 } from "@/components/dashboard/DashboardNav";
 import { DashboardRail } from "@/components/dashboard/DashboardRail";
+import { DashboardFrame } from "@/components/dashboard/DashboardFrame";
 import { DensityCookie } from "@/components/dashboard/accounts/DensityCookie";
 import { SetupBanner } from "@/components/dashboard/SetupBanner";
 import { isAdminUnlocked } from "@/lib/admin-unlock";
@@ -120,8 +121,9 @@ async function resolveDensity(userId: string | null): Promise<Density> {
 /**
  * Shared shell for the member portal: sidebar rail (nav + sign out)
  * beside the page content, inside the regular site header/footer.
- * Active state comes from a prop — portal pages are server components
- * replaced through App Router navigation.
+ * Member routes share this through app/(dashboard)/layout.tsx. The frame and
+ * nav follow the pathname without reloading the shell on each tab click.
+ * Standalone onboarding/invite pages can still provide explicit nav props.
  */
 export async function DashboardShell({
   active,
@@ -163,10 +165,7 @@ export async function DashboardShell({
   return (
     <main id="wp--skip-link--target" className="ff-main ff-main--fill">
       <DensityCookie value={density} />
-      <div
-        data-density={density}
-        data-surface={surface}
-        className="ff-container ff-container--wide ff-section--tight ff-dash">
+      <DashboardFrame density={density} surface={surface}>
         <DashboardRail>
           <DashboardNav
             items={items}
@@ -182,7 +181,7 @@ export async function DashboardShell({
           {setupUserId ? <SetupBanner userId={setupUserId} /> : null}
           {children}
         </div>
-      </div>
+      </DashboardFrame>
     </main>
   );
 }

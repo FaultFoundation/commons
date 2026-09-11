@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
-import { replyToTicket } from "@/app/admin/tickets/actions";
+import { replyToTicket } from "@/app/(dashboard)/admin/tickets/actions";
 import { TICKET_REPLY_MAX } from "@/lib/tickets-shared";
 
 /** Staff reply composer. Writes a website-source message and (via the bridge)

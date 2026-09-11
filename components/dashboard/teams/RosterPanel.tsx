@@ -7,7 +7,7 @@ import {
   changeMemberRole,
   removeMember,
   setMemberSkillRating,
-} from "@/app/teams/actions";
+} from "@/app/(dashboard)/teams/actions";
 import { Avatar } from "@/components/dashboard/Avatar";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { ConfirmDialog } from "@/components/dashboard/bubbles/ConfirmDialog";

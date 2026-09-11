@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
-import { enterTournament, withdrawFromTournament } from "@/app/teams/actions";
+import { enterTournament, withdrawFromTournament } from "@/app/(dashboard)/teams/actions";
 
 export type RegisterTeam = {
   id: string;

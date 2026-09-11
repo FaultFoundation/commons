@@ -8,7 +8,7 @@ import {
   discardAvatar,
   setAccountPassword,
   uploadAvatar,
-} from "@/app/account/actions";
+} from "@/app/(dashboard)/account/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { FieldRow } from "@/components/dashboard/bubbles/FieldRow";
 import { authClient } from "@/lib/auth-client";

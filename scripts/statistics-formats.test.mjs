@@ -126,7 +126,7 @@ function actionFixture() {
     '@/lib/team-statistics': {teamStatistics:async()=>({matches:[{matchKey:'faceit:match',status:'scheduled',reportedTime:{revision:state.revision}}]})},
   };
   const load = loader({modules});
-  return { actions:load('@/app/statistics/actions'), times:load('@/lib/match-times'), state, sqlite, db, modules };
+  return { actions:load('@/app/(dashboard)/statistics/actions'), times:load('@/lib/match-times'), state, sqlite, db, modules };
 }
 test('provider team links enforce role, membership proof, and one Commons team per external identity', async () => {
   const f = actionFixture();

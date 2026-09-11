@@ -30,12 +30,17 @@ now 308s via `middleware.ts`). `/` stays the public Commons landing page.
 
 Sign-up lands on `/account/setup/`; sign-in lands on `/home/`.
 
-`app/loading.tsx` provides a shared loading screen during server page and nested
-layout reads, keeping the root header and footer visible. `PageLoading` reuses
-the existing indeterminate stats bar with a plain-language wait message and
-reduced-motion support. Tournament route loaders retain their skeletons and
-include the same status. Client-side data requests still own their existing
-loaders; the route fallback ends when the server page is ready.
+Member tabs live under `app/(dashboard)/` (the group does not change URLs).
+Its shared `layout.tsx` owns `DashboardShell`, so the sidebar stays mounted
+across Home, Schedule, Teams, Settings, Experimental, and Admin navigation.
+`loading.tsx` renders the tournament-style `DashboardLoading` skeleton only in
+`.ff-dash__content`. The nav and admin surface styling follow the pathname on
+the client; default Link prefetching can fetch the loading boundary ahead of
+a click. Keep page data and setup prompts below this layout so slow reads
+cannot block the sidebar. Pages retain their own session/capability checks.
+Onboarding and public invite pages keep their standalone shells. Client-side
+requests retain their own loading indicators; tournament details keep their
+more specific skeleton.
 
 The core ideas:
 
@@ -451,16 +456,16 @@ together, gated on `editSettings` like every other team setting.
 
 ### `SetupBanner` — the amber "action required" bar
 
-`components/dashboard/SetupBanner.tsx`, rendered by `DashboardShell` on
-every tab that passes `setupUserId`. Exactly one prompt shows, in priority
-order:
+`components/dashboard/SetupBanner.tsx`, rendered by member pages (and the
+tournaments content layout) beneath the shared shell. Its reads stay inside
+the content loading boundary. Exactly one prompt shows, in priority order:
 
 1. academic email not `VERIFIED`, or Discord not linked → finish setup
 2. set up but on no team → create or join a team
 3. on a team but entered in nothing → join a tournament
 
-Renders nothing once all three hold. Don't pass `setupUserId` on pages that
-*are* a setup step — `SetupShell` already omits it.
+Renders nothing once all three hold. Omit the banner on pages that *are* a
+setup step — `SetupShell` already does this.
 
 ### `SetupShell` — chrome for the setup wizard
 
@@ -470,16 +475,15 @@ tab active, no banner) and draws the numbered step rail. Takes `step: 1 | 2
 
 ## Recipe: add a new tab
 
-1. Create `app/<tab>/page.tsx` from this skeleton:
+1. Create `app/(dashboard)/<tab>/page.tsx` from this skeleton:
 
    ```tsx
    import type { Metadata } from "next";
-   import { headers } from "next/headers";
    import { redirect } from "next/navigation";
 
-   import { DashboardShell } from "@/components/dashboard/DashboardShell";
+   import { SetupBanner } from "@/components/dashboard/SetupBanner";
    import { Bubble } from "@/components/dashboard/bubbles/Bubble";
-   import { getAuth } from "@/lib/auth";
+   import { getSessionCached } from "@/lib/session";
 
    // Session-gated: always rendered per request.
    export const dynamic = "force-dynamic";
@@ -487,17 +491,18 @@ tab active, no banner) and draws the numbered step rail. Takes `step: 1 | 2
    export const metadata: Metadata = { title: "My Tab", robots: { index: false } };
 
    export default async function MyTabPage() {
-     const session = await getAuth().api.getSession({ headers: await headers() });
+     const session = await getSessionCached();
      if (!session) redirect("/login/");
 
      return (
-       <DashboardShell active="mytab" setupUserId={session.user.id}>
+       <>
+         <SetupBanner userId={session.user.id} />
          <h1 className="screen-reader-text">My Tab</h1>
          <div className="ff-bubble-grid">
            {/* The first bubble always spans the grid. */}
            <Bubble title="First Bubble" span="full">…</Bubble>
          </div>
-       </DashboardShell>
+       </>
      );
    }
    ```
@@ -507,7 +512,8 @@ tab active, no banner) and draws the numbered step rail. Takes `step: 1 | 2
    (items without an `href` render dimmed as "Coming soon").
 
 That's it — the strip, sidebar, and responsive behavior come from the
-shell.
+shared layout, including the content-only loading skeleton. Do not wrap the
+page in another `DashboardShell`.
 
 ### Rail groups (a tab with sub-tabs)
 
@@ -617,7 +623,7 @@ Integrations), `ScheduleView.tsx` (`CalendarPanel`, `ResultsPanel`),
   member can pin, each with the `group` that sections the Customize popup and
   the `sources` it needs. `components/dashboard/home/HomeWidgets.tsx` maps a
   widget id to the real panel.
-- **Only enabled widgets' data is fetched.** `app/home/page.tsx` →
+- **Only enabled widgets' data is fetched.** `app/(dashboard)/home/page.tsx` →
   `loadHomeData` (`lib/home.ts`) reads the union of the enabled widgets'
   `sources` and nothing else. The board can now hold any bubble on the site, so
   fetching every tab's data up front stopped being affordable — it would mean a
@@ -638,7 +644,7 @@ Integrations), `ScheduleView.tsx` (`CalendarPanel`, `ResultsPanel`),
   in `lib/integrations.ts`. Types are fine (`import type` is erased); runtime
   values are not.
 - **Persistence** is `profiles.home_layout` (a JSON array of widget ids) via
-  `setHomeLayout` (`app/home/actions.ts`) — purely presentational, like
+  `setHomeLayout` (`app/(dashboard)/home/actions.ts`) — purely presentational, like
   `density`, so there's no capability to check and a tampered payload can at
   worst reorder/hide the caller's own widgets (`asHomeLayout` drops unknown
   ids). `[]` is a valid empty board.
@@ -951,7 +957,7 @@ in `components/auth/TwoFactorChallenge.tsx`.
   `npm run db:migrate:remote` **before** `npm run deploy`.
 - **D1 has no interactive transactions.** Drizzle's `transaction()` emits a
   raw `BEGIN`, which D1 rejects — use `db.batch([...])` for writes that must
-  land together (see `createTeam` in `app/teams/actions.ts`).
+  land together (see `createTeam` in `app/(dashboard)/teams/actions.ts`).
 - Two migration gotchas, both hit while adding teams: `drizzle-kit generate`
   asks whether a dropped + added column on one table is a rename (it needs a
   TTY — split the change into two generates if you can't answer), and its
@@ -1060,7 +1066,7 @@ exclude them, and all three read the one rule in `lib/tournaments-shared.ts`
 
 | Surface | How |
 | ------- | --- |
-| `/tournaments/` | `withoutDiscordSourced` in `app/tournaments/page.tsx`, before the panel, so counts, filters, pagination and the featured hero all ignore them |
+| `/tournaments/` | `withoutDiscordSourced` in `app/(dashboard)/tournaments/page.tsx`, before the panel, so counts, filters, pagination and the featured hero all ignore them |
 | Home board | `withoutDiscordSourced` on the `tournaments` source in `lib/home.ts` — one filter for both the pinned Tournaments tile (literally the same panel the tab mounts) and At a Glance's active list, so the board can't disagree with the tab |
 | `/schedule/` calendar | `listUpcomingExternalScheduleEntries` (`lib/external-tournaments.ts`) had an explicit `\|\| source === "discord"` escape hatch on **both** its layers — the match rows and the no-matches-yet start-date entries. Both are gone, so `discord` now falls out with every other non-`SCHEDULE_PROVIDERS` source |
 

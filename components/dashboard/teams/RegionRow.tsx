@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { updateTeamSettings } from "@/app/teams/actions";
+import { updateTeamSettings } from "@/app/(dashboard)/teams/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 
 /**

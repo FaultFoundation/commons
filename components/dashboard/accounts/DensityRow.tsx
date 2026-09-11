@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { setDensity } from "@/app/account/actions";
+import { setDensity } from "@/app/(dashboard)/account/actions";
 import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import {
   DENSITIES,

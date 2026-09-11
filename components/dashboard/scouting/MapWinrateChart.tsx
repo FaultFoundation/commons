@@ -73,7 +73,6 @@ export function MapWinrateChart({ rows }: { rows: MapWinrate[] }) {
     || a.map.localeCompare(b.map),
   );
   const established = sorted.filter((row) => row.total >= MIN_PLAYS);
-  const limited = sorted.filter((row) => row.total < MIN_PLAYS);
   return (
     <div className="ff-scoutmap" role="region" aria-label="Map Profile">
       <label className="ff-scoutmap__sort" htmlFor={selectId}>
@@ -85,13 +84,6 @@ export function MapWinrateChart({ rows }: { rows: MapWinrate[] }) {
         </select>
       </label>
       <MapSection rows={established} order={order} />
-      {limited.length > 0 ? (
-        <section className="ff-scoutmap__limited" aria-label="Not enough data">
-          <h4 className="ff-scoutmap__heading">Not enough data</h4>
-          <p className="ff-scoutmap__mode">Fewer than {MIN_PLAYS} plays per map.</p>
-          <MapSection rows={limited} order={order} />
-        </section>
-      ) : null}
       <p className="ff-scoutmap__note">Win rate excludes draws. Group totals cover the maps shown in each group.</p>
     </div>
   );

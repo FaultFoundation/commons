@@ -6,7 +6,6 @@ import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { FaceitMatchList } from "@/components/dashboard/scouting/FaceitMatchList";
 import { ScoutAnalytics } from "@/components/dashboard/scouting/ScoutAnalytics";
 import { ScoutDeepLoading } from "@/components/dashboard/scouting/ScoutDeepLoading";
-import { ScoutFacts } from "@/components/dashboard/scouting/ScoutFacts";
 import { ScoutModeToggle } from "@/components/dashboard/scouting/ScoutModeToggle";
 import { StatLoading } from "@/components/dashboard/statistics/StatLoading";
 import {
@@ -15,6 +14,7 @@ import {
   SCOUT_STATUS_MESSAGES,
   asScoutGameMode,
   formatElo,
+  formatWinratePct,
   normalizeNickname,
   type ScoutGameMode,
   type ScoutMode,
@@ -25,8 +25,7 @@ import { usePersistentState } from "@/lib/view-state";
 
 // The whole Scouting surface (Experimental → Scouting). Search ANY FACEIT
 // Overwatch player by nickname; the result is a tournament-view-style profile —
-// a hero header, Overview / Matches tabs, and a two-column Overview (analytics
-// graph cards + Map Profile on the left, a Details facts rail on the right).
+// a hero header, Overview / Matches tabs, and full-width analytics graph cards.
 //
 // Two search depths (ScoutModeToggle). A QUICK search pulls the recent ~50 games
 // fast and shows results as they land. A DEEP search opens a load screen and
@@ -442,7 +441,7 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
               </p>
             </Bubble>
           ) : tab === "overview" ? (
-            <div className="ff-toverview">
+            <div className="ff-toverview ff-toverview--single">
               <div className="ff-tpanel">
                 <ScoutAnalytics
                   matches={data.matches}
@@ -450,9 +449,6 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
                   summary={data.summary}
                   collecting={collecting}
                 />
-              </div>
-              <div className="ff-toverview__side">
-                <ScoutFacts player={player} summary={data.summary} />
               </div>
             </div>
           ) : (
@@ -486,7 +482,7 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
   );
 }
 
-// --- Profile header (identity only; the stats live in the Details rail) ------
+// --- Profile header (identity, ELO, and map win rate) ------------------------
 
 function ScoutHeader({
   resp,
@@ -532,9 +528,14 @@ function ScoutHeader({
             {player.faceitElo != null ? (
               <span>{formatElo(player.faceitElo)} elo</span>
             ) : null}
-            {player.region ? <span>{player.region}</span> : null}
-            {player.gamePlayerName ? <span>{player.gamePlayerName}</span> : null}
+            <span>{formatWinratePct(resp.data?.summary.maps.winrate ?? null)} map win rate</span>
           </div>
+          {player.region || player.gamePlayerName ? (
+            <div className="ff-scouthead__sub">
+              {player.region ? <span>{player.region}</span> : null}
+              {player.gamePlayerName ? <span>{player.gamePlayerName}</span> : null}
+            </div>
+          ) : null}
         </div>
         <div className="ff-scouthead__actions">
           {canDeepen ? (

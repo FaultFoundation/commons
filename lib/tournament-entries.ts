@@ -97,8 +97,8 @@ async function buildTournamentEntries(): Promise<TournamentListEntry[]> {
 function parseCached(payload: string): TournamentListEntry[] | null {
   try {
     const parsed: unknown = JSON.parse(payload);
-    // Earlier snapshots predate provider-parent grouping; rebuild them.
-    if (parsed && typeof parsed === "object" && "version" in parsed && parsed.version === 4 && "data" in parsed) {
+    // Earlier snapshots predate broader audience matching and test-name exclusion; rebuild them.
+    if (parsed && typeof parsed === "object" && "version" in parsed && parsed.version === 5 && "data" in parsed) {
       return unpackTournamentEntries(parsed.data as PackedTournamentEntries);
     }
     return null;
@@ -186,7 +186,7 @@ export const loadTournamentEntries = cache(
     // Best-effort write-back: a cache we failed to store is a slow next request,
     // never a failed one.
     try {
-      const payload = JSON.stringify({ version: 4, data: packTournamentEntries(entries) });
+      const payload = JSON.stringify({ version: 5, data: packTournamentEntries(entries) });
       await getDb()
         .insert(tournamentListCache)
         .values({

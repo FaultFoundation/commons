@@ -244,7 +244,7 @@ test("audit all stored start.gg and FACEIT parents without inventing missing ide
   const rows=JSON.parse(readFileSync(resolve(root,"scripts/fixtures/provider-parents-3610.json"),"utf8"));
   const parent=f.load("@/lib/discovery-shared").providerParent;
   const result=await f.load("@/lib/discovery").enrichDiscovery(rows);
-  assert.equal(result.length,3610);
+  assert.equal(result.length,3571);
   for (const [source,expectedRows,expectedParents] of [["startgg",1188,610],["faceit",252,125]]) {
     const direct=rows.filter(t=>t.source===source && parent(t));
     assert.equal(direct.length,expectedRows);
@@ -270,11 +270,11 @@ test("all 1,100 imported LeagueOS tournaments reach the correct parent profile",
     members.push(entry);
     groups.set(parent, members);
   }
-  assert.equal(entries.length, 1100);
+  assert.equal(entries.length, 1096);
   assert.equal(groups.size, 58);
   const multiGame = [...groups.values()].filter(g => new Set(g.map(t => t.game)).size > 1);
   assert.equal(multiGame.length, 38);
-  assert.equal(multiGame.reduce((n, g) => n + g.length, 0), 1048);
+  assert.equal(multiGame.reduce((n, g) => n + g.length, 0), 1044);
   const catalog = await f.load("@/lib/discovery").discoveryCatalog(entries);
   assert.ok(catalog.filter(p => p.kind === "series").length > 58);
   // The profile page uses precisely this seriesId membership filter.
@@ -371,7 +371,7 @@ test("collegiate competition aliases and eligibility evidence distinguish ambigu
     ["College League", {}, "collegiate"],
   ];
   for (const [name, extra, expected] of cases) {
-    const entry = f.entry("example", name, extra);
+    const entry = f.entry("example", name, { ...extra, source: "commons" });
     const result = s.inferFacts(entry);
     assert.equal(result.audience, expected, `${name}: ${JSON.stringify(extra)}`);
     assert.equal(s.matchesDiscovery({ ...entry, discovery: result },
@@ -827,4 +827,25 @@ test("a failed approval batch rolls back profile, override, identity and review 
     f.sqlite.prepare("SELECT count(*) AS n FROM discovery_overrides").get().n,
     0,
   );
+});
+
+test("provider audience matching favors recall and LeagueOS classification takes precedence", () => {
+  const f = fixture(), { inferAudience } = f.load("@/lib/discovery-audience");
+  for (const source of ["startgg", "faceit"]) {
+    for (const extra of [{name:"Campus Weekly"}, {organizer:"NACE"}, {description:"University alumni welcome; open to everyone"}, {organizerUrl:"https://faceit.com/en/organizers/id/college-esports"}]) {
+      assert.equal(inferAudience(f.entry("x", "Weekly", {source, ...extra})).audience, "collegiate");
+    }
+  }
+  for (const [tag, expected] of [["collegiate", "collegiate"], ["junior", "unknown"], ["amateur", "unknown"]]) {
+    assert.equal(inferAudience(f.entry("x", "College Cup", {source:"leagueos", description:`LeagueOS classification: ${tag}`})).audience, expected);
+  }
+});
+test("test names are omitted before discovery grouping", async () => {
+  const f = fixture(), { isTestTournamentName } = f.load("@/lib/discovery-audience");
+  const hidden = ["Test", "TESTING Cup", "Cup_test_2", "TestTournament", "test123", "Dummy Cup", "Sandbox", "Placeholder Cup"];
+  const visible = ["Contest", "Latest Cup", "Greatest Finals"];
+  for (const name of hidden) assert.equal(isTestTournamentName(name), true, name);
+  for (const name of visible) assert.equal(isTestTournamentName(name), false, name);
+  const result = await f.load("@/lib/discovery").enrichDiscovery([...hidden, ...visible].map((name,i)=>f.entry(String(i),name)));
+  assert.equal(result.length, visible.length);
 });

@@ -1,3 +1,4 @@
+import { isTestTournamentName } from "@/lib/discovery-audience";
 import { competitionSeries } from "@/lib/discovery-series";
 import { cache } from "react";
 import { eq } from "drizzle-orm";
@@ -48,7 +49,7 @@ export async function enrichDiscovery(
   // deterministically, without needing the fragile organizer/name inference (an
   // older event may carry no organizer at all).
   const tournamentGroups = new Map<string, TournamentListEntry[]>();
-  const enriched = entries.map((t) => {
+  const enriched = entries.filter(t => !isTestTournamentName(t.name)).map((t) => {
     const d = inferFacts(t);
     const identity = organizerIdentity(t);
     // Missing source identity never groups unrelated organizers by display name.

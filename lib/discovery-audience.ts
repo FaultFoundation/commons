@@ -38,6 +38,24 @@ export function inferAudience(t: DiscoverySource): {
   if (t.academicVerificationRequired)
     reasons.push("Commons requires academic verification");
 
+  // Discovery favors recall: provider prose and organizer identity are useful
+  // signals even when an event also welcomes the wider community.
+  const providerText = plain(`${text} ${t.organizer ?? ""} ${t.organizerUrl ?? ""}`)
+    .replace(/[_/.-]+/g, " ");
+  if (t.source === "leagueos") {
+    const classification = /LeagueOS classification:\s*([a-z-]+)/i.exec(description)?.[1]?.toLowerCase();
+    if (classification === "collegiate")
+      return { audience: "collegiate", reasons: ["LeagueOS collegiate classification"] };
+    if (classification)
+      return { audience: "unknown", reasons: [`LeagueOS classification: ${classification}`] };
+  }
+  if (["startgg", "faceit", "leagueos"].includes(t.source ?? "")) {
+    if (/\b(?:colleg(?:e|es|iate)|intercollegiate|universit(?:y|ies)|campus|varsity|students?|academic|NACE|NECC|NSE|NUEL|CSL|ECAC|NJCAAE|NACEsports)\b/i.test(providerText) ||
+      COLLEGIATE_COMPETITIONS.some(rule => rule.title.test(providerText) &&
+        (!("game" in rule) || rule.game.test(`${t.game ?? ""} ${providerText}`))))
+      return { audience: "collegiate", reasons: ["College, student or collegiate competition signal in provider title, description or organizer"] };
+  }
+
   // Incidental sponsor, alumni and recruiting mentions in descriptions cannot
   // establish eligibility. Acronym-only titles are suggestions, never verified.
   for (const rule of COLLEGIATE_COMPETITIONS) {
@@ -63,4 +81,10 @@ export function inferAudience(t: DiscoverySource): {
   if (unrestricted)
     return { audience: "open", reasons: ["Explicitly open to the public in source"] };
   return { audience: reasons.length ? "collegiate" : "unknown", reasons };
+}
+
+/** Match test labels without hiding legitimate names such as Contest or Latest. */
+export function isTestTournamentName(name: string): boolean {
+  const normalized = plain(name.replace(/([a-z])([A-Z])/g, "$1 $2")).replace(/[_-]+/g, " ");
+  return /\b(?:test(?:ing|er|ers|s)?\d*|dummy|sandbox|placeholder)\b/i.test(normalized);
 }

@@ -8515,22 +8515,110 @@ button.ff-dash__link:hover {
 .ff-discovery-profile-actions details { flex: 1 1 240px; }
 .ff-discovery-profile-actions [role="status"]:empty { display: none; }
 
-/* Series & Leagues — a vertical list of grouped-tournament rows, the Series
-   tab's first bubble. Its head is the shared .ff-list-heading (see the
-   tournament list section); the private __head/__count rules it used to carry
-   were the same declarations under a second name. */
+/* Series & Leagues — a single horizontal ROW of grouped-tournament cards, the
+   Series tab's first bubble. Each card is a tournament tile (.ff-tcard: banner
+   over a body, reusing that whole vocabulary) with two series-only additions:
+   the platform/game marks in the usual corner spot, and a stage line + progress
+   bar at the foot. Its head is the shared .ff-list-heading, made a toggle so the
+   whole section folds; the filter controls below it are the Tournaments tab's
+   own universal filters (see SeriesList). */
 .ff-serieslist { margin: 0; }
-.ff-serieslist__rows { display: flex; flex-direction: column; gap: 10px; }
-.ff-serieslist__row {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) 160px auto; align-items: center; gap: 16px;
-  padding: 12px 16px; border: 1px solid var(--ff-border); border-radius: var(--ff-radius-lg);
-  background: rgba(255, 255, 255, 0.03); color: inherit; text-decoration: none;
-  transition: border-color var(--ff-transition), background var(--ff-transition);
+/* The head's name is a button (collapse toggle); align its chevron+title to the
+   centre rather than the baseline the plain .ff-list-heading uses. */
+.ff-serieslist__head { align-items: center; }
+.ff-serieslist__toggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer;
+  transition: color var(--ff-transition);
 }
-.ff-serieslist__row:hover { border-color: var(--ff-accent); background: rgba(255, 255, 255, 0.05); }
-.ff-serieslist__thumb { width: 54px; height: 54px; border-radius: 12px; }
-.ff-serieslist__main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.ff-serieslist__badges { display: flex; flex-wrap: wrap; gap: 8px; }
+.ff-serieslist__toggle:hover { color: var(--ff-accent); }
+.ff-serieslist__toggle > svg { flex: none; color: var(--ff-text-dim); }
+.ff-serieslist__toggle:hover > svg { color: var(--ff-accent); }
+/* The universal filter controls — views · divider · Filter — grouped like the
+   Tournaments tab's own .ff-list-head__controls, before the row. */
+.ff-serieslist__controls {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px;
+}
+.ff-serieslist__controls .ff-ticket-views { margin-bottom: 0; }
+
+/* The horizontal scroller. The track scrolls on x; nav buttons overlay its
+   edges and are rendered only when it overflows (disabled at each end). */
+.ff-scardrow { position: relative; }
+.ff-scardrow__track {
+  display: flex; gap: 16px; overflow-x: auto; overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory; padding: 2px 2px 8px; scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+.ff-scardrow__track::-webkit-scrollbar { height: 8px; }
+.ff-scardrow__track::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: var(--ff-radius-pill); }
+/* Fixed-width cards so the row reads as a strip; ~1.15 cards on the narrowest
+   screens, several on a wide bubble. */
+.ff-scardrow__track > .ff-scard { flex: 0 0 clamp(238px, 82%, 292px); scroll-snap-align: start; }
+.ff-scardrow__nav {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 3;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid var(--ff-border); background: rgba(0, 20, 45, 0.9); color: #fff;
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: var(--ff-shadow-card);
+  transition: background var(--ff-transition), opacity var(--ff-transition);
+}
+.ff-scardrow__nav:hover { background: rgba(0, 40, 82, 0.96); }
+.ff-scardrow__nav--prev { left: -4px; }
+.ff-scardrow__nav--next { right: -4px; }
+.ff-scardrow__nav:disabled { opacity: 0; pointer-events: none; }
+
+/* The card. Everything not overridden here is inherited from .ff-tcard. */
+.ff-scard { min-width: 0; }
+/* Let the body grow so the foot (stage line + bar) sticks to the bottom edge,
+   keeping progress bars aligned across the row of equal-height cards. */
+.ff-scard .ff-tcard__body { flex: 1 1 auto; }
+
+/* The kind badge sits top-left in the banner's flow (the status pill above is
+   absolute top-right); a dark chip so it reads on any banner or swatch. It sits
+   above the banner image, which is an absolute layer. */
+.ff-scard__kind {
+  position: relative; z-index: 1; align-self: flex-start;
+  padding: 3px 9px; border-radius: var(--ff-radius-pill);
+  background: rgba(0, 0, 0, 0.42); color: #fff;
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.ff-scard__kind--league { background: rgba(70, 110, 190, 0.7); color: #eaf1ff; }
+.ff-scard__gamemore {
+  display: inline-flex; align-items: center; height: 18px; padding: 0 6px;
+  border-radius: var(--ff-radius-pill); background: rgba(255, 255, 255, 0.12); color: #fff;
+  font-size: var(--ff-dash-text-xs); font-weight: 800;
+}
+
+/* The stage line: a label + the platform/game marks on one row, over a thin
+   progress bar, pinned to the card's bottom (margin-top:auto) so the bars align
+   across the row; padding-top guarantees a gap when content fills the height. */
+.ff-scard__foot { display: flex; flex-direction: column; gap: 8px; margin-top: auto; padding-top: 12px; }
+.ff-scard__stage {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  font-size: var(--ff-dash-text-xs); color: var(--ff-text-dim); font-weight: 700;
+}
+.ff-scard__stagelabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Marks live on the card surface now, not a gradient banner — the source glyphs
+   default to white (for the banner), so tone them to the card's own text here. */
+.ff-scard__marks { flex: none; gap: 8px; }
+.ff-scard__marks .ff-tcard__source { color: #dfe9f4; filter: none; }
+.ff-scard__marks .ff-tcard__game-img { filter: none; }
+.ff-scard__marks .ff-tcard__source,
+.ff-scard__marks .ff-tcard__source svg,
+.ff-scard__marks .ff-tcard__source img,
+.ff-scard__marks .ff-tcard__game-img { height: 18px; }
+.ff-scard__marks .ff-tcard__game--mono { height: 18px; min-width: 18px; padding: 0 6px; }
+.ff-scard__bar {
+  width: 100%; height: 6px; border: 0; border-radius: var(--ff-radius-pill);
+  overflow: hidden; accent-color: var(--ff-accent);
+  background: rgba(255, 255, 255, 0.12);
+}
+.ff-scard__bar::-webkit-progress-bar { background: rgba(255, 255, 255, 0.12); border-radius: var(--ff-radius-pill); }
+.ff-scard__bar::-webkit-progress-value { background: var(--ff-accent); border-radius: var(--ff-radius-pill); }
+.ff-scard__bar::-moz-progress-bar { background: var(--ff-accent); border-radius: var(--ff-radius-pill); }
+
+/* The kind + status badges are still used by the series/organization hero
+   (ff-serieshero), so their classes are kept even though the list is now cards. */
 .ff-serieslist__kind, .ff-serieslist__status {
   font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;
   padding: 2px 8px; border-radius: var(--ff-radius-pill);
@@ -8539,20 +8627,6 @@ button.ff-dash__link:hover {
 .ff-serieslist__kind--league { background: rgba(120, 170, 255, 0.16); color: #bcd4ff; }
 .ff-serieslist__status { border: 1px solid var(--ff-border); color: var(--ff-text-dim); font-weight: 700; }
 .ff-serieslist__status--live { background: rgba(255, 90, 106, 0.16); border-color: rgba(255, 90, 106, 0.4); color: #ff9aa5; }
-.ff-serieslist__name { font-size: var(--ff-dash-text-md); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ff-serieslist__meta { color: var(--ff-text-dim); font-size: var(--ff-dash-text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ff-serieslist__progress { display: flex; flex-direction: column; gap: 4px; }
-.ff-serieslist__progresslabel { font-size: var(--ff-dash-text-xs); color: var(--ff-text-dim); text-align: right; }
-.ff-serieslist__progress progress { width: 100%; height: 6px; accent-color: var(--ff-accent); }
-.ff-serieslist__open { color: var(--ff-accent); font-weight: 700; font-size: var(--ff-dash-text-sm); white-space: nowrap; }
-@media (max-width: 720px) {
-  .ff-serieslist__row { grid-template-columns: auto minmax(0, 1fr) auto; }
-  .ff-serieslist__progress { display: none; }
-}
-@media (max-width: 480px) {
-  .ff-serieslist__row { grid-template-columns: auto minmax(0, 1fr); }
-  .ff-serieslist__open { display: none; }
-}
 
 /* Series / organization hero — a banner strip over the title, facts and follow. */
 .ff-serieshero { grid-column: 1 / -1; border: 1px solid var(--ff-border); border-radius: var(--ff-radius-lg); background: var(--ff-navy-900); overflow: hidden; }

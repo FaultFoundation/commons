@@ -65,13 +65,13 @@ export type TournamentListEntry = {
 
 /** All is the complete catalog; Active remains the default working view and
     Concluded is the archive. */
-const VIEWS = [
+export const VIEWS = [
   { key: "all", label: "All" },
   { key: "active", label: "Active" },
   { key: "concluded", label: "Concluded" },
 ] as const;
 
-type ViewKey = (typeof VIEWS)[number]["key"];
+export type ViewKey = (typeof VIEWS)[number]["key"];
 
 /** Per-page choices; 0 means "All" (no pagination). */
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 0] as const;
@@ -87,7 +87,7 @@ const DEFAULT_PAGE_SIZE = 12;
  * Layout is deliberately NOT in here — it's a cookie the server renders from
  * (see `TOURNAMENT_LAYOUT_COOKIE`), because it changes the markup on first paint.
  */
-type ListState = {
+export type ListState = {
   view: ViewKey;
   filters: Filters;
   /** Persisted as an array; the Set the UI wants is derived below. */
@@ -97,11 +97,12 @@ type ListState = {
   showPast: boolean;
 };
 
-/** Shared by the Tournaments tab and the pinned Home tile — they are the same
-    panel, so a filter set on one is the filter the other shows. */
-const LIST_STATE_KEY = "tournaments:list";
+/** Shared by the Tournaments tab, the pinned Home tile AND the Series tab — they
+    are the same universal filter set, so a filter changed on any of them is the
+    filter the others show. */
+export const LIST_STATE_KEY = "tournaments:list";
 
-const DEFAULT_LIST_STATE: ListState = {
+export const DEFAULT_LIST_STATE: ListState = {
   view: "active",
   filters: EMPTY_FILTERS,
   games: [],
@@ -113,7 +114,7 @@ const DEFAULT_LIST_STATE: ListState = {
 /** Storage is the member's own browser, but a stored blob can still be stale
     (an older shape, a view we no longer offer) — every field is checked and
     anything unrecognized falls back to its default. */
-function reviveListState(stored: unknown): ListState | undefined {
+export function reviveListState(stored: unknown): ListState | undefined {
   if (!stored || typeof stored !== "object") return undefined;
   const v = stored as Record<string, unknown>;
   const pageSize = PAGE_SIZE_OPTIONS.includes(v.pageSize as (typeof PAGE_SIZE_OPTIONS)[number])

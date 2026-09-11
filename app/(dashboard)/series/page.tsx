@@ -6,6 +6,7 @@ import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { SeriesList } from "@/components/dashboard/series/SeriesList";
 import { TournamentCards } from "@/components/dashboard/tournaments/TournamentList";
 import { loadTournamentEntries } from "@/lib/tournament-entries";
+import { discoveryFollowIds } from "@/lib/discovery";
 import { getSessionCached } from "@/lib/session";
 import { isDiscordSourced } from "@/lib/tournaments-shared";
 
@@ -31,7 +32,10 @@ export default async function SeriesPage() {
     redirect("/login/");
   }
 
-  const tournaments = await loadTournamentEntries();
+  const [tournaments, follows] = await Promise.all([
+    loadTournamentEntries(),
+    discoveryFollowIds(session.user.id),
+  ]);
   // The one surface that shows them: everywhere else runs the complementary
   // `withoutDiscordSourced`. Internal Commons tournaments leave `source` unset
   // (they read as Challonge), so this is only ever collector-written rows.
@@ -47,7 +51,7 @@ export default async function SeriesPage() {
             .ff-list-heading (name + dim count), the shape the tournaments grid
             uses, so the card carries one heading rather than two. */}
         <Bubble title="Series & Leagues" titleHidden span="full">
-          <SeriesList tournaments={experimentalSeries} />
+          <SeriesList tournaments={experimentalSeries} follows={follows} />
         </Bubble>
 
         <Bubble title="Discord Tournaments" titleHidden span="full">

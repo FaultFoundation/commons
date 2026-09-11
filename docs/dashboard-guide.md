@@ -211,7 +211,8 @@ const [tab, setTab] = usePersistentState<TabId>(
 
 | Key | Surface |
 | --- | --- |
-| `tournaments:list` | The tournaments list head bar: view, filters, games, page, page size, the ongoing-tournaments disclosure. Shared with the pinned Home tile — it's the same panel. |
+| `tournaments:list` | The tournaments list head bar: view, filters, games, page, page size, the ongoing-tournaments disclosure. **Universal** — shared with the pinned Home tile *and* the Series & Leagues row, so a filter set on any of them applies to the others. |
+| `series:open` | Whether the Series & Leagues row is expanded (its fold toggle). Only the fold is series-specific; its filters ride `tournaments:list`. |
 | `tournament-tab:<id>` | Overview / Bracket / Standings / Rules on a tournament. |
 | `tournament-stage:<id>` | The Bracket tab's stage/pool strip (`StageTabs`). |
 | `bracket-tab:<id>:<stage>` | `ExternalBracket`'s phase/pool sub-bracket tabs. |

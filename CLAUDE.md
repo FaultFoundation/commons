@@ -1437,10 +1437,16 @@ distinct series (per-season, not a cross-year franchise). `SeriesList`
 ("Series & Leagues", [components/dashboard/series/SeriesList.tsx](components/dashboard/series/SeriesList.tsx))
 groups by `seriesId` on its **own tab** — `/series/`, under Experimental —
 rather than as a rail above the list; the individual tournaments stay as
-ordinary cards in the `/tournaments/` grid, which grouping never collapses.
-Moving it off the list changed one thing beyond placement: it groups **every**
-recorded tournament, not just the ones the list's filters currently show, since
-there are no filters on the Series tab to narrow it. That tab also carries a
+ordinary cards in the `/tournaments/` grid, which grouping never collapses. Each
+series renders as a **tournament-style card** (the `.ff-tcard` shell: the first
+member tournament's banner, the platform/game marks in the usual corner, a stage
+line + progress bar at the foot) in a **single horizontal scroller**
+(`.ff-scardrow`, arrow buttons) that folds behind its heading (`series:open`).
+Its filters are **the Tournaments tab's own universal set** — `SeriesList` reads
+and writes the same `tournaments:list` state and renders the same view pills +
+`DiscoveryFilters` popover, then groups the ALREADY-FILTERED tournaments, so a
+game/region/etc. filter narrows the series exactly as it narrows the list, and a
+filter changed here also applies on the Tournaments tab. That tab also carries a
 **Discord Tournaments** bubble (`source === "discord"` — the cen-scraper's
 Discord ingestion, `discord_entities`/`discord_messages` in
 [db/cen-schema.ts](db/cen-schema.ts)), and it is the ONLY surface that shows

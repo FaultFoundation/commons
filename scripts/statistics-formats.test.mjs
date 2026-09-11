@@ -29,6 +29,26 @@ const load = loader();
 const fmt = load('@/lib/tournament-format');
 const rr = load('@/lib/round-robin-shared');
 const match = (a,b, extra={}) => ({ id: `${a}-${b}`, entrant1Name:a, entrant2Name:b, roundOrder:1, ...extra });
+test('WRMSEC preseason pairings stay in two stages, not 21 inferred pools',()=>{
+  const fixture=JSON.parse(readFileSync(resolve(root,'scripts/fixtures/wrmsec-preseason.json'),'utf8'));
+  const events=fixture.events.map(e=>({...e,matches:e.matches.map(m=>({...m,scheduledAt:m.scheduledAt?new Date(m.scheduledAt):null}))}));
+  const groups=rr.rrGroupsFromExternal(events);
+  assert.equal(groups.length,2);
+  assert.deepEqual(groups.map(g=>g.matches.length),[11,10]);
+  assert.deepEqual(groups.map(g=>g.entrants.length),[20,19]);
+  assert.ok(groups.every(g=>!rr.hasCompactRoundRobinMatrix(g)));
+  const stages=fmt.externalFormatStages(events);
+  assert.equal(stages.length,5,'announced season and playoffs retained');
+});
+test('only complete multi-team components infer pools; explicit partial pools are retained',()=>{
+  const triangle=(a,b,c)=>[match(a,b),match(a,c),match(b,c)];
+  assert.equal(rr.rrGroupsFromExternal([{matches:[...triangle('A','B','C'),...triangle('D','E','F')]}]).length,2);
+  assert.equal(rr.rrGroupsFromExternal([{matches:[match('A','B'),match('C','D'),match('E',null)]}]).length,1);
+  const explicit=rr.rrGroupsFromExternal([{matches:[match('A','B',{phaseGroupId:'a',phaseGroupName:'East'}),match('C','D',{phaseGroupId:'b',phaseGroupName:'West'})]}]);
+  assert.equal(explicit.length,2);
+  assert.equal(explicit[0].label,'East');
+  assert.ok(rr.hasCompactRoundRobinMatrix(explicit[0]));
+});
 test('partial elimination and Swiss schedules remain unconfirmed, never density-guessed', () => {
   assert.equal(fmt.classifyExternalFormat([match('A','B'),match('B','C')]), null);
   assert.equal(fmt.classifyExternalFormat([match('A','B'),match('C','D'),match('A','C')]), null);

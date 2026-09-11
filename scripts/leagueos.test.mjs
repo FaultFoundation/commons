@@ -107,3 +107,34 @@ test('LeagueOS artwork repairs cached league URLs and preserves other artwork',(
  assert.match(renderToStaticMarkup(React.createElement(TournamentBannerImage,{url:old})),/src="https:\/\/images.leagueos.gg\/league\//);
  assert.equal(renderToStaticMarkup(React.createElement(TournamentBannerImage,{url:null})), '');
 });
+test('sparse LeagueOS schedule renders named stages without singleton matrices',()=>{
+ const fixture=JSON.parse(readFileSync(resolve(root,'scripts/fixtures/wrmsec-preseason.json'),'utf8'));
+ const {RoundRobinView}=load('@/components/dashboard/tournaments/RoundRobinView');
+ const {StageTabs}=load('@/components/dashboard/tournaments/StageTabs');
+ const {rrGroupsFromExternal}=load('@/lib/round-robin-shared');
+ const events=fixture.events.map(e=>({...e,matches:e.matches.map(m=>({...m,scheduledAt:m.scheduledAt?new Date(m.scheduledAt):null}))}));
+ const tabs=events.map(e=>({key:e.id,label:e.name,node:React.createElement(RoundRobinView,{groups:rrGroupsFromExternal([e])})}));
+ const html=renderToStaticMarkup(React.createElement(StageTabs,{tabs}));
+ for(const e of events) assert.ok(html.includes(e.name));
+ assert.match(html,/20 teams · 11 matches/);
+ assert.match(html,/Truman Middle School \(black\)/);
+ assert.doesNotMatch(html,/Round Robin Matrix|Complete Graph|Pool 1/);
+ const many=renderToStaticMarkup(React.createElement(StageTabs,{tabs:Array.from({length:12},(_,i)=>({key:String(i),label:`Division ${i+1}`,node:null}))}));
+ assert.match(many,/<select/);assert.equal((many.match(/<option/g)??[]).length,12);
+});
+test('external tournament host preserves all five WRMSEC stage names',()=>{
+ const fixture=JSON.parse(readFileSync(resolve(root,'scripts/fixtures/wrmsec-preseason.json'),'utf8'));
+ const events=fixture.events.map(e=>({...e,matches:e.matches.map(m=>({...m,scheduledAt:m.scheduledAt?new Date(m.scheduledAt):null}))}));
+ const modulePath=resolve(root,'components/dashboard/tournaments/ExternalTournamentView.tsx');
+ cache.delete(modulePath);
+ mocks.set('@/components/dashboard/tournaments/TournamentChrome',{TournamentChrome:({tabs})=>tabs.find(t=>t.id==='bracket').node});
+ try {
+  const {ExternalTournamentView}=load('@/components/dashboard/tournaments/ExternalTournamentView');
+  const tournament={id:'wrmsec-preview',source:'leagueos',name:fixture.name,game:'Rocket League',status:'active',startAt:null,endAt:null,numAttendees:20,bannerUrl:null,url:'https://wrmsec.leagueos.gg',description:null,links:[],images:[],aboutLayout:[],events};
+  const html=renderToStaticMarkup(React.createElement(ExternalTournamentView,{tournament,shareUrl:'https://example.test',shareMessage:fixture.name}));
+  for (const e of events) assert.ok(html.includes(e.name),e.name);
+  assert.equal((html.match(/role="tab"/g)??[]).length,5);
+  assert.match(html,/20 teams · 11 matches/);
+  assert.doesNotMatch(html,/Round Robin Matrix|Pool 1/);
+ } finally { mocks.clear();cache.delete(modulePath); }
+});

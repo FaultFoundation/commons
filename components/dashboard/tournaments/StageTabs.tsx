@@ -18,7 +18,7 @@ import { usePersistentState } from "@/lib/view-state";
 // never its index: a re-scrape can add, drop or reorder pools, and a stored
 // index would then quietly select a different stage than the member left open.
 
-export type StageTab = { key: string; label: string; node: ReactNode };
+export type StageTab = { key: string; label: string; node: ReactNode; pending?: boolean };
 
 export function StageTabs({
   tabs,
@@ -44,7 +44,14 @@ export function StageTabs({
   const index = found >= 0 ? found : 0;
   return (
     <div className="ff-rr">
-      <div className="ff-bracket__tabs" role="tablist" aria-label="Stages">
+      {tabs.length > 8 ? (
+        <label className="ff-stage-picker">
+          <span>Stage</span>
+          <select value={tabs[index].key} onChange={(event) => setActive(event.target.value)}>
+            {tabs.map(tab => <option key={tab.key} value={tab.key}>{tab.label}</option>)}
+          </select>
+        </label>
+      ) : <div className="ff-bracket__tabs" role="tablist" aria-label="Stages">
         {tabs.map((tab, i) => (
           <button
             key={tab.key}
@@ -57,7 +64,7 @@ export function StageTabs({
             {tab.label}
           </button>
         ))}
-      </div>
+      </div>}
       {tabs[index].node}
     </div>
   );

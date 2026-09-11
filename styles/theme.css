@@ -4236,6 +4236,29 @@ button.ff-dash__link:hover {
   font-weight: 800;
   letter-spacing: 0.02em;
 }
+
+/* Supplied Ultimate vector is black; other game marks keep their source colors. */
+.ff-tcard__game-img--black-mark,
+.ff-ticket-brand .ff-tcard__game-img--black-mark {
+  filter: invert(1);
+}
+
+.ff-stage-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.ff-stage-picker select {
+  min-width: 0;
+  max-width: 100%;
+  padding: 10px 14px;
+  color: inherit;
+  background: var(--ff-surface, #153b66);
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 8px;
+  font: inherit;
+}
 /* Source mark + divider + game mark group into one inline row — used in the
    card's bottom-right corner cluster (.ff-tcard__marks) and the compact table's
    brand column. The individual marks above are plain inline-flex items. */

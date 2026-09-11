@@ -15,3 +15,19 @@ The live Challonge table had no non-draft tournaments. Its community-subdomain p
 ## Separate series layer
 
 Parent IDs are retained as metadata and organizer profile links. Series membership is now inferred within each parent; see `docs/series-audit.md` for the current grouping audit and known unassigned rows. Fixture counts above describe authoritative parents, not the number of competition series.
+
+## WRMSEC preseason bracket (2026-09-10)
+
+`wrmsec-preseason.json` is the normalized public schedule from
+https://wrmsec.leagueos.gg/schedule/rl/3g1u059qkmgq0ojweucqupkdo/standings.
+The LeagueOS extended season endpoint announces five stages. Its separately
+paginated stage-match endpoints return 11 and 10 preseason matches, followed by
+three empty future stages. Both preseason stages use round-robin method 0,
+`rrRoundLimit: 1`, and `rrGroupSize: 0`: disconnected pairings are not pools.
+The fixture retains only normalized display fields, not roster member data.
+Blank roster names use their public school name and color tag via the collector.
+
+Two older seasons (`03ngd4f5e1ohkrnb95njxqq73` and
+`13bzve2a3mnci8ykjvs19ii1k`) were also checked through the public extended endpoint;
+both have the same two one-round preseason stages without groups. This is a
+source-level spot check, not an audit of the entire production database.

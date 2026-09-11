@@ -192,10 +192,33 @@ function externalRRGroups(
   if (!inferGroups) return [{ name: null, matches }];
   const components = entrantComponents(matches, externalSides);
   if (components.length <= 1) return [{ name: null, matches }];
+  // Disconnected first-round pairings (or byes) are not evidence of pools.
+  // Infer only when every component contains a complete RR of at least 3
+  // entrants. Explicit provider group IDs above still support partial pools.
+  const completePools = components.every(component => {
+    const entrants = new Set<string>(), pairs = new Set<string>();
+    for (const m of component) {
+      const [a,b] = externalSides(m);
+      if (a) entrants.add(a);
+      if (b) entrants.add(b);
+      if (a && b && a !== b) pairs.add(JSON.stringify([a,b].sort()));
+    }
+    return entrants.size >= 3 && pairs.size === entrants.size * (entrants.size - 1) / 2;
+  });
+  if (!completePools) return [{ name: null, matches }];
   return components
     .map((matches) => ({ matches, key: minOrderKey(matches) }))
     .sort((a, b) => compareOrderKeys(a.key, b.key))
     .map(({ matches }) => ({ name: null, matches }));
+}
+
+/** Sparse or large schedules are clearer as fixtures than mostly empty grids. */
+export function hasCompactRoundRobinMatrix(group: RRGroup): boolean {
+  const n = group.entrants.length;
+  if (n < 2 || n > 12) return false;
+  const pairs = new Set(group.matches.filter(m => m.aId && m.bId && m.aId !== m.bId)
+    .map(m => JSON.stringify([m.aId,m.bId].sort())));
+  return pairs.size === n * (n - 1) / 2;
 }
 
 /** Build round-robin groups from the external projection. Flattens all events'

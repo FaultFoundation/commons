@@ -25,6 +25,19 @@ const KNOWN_GAME_LOGOS: Record<string, string> = {
   leagueoflegends: "/brand/games/league-of-legends.svg",
   lol: "/brand/games/league-of-legends.svg",
   rocketleague: "/brand/games/rocket-league.svg",
+  supersmashbrosmelee: "/brand/games/smash-melee.svg",
+  smashmelee: "/brand/games/smash-melee.svg",
+  ssbm: "/brand/games/smash-melee.svg",
+  supersmashbrosultimate: "/brand/games/smash-ultimate.svg",
+  smashultimate: "/brand/games/smash-ultimate.svg",
+  ssbu: "/brand/games/smash-ultimate.svg",
+  marvelrivals: "/brand/games/marvel-rivals.svg",
+  rainbowsixsiege: "/brand/games/rainbow-six-siege.svg",
+  rainbow6siege: "/brand/games/rainbow-six-siege.svg",
+  r6siege: "/brand/games/rainbow-six-siege.svg",
+  r6s: "/brand/games/rainbow-six-siege.svg",
+  r6: "/brand/games/rainbow-six-siege.svg",
+  cod: "/brand/games/call-of-duty.svg",
 };
 
 function normalizeGameName(name: string): string {
@@ -37,7 +50,8 @@ function resolveLogoUrl(
 ): string | null {
   if (logoUrl) return logoUrl;
   if (!name) return null;
-  return KNOWN_GAME_LOGOS[normalizeGameName(name)] ?? null;
+  const key = normalizeGameName(name);
+  return KNOWN_GAME_LOGOS[key] ?? (key.startsWith("callofduty") ? "/brand/games/call-of-duty.svg" : null);
 }
 
 /** First-letters monogram: "Overwatch" -> "OV", "Rocket League" -> "RL". */
@@ -62,7 +76,7 @@ export function GameLogo({
         {/* Plain <img> to match the rest of the markup (next.config sets
             images.unoptimized). */}
         <img
-          className="ff-tcard__game-img"
+          className={`ff-tcard__game-img${resolved === "/brand/games/smash-ultimate.svg" ? " ff-tcard__game-img--black-mark" : ""}`}
           src={resolved}
           alt=""
           loading="lazy"

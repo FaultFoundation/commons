@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import {
   currentRound,
+  hasCompactRoundRobinMatrix,
   type RREntrant,
   type RRGroup,
   type RRMatch,
@@ -468,6 +469,7 @@ export function RoundRobinView({ groups }: { groups: RRGroup[] }) {
   const groupIndex = Math.min(activeGroup, usable.length - 1);
   const group = usable[groupIndex];
   const byId = new Map(group.entrants.map((e) => [e.id, e]));
+  const showMatrix = hasCompactRoundRobinMatrix(group);
 
   return (
     <div className="ff-rr">
@@ -488,15 +490,16 @@ export function RoundRobinView({ groups }: { groups: RRGroup[] }) {
         </div>
       ) : null}
 
-      <Bubble title="Round Robin Matrix" span="full" className="ff-bubble--divided">
+      {showMatrix ? <Bubble title="Round Robin Matrix" span="full" className="ff-bubble--divided">
         <ResultsMatrix group={group} onSelect={setDetail} />
-      </Bubble>
+      </Bubble> : null}
 
-      <div className="ff-rr__lower">
-        <Bubble title="Complete Graph" className="ff-bubble--divided">
+      <div className={showMatrix ? "ff-rr__lower" : undefined}>
+        {showMatrix ? <Bubble title="Matchups" className="ff-bubble--divided">
           <MatchupGraph group={group} />
-        </Bubble>
+        </Bubble> : null}
         <Bubble title="Rounds and Matches">
+          {!showMatrix ? <p className="ff-ticket-empty">{group.entrants.length} teams · {group.matches.length} matches</p> : null}
           <RoundSchedule group={group} onSelect={setDetail} />
         </Bubble>
       </div>

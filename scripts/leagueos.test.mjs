@@ -15,7 +15,7 @@ async function enrich(rows) {
  mocks.set('@/db/schema',{});
  try {return await load('@/lib/discovery').enrichDiscovery(rows);} finally {mocks.delete('@/lib/db');mocks.delete('@/db/schema');}
 }
-test('Series page passes LeagueOS imports into its grouped list',async()=>{
+test('Experimental Series page excludes LeagueOS',async()=>{
  const rows=JSON.parse(readFileSync(resolve(root,'scripts/fixtures/leagueos-series-1100.json'),'utf8')).filter(t=>t.organizer==='NECC');
  const entries=await enrich(rows.map(t=>({...t,status:'completed'})));
  const wrapper=({children})=>React.createElement('div',null,children);
@@ -27,8 +27,8 @@ test('Series page passes LeagueOS imports into its grouped list',async()=>{
  try {
   const page=await load('@/app/series/page').default();
   const html=renderToStaticMarkup(page);
-  assert.equal((html.match(/class="ff-serieslist__row"/g)??[]).length,12);
-  assert.equal((html.match(/>Concluded</g)??[]).length,12);
+  assert.equal((html.match(/class="ff-serieslist__row"/g)??[]).length,0);
+  assert.equal((html.match(/>Concluded</g)??[]).length,0);
  } finally {mocks.clear();}
 });
 test('all concluded NECC seasons render separately with valid profile links',async()=>{
@@ -83,13 +83,13 @@ function load(name, parent=root) {
  runInNewContext(code,{module,exports:module.exports,require:n=>load(n,dirname(path)),console,URL,URLSearchParams,Date,Intl,setTimeout,clearTimeout});
  return module.exports;
 }
-test('LeagueOS provider uses supplied logo and stays off general surfaces',()=>{
+test('LeagueOS provider uses supplied logo and appears on general surfaces',()=>{
  const {sourceKey,SourceLogo}=load('@/components/brand/SourceLogo');
  assert.equal(sourceKey('leagueos'),'leagueos');
  const html=renderToStaticMarkup(React.createElement(SourceLogo,{source:'leagueos'}));
  assert.match(html,/\/brand\/sources\/leagueos.svg/);assert.match(html,/aria-label="LeagueOS"/);
  const {withoutDiscordSourced}=load('@/lib/tournaments-shared');
- assert.equal(withoutDiscordSourced([{source:'leagueos'},{source:'discord'},{source:'faceit'}]).map(t=>t.source).join(','),'faceit');
+ assert.equal(withoutDiscordSourced([{source:'leagueos'},{source:'discord'},{source:'faceit'}]).map(t=>t.source).join(','),'leagueos,faceit');
 });
 test('LeagueOS overview keeps stage positions out of the overall podium and mounts refresh',()=>{
  const {ExternalTournamentView}=load('@/components/dashboard/tournaments/ExternalTournamentView');
@@ -156,7 +156,13 @@ test('SSBU retains 277 public matches, one playoff bracket and chronological sta
    const {ExternalTournamentView}=load('@/components/dashboard/tournaments/ExternalTournamentView');
    const html=renderToStaticMarkup(React.createElement(ExternalTournamentView,{tournament,shareUrl:'https://example.test',shareMessage:fixture.name}));
    if(tab==='overview') {assert.match(html,/Playoff Bracket · Top standings/);assert.match(html,/Season · Top standings/);}
-   else {assert.ok(html.indexOf('>Preseason Week 2<')<html.indexOf('>Season<'));assert.ok(html.indexOf('>Season<')<html.indexOf('>Finals<'));}
+   if(tab==='overview') {
+    for (const status of ['upcoming','registration','active','cancelled']) {
+     const pending=renderToStaticMarkup(React.createElement(ExternalTournamentView,{tournament:{...tournament,status},shareUrl:'https://example.test',shareMessage:fixture.name}));
+     assert.doesNotMatch(pending,/· Top standings/,status);
+    }
+   }
+   if(tab==='bracket') {assert.ok(html.indexOf('>Preseason Week 2<')<html.indexOf('>Season<'));assert.ok(html.indexOf('>Season<')<html.indexOf('>Finals<'));}
   } finally { mocks.clear();cache.delete(modulePath); }
  }
 });

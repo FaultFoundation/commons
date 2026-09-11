@@ -783,9 +783,9 @@ export function ExternalTournamentView({
     <div className="ff-tpanel">
       {/* LeagueOS positions are stage-local source standings, not an overall
           podium across independent divisions (and may lag match results). */}
-      {tournament.source === "leagueos"
+      {tournament.status === "completed" && (tournament.source === "leagueos"
         ? leagueosRankings.map((stage, index) => <TopFinishers key={index} finishers={stage.finishers} label={`${stage.name} · Top standings`} />)
-        : <TopFinishers finishers={finishers} />}
+        : <TopFinishers finishers={finishers} />)}
       <TournamentOverview
         about={aboutBubble}
         details={detailsBubble}

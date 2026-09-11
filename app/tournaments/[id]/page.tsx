@@ -302,7 +302,7 @@ export default async function TournamentPage({
 
   const overview = (
     <div className="ff-tpanel">
-      <TopFinishers finishers={finishers} />
+      {tournament.status === "completed" && <TopFinishers finishers={finishers} />}
       {tournament.description ? (
         <Bubble title="About" span="full">
           <p className="ff-ext-about">{tournament.description}</p>

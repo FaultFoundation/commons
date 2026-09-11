@@ -1176,3 +1176,5 @@ Automated checks: `node --test scripts/discovery.test.mjs`,
 classification functions and API/review code against Drizzle and in-memory SQLite,
 including concurrent stale claims, approval rollback, temporal attribution,
 revision-order undo, authorization and per-account follow isolation.
+
+Tournament overview top finishers (including LeagueOS stage standings) appear only once the tournament is completed. LeagueOS tournaments are included on general tournament surfaces and excluded from the Experimental Series page; Discord tournaments remain experimental.

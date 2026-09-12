@@ -21,7 +21,6 @@ now 308s via `middleware.ts`). `/` stays the public Commons landing page.
 | `/statistics/`                 | Experimental › Statistics | Player Data (Overwatch) + Match Data (cross-provider) tabs |
 | `/tournaments/discovery/<id>/` | —           | One series / organization profile — the shell, showing whatever tournament is current |
 | `/tournaments/discovery/<id>/<tid>/` | —     | One of that series' tournaments, inside the shell |
-| `/tournaments/discovery/<id>/series/` | —     | The series' own panel (description, facts, catalog, Follow) |
 | `/join/<token>/`               | —           | Invite landing (join a team) |
 | `/account/`                    | Account     | Profile / integrations       |
 | `/account/setup/`              | —           | Resolver → current step      |
@@ -1113,26 +1112,35 @@ Three segments, and the split between them is the whole feature:
 
 | Segment | Renders |
 | ------- | ------- |
-| `layout.tsx` | `SeriesChrome` — the hero and the tournament strip |
-| `page.tsx` (index) | The **current** tournament (`preferredTournament`) |
+| `layout.tsx` | `SeriesChrome` — the complete hero and the tournament strip |
+| `page.tsx` (index) | The **current** tournament's tabs (`preferredTournament`) |
 | `[tid]/page.tsx` | One named tournament — what the strip links to |
-| `series/page.tsx` | The series ITSELF: description, facts, Follow, full catalog |
 
-**The hero and the strip are in the LAYOUT, the tournament in the child.** A
+**The hero and the strip are in the LAYOUT, the tabs and panels in the child.** A
 Next layout is not remounted when a sibling child segment changes, so moving
-along the strip replaces only the panel below it — verified: the RSC payload for
-a strip click carries the tournament's `ff-thero--meta` header and **no**
-`ff-thero__title` / `ff-tstrip__card` at all. The hero genuinely does not
+along the strip replaces only what is below it — verified: the RSC payload for a
+strip click contains **no** `ff-thero__title`, `ff-stat__label`,
+`ff-sview__eyebrow` or `ff-tstrip__card` at all. The header genuinely does not
 re-render. `[tid]/loading.tsx` is therefore a panel-shaped skeleton, not a page
-one: the header stays on screen while the next tournament loads.
+one: the hero stays on screen while the next tournament loads.
+
+**The hero is the whole hero.** The stat/action bar is attached to the banner in
+one `.ff-thero` card, exactly as a standalone tournament page renders it, and the
+strip sits under that card. An earlier split — banner in the layout, stat bar in
+the panel — put the strip between the two and left the stats reading as a loose
+slab. Keeping them together is why the stat pairs are built in the LAYOUT, by
+`heroStats`, from the list projection: the layout can't see the tournament detail,
+but `TournamentListEntry` already carries game / entrants / dates / source and
+format / max / verification, so the row costs no extra query.
 
 **The hero's content comes from the strip data, not from the child page.** A
 layout can't read a child segment's params, but it *can* read which child is
 active (`useSelectedLayoutSegment`), and it already holds every member
-tournament — so the banner, title and status swap the instant a card is clicked,
-client-side, ahead of the server render landing. That is why `SeriesChrome` is a
-client component and `StripTournament` is a deliberately small projection of
-`TournamentListEntry`: it crosses the boundary on every series open.
+tournament — so banner, title, status and stats swap the instant a card is
+clicked, client-side, ahead of the server render landing. That is why
+`SeriesChrome` is a client component and `StripTournament` is a deliberately
+small projection of `TournamentListEntry`: it crosses the boundary on every
+series open.
 
 **The index renders, it does not redirect.** The dashboard's loading boundary
 flushes the shell before the profile resolves, so a `redirect()` to the current
@@ -1142,18 +1150,20 @@ layout passes the chrome `defaultSelectedId`, so hero, strip and panel agree.
 `preferredTournament` picks live → taking registrations → next upcoming → most
 recent.
 
+The one per-tournament control the projection can't supply is **register**: it
+needs the tournament row plus the member's eligible teams. The layout loads it
+for INTERNAL members only, and an internal tournament never acquires an organizer
+identity, so in practice a series holds none and that `Promise.all` is empty.
+**Follow / claim / edit are series-level** and share the same action row, so they
+do not change as the member moves along the strip.
+
 The strip is **flat and newest-first**, reusing the `.ff-scardrow` scroller from
 the Series & Leagues row (`CardRow`, extracted so there is one copy of the
-overflow/arrow bookkeeping). Its first card is the series overview. For a
-LeagueOS league the season/program/game accordions (`LeagueCompetitions`) stay in
-that overview panel — the strip is a navigation control, the accordions are where
-a league's real structure stays browsable. A card grid hosted by a profile passes
-`seriesId` to `TournamentCards`, which re-points every card into the series shell
-(`TournamentHrefCtx`) so opening one from the catalog keeps the hero and strip.
+overflow/arrow bookkeeping).
 
-Both tournament views take `embedded`: the shell owns the banner, title, status
-and the `.ff-tview` wrapper, so the view's own header shrinks to its meta+actions
-bar (`.ff-thero--meta`). The **internal** view was extracted out of
+Both tournament views take `embedded`: the shell owns the hero and the
+`.ff-tview` wrapper, so the view contributes no header at all and starts at its
+tab strip. The **internal** view was extracted out of
 `app/(dashboard)/tournaments/[id]/page.tsx` into
 `components/dashboard/tournaments/InternalTournamentView.tsx` for this — that
 page is now only a router over the two views, and `SeriesTournamentPanel` is the

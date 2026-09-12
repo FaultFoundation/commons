@@ -1469,38 +1469,49 @@ series' *current* tournament, rendered through the same chrome as any other
 tournament, with a horizontal strip of the series' tournaments under the hero.
 The route is three segments, and the split is load-bearing:
 
-- **`layout.tsx` owns the hero + strip** ([SeriesChrome](components/dashboard/series/SeriesChrome.tsx),
-  client); **the child owns the tournament.** A Next layout isn't remounted when
-  a sibling child segment changes, so a strip click replaces ONLY the panel —
-  the RSC payload for one carries the tournament's `ff-thero--meta` header and
-  no hero or strip markup at all. `[tid]/loading.tsx` is a panel-shaped
-  skeleton for the same reason.
+- **`layout.tsx` owns the WHOLE hero + the strip**
+  ([SeriesChrome](components/dashboard/series/SeriesChrome.tsx), client); **the
+  child owns only the tabs and panels.** A Next layout isn't remounted when a
+  sibling child segment changes, so a strip click replaces ONLY the panels — the
+  RSC payload for one carries no `ff-thero__title`, `ff-stat__label`,
+  `ff-sview__eyebrow` or `ff-tstrip__card` at all. `[tid]/loading.tsx` is a
+  panel-shaped skeleton for the same reason.
+- **The hero is the whole hero**: the stat/action bar is attached to the banner
+  in one `.ff-thero` card, exactly as a standalone tournament page renders it,
+  and the strip sits under that card. Splitting the two across layout and page
+  (banner here, stats in the panel) put the strip between them and left the
+  stats reading as a loose slab — which is why the stat pairs are built in the
+  layout from the LIST projection (`heroStats`) rather than read from the
+  tournament detail the layout can't see.
 - **The hero's content comes from the strip data.** A layout can't read a child
   segment's params, but it can read which child is active
   (`useSelectedLayoutSegment`) and it already holds every member tournament, so
-  the banner/title/status swap client-side the instant a card is clicked, ahead
-  of the server render.
+  the banner/title/status/stats swap client-side the instant a card is clicked,
+  ahead of the server render.
 - **The index renders the current tournament, it never redirects to it.** The
   dashboard loading boundary flushes the shell first, so `redirect()` here
   degrades to a client-side hop (blank shell, then a second navigation). The
   layout passes `defaultSelectedId` so hero, strip and panel agree.
   `preferredTournament` ([lib/series-profile.ts](lib/series-profile.ts)) picks
   live → registration → next upcoming → most recent.
-- **`series/` is the series ITSELF** — description, facts, Follow, full catalog,
-  and for LeagueOS the season/program/game accordions. A static segment, so it
-  can't be mistaken for a tournament id by `[tid]`.
+
+The only per-tournament thing the list projection can't supply is the register
+control (it needs the tournament row plus the member's eligible teams), so the
+layout loads that for INTERNAL members only — and an internal tournament never
+acquires an organizer identity, so in practice a series holds none and the
+`Promise.all` is empty. Follow / claim / edit are series-level and sit in the
+same action row, unchanged as the member moves along the strip.
 
 [lib/series-profile.ts](lib/series-profile.ts) resolves profile + membership once
-per request (React `cache`, shared by all three segments) so the strip can never
+per request (React `cache`, shared by both segments) so the strip can never
 offer a tournament the child then 404s. Both tournament views take `embedded`,
-which drops the banner and the `.ff-tview` wrapper the shell owns; the internal
-view was extracted to
+which drops their whole header and the `.ff-tview` wrapper the shell owns; the
+internal view was extracted to
 [InternalTournamentView](components/dashboard/tournaments/InternalTournamentView.tsx)
 so `/tournaments/[id]/` and the series' `SeriesTournamentPanel` are two routers
 over the same two components. The whole series shares ONE remembered tab
-(`series:<profileId>`), and `TournamentCards` takes a `seriesId` that re-points
-every card into the shell (`TournamentHrefCtx`) — an id, not a function, because
-the hosts are server components.
+(`series:<profileId>`), so moving along the strip keeps the member on the section
+they were reading.
 
 Run `node --test scripts/discovery.test.mjs` for classification, API authorization,
 concurrent review and rollback tests. The data audit and manual checklist are in
@@ -1513,4 +1524,10 @@ because browsers reject `.fault.foundation` cookies on localhost. Auth forms use
 POST even before hydration so a premature native submission does not place
 credentials in a query string.
 
-LeagueOS league profiles use `LeagueCompetitions` and `leagueosSections` for season/program → game → source tournament navigation. Formats and Club/JV/Varsity tiers are presentation subgroups, not new top-level cards; provider identity scopes each league. Existing season identities remain unchanged.
+A LeagueOS league profile is the series shell like any other — its tournaments
+are the flat strip under the hero. (The season/program → game accordions
+`LeagueCompetitions` / `leagueosSections` used to render went with the profile's
+overview panel; `leagueosGroup` still scopes a league by provider identity.)
+Formats and Club/JV/Varsity tiers are presentation subgroups, not new top-level
+cards; provider identity scopes each league. Existing season identities remain
+unchanged.

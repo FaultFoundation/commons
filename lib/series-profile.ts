@@ -7,10 +7,7 @@ import type { DiscoveryProfile } from "@/lib/discovery-shared";
 // Re-exported so a server caller has one import for the whole profile surface;
 // the definitions live in the client-safe module because the strip and the card
 // grid are client components.
-export {
-  seriesOverviewPath,
-  seriesTournamentPath,
-} from "@/lib/discovery-shared";
+export { seriesTournamentPath } from "@/lib/discovery-shared";
 import { seriesStatus } from "@/lib/series-status";
 
 /**

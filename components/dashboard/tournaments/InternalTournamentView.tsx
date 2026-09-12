@@ -193,30 +193,29 @@ export async function InternalTournamentView({
       })
     : null;
 
-  // Embedded in a series, the banner/title/status are the shell's job (the
-  // layout renders them once and keeps them mounted across tournaments), so the
-  // header shrinks to its meta+actions bar. Standalone, it is the full hero.
-  const header = (
-    <section className={`ff-thero${embedded ? " ff-thero--meta" : ""}`}>
-      {embedded ? null : (
-        <div
-          className="ff-thero__banner"
-          style={
-            tournament.bannerUrl
-              ? { backgroundImage: `url(${tournament.bannerUrl})` }
-              : undefined
-          }
-        >
-          <div className="ff-thero__head">
-            <span
-              className={`ff-thero__status${live ? " ff-thero__status--live" : ""}`}
-            >
-              {TOURNAMENT_STATUS_LABELS[tournament.status] ?? tournament.status}
-            </span>
-            <h2 className="ff-thero__title">{tournament.name}</h2>
-          </div>
+  // Embedded in a series, the shell renders the WHOLE hero — banner, title,
+  // status and the stat/action bar attached beneath it — from the list
+  // projection, once, and keeps it mounted across tournaments. So this view
+  // contributes no header at all and starts at its tab strip.
+  const header = embedded ? null : (
+    <section className="ff-thero">
+      <div
+        className="ff-thero__banner"
+        style={
+          tournament.bannerUrl
+            ? { backgroundImage: `url(${tournament.bannerUrl})` }
+            : undefined
+        }
+      >
+        <div className="ff-thero__head">
+          <span
+            className={`ff-thero__status${live ? " ff-thero__status--live" : ""}`}
+          >
+            {TOURNAMENT_STATUS_LABELS[tournament.status] ?? tournament.status}
+          </span>
+          <h2 className="ff-thero__title">{tournament.name}</h2>
         </div>
-      )}
+      </div>
       <div className="ff-thero__body">
         <div className="ff-thero__meta">
           <div className="ff-thero__stats">

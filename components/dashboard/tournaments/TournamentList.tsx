@@ -9,17 +9,10 @@ import {
   matchesDiscovery,
   discoveryScore,
   activeFilterCount,
-  seriesTournamentPath,
   type DiscoveryFilters as Filters,
 } from "@/lib/discovery-shared";
 import { CorrectionDialog } from "./DiscoveryActions";
-import {
-  createContext,
-  useContext,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { usePersistentState } from "@/lib/view-state";
 
@@ -570,19 +563,6 @@ function hrefFor(t: TournamentListEntry): string {
   return `/tournaments/${encodeURIComponent(t.id)}/`;
 }
 
-/** Lets a HOST re-point every card/row in a grid without threading a prop
-    through four components. The series profile sets it so a card opened from
-    the series catalog stays inside the series shell (hero + strip preserved)
-    instead of navigating out to the standalone tournament page. Unset — the
-    Tournaments tab, Home, everywhere else — it is the standalone path above. */
-const TournamentHrefCtx = createContext<
-  ((t: TournamentListEntry) => string) | null
->(null);
-
-function useHrefFor(): (t: TournamentListEntry) => string {
-  return useContext(TournamentHrefCtx) ?? hrefFor;
-}
-
 function TournamentLink({
   tournament,
   className,
@@ -592,11 +572,10 @@ function TournamentLink({
   className: string;
   children: ReactNode;
 }) {
-  const href = useHrefFor();
   return (
     <Link
       className={className}
-      href={href(tournament)}
+      href={hrefFor(tournament)}
       prefetch={false}
       data-status={tournament.status}
     >
@@ -760,30 +739,21 @@ function CardGrid({
 export function TournamentCards({
   tournaments,
   empty = "No tournaments recorded yet.",
-  seriesId,
 }: {
   tournaments: TournamentListEntry[];
   empty?: string;
-  /** Set by a series profile: every card then opens inside that series' shell
-      (see TournamentHrefCtx). An id, not a function, because the hosts are
-      server components and a function isn't serializable across the boundary. */
-  seriesId?: string;
 }) {
   const [correcting, setCorrecting] = useState<TournamentListEntry | null>(null);
   if (tournaments.length === 0)
     return <p className="ff-ticket-empty">{empty}</p>;
   return (
-    <TournamentHrefCtx.Provider
-      value={
-        seriesId ? (t) => seriesTournamentPath(seriesId, t.id) : null
-      }
-    >
+    <>
       <CardGrid tournaments={tournaments} onCorrect={setCorrecting} />
       <CorrectionDialog
         tournament={correcting}
         onClose={() => setCorrecting(null)}
       />
-    </TournamentHrefCtx.Provider>
+    </>
   );
 }
 
@@ -794,7 +764,6 @@ function CompactTable({
   tournaments: TournamentListEntry[];
   onCorrect: (t: TournamentListEntry) => void;
 }) {
-  const rowHref = useHrefFor();
   return (
     <div className="ff-ticket-table-wrap">
       <table className="ff-ticket-table">
@@ -822,7 +791,7 @@ function CompactTable({
                     </span>
                     <Link
                       className="ff-ticket-subject"
-                      href={rowHref(t)}
+                      href={hrefFor(t)}
                       prefetch={false}
                     >
                       {t.name}

@@ -54,3 +54,63 @@ export const TOURNAMENT_TAB_IDS: readonly TournamentTabId[] = [
 export function isTournamentTabId(value: string): value is TournamentTabId {
   return (TOURNAMENT_TAB_IDS as readonly string[]).includes(value);
 }
+
+/** Provider display names, shared by the tournament view's "Source" stat and
+    its "View on <provider>" out-link, and by the series shell's hero (which
+    renders the same stat row from the list projection). */
+export const SOURCE_LABELS: Record<string, string> = {
+  leagueos: "LeagueOS",
+  discord: "Discord",
+  startgg: "start.gg",
+  faceit: "FACEIT",
+  challonge: "Challonge",
+  commons: "The Fault Foundation",
+};
+
+/** "Sep 4 – 6, 2026" / "Sep 4, 2026". Collapses a shared month or year, and
+    tolerates only one end of the range being known. */
+export function formatDateRange(
+  start: Date | null,
+  end: Date | null,
+): string | null {
+  if (!start && !end) return null;
+  if (start && !end) {
+    return start.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+  if (!start && end) {
+    return end.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+  const s = start as Date;
+  const e = end as Date;
+  // A one-day tournament carries start == end; without this it read "Sep 11 – 11".
+  if (s.toDateString() === e.toDateString()) {
+    return s.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+  const sameYear = s.getFullYear() === e.getFullYear();
+  const sameMonth = sameYear && s.getMonth() === e.getMonth();
+  const left = s.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+  const right = sameMonth
+    ? `${e.getDate()}, ${e.getFullYear()}`
+    : e.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+  return `${left} – ${right}`;
+}

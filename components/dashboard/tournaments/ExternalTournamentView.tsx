@@ -22,6 +22,10 @@ import type {
   ResultRow,
 } from "@/components/dashboard/tournaments/tournament-view-shared";
 import {
+  SOURCE_LABELS,
+  formatDateRange,
+} from "@/components/dashboard/tournaments/tournament-view-shared";
+import {
   compareOrderKeys,
   connectedComponents,
   hasFeedGraph,
@@ -48,15 +52,6 @@ import type {
 // Challonge view uses, so the two are visually identical. It never calls a
 // provider itself; freshness comes from the scraper's projection (and, layered
 // on top, the on-demand refresh in ExternalTournamentRefresh).
-
-const SOURCE_LABELS: Record<string, string> = {
-  leagueos: "LeagueOS",
-  discord: "Discord",
-  startgg: "start.gg",
-  faceit: "FACEIT",
-  challonge: "Challonge",
-  commons: "The Fault Foundation",
-};
 
 function statusLabel(status: string): string {
   return (
@@ -115,40 +110,6 @@ function formatResultDateTime(date: Date | null): string | null {
 
 /** A compact human range for the header — "Aug 30 – 31, 2026", collapsing a
     shared month/year. Falls back to a single date, or null when there's none. */
-function formatDateRange(start: Date | null, end: Date | null): string | null {
-  if (!start && !end) return null;
-  if (start && !end) {
-    return start.toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  }
-  if (!start && end) {
-    return end.toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  }
-  const s = start as Date;
-  const e = end as Date;
-  const sameYear = s.getFullYear() === e.getFullYear();
-  const sameMonth = sameYear && s.getMonth() === e.getMonth();
-  const left = s.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    ...(sameYear ? {} : { year: "numeric" }),
-  });
-  const right = sameMonth
-    ? `${e.getDate()}, ${e.getFullYear()}`
-    : e.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-  return `${left} – ${right}`;
-}
 
 /** True when the whole blurb is just a single URL (no prose around it). */
 function isBareUrl(text: string): boolean {
@@ -699,24 +660,23 @@ export function ExternalTournamentView({
     });
   }
 
-  // Embedded in a series, the banner/title/status are the shell's job (the
-  // layout renders them once and keeps them mounted across tournaments), so the
-  // header shrinks to its meta+actions bar. Standalone, it is the full hero.
-  const header = (
-    <section className={`ff-thero${embedded ? " ff-thero--meta" : ""}`}>
-      {embedded ? null : (
-        <div className="ff-thero__banner">
-          <TournamentBannerImage url={tournament.bannerUrl} className="ff-thero__banner-img" eager />
-          <div className="ff-thero__head">
-            <span
-              className={`ff-thero__status${live ? " ff-thero__status--live" : ""}`}
-            >
-              {statusLabel(tournament.status)}
-            </span>
-            <h2 className="ff-thero__title">{tournament.name}</h2>
-          </div>
+  // Embedded in a series, the shell renders the WHOLE hero — banner, title,
+  // status and the stat/action bar attached beneath it — from the list
+  // projection, once, and keeps it mounted across tournaments. So this view
+  // contributes no header at all and starts at its tab strip.
+  const header = embedded ? null : (
+    <section className="ff-thero">
+      <div className="ff-thero__banner">
+        <TournamentBannerImage url={tournament.bannerUrl} className="ff-thero__banner-img" eager />
+        <div className="ff-thero__head">
+          <span
+            className={`ff-thero__status${live ? " ff-thero__status--live" : ""}`}
+          >
+            {statusLabel(tournament.status)}
+          </span>
+          <h2 className="ff-thero__title">{tournament.name}</h2>
         </div>
-      )}
+      </div>
       <div className="ff-thero__body">
         <div className="ff-thero__meta">
           <div className="ff-thero__stats">

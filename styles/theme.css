@@ -8629,16 +8629,7 @@ button.ff-dash__link:hover {
 .ff-serieslist__status { border: 1px solid var(--ff-border); color: var(--ff-text-dim); font-weight: 700; }
 .ff-serieslist__status--live { background: rgba(255, 90, 106, 0.16); border-color: rgba(255, 90, 106, 0.4); color: #ff9aa5; }
 
-/* The series' OWN panel (the `series` segment): its facts list, follow/edit row
-   and inference note. The old ff-serieshero rules went with the standalone hero
-   this panel replaced — the banner, title and status now live in the shell's
-   persistent hero (ff-sview, above), which every tournament in the series
-   shares. */
-.ff-seriesfacts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px 20px; margin: 14px 0 0; }
-.ff-seriesfacts__item dt { font-size: var(--ff-dash-text-xs); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ff-text-dim); font-weight: 700; }
-.ff-seriesfacts__item dd { margin: 3px 0 0; font-size: var(--ff-dash-text-sm); font-weight: 600; }
-.ff-seriesfacts__actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
-.ff-seriesfacts__note { margin: 8px 0 0; color: var(--ff-text-dim); font-size: var(--ff-dash-text-xs); }
+
 
 /* Keep large league matrices navigable without pushing the schedule off-page. */
 .ff-rr-matrix-wrap--large {
@@ -8709,6 +8700,21 @@ a.ff-sview__crumb:hover {
   text-shadow: none;
 }
 
+/* Follow / claim / edit are SERIES-level, so they share the tournament's action
+   row and simply don't change as the member moves along the strip. Its own
+   `details { flex: 1 1 240px }` would stretch the collapsed summaries across
+   that row, so inside the hero they size to their content and only the open
+   form takes a line of its own. */
+.ff-sview .ff-thero__actions .ff-discovery-profile-actions {
+  gap: 14px;
+}
+.ff-sview .ff-thero__actions .ff-discovery-profile-actions details {
+  flex: 0 1 auto;
+}
+.ff-sview .ff-thero__actions .ff-discovery-profile-actions details[open] {
+  flex: 1 1 100%;
+}
+
 /* The banner is keyed on the selection, so it re-mounts on every strip click.
    A short fade is the only motion in an otherwise fixed hero. */
 .ff-sview__banner-img {
@@ -8733,7 +8739,7 @@ a.ff-sview__crumb:hover {
    navigation control that has to stay above the fold with the hero AND the
    tournament's own tabs, not a second card grid. */
 .ff-tstrip {
-  margin: 14px 0 18px;
+  margin: 16px 0 4px;
 }
 .ff-tstrip .ff-scardrow__track {
   gap: 10px;
@@ -8795,10 +8801,6 @@ a.ff-sview__crumb:hover {
   height: 15px;
   font-size: 8px;
 }
-.ff-tstrip__thumb--series {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--ff-text-dim);
-}
 .ff-tstrip__text {
   display: flex;
   flex-direction: column;
@@ -8839,10 +8841,4 @@ a.ff-sview__crumb:hover {
   position: static;
   width: 18px;
   height: 18px;
-}
-
-/* The embedded tournament header: the meta+actions bar with no banner, because
-   the shell's hero is carrying the banner, title and status. */
-.ff-thero--meta .ff-thero__body {
-  padding: 14px 20px;
 }

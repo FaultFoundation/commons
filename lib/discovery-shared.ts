@@ -82,11 +82,6 @@ export function seriesTournamentPath(
 ): string {
   return `${profilePath(profileId)}${encodeURIComponent(tournamentId)}/`;
 }
-/** The series' own overview panel — a static segment, so it can never be
-    mistaken for a tournament id by the `[tid]` matcher. */
-export function seriesOverviewPath(profileId: string): string {
-  return `${profilePath(profileId)}series/`;
-}
 export function seriesName(name: string): string {
   // Keep game numbers, season/year and division intact. Only explicit installment
   // markers and trailing stages are removed; "Open"/"Championship" are brands too.

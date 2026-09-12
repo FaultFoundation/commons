@@ -299,15 +299,15 @@ test('tournament list cache rebuilds old discovery versions and reuses current s
     const entries = [{ id: 'public:1', name: 'Old grouping', status: 'active', startsAt: null, featured: false }];
     f.sqlite.prepare('INSERT INTO tournament_list_cache (id,payload,built_at) VALUES (?,?,?)')
       .run('default', JSON.stringify(entries), Date.now());
-    for (const old of [entries, { version: 1, data: packTournamentEntries(entries) }, { version: 2, data: packTournamentEntries(entries) }, { version: 3, data: packTournamentEntries(entries) }]) {
+    for (const old of [entries, { version: 1, data: packTournamentEntries(entries) }, { version: 2, data: packTournamentEntries(entries) }, { version: 3, data: packTournamentEntries(entries) }, { version: 4, data: packTournamentEntries(entries) }]) {
       f.sqlite.prepare('UPDATE tournament_list_cache SET payload = ?, built_at = ?, lease_until = NULL WHERE id = ?')
         .run(JSON.stringify(old), Date.now(), 'default');
       assert.deepEqual(JSON.parse(JSON.stringify(await loadTournamentEntries())), []);
       const saved = JSON.parse(f.sqlite.prepare("SELECT payload FROM tournament_list_cache WHERE id = 'default'").get().payload);
-      assert.equal(saved.version, 4);
+      assert.equal(saved.version, 5);
     }
     f.sqlite.prepare('UPDATE tournament_list_cache SET payload = ? WHERE id = ?')
-      .run(JSON.stringify({ version: 4, data: packTournamentEntries(entries) }), 'default');
+      .run(JSON.stringify({ version: 5, data: packTournamentEntries(entries) }), 'default');
     assert.deepEqual(JSON.parse(JSON.stringify(await loadTournamentEntries())), entries);
   } finally { f.sqlite.close(); }
 });

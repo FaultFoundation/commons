@@ -1444,9 +1444,11 @@ line + progress bar at the foot) in a **single horizontal scroller**
 (`.ff-scardrow`, arrow buttons) that folds behind its heading (`series:open`).
 Its filters are **the Tournaments tab's own universal set** — `SeriesList` reads
 and writes the same `tournaments:list` state and renders the same view pills +
-`DiscoveryFilters` popover, then groups the ALREADY-FILTERED tournaments, so a
-game/region/etc. filter narrows the series exactly as it narrows the list, and a
-filter changed here also applies on the Tournaments tab. That tab also carries a
+`DiscoveryFilters` popover. Filters select series through matching members;
+status and progress use the complete membership so hiding a live game cannot
+conclude a season. LeagueOS is included. All/Active/Concluded display counts,
+and past external end dates conclude stale snapshot entries. A filter changed
+here also applies on the Tournaments tab. That tab also carries a
 **Discord Tournaments** bubble (`source === "discord"` — the cen-scraper's
 Discord ingestion, `discord_entities`/`discord_messages` in
 [db/cen-schema.ts](db/cen-schema.ts)), and it is the ONLY surface that shows

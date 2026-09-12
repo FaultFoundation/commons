@@ -15,7 +15,7 @@ async function enrich(rows) {
  mocks.set('@/db/schema',{});
  try {return await load('@/lib/discovery').enrichDiscovery(rows);} finally {mocks.delete('@/lib/db');mocks.delete('@/db/schema');}
 }
-test('Experimental Series page excludes LeagueOS',async()=>{
+test('Series page includes LeagueOS',async()=>{
  const rows=JSON.parse(readFileSync(resolve(root,'scripts/fixtures/leagueos-series-1100.json'),'utf8')).filter(t=>t.organizer==='NECC');
  const entries=await enrich(rows.map(t=>({...t,status:'completed'})));
  const wrapper=({children})=>React.createElement('div',null,children);
@@ -23,20 +23,20 @@ test('Experimental Series page excludes LeagueOS',async()=>{
  mocks.set('@/lib/tournament-entries',{loadTournamentEntries:async()=>entries});
  mocks.set('@/components/dashboard/SetupBanner',{SetupBanner:()=>null});
  mocks.set('@/components/dashboard/bubbles/Bubble',{Bubble:wrapper});
- mocks.set('@/components/dashboard/tournaments/TournamentList',{TournamentCards:()=>null});
+ mocks.set('@/components/dashboard/tournaments/TournamentList',{...load('@/components/dashboard/tournaments/TournamentList'),TournamentCards:()=>null});
+ mocks.set('@/components/dashboard/series/SeriesList',{SeriesList:({tournaments})=>{ assert.equal(tournaments.length,entries.length); return null; }});
  try {
   const page=await load('@/app/(dashboard)/series/page').default();
   const html=renderToStaticMarkup(page);
-  assert.equal((html.match(/class="ff-serieslist__row"/g)??[]).length,0);
+  assert.equal((html.match(/class="ff-tcard ff-scard"/g)??[]).length,0);
   assert.equal((html.match(/>Concluded</g)??[]).length,0);
- } finally {mocks.clear();}
+ } finally {mocks.clear();cache.clear();}
 });
 test('all concluded NECC seasons render separately with valid profile links',async()=>{
- const {SeriesList}=load('@/components/dashboard/series/SeriesList');
  const rows=JSON.parse(readFileSync(resolve(root,'scripts/fixtures/leagueos-series-1100.json'),'utf8')).filter(t=>t.organizer==='NECC');
  const tournaments=await enrich(rows.map(t=>({...t,status:'completed'})));
- const html=renderToStaticMarkup(React.createElement(SeriesList,{tournaments}));
- assert.equal((html.match(/class="ff-serieslist__row"/g)??[]).length,12);
+ const html=renderSeries(tournaments);
+ assert.equal((html.match(/class="ff-tcard ff-scard"/g)??[]).length,12);
  assert.equal((html.match(/>Concluded</g)??[]).length,12);
  assert.doesNotMatch(html,/>Upcoming</);
  assert.doesNotMatch(html,/318 tournaments/);
@@ -46,29 +46,64 @@ test('all concluded NECC seasons render separately with valid profile links',asy
  for(const id of new Set(tournaments.map(t=>t.discovery.seriesId).filter(Boolean))) assert.ok(html.includes(encodeURIComponent(id)),id);
 });
 test('active leagues sort ahead of concluded groups and inferred singletons stay hidden',()=>{
- const {SeriesList}=load('@/components/dashboard/series/SeriesList');
  const t=(id,name,status)=>({id,name,status,startsAt:null,endsAt:null,discovery:{seriesId:id,seriesName:name}});
- const html=renderToStaticMarkup(React.createElement(SeriesList,{tournaments:[
+ const html=renderSeries([
   t('series:competition:old','A concluded league 2025','cancelled'),
   t('series:competition:new','Z active league 2026','active'),
   t('series:competition:startgg','start.gg archive 2025','completed'),
   t('series:competition:faceit','FACEIT archive 2025','completed'),
   t('series:competition:challonge','Challonge archive 2025','completed'),
   t('series:tournament:solo','Inferred singleton','completed'),
- ]}));
+ ]);
  assert.ok(html.indexOf('Z active league')<html.indexOf('A concluded league'));
  assert.match(html,/>Concluded</);
- assert.equal((html.match(/class="ff-serieslist__row"/g)??[]).length,5);
+ assert.equal((html.match(/class="ff-tcard ff-scard"/g)??[]).length,5);
  assert.doesNotMatch(html,/Inferred singleton/);
 });
 test('start.gg series cards use competition names when the owner name is missing',async()=>{
- const {SeriesList}=load('@/components/dashboard/series/SeriesList');
  const rows=JSON.parse(readFileSync(resolve(root,'scripts/fixtures/provider-parents-3610.json'),'utf8')).filter(t=>t.organizerUrl?.endsWith('/8763a415'));
  const tournaments=await enrich(rows.map(t=>({...t,status:'completed'})));
- const html=renderToStaticMarkup(React.createElement(SeriesList,{tournaments}));
+ const html=renderSeries(tournaments);
  assert.match(html,/Wednesday my Dudes/);
  assert.doesNotMatch(html,/>start.gg organizer/);
  assert.ok(tournaments.every(t=>t.discovery.providerParentId==='series:startgg:owner:8763a415'));
+});
+function renderSeries(tournaments, view = 'all', games = []) {
+ const modulePath=resolve(root,'components/dashboard/series/SeriesList.tsx');
+ cache.delete(modulePath);
+ mocks.set('@/lib/view-state',{usePersistentState:(key,fallback)=>[
+  key==='tournaments:list'?{...fallback,view,games}:fallback,()=>{},true
+ ]});
+ try {
+  const {SeriesList}=load('@/components/dashboard/series/SeriesList');
+  return renderToStaticMarkup(React.createElement(SeriesList,{tournaments}));
+ } finally {mocks.delete('@/lib/view-state');cache.delete(modulePath);}
+}
+test('All, Active and Concluded partition series across providers and preserve full membership',()=>{
+ const now=Date.now();
+ const event=(id,series,status,source,game='Overwatch',endsAt=null)=>({id,name:series,status,source,game,endsAt,
+  discovery:{seriesId:'series:competition:'+series,seriesName:series}});
+ const rows=[
+  event('a','Archive 2025','completed','startgg'),
+  event('b','Cancelled 2025','cancelled','faceit'),
+  event('c','Ended 2025','registration','leagueos','Overwatch',now-86400000),
+  event('d','Mixed 2026','completed','leagueos'),
+  event('e','Mixed 2026','active','leagueos','VALORANT'),
+  event('f','Upcoming 2027','registration','startgg','Overwatch',now+86400000),
+ ];
+ const count=html=>(html.match(/class="ff-tcard ff-scard"/g)??[]).length;
+ assert.equal(count(renderSeries(rows,'all')),5);
+ const active=renderSeries(rows,'active');
+ assert.equal(count(active),2);
+ assert.match(active,/Mixed 2026/);assert.match(active,/Upcoming 2027/);
+ assert.doesNotMatch(active,/Archive 2025|Cancelled 2025|Ended 2025/);
+ const concluded=renderSeries(rows,'concluded');
+ assert.equal(count(concluded),3);
+ assert.doesNotMatch(concluded,/Mixed 2026|Upcoming 2027/);
+ assert.match(concluded,/All.*?\(5\)/);assert.match(concluded,/Active.*?\(2\)/);assert.match(concluded,/Concluded.*?\(3\)/);
+ const filtered=renderSeries(rows,'concluded',['Overwatch']);
+ assert.doesNotMatch(filtered,/Mixed 2026/);
+ assert.match(renderSeries(rows,'active',['Overwatch']),/1 of 2 concluded/);
 });
 function load(name, parent=root) {
  if(mocks.has(name)) return mocks.get(name);

@@ -21,8 +21,7 @@ import {
   seriesName,
 } from "@/lib/discovery-shared";
 import { usePersistentState } from "@/lib/view-state";
-
-const CONCLUDED = new Set(["completed", "cancelled"]);
+import { seriesStatus } from "@/lib/series-status";
 
 /** How many game marks to show in a card's corner before collapsing to "+N". */
 const MAX_GAME_MARKS = 3;
@@ -165,23 +164,24 @@ export function SeriesList({
     });
   }
 
-  // Group the filtered tournaments into series — so a game/region/etc. filter
-  // narrows which events (and thus which series) show, exactly as it narrows the
-  // Tournaments tab.
+  // Filters select series through matching members. Classify the complete
+  // series so hiding a live game cannot move its season into the archive.
   const series = useMemo<SeriesGroup[]>(() => {
     const now = Date.now();
-    const visible = tournaments.filter(
-      (t) =>
-        (selectedGames.size === 0 ||
-          (t.game != null && selectedGames.has(t.game))) &&
-        matchesDiscovery(t, filters, follows, now),
+    const visible = new Set(
+      tournaments.filter(
+        (t) =>
+          (selectedGames.size === 0 ||
+            (t.game != null && selectedGames.has(t.game))) &&
+          matchesDiscovery(t, filters, follows, now),
+      ).map((t) => t.id),
     );
 
     const groups = new Map<
       string,
       { id: string; name: string; events: TournamentListEntry[] }
     >();
-    for (const t of visible) {
+    for (const t of tournaments) {
       const id = t.discovery?.seriesId;
       if (!id) continue;
       const group =
@@ -199,7 +199,8 @@ export function SeriesList({
     }
 
     return [...groups.values()]
-      // Only surface a group that actually gathers several shown tournaments.
+      .filter((g) => g.events.some((t) => visible.has(t.id)))
+      // Recurring groups and explicit named seasons qualify as series.
       .filter(
         (g) =>
           g.events.length > 1 ||
@@ -211,27 +212,12 @@ export function SeriesList({
             )),
       )
       .map((g) => {
-        const done = g.events.filter((t) => CONCLUDED.has(t.status)).length;
-        const total = g.events.length;
-        const live = g.events.some((t) => t.status === "active");
-        const registering = g.events.some((t) => t.status === "registration");
-        const concluded = done === total;
         return {
           ...g,
-          done,
-          total,
-          concluded,
+          ...seriesStatus(g.events, now),
           isLeague:
             g.id.startsWith("series:leagueos:") ||
             g.events.some((t) => t.discovery?.competition === "league"),
-          status: concluded
-            ? "Concluded"
-            : live
-              ? "Live"
-              : registering
-                ? "Registration open"
-                : "Upcoming",
-          statusLive: live || registering,
           range: dateRange(g.events),
           banner: g.events.find((t) => t.bannerUrl)?.bannerUrl ?? null,
           sources: seriesSources(g.events),
@@ -255,6 +241,13 @@ export function SeriesList({
     if (view === "active") return series.filter((g) => !g.concluded);
     return series;
   }, [series, view]);
+
+  const concludedCount = series.filter((g) => g.concluded).length;
+  const viewCounts = {
+    all: series.length,
+    active: series.length - concludedCount,
+    concluded: concludedCount,
+  };
 
   return (
     <section className="ff-serieslist">
@@ -289,6 +282,7 @@ export function SeriesList({
                   onClick={() => refine({ view: option.key })}
                 >
                   {option.label}
+                  {" "}({viewCounts[option.key]})
                 </button>
               ))}
             </div>
@@ -311,7 +305,7 @@ export function SeriesList({
                 : "No leagues or series in this view."}
             </p>
           ) : (
-            <SeriesRow groups={filtered} />
+            <SeriesRow key={view} groups={filtered} />
           )}
         </>
       ) : null}

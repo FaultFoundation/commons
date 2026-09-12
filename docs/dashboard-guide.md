@@ -1044,15 +1044,16 @@ Grouped competition lives on its **own tab** (`/series/`, under Experimental),
 not above the tournament list. `/tournaments/` is the flat list of individual
 tournaments; anything that gathers several of them is a Series-tab concern.
 
-`SeriesList` (`components/dashboard/series/SeriesList.tsx`) lists grouped
-tournaments as rows linking to their series page. A group appears **only when
-more than one tournament belongs to it** — a lone tournament is just a card, not
-a series — and only while at least one of its tournaments is still active or
-upcoming. Each row shows a Series/League badge, a Live/Registration/Upcoming
-status, the game(s), the tournament count, a date range and a
-concluded-progress bar. It was the `DiscoveryRail` above the list; as a page it
-drops the old 8-row cap and renders an empty-state line instead of nothing,
-because a blank tab reads as broken where a missing rail read as "none today".
+`SeriesList` (`components/dashboard/series/SeriesList.tsx`) includes LeagueOS
+and renders grouped tournaments as cards in a horizontal scroller. Recurring
+groups and explicit named seasons appear, including concluded seasons. All,
+Active and Concluded show counts for the current filters; Active includes
+upcoming seasons, and Concluded requires every member to be completed or
+cancelled. Past external end dates also conclude stale snapshot entries.
+Filters select series through matching tournaments, while status, progress and
+membership counts describe the complete series. Filtering out an active game
+therefore cannot move its season into the archive. View changes reset the
+scroller to the beginning.
 
 Beneath it, a **Discord Tournaments** bubble lists entries whose `source` is
 `"discord"` — tournaments the **cen-scraper** ingests from forwarded Discord

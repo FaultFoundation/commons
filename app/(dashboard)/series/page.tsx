@@ -40,7 +40,6 @@ export default async function SeriesPage() {
   // `withoutDiscordSourced`. Internal Commons tournaments leave `source` unset
   // (they read as Challonge), so this is only ever collector-written rows.
   const discord = tournaments.filter(isDiscordSourced);
-  const experimentalSeries = tournaments.filter(t => t.source !== "leagueos");
 
   return (
     <>
@@ -51,7 +50,7 @@ export default async function SeriesPage() {
             .ff-list-heading (name + dim count), the shape the tournaments grid
             uses, so the card carries one heading rather than two. */}
         <Bubble title="Series & Leagues" titleHidden span="full">
-          <SeriesList tournaments={experimentalSeries} follows={follows} />
+          <SeriesList tournaments={tournaments} follows={follows} />
         </Bubble>
 
         <Bubble title="Discord Tournaments" titleHidden span="full">

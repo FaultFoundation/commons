@@ -14,7 +14,7 @@ Read-only audit of 4,716 live rows (2,437 start.gg, 1,179 FACEIT and 1,100 Leagu
 | leagueos | 1100 | 1100 | 954 | 365 |
 | startgg | 2437 | 1194 | 577 | 388 |
 
-These are classification counts, not a claim that every inferred singleton is a league. The UI shows recurring groups and explicit named seasons, including concluded series.
+These are classification counts, not a claim that every inferred singleton is a league. The UI shows recurring groups and explicit named seasons for other providers. LeagueOS now shows one card per provider league, with its seasons/programs and games nested on the league profile. The classification counts below remain season identities, not top-level card counts.
 
 ## NECC
 

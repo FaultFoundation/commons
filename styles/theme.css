@@ -8668,3 +8668,10 @@ button.ff-dash__link:hover {
 @media (max-width: 640px) {
   .ff-rr-matrix-wrap--large .ff-rr-matrix__rowname { max-width: 120px; }
 }
+
+/* LeagueOS: one league card, with seasons/programs and games inside. */
+.ff-league-season { border-bottom: 1px solid var(--ff-border); padding: 1rem 0; }
+.ff-league-season > summary { cursor: pointer; font-weight: 700; font-size: 1.1rem; }
+.ff-league-season__meta { display: block; font-size: .85rem; font-weight: 400; opacity: .75; margin-top: .3rem; }
+.ff-league-game { margin-top: 1.5rem; min-width: 0; }
+.ff-league-game > h3 { margin-bottom: .75rem; }

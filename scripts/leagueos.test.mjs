@@ -32,18 +32,45 @@ test('Series page includes LeagueOS',async()=>{
   assert.equal((html.match(/>Concluded</g)??[]).length,0);
  } finally {mocks.clear();cache.clear();}
 });
-test('all concluded NECC seasons render separately with valid profile links',async()=>{
+test('NECC has one league card while season identities remain available',async()=>{
  const rows=JSON.parse(readFileSync(resolve(root,'scripts/fixtures/leagueos-series-1100.json'),'utf8')).filter(t=>t.organizer==='NECC');
  const tournaments=await enrich(rows.map(t=>({...t,status:'completed'})));
  const html=renderSeries(tournaments);
- assert.equal((html.match(/class="ff-tcard ff-scard"/g)??[]).length,12);
- assert.equal((html.match(/>Concluded</g)??[]).length,12);
- assert.doesNotMatch(html,/>Upcoming</);
- assert.doesNotMatch(html,/318 tournaments/);
- assert.match(html,/68 tournaments/);
- assert.match(html,/NECC · Spring 2026/);
- assert.match(html,/NECC · Fall 2025/);
- for(const id of new Set(tournaments.map(t=>t.discovery.seriesId).filter(Boolean))) assert.ok(html.includes(encodeURIComponent(id)),id);
+ assert.equal((html.match(/class="ff-tcard ff-scard"/g)??[]).length,1);
+ assert.match(html,/318 tournaments/);
+ assert.match(html,/>Concluded</);
+ assert.ok(html.includes(encodeURIComponent(tournaments[0].discovery.providerParentId)));
+ assert.equal(new Set(tournaments.map(t=>t.discovery.seriesId).filter(Boolean)).size,12);
+});
+test('screenshot leagues group across roster sizes, tiers and seasons without merging provider identities',async()=>{
+ const rows=JSON.parse(readFileSync(resolve(root,'scripts/fixtures/leagueos-series-1100.json'),'utf8'))
+  .filter(t=>['Esports Ohio','Indiana Esports Network'].includes(t.organizer));
+ const tournaments=await enrich(rows.map(t=>({...t,status:'registration'})));
+ const html=renderSeries(tournaments);
+ assert.equal((html.match(/class="ff-tcard ff-scard"/g)??[]).length,2);
+ assert.match(html,/>Esports Ohio</);assert.match(html,/>Indiana Esports Network</);
+ assert.doesNotMatch(html,/ff-tcard__title[^>]*>[^<]*(?:Varsity|Club|2v2|3v3)/);
+ const {leagueosSections,leagueosGroup}=load('@/lib/leagueos-groups');
+ const ohio=leagueosSections(tournaments.filter(t=>t.organizer==='Esports Ohio'));
+ const sponsored=ohio.find(s=>s.name==='2026–2027 · Sponsored Season');
+ assert.equal(sponsored.tournaments.length,7);
+ assert.ok(sponsored.tournaments.some(t=>t.name.includes('(2v2)')));
+ assert.ok(sponsored.tournaments.some(t=>t.name.includes('(3v3)')));
+ const indiana=leagueosSections(tournaments.filter(t=>t.organizer==='Indiana Esports Network'));
+ const ihsen=indiana.find(s=>s.name==='2026–2027 · IHSEN');
+ assert.equal(ihsen.tournaments.length,10);
+ assert.ok(ihsen.tournaments.some(t=>t.name.includes('Club')));
+ assert.ok(ihsen.tournaments.some(t=>t.name.includes('Varsity')));
+ assert.ok(indiana.some(s=>s.name==='Fall 2026 · IMSEN'));
+ assert.equal(ohio.reduce((n,s)=>n+s.tournaments.length,0)+indiana.reduce((n,s)=>n+s.tournaments.length,0),tournaments.length);
+ const a=tournaments[0];
+ const {matchesDiscovery,EMPTY_FILTERS}=load('@/lib/discovery-shared');
+ assert.equal(matchesDiscovery(a,{...EMPTY_FILTERS,following:true},[leagueosGroup(a).id],Date.now()),true);
+ assert.notEqual(leagueosGroup(a).id,leagueosGroup({...a,discovery:{...a.discovery,providerParentId:'series:leagueos:another'}}).id);
+ const {LeagueCompetitions}=load('@/components/dashboard/series/LeagueCompetitions');
+ const detail=renderToStaticMarkup(React.createElement(LeagueCompetitions,{tournaments:ihsen.tournaments}));
+ assert.match(detail,/<summary>/);assert.match(detail,/IHSEN/);
+ assert.match(detail,/Varsity/);assert.match(detail,/Club/);
 });
 test('active leagues sort ahead of concluded groups and inferred singletons stay hidden',()=>{
  const t=(id,name,status)=>({id,name,status,startsAt:null,endsAt:null,discovery:{seriesId:id,seriesName:name}});

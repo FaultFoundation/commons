@@ -1435,7 +1435,7 @@ season across several games (or several per-game tournaments) is one series.
 `seriesName` still keeps the season/year and division, so different seasons stay
 distinct series (per-season, not a cross-year franchise). `SeriesList`
 ("Series & Leagues", [components/dashboard/series/SeriesList.tsx](components/dashboard/series/SeriesList.tsx))
-groups by `seriesId` on its **own tab** — `/series/`, under Experimental —
+groups LeagueOS by `providerParentId` and other sources by `seriesId` on its **own tab** — `/series/`, under Experimental —
 rather than as a rail above the list; the individual tournaments stay as
 ordinary cards in the `/tournaments/` grid, which grouping never collapses. Each
 series renders as a **tournament-style card** (the `.ff-tcard` shell: the first
@@ -1473,3 +1473,5 @@ Development auth uses host-only cookies (`crossSubDomainCookies.enabled = !isDev
 because browsers reject `.fault.foundation` cookies on localhost. Auth forms use
 POST even before hydration so a premature native submission does not place
 credentials in a query string.
+
+LeagueOS league profiles use `LeagueCompetitions` and `leagueosSections` for season/program → game → source tournament navigation. Formats and Club/JV/Varsity tiers are presentation subgroups, not new top-level cards; provider identity scopes each league. Existing season identities remain unchanged.

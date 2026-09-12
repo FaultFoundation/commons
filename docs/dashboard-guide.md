@@ -1055,6 +1055,14 @@ membership counts describe the complete series. Filtering out an active game
 therefore cannot move its season into the archive. View changes reset the
 scroller to the beginning.
 
+LeagueOS uses one top-level card per provider league identity, spanning its
+seasons and programs. Opening it shows collapsible season/program sections,
+then games. Roster sizes (2v2/3v3) and Club/JV/Varsity tiers do not create
+separate section headings; the original tournament names and division selectors
+remain available underneath. IHSEN/IMSEN, named cups and different seasons stay
+distinguishable inside the league. Existing season profile links still work.
+Grouping never relies on shared artwork or organizer display names.
+
 Beneath it, a **Discord Tournaments** bubble lists entries whose `source` is
 `"discord"` — tournaments the **cen-scraper** ingests from forwarded Discord
 posts (`discord_messages` → extraction → `discord_entities`, migrated by its

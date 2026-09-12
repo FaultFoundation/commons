@@ -333,7 +333,7 @@ export function matchesDiscovery(
     return false;
   if (
     f.following &&
-    ![d.organizationId, d.seriesId].some((id) => id && follows.includes(id))
+    ![d.organizationId, d.seriesId, d.providerParentId].some((id) => id && follows.includes(id))
   )
     return false;
   return true;

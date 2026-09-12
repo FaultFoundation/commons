@@ -7,14 +7,14 @@ import { loadTournamentEntries } from "@/lib/tournament-entries";
 import { discoveryCatalog, discoveryFollowIds } from "@/lib/discovery";
 import { getSessionCached } from "@/lib/session";
 import { safeWebsite } from "@/lib/discovery-shared";
+import { LeagueCompetitions } from "@/components/dashboard/series/LeagueCompetitions";
+import { seriesStatus } from "@/lib/series-status";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Tournament Discovery",
   robots: { index: false },
 };
-
-const CONCLUDED = new Set(["completed", "cancelled"]);
 
 function swatch(id: string): string {
   let h = 0;
@@ -55,16 +55,15 @@ export default async function DiscoveryProfilePage({
   id = profile.id;
   const follows = await discoveryFollowIds(session.user.id);
   const tournaments = entries.filter((t) =>
-    profile.kind === "organization"
+    id.startsWith("series:leagueos:") || profile.kind === "organization"
       ? t.discovery?.organizationId === id || t.discovery?.providerParentId === id
       : t.discovery?.seriesId === id,
   );
 
   const isLeague = id.startsWith("series:leagueos:") || tournaments.some((t) => t.discovery?.competition === "league");
-  const live = tournaments.some((t) => t.status === "active");
-  const registering = tournaments.some((t) => t.status === "registration");
+  const lifecycle = seriesStatus(tournaments, Date.now());
   const kindLabel =
-    profile.kind === "organization"
+    id.startsWith("series:leagueos:") ? "League" : profile.kind === "organization"
       ? "Organization"
       : isLeague
         ? "League"
@@ -88,7 +87,7 @@ export default async function DiscoveryProfilePage({
           return lo === hi ? lo : `${lo} – ${hi}`;
         })()
       : null;
-  const done = tournaments.filter((t) => CONCLUDED.has(t.status)).length;
+  const done = lifecycle.done;
   const website = safeWebsite(profile.website);
 
   const facts: [string, string][] = [
@@ -122,15 +121,9 @@ export default async function DiscoveryProfilePage({
                 ? ` · ${tournaments.length} tournaments`
                 : ""}
             </span>
-            {live ? (
-              <span className="ff-serieslist__status ff-serieslist__status--live">
-                Live
-              </span>
-            ) : done === tournaments.length ? (
-              <span className="ff-serieslist__status">Concluded</span>
-            ) : registering ? (
-              <span className="ff-serieslist__status">Registration open</span>
-            ) : null}
+            <span className={`ff-serieslist__status${lifecycle.statusLive ? " ff-serieslist__status--live" : ""}`}>
+              {lifecycle.status}
+            </span>
           </div>
           <h2 className="ff-serieshero__title">{profile.name}</h2>
           {profile.description ? (
@@ -177,10 +170,10 @@ export default async function DiscoveryProfilePage({
         }
         span="full"
       >
-        <TournamentCards
+        {id.startsWith("series:leagueos:") ? <LeagueCompetitions tournaments={tournaments} /> : <TournamentCards
           tournaments={tournaments}
           empty="No tournaments recorded here yet."
-        />
+        />}
       </Bubble>
     </div>
   );

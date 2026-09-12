@@ -22,6 +22,7 @@ import {
 } from "@/lib/discovery-shared";
 import { usePersistentState } from "@/lib/view-state";
 import { seriesStatus } from "@/lib/series-status";
+import { leagueosGroup } from "@/lib/leagueos-groups";
 
 /** How many game marks to show in a card's corner before collapsing to "+N". */
 const MAX_GAME_MARKS = 3;
@@ -182,14 +183,15 @@ export function SeriesList({
       { id: string; name: string; events: TournamentListEntry[] }
     >();
     for (const t of tournaments) {
-      const id = t.discovery?.seriesId;
+      const league = leagueosGroup(t);
+      const id = league?.id ?? t.discovery?.seriesId;
       if (!id) continue;
       const group =
         groups.get(id) ??
         (() => {
           const g = {
             id,
-            name: t.discovery?.seriesName ?? seriesName(t.name),
+            name: league?.name ?? t.discovery?.seriesName ?? seriesName(t.name),
             events: [] as TournamentListEntry[],
           };
           groups.set(id, g);
@@ -203,6 +205,7 @@ export function SeriesList({
       // Recurring groups and explicit named seasons qualify as series.
       .filter(
         (g) =>
+          g.id.startsWith("series:leagueos:") ||
           g.events.length > 1 ||
           (g.id.startsWith("series:competition:") &&
             g.events.some((t) =>

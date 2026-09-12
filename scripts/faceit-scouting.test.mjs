@@ -293,3 +293,86 @@ test('deep readiness and progress include voting backfill', async () => {
   assert.equal(result.progress.detailed, 3);
  } finally { f.sqlite.close(); }
 });
+
+function seedTeam(f) {
+  f.sqlite.exec(`CREATE TABLE faceit_scout_teams (team_id TEXT PRIMARY KEY, name TEXT NOT NULL, nickname TEXT NOT NULL, avatar_url TEXT, roster_json TEXT NOT NULL, search_mode TEXT NOT NULL, list_page INTEGER DEFAULT 0 NOT NULL, list_done INTEGER DEFAULT 0 NOT NULL, updated_at INTEGER NOT NULL);
+    CREATE TABLE faceit_scout_team_matches (id TEXT PRIMARY KEY, team_id TEXT NOT NULL, match_id TEXT NOT NULL);
+    INSERT INTO faceit_scout_teams VALUES ('team-us','Example','EX',null,'[{"playerId":"p1","nickname":"Scouted"}]','deep',1,1,0);
+    INSERT INTO faceit_scout_team_matches VALUES ('tm1','team-us','m1'),('tm3','team-us','m3');
+    INSERT INTO faceit_match_players (id,match_id,player_id,nickname,faction,team_id,result,stats_synced_at,created_at,updated_at)
+      VALUES ('m1:p2','m1','p2','Former member','faction1','team-us','win',1,0,0);
+    UPDATE faceit_match_players SET player_id='p2' WHERE match_id='m3';`);
+}
+
+test('team reads use only team-feed matches, deduplicate teammates, and retain former-roster matches', async () => {
+  const f = fixture();
+  try {
+    seedTeam(f);
+    const { getScoutingData, getScoutMatchDetail } = f.load('@/lib/faceit-scouting');
+    const res = await getScoutingData({ teamId: US });
+    assert.equal(res.status, 'ready');
+    assert.equal(res.target, 'team');
+    assert.equal(res.data.summary.total, 2);
+    assert.equal(res.data.summary.wins, 1);
+    assert.deepEqual(Array.from(res.data.matches, m => m.matchId).sort(), ['m1','m3']);
+    assert.equal(res.data.summary.maps.total, 5, 'a map must not be counted once per teammate');
+    assert.equal(res.data.matches[0].kdRatio, null, 'never present one representative player as team performance');
+    assert.deepEqual(Array.from(res.team.members[0].data.matches, m => m.matchId).sort(), ['m1','m2'], 'individual history remains independent');
+    const detail = await getScoutMatchDetail('m1', undefined, US);
+    assert.equal(detail.rounds[0].result, 'loss');
+    assert.equal(detail.teams[0].faction, 'faction1');
+    assert.equal(detail.teams[0].players.some(p => p.isScouted), false);
+    const filtered = await getScoutingData({ teamId: US }, '1v1');
+    assert.equal(filtered.data.summary.total, 0, 'non-team matches stay excluded even in another format');
+    assert.equal(filtered.progress.total, res.progress.total);
+  } finally { f.sqlite.close(); }
+});
+
+test('team readiness waits for missing feed matches and unfinished roster histories', async () => {
+  const f = fixture();
+  try {
+    seedTeam(f);
+    const { getScoutingData } = f.load('@/lib/faceit-scouting');
+    f.sqlite.exec("INSERT INTO faceit_scout_team_matches VALUES ('missing','team-us','missing')");
+    assert.equal((await getScoutingData({ teamId: US })).status, 'collecting');
+    f.sqlite.exec("DELETE FROM faceit_scout_team_matches WHERE id='missing'; UPDATE faceit_players SET list_done=0,detail_done=0 WHERE player_id='p1'");
+    assert.equal((await getScoutingData({ teamId: US })).status, 'collecting');
+  } finally { f.sqlite.close(); }
+});
+
+test('roster map average is unweighted, includes zero rates, and excludes undecided maps', () => {
+  const f = fixture();
+  try {
+    const { teamMapWinrates } = f.load('@/lib/faceit-scouting-shared');
+    const member = (id, wins, losses, draws) => ({ player: { playerId:id }, data: { mapWinrates: [{ map:'Ilios', mapMode:'Control', wins, losses, draws, total:wins+losses+draws, winrate:wins+losses ? wins/(wins+losses) : null }] } });
+    const [row] = teamMapWinrates([member('a',1,0,0), member('b',0,9,0), member('c',0,0,2)]);
+    assert.equal(row.winrate, .5);
+    assert.equal(row.low, 0);
+    assert.equal(row.high, 1);
+    assert.equal(row.players.length, 2);
+    assert.equal(row.total, 12);
+    const [empty] = teamMapWinrates([member('c',0,0,2)]);
+    assert.equal(empty.winrate, null);
+    assert.equal(empty.low, null);
+  } finally { f.sqlite.close(); }
+});
+
+test('quick team readiness checks the newest window and refreshes page zero on another search', async () => {
+  const f=fixture();
+  try {
+    seedTeam(f);
+    f.sqlite.exec("UPDATE faceit_scout_teams SET search_mode='quick',roster_json='[]',list_done=0,list_page=1");
+    for(let i=0;i<50;i++) {
+      const id=`extra-${i}`;
+      f.sqlite.prepare("INSERT INTO faceit_matches (match_id,status,game_mode,started_at,detail_synced_at,stats_synced_at,rounds_synced_at,voting_synced_at,created_at,updated_at) VALUES (?,'finished','5v5',?,1,1,1,1,0,0)").run(id,2000+i);
+      f.sqlite.prepare("INSERT INTO faceit_match_players (id,match_id,player_id,faction,team_id,result,stats_synced_at,created_at,updated_at) VALUES (?,?,'p1','faction1','team-us','win',1,0,0)").run(id+':p1',id);
+      f.sqlite.prepare("INSERT INTO faceit_scout_team_matches VALUES (?,'team-us',?)").run(id,id);
+    }
+    const {getScoutingData}=f.load('@/lib/faceit-scouting');
+    assert.equal((await getScoutingData({teamId:US})).status,'ready');
+    f.sqlite.exec("UPDATE faceit_matches SET rounds_synced_at=null WHERE match_id='extra-49'");
+    assert.equal((await getScoutingData({teamId:US})).status,'collecting','older complete matches cannot hide a missing newest match');
+    f.sqlite.exec("UPDATE faceit_matches SET rounds_synced_at=1; UPDATE faceit_scout_teams SET list_page=0");
+    assert.equal((await getScoutingData({teamId:US})).status,'collecting','new search must fetch newest team feed page');
+  } finally {f.sqlite.close();}
+});

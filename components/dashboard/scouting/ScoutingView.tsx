@@ -18,6 +18,7 @@ import {
   normalizeNickname,
   type ScoutGameMode,
   type ScoutMode,
+  type ScoutTarget,
   type ScoutResponse,
 } from "@/lib/faceit-scouting-shared";
 import { finishDeepScout, scoutRequest } from "@/lib/scouting-request";
@@ -47,42 +48,47 @@ import { usePersistentState } from "@/lib/view-state";
 
 // Bumped when the cached payload's shape changes; a stale entry from the
 // pre-filter shape would otherwise be shown under a format it never respected.
-const CACHE_KEY = "ff-scouting-v3";
+const CACHE_KEY = "ff-scouting-v4";
 const POLL_MS = 4000;
 const MAX_POLLS = 4;
 
 /** How many rows the Matches tab shows before "Show more". */
 const PAGE = 20;
 
-type Cached = { nickname: string; gameMode: ScoutGameMode; resp: ScoutResponse };
+type Cached = { query?: string; nickname: string; gameMode: ScoutGameMode; resp: ScoutResponse };
 type Tab = "overview" | "matches";
 type DeepState = { active: boolean; total: number | null; detailed: number | null };
 
-function readCache(): Cached | null {
+function readCache(target: ScoutTarget): Cached | null {
   try {
-    const raw = sessionStorage.getItem(CACHE_KEY);
+    const raw = sessionStorage.getItem(`${CACHE_KEY}:${target}`);
     return raw ? (JSON.parse(raw) as Cached) : null;
   } catch {
     return null;
   }
 }
 
-function writeCache(nickname: string, gameMode: ScoutGameMode, resp: ScoutResponse) {
+function writeCache(nickname: string, gameMode: ScoutGameMode, resp: ScoutResponse, target: ScoutTarget, query: string) {
   try {
-    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ nickname, gameMode, resp }));
+    sessionStorage.setItem(`${CACHE_KEY}:${target}`, JSON.stringify({ nickname, gameMode, resp, query }));
   } catch {
     // Caching is an optimization, never a must.
   }
 }
 
 export function ScoutingView({ initialQuery }: { initialQuery: string }) {
+  const [target, setTarget] = usePersistentState<ScoutTarget>("scouting:target", "player", value => value === "team" || value === "player" ? value : undefined);
+  return <ScoutingSearch key={target} initialQuery={target === "player" ? initialQuery : ""} target={target} onTargetChange={setTarget} />;
+}
+
+function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery: string; target: ScoutTarget; onTargetChange: (target: ScoutTarget) => void }) {
   // The search box + depth remember the last choice across visits; ?q= / the
   // member's own handle is the fallback the server seeded.
   const [query, setQuery, restored] = usePersistentState<string>(
-    "scouting:query",
+    `scouting:query:${target}`,
     initialQuery,
     (stored) =>
-      typeof stored === "string" && stored.length <= 64 ? stored : undefined,
+      typeof stored === "string" && stored.length <= 256 ? stored : undefined,
   );
   const [mode, setMode] = usePersistentState<ScoutMode>(
     "scouting:mode",
@@ -106,6 +112,7 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
 
   const [resp, setResp] = useState<ScoutResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [teamRunning, setTeamRunning] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [deep, setDeep] = useState<DeepState>({ active: false, total: null, detailed: null });
   const [shown, setShown] = useState(PAGE);
@@ -137,9 +144,9 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
       const shownNick = data.player?.nickname ?? nickname;
       activeNick.current = shownNick;
       shownMode.current = mode;
-      writeCache(shownNick, mode, data);
+      writeCache(shownNick, mode, data, target, nickname);
     },
-    [],
+    [target],
   );
 
   // A cache-only read (no Worker trigger). Also used by the background poll and
@@ -151,11 +158,11 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
       mode: ScoutGameMode,
     ): Promise<ScoutResponse | null> => {
       const params = new URLSearchParams({ game_mode: mode });
-      if (playerId) params.set("player_id", playerId);
+      if (playerId) params.set(target === "team" ? "team_id" : "player_id", playerId);
       else params.set("nickname", nickname);
-      return scoutRequest(`/api/scouting/player?${params.toString()}`);
+      return scoutRequest(`/api/scouting/${target}?${params.toString()}`);
     },
-    [],
+    [target],
   );
 
   // Re-read a handful of times while a quick search is still collecting, so maps
@@ -186,12 +193,29 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
   // A quick search: ask the Worker to collect, then read back + poll a few times.
   const runQuick = useCallback(
     async (raw: string, gm: ScoutGameMode) => {
-      const nickname = normalizeNickname(raw);
+      const nickname = target === "team" ? (raw.trim().length <= 256 ? raw.trim() : null) : normalizeNickname(raw);
       if (!nickname) return;
       clearPoll();
       setLoading(true);
+      if (target === "team") setTeamRunning(true);
       setResp(null);
       try {
+        if (target === "team") {
+          let teamId: string | undefined;
+          const completed = await finishDeepScout(
+            { status: "collecting", player: null, data: null },
+            async () => {
+              const next = await scoutRequest("/api/scouting/team", { method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...(teamId ? { team_id: teamId } : { nickname }), mode: "quick", game_mode: gm }) });
+              if (next?.team) teamId = next.team.teamId;
+              return next;
+            },
+            next => { applyResp(nickname, next, gm); setLoading(false); },
+            () => alive.current,
+          );
+          if (completed && alive.current) applyResp(nickname, completed, gm);
+          return;
+        }
         const response = await scoutRequest("/api/scouting/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -206,27 +230,27 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
       } catch {
         if (alive.current) setResp({ status: "error", player: null, data: null });
       } finally {
-        if (alive.current) setLoading(false);
+        if (alive.current) { setLoading(false); setTeamRunning(false); }
       }
     },
-    [applyResp, clearPoll, schedulePoll],
+    [applyResp, clearPoll, schedulePoll, target],
   );
 
   // A deep search: register + first page, then loop /advance behind the load
   // screen until the whole history is collected, or an explicit failure occurs.
   const runDeep = useCallback(
     async (raw: string, gm: ScoutGameMode) => {
-      const nickname = normalizeNickname(raw);
+      const nickname = target === "team" ? (raw.trim().length <= 256 ? raw.trim() : null) : normalizeNickname(raw);
       if (!nickname) return;
       clearPoll();
       setLoading(false);
       setResp(null);
       setDeep({ active: true, total: null, detailed: null });
 
-      const post = (path: string, body: unknown) => scoutRequest(path, {
+      const post = (path: string, body: Record<string, unknown>) => scoutRequest(target === "team" ? "/api/scouting/team" : path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(target === "team" && body.player_id ? { ...body, team_id: body.player_id } : body),
       });
 
       let playerId: string | undefined;
@@ -251,7 +275,7 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
       setDeep({ active: false, total: null, detailed: null });
       applyResp(nickname, completed, gm);
     },
-    [applyResp, clearPoll],
+    [applyResp, clearPoll, target],
   );
 
   const runSearch = useCallback(
@@ -288,9 +312,9 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
   useEffect(() => {
     if (!restored || hydrated.current) return;
     hydrated.current = true;
-    const seed = normalizeNickname(query);
-    const cached = readCache();
-    if (cached && seed && cached.nickname.toLowerCase() === seed.toLowerCase()) {
+    const seed = target === "team" ? query.trim() : normalizeNickname(query);
+    const cached = readCache(target);
+    if (cached && seed && (cached.nickname.toLowerCase() === seed.toLowerCase() || cached.query?.toLowerCase() === seed.toLowerCase())) {
       setResp(cached.resp);
       activeNick.current = cached.nickname;
       // Whatever format the cache was filled under — the effect below re-reads
@@ -332,7 +356,7 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
   const data = resp?.data ?? null;
   const status = resp?.status ?? "idle";
   const collecting = status === "collecting";
-  const busy = loading || deep.active;
+  const busy = loading || deep.active || teamRunning;
   // The player is collected but has nothing in the selected format — a real
   // answer, not an error, so it replaces the panels rather than showing a page
   // of zeroes. Only once collection has settled, or a mid-backfill 5v5 view
@@ -343,13 +367,19 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
     <div className="ff-owpage">
       <Bubble title="Scouting" span="full">
         <form className="ff-scoutsearch" onSubmit={onSubmit} role="search">
+          <div className="ff-scoutmode" role="radiogroup" aria-label="Search for">
+            {(["player", "team"] as const).map(option => <button key={option} type="button" role="radio" aria-checked={target === option}
+              className={`ff-scoutmode__opt${target === option ? " ff-scoutmode__opt--on" : ""}`} onClick={() => onTargetChange(option)}>
+              {option === "player" ? "Player" : "Team"}
+            </button>)}
+          </div>
           <input
             className="ff-auth__input ff-scoutsearch__input"
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="FACEIT nickname"
-            aria-label="FACEIT nickname"
+            placeholder={target === "team" ? "FACEIT team name (tag) or URL" : "FACEIT nickname"}
+            aria-label={target === "team" ? "FACEIT team" : "FACEIT nickname"}
             autoComplete="off"
             spellCheck={false}
           />
@@ -357,7 +387,7 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
           <button
             type="submit"
             className="ff-btn ff-btn--brand"
-            disabled={busy || !normalizeNickname(query)}
+            disabled={busy || !(target === "team" ? query.trim() && query.length <= 256 : normalizeNickname(query))}
           >
             {busy ? "Scouting…" : "Scout"}
           </button>
@@ -400,7 +430,7 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
         <StatLoading />
       ) : status === "not_found" || status === "error" || status === "unauthorized" || status === "not_configured" ? (
         <Bubble title="Scouting" span="full">
-          <p className="ff-bubble__lede">{SCOUT_STATUS_MESSAGES[status]}</p>
+          <p className="ff-bubble__lede">{resp?.message ?? SCOUT_STATUS_MESSAGES[status]}</p>
         </Bubble>
       ) : player && data ? (
         <>
@@ -434,10 +464,10 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
             ))}
           </div>
 
-          {emptyFormat ? (
+          {emptyFormat && (!resp?.team || tab === "matches") ? (
             <Bubble title={`No ${gameMode} matches`} span="full">
               <p className="ff-bubble__lede">
-                {SCOUT_STATUS_MESSAGES.no_matches}
+                {target === "team" ? "No team matches in this format. Try another format above." : SCOUT_STATUS_MESSAGES.no_matches}
               </p>
             </Bubble>
           ) : tab === "overview" ? (
@@ -448,6 +478,7 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
                   mapWinrates={data.mapWinrates}
                   summary={data.summary}
                   collecting={collecting}
+                  members={resp?.team?.members}
                 />
               </div>
             </div>
@@ -461,7 +492,8 @@ export function ScoutingView({ initialQuery }: { initialQuery: string }) {
               ) : null}
               <FaceitMatchList
                 matches={data.matches.slice(0, shown)}
-                scoutedPlayerId={player.playerId}
+                scoutedPlayerId={resp?.team ? undefined : player.playerId}
+                scoutedTeamId={resp?.team?.teamId}
               />
               {data.matches.length > shown ? (
                 <div className="ff-bubble__cta">
@@ -497,7 +529,7 @@ function ScoutHeader({
 }) {
   const player = resp.player!;
   const collecting = resp.status === "collecting";
-  const canDeepen = player.searchMode !== "deep";
+  const canDeepen = player.searchMode !== "deep" && !collecting;
 
   return (
     <section className="ff-card ff-bubble ff-bubble--full ff-scouthead">

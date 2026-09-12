@@ -8,9 +8,11 @@ import { ScoutMatchRow } from "@/components/dashboard/scouting/ScoutMatchRow";
 export function FaceitMatchList({
   matches,
   scoutedPlayerId,
+  scoutedTeamId,
 }: {
   matches: ScoutMatch[];
-  scoutedPlayerId: string;
+  scoutedPlayerId?: string;
+  scoutedTeamId?: string;
 }) {
   if (!matches.length) {
     return (
@@ -22,7 +24,7 @@ export function FaceitMatchList({
   return (
     <div className="ff-scoutmatches">
       {matches.map((m) => (
-        <ScoutMatchRow key={m.matchId} match={m} scoutedPlayerId={scoutedPlayerId} />
+        <ScoutMatchRow key={m.matchId} match={m} scoutedPlayerId={scoutedPlayerId} scoutedTeamId={scoutedTeamId} />
       ))}
     </div>
   );

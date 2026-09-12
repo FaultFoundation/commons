@@ -28,6 +28,7 @@ export type ScoutStatus =
  *  front-loads the per-match scoreboard/overview with bigger budgets. Note this
  *  is the search DEPTH — distinct from `ScoutGameMode`, the team size. */
 export type ScoutMode = "quick" | "deep";
+export type ScoutTarget = "player" | "team";
 
 /**
  * The FACEIT team-size format a match was played in, which every scouting read
@@ -179,7 +180,11 @@ export type ScoutData = {
   gameMode: ScoutGameMode;
 };
 
+export type ScoutTeamMember = { player: ScoutPlayer; data: ScoutData | null; status: ScoutStatus };
+
 export type ScoutResponse = {
+  target?: ScoutTarget;
+  team?: { teamId: string; members: ScoutTeamMember[] };
   status: ScoutStatus;
   player: ScoutPlayer | null;
   data: ScoutData | null;
@@ -532,4 +537,18 @@ export function computeConsistency(matches: ScoutMatch[]): ConsistencyStat[] {
     const cv = mu != null && sd != null && mu !== 0 ? sd / Math.abs(mu) : null;
     return { key, stat: label, mean: mu, stddev: sd, cv };
   }).filter((s) => s.cv != null);
+}
+
+/** Each roster member has equal weight; unknown/undecided rates are omitted. */
+export function teamMapWinrates(members: ScoutTeamMember[]) {
+  const maps = new Map<string, MapWinrate & { players: { member: ScoutTeamMember; rate: number; total: number }[] }>();
+  for (const member of members) for (const row of member.data?.mapWinrates ?? []) {
+    const entry = maps.get(row.map) ?? { ...row, wins: 0, losses: 0, draws: 0, total: 0, players: [] };
+    entry.wins += row.wins; entry.losses += row.losses; entry.draws += row.draws; entry.total += row.total;
+    if (row.winrate != null) entry.players.push({ member, rate: row.winrate, total: row.total });
+    maps.set(row.map, entry);
+  }
+  return [...maps.values()].map(row => ({ ...row, winrate: mean(row.players.map(p => p.rate)),
+    low: row.players.length ? Math.min(...row.players.map(p => p.rate)) : null,
+    high: row.players.length ? Math.max(...row.players.map(p => p.rate)) : null }));
 }

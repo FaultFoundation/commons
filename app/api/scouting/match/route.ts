@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "match_id required" }, { status: 400 });
   }
 
-  const detail = await getScoutMatchDetail(matchId, playerId);
+  const detail = await getScoutMatchDetail(matchId, playerId, url.searchParams.get("team")?.trim() || undefined);
   if (!detail) {
     return Response.json({ error: "not found" }, { status: 404 });
   }

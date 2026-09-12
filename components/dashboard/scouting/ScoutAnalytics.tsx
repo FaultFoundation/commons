@@ -1,9 +1,11 @@
+import { TeamMapWinrateChart } from "./TeamMapWinrateChart";
 import {
   computeWinLossStrip,
   formatWinratePct,
   type MapWinrate,
   type ScoutMatch,
   type ScoutSummary,
+  type ScoutTeamMember,
 } from "@/lib/faceit-scouting-shared";
 
 import { MapWinrateChart } from "@/components/dashboard/scouting/MapWinrateChart";
@@ -19,11 +21,13 @@ export function ScoutAnalytics({
   mapWinrates,
   summary,
   collecting,
+  members,
 }: {
   matches: ScoutMatch[];
   mapWinrates: MapWinrate[];
   summary: ScoutSummary;
   collecting: boolean;
+  members?: ScoutTeamMember[];
 }) {
   const wl = computeWinLossStrip(matches);
 
@@ -39,14 +43,14 @@ export function ScoutAnalytics({
 
   return (
     <div className="ff-scoutanalytics">
-      <ScoutGraphCard title="Map Profile" caption={mapCaption} defaultOpen>
+      <ScoutGraphCard title="Map Profile" caption={members ? `Team record: ${mapCaption}` : mapCaption} defaultOpen>
         {collecting && mapWinrates.length === 0 ? (
           <p className="ff-bubble__note">
             Collecting matches… map win rates appear as each match&apos;s rounds
             are pulled.
           </p>
         ) : (
-          <MapWinrateChart rows={mapWinrates} />
+          members ? <TeamMapWinrateChart members={members} /> : <MapWinrateChart rows={mapWinrates} />
         )}
       </ScoutGraphCard>
 

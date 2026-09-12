@@ -8842,3 +8842,16 @@ a.ff-sview__crumb:hover {
   width: 18px;
   height: 18px;
 }
+
+/* Team map distributions: fixed percentage axis with accessible player previews. */
+.ff-teammap__track { position: relative; min-width: 0; height: 62px; margin-inline: 10px; }
+.ff-teammap__guide { position: absolute; inset: 50% 0 auto; height: 2px; background: var(--ff-border); }
+.ff-teammap__wick { position: absolute; top: calc(50% - 8px); height: 16px; border-inline: 2px solid currentColor; color: var(--ff-accent); pointer-events: none; }
+.ff-teammap__wick::after { content: ""; position: absolute; top: 7px; left: 0; right: 0; border-top: 2px solid currentColor; }
+.ff-teammap__average { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 15px; height: 15px; border-radius: 50%; background: var(--ff-accent); border: 2px solid var(--ff-navy-900); z-index: 2; padding: 0; }
+.ff-teammap__point { position: absolute; transform: translateX(-50%); width: 18px; height: 18px; z-index: 3; }
+.ff-teammap__point:hover, .ff-teammap__point:focus-within { z-index: 10; }
+.ff-teammap__dot { display: block; margin: 3px; width: 12px; height: 12px; padding: 0; border-radius: 50%; border: 1px solid var(--ff-navy-900); background: color-mix(in srgb, var(--ff-accent) 45%, transparent); cursor: pointer; }
+.ff-teammap__dot:focus-visible, .ff-teammap__average:focus-visible { outline: 2px solid var(--ff-navy-900); outline-offset: 3px; }
+.ff-teammap__tooltip { position: fixed; z-index: 1000; display: grid; gap: 5px; width: 250px; max-width: calc(100vw - 50px); padding: 13px; border: 1px solid #53606e; border-radius: 10px; background: #182029; color: #f4f7fa; box-shadow: 0 8px 30px #0006; font-size: 12px; line-height: 1.4; pointer-events: none; }
+.ff-teammap__tooltip strong { font-size: 14px; }

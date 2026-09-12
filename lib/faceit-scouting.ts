@@ -9,6 +9,8 @@ import {
   faceitMatchRounds,
   faceitMatches,
   faceitPlayers,
+  faceitScoutTeams,
+  faceitScoutTeamMatches,
 } from "@/db/faceit-schema";
 import {
   DEFAULT_GAME_MODE,
@@ -105,21 +107,21 @@ function asResult(v: string | null): ScoutResult | null {
  * progress instead of looking finished because their 5v5 slice happens to be.
  */
 export async function getScoutingData(
-  query: { playerId?: string; nickname?: string },
+  query: { playerId?: string; nickname?: string; teamId?: string },
   gameMode: ScoutGameMode = DEFAULT_GAME_MODE,
   limit = DEFAULT_MATCH_LIMIT,
 ): Promise<ScoutResponse> {
   const db = getOwDb();
   if (!db) return { status: "not_configured", player: null, data: null };
 
-  const key = query.playerId?.trim();
+  const key = query.teamId?.trim() || query.playerId?.trim();
   const nick = query.nickname?.trim();
   if (!key && !nick) return { status: "idle", player: null, data: null };
 
   const take = Math.min(Math.max(1, limit), MAX_MATCH_LIMIT);
 
   try {
-    const [row] = await db
+    const [playerRow] = await db
       .select()
       .from(faceitPlayers)
       .where(
@@ -129,6 +131,18 @@ export async function getScoutingData(
       )
       .limit(1);
 
+    const [teamRow] = query.teamId ? await db.select().from(faceitScoutTeams).where(eq(faceitScoutTeams.teamId, query.teamId)) : [];
+    if (query.teamId && !teamRow) return { status: "idle", player: null, data: null };
+    const row = teamRow ? { ...playerRow, playerId: teamRow.teamId, nickname: `${teamRow.name} (${teamRow.nickname})`,
+      avatarUrl: teamRow.avatarUrl, country: null, skillLevel: null, faceitElo: null, region: null,
+      faceitUrl: `https://www.faceit.com/en/teams/${teamRow.teamId}/stats`, gamePlayerName: null,
+      matchCount: 0, listDone: teamRow.listDone, detailDone: true, searchMode: teamRow.searchMode, status: "collecting" } : playerRow;
+    // Exactly one participant represents a team in each TEAM-FEED match. This
+    // also handles old rosters without merging current members' other matches.
+    const subject = query.teamId ? sql`${faceitMatchPlayers.teamId} = ${query.teamId}
+      and exists (select 1 from faceit_scout_team_matches tm where tm.team_id=${query.teamId} and tm.match_id=${faceitMatches.matchId})
+      and ${faceitMatchPlayers.playerId} = (select min(p.player_id) from faceit_match_players p where p.match_id=${faceitMatches.matchId} and p.team_id=${query.teamId})`
+      : eq(faceitMatchPlayers.playerId, row?.playerId ?? "");
     // Never searched (or only seen as an opponent, no own history collected).
     if (!row || (!row.searchMode && row.matchCount === 0)) {
       return { status: "idle", player: null, data: null };
@@ -143,7 +157,7 @@ export async function getScoutingData(
       )
       .where(
         and(
-          eq(faceitMatchPlayers.playerId, row.playerId),
+          subject,
           eq(faceitMatches.gameMode, gameMode),
         ),
       )
@@ -164,7 +178,7 @@ export async function getScoutingData(
       )
       .where(
         and(
-          eq(faceitMatchPlayers.playerId, row.playerId),
+          subject,
           eq(faceitMatches.gameMode, gameMode),
         ),
       )
@@ -212,14 +226,14 @@ export async function getScoutingData(
         scoreFor: factions.scoreFor,
         scoreAgainst: factions.scoreAgainst,
         opponentName: factions.opponentName,
-        role: me.role,
-        eliminations: me.eliminations,
-        deaths: me.deaths,
-        assists: me.assists,
-        kdRatio: me.kdRatio,
-        damageDealt: me.damageDealt,
-        healingDone: me.healingDone,
-        damageMitigated: me.damageMitigated,
+        role: query.teamId ? null : me.role,
+        eliminations: query.teamId ? null : me.eliminations,
+        deaths: query.teamId ? null : me.deaths,
+        assists: query.teamId ? null : me.assists,
+        kdRatio: query.teamId ? null : me.kdRatio,
+        damageDealt: query.teamId ? null : me.damageDealt,
+        healingDone: query.teamId ? null : me.healingDone,
+        damageMitigated: query.teamId ? null : me.damageMitigated,
       };
     });
 
@@ -256,7 +270,7 @@ export async function getScoutingData(
         faceitMatches,
         eq(faceitMatchPlayers.matchId, faceitMatches.matchId),
       )
-      .where(eq(faceitMatchPlayers.playerId, row.playerId));
+      .where(subject);
 
     // MAP record, grouped by map NAME only. The mode is a property of the map
     // (Ilios is always Control), so it rides along as max() rather than being
@@ -285,7 +299,7 @@ export async function getScoutingData(
       )
       .where(
         and(
-          eq(faceitMatchPlayers.playerId, row.playerId),
+          subject,
           eq(faceitMatches.gameMode, gameMode),
           isNotNull(faceitMatchRounds.mapName),
         ),
@@ -365,11 +379,19 @@ export async function getScoutingData(
     // waiting on a full backfill it never asked for. Both read the UNFILTERED
     // counts — readiness is a property of the collection, not of the format the
     // viewer happens to be looking at.
-    const fullyReady = row.listDone && row.detailDone && Number(agg?.completeAll ?? 0) === totalAll;
-    const quickReady =
+    const [teamCount] = query.teamId ? await db.select({ total: sql<number>`count(*)` }).from(faceitScoutTeamMatches).where(eq(faceitScoutTeamMatches.teamId, query.teamId)) : [];
+    const expectedTotal = teamCount ? Number(teamCount.total) : totalAll;
+    player.matchCount = expectedTotal;
+    const fullyReady = row.listDone && row.detailDone && Number(agg?.completeAll ?? 0) === expectedTotal;
+    const teamWindow = teamRow ? await db.select({ complete: sql<number>`case when ${faceitMatches.detailSyncedAt} is not null and ${faceitMatches.statsSyncedAt} is not null and ${faceitMatches.roundsSyncedAt} is not null and ${faceitMatches.votingSyncedAt} is not null then 1 else 0 end` })
+      .from(faceitScoutTeamMatches).innerJoin(faceitMatches, eq(faceitScoutTeamMatches.matchId, faceitMatches.matchId))
+      .where(eq(faceitScoutTeamMatches.teamId, teamRow.teamId)).orderBy(desc(faceitMatches.startedAt)).limit(50) : [];
+    player.detailDone = teamRow ? fullyReady : player.detailDone;
+    const quickReady = teamRow ? row.searchMode === "quick" && teamRow.listPage > 0 && (teamRow.listDone || expectedTotal >= 50)
+      && teamWindow.length === Math.min(expectedTotal, 50) && teamWindow.every(m => Number(m.complete) === 1) :
       row.searchMode === "quick" &&
       totalAll > 0 &&
-      detailedAll >= Math.min(totalAll, QUICK_READY_MATCHES);
+      detailedAll >= Math.min(expectedTotal, QUICK_READY_MATCHES);
     const status: ScoutStatus =
       row.status === "not_found"
         ? "not_found"
@@ -379,11 +401,22 @@ export async function getScoutingData(
             ? "ready"
             : "collecting";
 
+    const members = teamRow ? await Promise.all((JSON.parse(teamRow.rosterJson) as { playerId: string; nickname: string }[]).map(async member => {
+      const response = await getScoutingData({ playerId: member.playerId }, gameMode, limit);
+      return { status: response.status, data: response.data, progress: response.progress, player: response.player ?? {
+        playerId: member.playerId, nickname: member.nickname, avatarUrl: null, country: null, skillLevel: null, faceitElo: null,
+        region: null, faceitUrl: `https://www.faceit.com/en/players/${encodeURIComponent(member.nickname)}`, gamePlayerName: null,
+        matchCount: 0, listDone: false, detailDone: false, searchMode: null,
+      } };
+    })) : [];
+    const rosterReady = members.every(m => m.status === "ready" && m.player.searchMode === row.searchMode);
     return {
-      status,
+      target: teamRow ? "team" : "player",
+      ...(teamRow ? { team: { teamId: teamRow.teamId, members } } : {}),
+      status: teamRow && status === "ready" && !rosterReady ? "collecting" : status,
       player,
       data: { summary, mapWinrates, matches, gameMode },
-      progress: { total: totalAll, detailed: Number(agg?.completeAll ?? 0) },
+      progress: { total: expectedTotal + members.reduce((n, m) => n + (m.progress?.total ?? m.player.matchCount), 0), detailed: Number(agg?.completeAll ?? 0) + members.reduce((n, m) => n + (m.progress?.detailed ?? 0), 0) },
     };
   } catch (error) {
     console.error("scouting: read failed", error);
@@ -633,6 +666,7 @@ function parseHeroBans(json: string | null): string[] {
 export async function getScoutMatchDetail(
   matchId: string,
   scoutedPlayerId?: string,
+  requestedTeamId?: string,
 ): Promise<ScoutMatchDetail | null> {
   const db = getOwDb();
   if (!db) return null;
@@ -660,9 +694,9 @@ export async function getScoutMatchDetail(
       .where(eq(faceitMatchRounds.matchId, id))
       .orderBy(asc(faceitMatchRounds.roundIndex));
 
-    const scoutedTeamId = scoutedPlayerId
+    const scoutedTeamId = requestedTeamId ?? (scoutedPlayerId
       ? (players.find((p) => p.playerId === scoutedPlayerId)?.teamId ?? null)
-      : null;
+      : null);
     const rounds: ScoutMapRound[] = roundRows.map((r) => ({
       round: r.roundIndex,
       mapName: r.mapName,
@@ -702,7 +736,7 @@ export async function getScoutMatchDetail(
       rounds.length,
     );
 
-    const scoutedFaction = scoutedPlayerId
+    const scoutedFaction = requestedTeamId ? players.find(p => p.teamId === requestedTeamId)?.faction : scoutedPlayerId
       ? (sbPlayers.find((p) => p.playerId === scoutedPlayerId)?.faction ?? null)
       : null;
     const factionKeys = [
@@ -757,4 +791,20 @@ export async function getScoutMatchDetail(
     console.error("scouting: match detail read failed", error);
     return null;
   }
+}
+
+/** Team triggers use the same authenticated Worker boundary as player searches. */
+export async function requestFaceitTeam(action: "search" | "advance", value: string, mode: ScoutMode) {
+  const { env } = getCloudflareContext();
+  const rawBase = env.OW_DATA_URL?.trim();
+  const secret = env.OW_POLLER_SECRET?.trim();
+  if (!rawBase || !secret) return { status: "not_configured" as const };
+  const base = (/^https?:\/\//i.test(rawBase) ? rawBase : `https://${rawBase}`).replace(/\/$/, "");
+  const params = new URLSearchParams({ mode, [action === "search" ? "nickname" : "team_id"]: value });
+  try {
+    const res = await fetch(`${base}/faceit/team/${action}?${params}`, { method: "POST", headers: { Authorization: `Bearer ${secret}` }, signal: AbortSignal.timeout(35_000) });
+    if (!res.ok) return { status: res.status === 404 ? "not_found" as const : res.status === 503 ? "not_configured" as const : "error" as const };
+    const body = await res.json() as { teamId?: string };
+    return { status: "collecting" as const, teamId: body.teamId };
+  } catch { return { status: "error" as const }; }
 }

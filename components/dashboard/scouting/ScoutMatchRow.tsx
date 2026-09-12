@@ -34,9 +34,11 @@ function formatKda(m: ScoutMatch): string | null {
 export function ScoutMatchRow({
   match,
   scoutedPlayerId,
+  scoutedTeamId,
 }: {
   match: ScoutMatch;
-  scoutedPlayerId: string;
+  scoutedPlayerId?: string;
+  scoutedTeamId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<ScoutMatchDetail | null>(null);
@@ -52,7 +54,8 @@ export function ScoutMatchRow({
     try {
       const params = new URLSearchParams({
         match_id: match.matchId,
-        player: scoutedPlayerId,
+        ...(scoutedPlayerId ? { player: scoutedPlayerId } : {}),
+        ...(scoutedTeamId ? { team: scoutedTeamId } : {}),
       });
       const res = await fetch(`/api/scouting/match?${params.toString()}`, {
         cache: "no-store",
@@ -66,7 +69,7 @@ export function ScoutMatchRow({
     } finally {
       setLoading(false);
     }
-  }, [open, detail, loading, match.matchId, scoutedPlayerId]);
+  }, [open, detail, loading, match.matchId, scoutedPlayerId, scoutedTeamId]);
 
   const score =
     match.scoreFor != null && match.scoreAgainst != null

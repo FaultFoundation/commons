@@ -27,8 +27,32 @@ function loader(overrides = {}) {
 }
 const load = loader();
 const fmt = load('@/lib/tournament-format');
+const { bracketConnectorEdges } = load('@/lib/bracket-connectors');
 const rr = load('@/lib/round-robin-shared');
 const match = (a,b, extra={}) => ({ id: `${a}-${b}`, entrant1Name:a, entrant2Name:b, roundOrder:1, ...extra });
+test('custom schedules resolve complete knockout, round robin, and explicit loser brackets', () => {
+  for (const raw of ['CUSTOM_SCHEDULE','LEAGUEOS_METHOD_4']) {
+    const resolveMatches = matches => fmt.resolveExternalFormat([{id:'e',phases:[{id:'default',bracketType:raw}],matches:matches.map(m=>({...m,bracketType:raw}))}]);
+    assert.equal(resolveMatches([match('A','B'),match('A','C'),match('B','C')]),'round_robin');
+    assert.equal(resolveMatches([match('A','B',{winner:1}),match('C','D',{winner:1}),match('A','C',{winner:1,roundOrder:2})]),'single_elim');
+    assert.equal(resolveMatches([match('A','B',{round:'Losers Round 1',roundOrder:-1})]),'double_elim');
+    assert.equal(resolveMatches([match('A','B'),match('C','D')]),null);
+    assert.equal(resolveMatches([match('A','B',{winner:1}),match('C','D',{winner:1}),match('B','C',{winner:1,roundOrder:2})]),null,'eliminated entrant cannot advance');
+    assert.equal(resolveMatches([]),null);
+  }
+});
+test('elimination connectors survive placement rounds and shuffled provider rows', () => {
+  const m=(id,a,b,extra={})=>match(a,b,{sourceMatchId:id,prereq1Id:null,prereq2Id:null,orderKey:null,...extra});
+  const columns=[{matches:[m('s2','C','D'),m('s1','A','B')]},{matches:[m('f','A','C')]},{matches:[m('bronze','B','D')]}];
+  assert.deepEqual(JSON.parse(JSON.stringify(bracketConnectorEdges(columns,true))),[['s1','f'],['s2','f'],['s1','bronze'],['s2','bronze']]);
+  assert.equal(bracketConnectorEdges(columns,false).length,0);
+  const explicit=[columns[0],{matches:[m('f',null,null,{prereq1Id:'s1',prereq2Id:'s2'})]}];
+  assert.equal(bracketConnectorEdges(explicit,false).length,2);
+  const tbd=[columns[0],{matches:[m('f',null,null)]}];
+  assert.equal(bracketConnectorEdges(tbd,true).length,0,'unordered TBD slots must not get invented connections');
+  const positioned=tbd.map(c=>({matches:c.matches.map((m,i)=>({...m,orderKey:String(i)}))}));
+  assert.equal(bracketConnectorEdges(positioned,true).length,2);
+});
 test('WRMSEC preseason pairings stay in two stages, not 21 inferred pools',()=>{
   const fixture=JSON.parse(readFileSync(resolve(root,'scripts/fixtures/wrmsec-preseason.json'),'utf8'));
   const events=fixture.events.map(e=>({...e,matches:e.matches.map(m=>({...m,scheduledAt:m.scheduledAt?new Date(m.scheduledAt):null}))}));
@@ -56,6 +80,7 @@ test('partial elimination and Swiss schedules remain unconfirmed, never density-
 test('complete unique pairings identify RR; duplicate rows cannot inflate coverage', () => {
   assert.equal(fmt.classifyExternalFormat([match('A','B'),match('B','C'),match('A','C')]), 'round_robin');
   assert.equal(fmt.classifyExternalFormat([match('A','B'),match('A','B'),match('B','C')]), null);
+  assert.equal(fmt.classifyExternalFormat([match('A','B'),match('B','C'),match('A','C'),match('A','B')]), null,'a rematch after complete coverage is not necessarily RR');
 });
 test('provider metadata takes precedence and mixed stages are not collapsed', () => {
   for (const [raw, expected] of [['ROUND_ROBIN','round_robin'],['singleElimination','single_elim'],['doubleElimination','double_elim'],['SWISS','swiss']]) {

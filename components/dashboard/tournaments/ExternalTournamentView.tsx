@@ -821,6 +821,7 @@ export function ExternalTournamentView({
           <Bubble title={title} className="ff-bubble--divided">
             <ExternalBracket
               events={stage.events}
+              format={fmt}
               source={tournament.source}
               storageKey={`${tournament.id}:${stage.id}`}
             />

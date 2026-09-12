@@ -43,6 +43,19 @@ Old rows use conservative structural inference. Match-density thresholds are
 removed; sparse schedules and unsupported provider formats remain unconfirmed.
 Mixed tournaments are not forced into one format.
 
+Custom schedules (`CUSTOM_SCHEDULE` and `LEAGUEOS_METHOD_4`) may use an existing
+format view when their match data establishes it: loser rounds/feed edges for
+elimination, a complete knockout with no eliminated entrant returning, or complete
+round-robin pairings with equal pairing multiplicity. Partial custom schedules
+and unsupported competition types remain unconfirmed. A phase named "Bracket"
+alone is not evidence of a format.
+
+Elimination connectors prefer provider prerequisites. Without them, known
+entrants link to their most recent earlier match in the same section; this also
+handles placement rounds listed between semifinals and finals. Unseeded slots
+use geometric links only with stable position keys and a binary round transition.
+An extra placement round must not disable all connectors or connect to the final.
+
 Round-robin fixes include upcoming rounds before completed rounds, second-round
 emphasis based on the next actual round number, repeat meetings retained in the
 matrix, completed draws staying completed, and playable matches no longer marked

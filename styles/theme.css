@@ -8617,8 +8617,9 @@ button.ff-dash__link:hover {
 .ff-scard__bar::-webkit-progress-value { background: var(--ff-accent); border-radius: var(--ff-radius-pill); }
 .ff-scard__bar::-moz-progress-bar { background: var(--ff-accent); border-radius: var(--ff-radius-pill); }
 
-/* The kind + status badges are still used by the series/organization hero
-   (ff-serieshero), so their classes are kept even though the list is now cards. */
+/* The kind + status badges are still used by the series/organization shell's
+   hero eyebrow (ff-sview__eyebrow), so their classes are kept even though the
+   list is now cards. */
 .ff-serieslist__kind, .ff-serieslist__status {
   font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;
   padding: 2px 8px; border-radius: var(--ff-radius-pill);
@@ -8628,20 +8629,16 @@ button.ff-dash__link:hover {
 .ff-serieslist__status { border: 1px solid var(--ff-border); color: var(--ff-text-dim); font-weight: 700; }
 .ff-serieslist__status--live { background: rgba(255, 90, 106, 0.16); border-color: rgba(255, 90, 106, 0.4); color: #ff9aa5; }
 
-/* Series / organization hero — a banner strip over the title, facts and follow. */
-.ff-serieshero { grid-column: 1 / -1; border: 1px solid var(--ff-border); border-radius: var(--ff-radius-lg); background: var(--ff-navy-900); overflow: hidden; }
-.ff-serieshero__banner { height: 116px; }
-.ff-serieshero__body { display: flex; flex-direction: column; gap: 10px; padding: 18px 20px 20px; }
-.ff-serieshero__back { align-self: flex-start; color: var(--ff-text-dim); font-size: var(--ff-dash-text-sm); text-decoration: none; }
-.ff-serieshero__back:hover { color: #fff; }
-.ff-serieshero__badges { display: flex; flex-wrap: wrap; gap: 8px; }
-.ff-serieshero__title { margin: 0; font-size: var(--ff-dash-text-xl); }
-.ff-serieshero__desc { margin: 0; color: var(--ff-text-dim); font-size: var(--ff-dash-text-sm); }
-.ff-seriesfacts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px 20px; margin: 6px 0 0; }
+/* The series' OWN panel (the `series` segment): its facts list, follow/edit row
+   and inference note. The old ff-serieshero rules went with the standalone hero
+   this panel replaced — the banner, title and status now live in the shell's
+   persistent hero (ff-sview, above), which every tournament in the series
+   shares. */
+.ff-seriesfacts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px 20px; margin: 14px 0 0; }
 .ff-seriesfacts__item dt { font-size: var(--ff-dash-text-xs); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ff-text-dim); font-weight: 700; }
 .ff-seriesfacts__item dd { margin: 3px 0 0; font-size: var(--ff-dash-text-sm); font-weight: 600; }
-.ff-serieshero__actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 4px; }
-.ff-serieshero__note { margin: 4px 0 0; color: var(--ff-text-dim); font-size: var(--ff-dash-text-xs); }
+.ff-seriesfacts__actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
+.ff-seriesfacts__note { margin: 8px 0 0; color: var(--ff-text-dim); font-size: var(--ff-dash-text-xs); }
 
 /* Keep large league matrices navigable without pushing the schedule off-page. */
 .ff-rr-matrix-wrap--large {
@@ -8675,3 +8672,177 @@ button.ff-dash__link:hover {
 .ff-league-season__meta { display: block; font-size: .85rem; font-weight: 400; opacity: .75; margin-top: .3rem; }
 .ff-league-game { margin-top: 1.5rem; min-width: 0; }
 .ff-league-game > h3 { margin-bottom: .75rem; }
+
+/* ===========================================================================
+   Series profile — the tournament-style shell with a tournament strip
+   (components/dashboard/series/SeriesChrome.tsx). The hero is the ordinary
+   ff-thero, rendered by the route LAYOUT so it survives navigation between the
+   series' tournaments; only the panel under the strip is replaced. The strip
+   reuses the .ff-scardrow scroller from the Series & Leagues row.
+   =========================================================================== */
+
+/* The series identity above the title: breadcrumb back to the tab, the series
+   name, and the League/Series badge. Sits inside the banner's scrim, so it uses
+   the same light-on-dark treatment as the title. */
+.ff-sview__eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+.ff-sview__crumb {
+  color: rgba(255, 255, 255, 0.82);
+  text-decoration: none;
+}
+a.ff-sview__crumb:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+.ff-sview__crumb--here {
+  color: #fff;
+}
+.ff-sview__eyebrow .ff-serieslist__kind {
+  text-shadow: none;
+}
+
+/* The banner is keyed on the selection, so it re-mounts on every strip click.
+   A short fade is the only motion in an otherwise fixed hero. */
+.ff-sview__banner-img {
+  animation: ff-sview-fade 0.28s ease-out both;
+}
+@keyframes ff-sview-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ff-sview__banner-img {
+    animation: none;
+  }
+}
+
+/* The strip itself: compact horizontal cards, one per tournament, in the
+   .ff-scardrow scroller. Deliberately smaller than a tournament tile — it is a
+   navigation control that has to stay above the fold with the hero AND the
+   tournament's own tabs, not a second card grid. */
+.ff-tstrip {
+  margin: 14px 0 18px;
+}
+.ff-tstrip .ff-scardrow__track {
+  gap: 10px;
+  padding-bottom: 8px;
+}
+.ff-tstrip__card {
+  display: flex;
+  flex: 0 0 clamp(200px, 60%, 244px);
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-surface-2);
+  color: inherit;
+  text-decoration: none;
+  scroll-snap-align: start;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ff-tstrip__card:hover {
+  border-color: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+/* Selected reads the way an active section tab does (.ff-ttab--active): a
+   lifted surface and a brighter hairline, not a colour change. */
+.ff-tstrip__card--active {
+  border-color: rgba(255, 255, 255, 0.34);
+  background: var(--ff-surface-1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+.ff-tstrip__card--active .ff-tstrip__name {
+  color: #fff;
+}
+.ff-tstrip__thumb {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 34px;
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-grad-brand);
+  overflow: hidden;
+}
+.ff-tstrip__thumb-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* The game mark rides the thumbnail corner, as it does on a tournament tile. */
+.ff-tstrip__thumb .ff-tcard__game {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 15px;
+  height: 15px;
+  font-size: 8px;
+}
+.ff-tstrip__thumb--series {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ff-text-dim);
+}
+.ff-tstrip__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ff-tstrip__name {
+  overflow: hidden;
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ff-tstrip__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-xs);
+  white-space: nowrap;
+}
+.ff-tstrip__live {
+  padding: 1px 6px;
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-ok);
+  color: var(--ff-navy-900);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ff-tstrip__source {
+  display: flex;
+  flex: none;
+  margin-left: auto;
+}
+.ff-tstrip__source .ff-tcard__source {
+  position: static;
+  width: 18px;
+  height: 18px;
+}
+
+/* The embedded tournament header: the meta+actions bar with no banner, because
+   the shell's hero is carrying the banner, title and status. */
+.ff-thero--meta .ff-thero__body {
+  padding: 14px 20px;
+}

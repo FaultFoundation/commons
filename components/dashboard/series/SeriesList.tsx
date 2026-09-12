@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 
 import { GameLogo } from "@/components/brand/GameLogo";
+import { CardRow } from "@/components/dashboard/series/CardRow";
 import { SourceLogo, sourceKey, type TournamentSource } from "@/components/brand/SourceLogo";
 import { TournamentBannerImage as BannerImage } from "@/components/dashboard/tournaments/TournamentBannerImage";
 import { DiscoveryFilters } from "@/components/dashboard/tournaments/DiscoveryFilters";
@@ -308,80 +309,15 @@ export function SeriesList({
                 : "No leagues or series in this view."}
             </p>
           ) : (
-            <SeriesRow key={view} groups={filtered} />
+            <CardRow key={view} label="series">
+              {filtered.map((g) => (
+                <SeriesCard key={g.id} group={g} />
+              ))}
+            </CardRow>
           )}
         </>
       ) : null}
     </section>
-  );
-}
-
-/** The horizontal scroller: one row of cards with left/right buttons that appear
-    only when the row overflows and disable at each end. */
-function SeriesRow({ groups }: { groups: SeriesGroup[] }) {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [nav, setNav] = useState({ prev: false, next: false });
-
-  const updateNav = useCallback(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    const prev = el.scrollLeft > 4;
-    const next = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
-    setNav((n) => (n.prev === prev && n.next === next ? n : { prev, next }));
-  }, []);
-
-  useEffect(() => {
-    updateNav();
-    const el = trackRef.current;
-    if (!el) return;
-    el.addEventListener("scroll", updateNav, { passive: true });
-    window.addEventListener("resize", updateNav);
-    return () => {
-      el.removeEventListener("scroll", updateNav);
-      window.removeEventListener("resize", updateNav);
-    };
-  }, [updateNav, groups.length]);
-
-  function scrollBy(dir: number) {
-    const el = trackRef.current;
-    if (!el) return;
-    el.scrollBy({
-      left: dir * Math.max(280, el.clientWidth * 0.8),
-      behavior: "smooth",
-    });
-  }
-
-  const overflow = nav.prev || nav.next;
-  return (
-    <div className="ff-scardrow">
-      {overflow ? (
-        <button
-          type="button"
-          className="ff-scardrow__nav ff-scardrow__nav--prev"
-          onClick={() => scrollBy(-1)}
-          disabled={!nav.prev}
-          aria-label="Scroll left"
-        >
-          ‹
-        </button>
-      ) : null}
-      <div className="ff-scardrow__track" ref={trackRef}>
-        {groups.map((g) => (
-          <SeriesCard key={g.id} group={g} />
-        ))}
-      </div>
-      {overflow ? (
-        <button
-          type="button"
-          className="ff-scardrow__nav ff-scardrow__nav--next"
-          onClick={() => scrollBy(1)}
-          disabled={!nav.next}
-          aria-label="Scroll right"
-        >
-          ›
-        </button>
-      ) : null}
-    </div>
   );
 }
 

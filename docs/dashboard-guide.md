@@ -19,7 +19,9 @@ now 308s via `middleware.ts`). `/` stays the public Commons landing page.
 | `/teams/`                      | Teams       | Your teams + create          |
 | `/teams/<teamId>/`             | Teams       | One team: roster, invites, settings, tournaments. External (`provider:id`) ids render the read-only synced view |
 | `/statistics/`                 | Experimental › Statistics | Player Data (Overwatch) + Match Data (cross-provider) tabs |
-| `/tournaments/discovery/<id>/` | —           | One series / organization profile (reached from the Series tab) |
+| `/tournaments/discovery/<id>/` | —           | One series / organization profile — the shell, showing whatever tournament is current |
+| `/tournaments/discovery/<id>/<tid>/` | —     | One of that series' tournaments, inside the shell |
+| `/tournaments/discovery/<id>/series/` | —     | The series' own panel (description, facts, catalog, Follow) |
 | `/join/<token>/`               | —           | Invite landing (join a team) |
 | `/account/`                    | Account     | Profile / integrations       |
 | `/account/setup/`              | —           | Resolver → current step      |
@@ -213,6 +215,7 @@ const [tab, setTab] = usePersistentState<TabId>(
 | --- | --- |
 | `tournaments:list` | The tournaments list head bar: view, filters, games, page, page size, the ongoing-tournaments disclosure. **Universal** — shared with the pinned Home tile *and* the Series & Leagues row, so a filter set on any of them applies to the others. |
 | `series:open` | Whether the Series & Leagues row is expanded (its fold toggle). Only the fold is series-specific; its filters ride `tournaments:list`. |
+| `tournament-tab:series:<profileId>` | The open section (Overview / Bracket / Standings / Rules) inside a series profile — ONE key for the whole series, so moving along its tournament strip keeps the member on the section they were reading. |
 | `tournament-tab:<id>` | Overview / Bracket / Standings / Rules on a tournament. |
 | `tournament-stage:<id>` | The Bracket tab's stage/pool strip (`StageTabs`). |
 | `bracket-tab:<id>:<stage>` | `ExternalBracket`'s phase/pool sub-bracket tabs. |
@@ -1098,19 +1101,75 @@ and groups in the component, so it is not a second source of truth. Both bubbles
 pass `titleHidden` and render their own `.ff-list-heading` — the shared head
 shape (name left, dim count beside it) the tournaments grid uses.
 
-Organization and series pages live at `/tournaments/discovery/<encoded-id>/`
-(the route stayed put; the Series tab is now the only thing that links into it,
-so their back link reads "← All series").
-The page is a **hero header** (banner strip, kind/status badges, title, a facts
-grid of game / tournaments / entrants / dates / source, and Follow) over a
-single **"Tournaments in this series"** grid of the ordinary tournament bubbles
-(`TournamentCards`) — no Overview/Standings/Stages tabs. There is **no
-qualification-path or aggregate-prize display**: the data is imported
-tournaments, not an official season schedule, so nothing invents a total season
-length, standings, qualification path or prize pool. Following is a persisted
-per-account discovery preference (including the pinned Home widget); it does not
-send notifications. Following/approving an inferred profile stores its display
-identity so its URL remains available after source changes.
+#### A series profile is a tournament page you can move around inside
+
+Organization and series pages live under `/tournaments/discovery/<encoded-id>/`
+(the Series tab is the only thing that links into it). The profile is **not a
+landing page listing tournaments** — it is the ordinary tournament view with a
+**strip of the series' tournaments under the hero**, so following a season is
+clicking along the strip rather than walking back and forth through a list.
+
+Three segments, and the split between them is the whole feature:
+
+| Segment | Renders |
+| ------- | ------- |
+| `layout.tsx` | `SeriesChrome` — the hero and the tournament strip |
+| `page.tsx` (index) | The **current** tournament (`preferredTournament`) |
+| `[tid]/page.tsx` | One named tournament — what the strip links to |
+| `series/page.tsx` | The series ITSELF: description, facts, Follow, full catalog |
+
+**The hero and the strip are in the LAYOUT, the tournament in the child.** A
+Next layout is not remounted when a sibling child segment changes, so moving
+along the strip replaces only the panel below it — verified: the RSC payload for
+a strip click carries the tournament's `ff-thero--meta` header and **no**
+`ff-thero__title` / `ff-tstrip__card` at all. The hero genuinely does not
+re-render. `[tid]/loading.tsx` is therefore a panel-shaped skeleton, not a page
+one: the header stays on screen while the next tournament loads.
+
+**The hero's content comes from the strip data, not from the child page.** A
+layout can't read a child segment's params, but it *can* read which child is
+active (`useSelectedLayoutSegment`), and it already holds every member
+tournament — so the banner, title and status swap the instant a card is clicked,
+client-side, ahead of the server render landing. That is why `SeriesChrome` is a
+client component and `StripTournament` is a deliberately small projection of
+`TournamentListEntry`: it crosses the boundary on every series open.
+
+**The index renders, it does not redirect.** The dashboard's loading boundary
+flushes the shell before the profile resolves, so a `redirect()` to the current
+tournament's `[tid]` URL degrades into a client-side hop — a blank shell, then a
+second navigation. Instead the index renders that tournament in place and the
+layout passes the chrome `defaultSelectedId`, so hero, strip and panel agree.
+`preferredTournament` picks live → taking registrations → next upcoming → most
+recent.
+
+The strip is **flat and newest-first**, reusing the `.ff-scardrow` scroller from
+the Series & Leagues row (`CardRow`, extracted so there is one copy of the
+overflow/arrow bookkeeping). Its first card is the series overview. For a
+LeagueOS league the season/program/game accordions (`LeagueCompetitions`) stay in
+that overview panel — the strip is a navigation control, the accordions are where
+a league's real structure stays browsable. A card grid hosted by a profile passes
+`seriesId` to `TournamentCards`, which re-points every card into the series shell
+(`TournamentHrefCtx`) so opening one from the catalog keeps the hero and strip.
+
+Both tournament views take `embedded`: the shell owns the banner, title, status
+and the `.ff-tview` wrapper, so the view's own header shrinks to its meta+actions
+bar (`.ff-thero--meta`). The **internal** view was extracted out of
+`app/(dashboard)/tournaments/[id]/page.tsx` into
+`components/dashboard/tournaments/InternalTournamentView.tsx` for this — that
+page is now only a router over the two views, and `SeriesTournamentPanel` is the
+same router for the series' two entry points, so a tournament cannot look
+different depending on how it was opened. The whole series shares ONE remembered
+tab (`series:<profileId>`), so moving along the strip keeps the member on the
+section they were reading instead of resetting to each tournament's own last tab.
+The ShareBar always links the standalone `/tournaments/<id>/` URL — that is the
+canonical page, and it opens for someone with no context for the series.
+
+There is **no qualification-path or aggregate-prize display**: the data is
+imported tournaments, not an official season schedule, so nothing invents a total
+season length, standings, qualification path or prize pool. Following is a
+persisted per-account discovery preference (including the pinned Home widget); it
+does not send notifications. Following/approving an inferred profile stores its
+display identity so its URL remains available after source changes.
 
 Every tournament bubble carries a small **"?"** button in its corner
 (`CorrectButton`) that opens **one shared correction dialog** (`CorrectionDialog`

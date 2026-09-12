@@ -5,7 +5,11 @@ import { seriesStatus } from "@/lib/series-status";
 
 /** Retain each source event's division dropdown and original title; group
  * separate JV/varsity records under the same season and game. */
-export function LeagueCompetitions({ tournaments }: { tournaments: TournamentListEntry[] }) {
+export function LeagueCompetitions({ tournaments, seriesId }: {
+  tournaments: TournamentListEntry[];
+  /** When hosted inside a series profile, keep card links in that shell. */
+  seriesId?: string;
+}) {
   const now = Date.now();
   return <div className="ff-league-competitions">
     {leagueosSections(tournaments).map((section) => {
@@ -18,7 +22,7 @@ export function LeagueCompetitions({ tournaments }: { tournaments: TournamentLis
         </summary>
         {games.map((game) => <section key={game} className="ff-league-game">
           <h3>{game}</h3>
-          <TournamentCards tournaments={section.tournaments.filter((t) => (t.game ?? "Other games") === game)} empty="No tournaments recorded here yet." />
+          <TournamentCards tournaments={section.tournaments.filter((t) => (t.game ?? "Other games") === game)} seriesId={seriesId} empty="No tournaments recorded here yet." />
         </section>)}
       </details>;
     })}

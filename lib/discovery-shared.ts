@@ -72,6 +72,21 @@ export function discoveryId(
 export function profilePath(id: string): string {
   return `/tournaments/discovery/${encodeURIComponent(id)}/`;
 }
+/** One of a series' tournaments, rendered INSIDE the series shell (hero +
+    tournament strip) rather than on the standalone tournament page. Both ids
+    are percent-encoded: a series id carries colons and an external tournament
+    id carries a `source:` prefix. */
+export function seriesTournamentPath(
+  profileId: string,
+  tournamentId: string,
+): string {
+  return `${profilePath(profileId)}${encodeURIComponent(tournamentId)}/`;
+}
+/** The series' own overview panel — a static segment, so it can never be
+    mistaken for a tournament id by the `[tid]` matcher. */
+export function seriesOverviewPath(profileId: string): string {
+  return `${profilePath(profileId)}series/`;
+}
 export function seriesName(name: string): string {
   // Keep game numbers, season/year and division intact. Only explicit installment
   // markers and trailing stages are removed; "Open"/"Championship" are brands too.

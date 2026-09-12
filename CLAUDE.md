@@ -1463,6 +1463,45 @@ them too. Only a **series profile page** still shows one — a Discord tournamen
 in a series is part of that series, and that page is reachable only from the
 Series tab.
 
+**A series profile IS a tournament page with a tournament strip.** Opening a
+series (`/tournaments/discovery/<id>/`) does not land on a list — it lands on the
+series' *current* tournament, rendered through the same chrome as any other
+tournament, with a horizontal strip of the series' tournaments under the hero.
+The route is three segments, and the split is load-bearing:
+
+- **`layout.tsx` owns the hero + strip** ([SeriesChrome](components/dashboard/series/SeriesChrome.tsx),
+  client); **the child owns the tournament.** A Next layout isn't remounted when
+  a sibling child segment changes, so a strip click replaces ONLY the panel —
+  the RSC payload for one carries the tournament's `ff-thero--meta` header and
+  no hero or strip markup at all. `[tid]/loading.tsx` is a panel-shaped
+  skeleton for the same reason.
+- **The hero's content comes from the strip data.** A layout can't read a child
+  segment's params, but it can read which child is active
+  (`useSelectedLayoutSegment`) and it already holds every member tournament, so
+  the banner/title/status swap client-side the instant a card is clicked, ahead
+  of the server render.
+- **The index renders the current tournament, it never redirects to it.** The
+  dashboard loading boundary flushes the shell first, so `redirect()` here
+  degrades to a client-side hop (blank shell, then a second navigation). The
+  layout passes `defaultSelectedId` so hero, strip and panel agree.
+  `preferredTournament` ([lib/series-profile.ts](lib/series-profile.ts)) picks
+  live → registration → next upcoming → most recent.
+- **`series/` is the series ITSELF** — description, facts, Follow, full catalog,
+  and for LeagueOS the season/program/game accordions. A static segment, so it
+  can't be mistaken for a tournament id by `[tid]`.
+
+[lib/series-profile.ts](lib/series-profile.ts) resolves profile + membership once
+per request (React `cache`, shared by all three segments) so the strip can never
+offer a tournament the child then 404s. Both tournament views take `embedded`,
+which drops the banner and the `.ff-tview` wrapper the shell owns; the internal
+view was extracted to
+[InternalTournamentView](components/dashboard/tournaments/InternalTournamentView.tsx)
+so `/tournaments/[id]/` and the series' `SeriesTournamentPanel` are two routers
+over the same two components. The whole series shares ONE remembered tab
+(`series:<profileId>`), and `TournamentCards` takes a `seriesId` that re-points
+every card into the shell (`TournamentHrefCtx`) — an id, not a function, because
+the hosts are server components.
+
 Run `node --test scripts/discovery.test.mjs` for classification, API authorization,
 concurrent review and rollback tests. The data audit and manual checklist are in
 `docs/dashboard-guide.md#tournament-discovery`. Migration `0023_pale_hex.sql` must

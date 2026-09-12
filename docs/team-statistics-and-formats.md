@@ -31,6 +31,7 @@ The Schedule tab and external provider sites are not changed by these reports.
 ## Tournament formats
 
 The scraper preserves start.gg phase `bracketType`, FACEIT championship `type`,
+including FACEIT's `bracket` value (single elimination),
 and the event's phase catalog. Announced stages can therefore have a format
 before any matches exist. Each event and phase renders independently:
 

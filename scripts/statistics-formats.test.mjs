@@ -64,6 +64,19 @@ test('provider metadata takes precedence and mixed stages are not collapsed', ()
   assert.equal(fmt.classifyExternalFormat([match('A','B',{ bracketType:'ROUND_ROBIN' }),match('A','C',{ bracketType:'SINGLE_ELIMINATION' })]), null);
   assert.equal(fmt.classifyExternalFormat([match('A','B',{ round:'Losers Round 1', roundOrder:1 })]), 'double_elim');
 });
+
+test('FACEIT bracket resolves for cached matches and announced championships', () => {
+  assert.equal(fmt.providerFormat('bracket'), 'single_elim');
+  assert.equal(fmt.classifyExternalFormat([match('A','B',{bracketType:'bracket'})]), 'single_elim');
+  const event = {id:'faceit:cup',name:'Cup',phases:[{id:'default',name:'Cup',bracketType:'bracket'}],matches:[]};
+  assert.equal(fmt.resolveExternalFormat([event]), 'single_elim');
+  assert.equal(fmt.externalFormatStages([event])[0].format, 'single_elim');
+  assert.equal(fmt.resolveExternalFormat([{...event,phases:[],matches:[match('A','B',{bracketType:'bracket'})]}]), 'single_elim');
+  for (const raw of ['ffaLeague','stage','CUSTOM_SCHEDULE','ELIMINATION_ROUNDS','MATCHMAKING','LEAGUEOS_METHOD_4','LEAGUEOS_METHOD_6']) {
+    assert.equal(fmt.providerFormat(raw), null, `${raw} must not be guessed as single elimination`);
+    assert.equal(fmt.resolveExternalFormat([{...event,phases:[{...event.phases[0],bracketType:raw}]}]), null);
+  }
+});
 test('round robin open is not live, completed draws stay completed, events stay separate', () => {
   const groups = rr.rrGroupsFromExternal([{matches:[match('A','B',{state:'3'})]}, {matches:[match('A','C',{state:'ready'})]}]);
   assert.equal(groups.length,2);

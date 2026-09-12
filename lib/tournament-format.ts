@@ -71,6 +71,10 @@ function classifyComponent(matches: ExternalTournamentMatch[]): TournamentFormat
 export function providerFormat(raw: string | null | undefined): TournamentFormat | null {
   const value = raw?.trim().replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase().replace(/[\s-]+/g, "_");
   switch (value) {
+    // FACEIT's single-elimination championship type is "bracket"; its
+    // double-elimination type is separately reported as "doubleElimination".
+    // Accept the stored provider value here so historical rows need no backfill.
+    case "bracket":
     case "single_elimination": case "single_elim": return "single_elim";
     case "double_elimination": case "double_elim": return "double_elim";
     case "round_robin": return "round_robin";

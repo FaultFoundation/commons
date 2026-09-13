@@ -413,7 +413,13 @@ export async function getScoutingData(
         matchCount: 0, listDone: false, detailDone: false, searchMode: null,
       } };
     })) : [];
-    const rosterReady = members.every(m => m.status === "ready" && m.player.searchMode === row.searchMode);
+    // A roster member blocks the team's "ready" only while it is still actively
+    // collecting. A member that is fully collected — OR terminally uncollectable
+    // (a renamed/deleted account, surfaced as not_found/error) — must not wedge
+    // the deep search. We deliberately no longer require the member's searchMode
+    // to equal the team's: the Worker re-tags members lazily, so that equality
+    // used to hold the team at "collecting" forever even once everything was in.
+    const rosterReady = members.every(m => m.status === "ready" || m.status === "not_found" || m.status === "error");
     return {
       target: teamRow ? "team" : "player",
       ...(teamRow ? { team: { teamId: teamRow.teamId, members } } : {}),

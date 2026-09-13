@@ -136,6 +136,10 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
   // applies while its captured value is still current, so a cancelled search
   // (or one superseded by a new one) can neither resume nor land a stale result.
   const runId = useRef(0);
+  // Aborts the request currently in flight so Cancel stops the search
+  // immediately — the generation token stops the LOOP, this stops the pending
+  // network call it is waiting on (a deep advance can run 30s+ server-side).
+  const searchAbort = useRef<AbortController | null>(null);
   // The nickname currently on screen (drives Refresh / Deep scan / polling).
   const activeNick = useRef<string | null>(null);
   // The format the response on screen was fetched under. Comparing it to the
@@ -214,6 +218,8 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
       if (!nickname) return;
       const myRun = ++runId.current;
       const isLive = () => alive.current && runId.current === myRun;
+      searchAbort.current?.abort();
+      const signal = (searchAbort.current = new AbortController()).signal;
       clearPoll();
       setLoading(true);
       if (target === "team") setTeamRunning(true);
@@ -224,7 +230,7 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
           const completed = await finishDeepScout(
             { status: "collecting", player: null, data: null },
             async () => {
-              const next = await scoutRequest("/api/scouting/team", { method: "POST", headers: { "Content-Type": "application/json" },
+              const next = await scoutRequest("/api/scouting/team", { method: "POST", headers: { "Content-Type": "application/json" }, signal,
                 body: JSON.stringify({ ...(teamId ? { team_id: teamId } : { nickname }), mode: "quick", game_mode: gm }) });
               if (next?.team) teamId = next.team.teamId;
               return next;
@@ -238,6 +244,7 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
         const response = await scoutRequest("/api/scouting/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal,
           body: JSON.stringify({ nickname, mode: "quick", game_mode: gm }),
         });
         const data = response ?? ({ status: "error", player: null, data: null } as ScoutResponse);
@@ -263,6 +270,8 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
       if (!nickname) return;
       const myRun = ++runId.current;
       const isLive = () => alive.current && runId.current === myRun;
+      searchAbort.current?.abort();
+      const signal = (searchAbort.current = new AbortController()).signal;
       clearPoll();
       setLoading(false);
       setResp(null);
@@ -271,6 +280,7 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
       const post = (path: string, body: Record<string, unknown>) => scoutRequest(target === "team" ? "/api/scouting/team" : path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal,
         body: JSON.stringify(target === "team" && body.player_id ? { ...body, team_id: body.player_id } : body),
       });
 
@@ -310,6 +320,8 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
   // bar. The controls re-enable the moment `busy` clears.
   const cancel = useCallback(() => {
     runId.current += 1;
+    searchAbort.current?.abort();
+    searchAbort.current = null;
     clearPoll();
     setLoading(false);
     setTeamRunning(false);
@@ -333,6 +345,7 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
     alive.current = true;
     return () => {
       alive.current = false;
+      searchAbort.current?.abort();
       clearPoll();
     };
   }, [clearPoll]);

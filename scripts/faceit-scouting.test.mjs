@@ -340,6 +340,26 @@ test('team readiness waits for missing feed matches and unfinished roster histor
   } finally { f.sqlite.close(); }
 });
 
+test('a terminal roster member does not wedge team readiness, but a collecting one does', async () => {
+  const f = fixture();
+  try {
+    seedTeam(f);
+    const { getScoutingData } = f.load('@/lib/faceit-scouting');
+    // A renamed/deleted member the Worker marked not_found must be treated as
+    // terminal — it can never finish, so it can't hold a deep search open forever.
+    f.sqlite.exec("UPDATE faceit_scout_teams SET roster_json='[{\"playerId\":\"p1\",\"nickname\":\"Scouted\"},{\"playerId\":\"dead\",\"nickname\":\"Gone\"}]'");
+    f.sqlite.prepare("INSERT INTO faceit_players (player_id,nickname,game,search_mode,list_done,detail_done,status,match_count,created_at,updated_at) VALUES ('dead','Gone','ow2','deep',1,1,'not_found',0,0,0)").run();
+    assert.equal((await getScoutingData({ teamId: US })).status, 'ready', 'a not_found member is terminal, not still-collecting');
+    // A member genuinely still collecting must still hold the team back.
+    f.sqlite.exec("UPDATE faceit_players SET status='collecting',list_done=0,detail_done=0 WHERE player_id='dead'");
+    assert.equal((await getScoutingData({ teamId: US })).status, 'collecting');
+    // Readiness no longer requires the member's searchMode to equal the team's:
+    // a quick-tagged member that is nonetheless fully collected does not block.
+    f.sqlite.exec("UPDATE faceit_players SET status='ready',search_mode='quick',list_done=1,detail_done=1 WHERE player_id='dead'");
+    assert.equal((await getScoutingData({ teamId: US })).status, 'ready');
+  } finally { f.sqlite.close(); }
+});
+
 test('roster map average is unweighted, includes zero rates, and excludes undecided maps', () => {
   const f = fixture();
   try {

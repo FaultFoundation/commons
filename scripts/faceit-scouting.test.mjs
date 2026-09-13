@@ -494,3 +494,31 @@ test('player name submissions use local IDs but explicit profile links preserve 
     assert.equal((await post(null)).status,400);
   } finally {f.sqlite.close();}
 });
+
+test('466/466 completed matches finish despite stale collection flags', async () => {
+  const f = fixture();
+  try {
+    seedTeam(f);
+    const initialCount = f.sqlite.prepare("SELECT count(*) AS n FROM faceit_match_players WHERE player_id='p1'").get().n;
+    for (let i = initialCount; i < 466; i++) {
+      const id = `completed-${i}`;
+      f.sqlite.prepare("INSERT INTO faceit_matches (match_id,status,game_mode,detail_synced_at,stats_synced_at,rounds_synced_at,voting_synced_at,created_at,updated_at) VALUES (?,'finished','5v5',1,1,1,1,0,0)").run(id);
+      f.sqlite.prepare("INSERT INTO faceit_match_players (id,match_id,player_id,stats_synced_at,created_at,updated_at) VALUES (?,?,'p1',1,0,0)").run(id+':p1',id);
+    }
+    const { getScoutingData } = f.load('@/lib/faceit-scouting');
+    for (const status of ['collecting', 'error']) {
+      f.sqlite.prepare("UPDATE faceit_players SET detail_done=0,status=? WHERE player_id='p1'").run(status);
+      const player = await getScoutingData({ playerId: 'p1' });
+      assert.equal(player.progress.total, 466);
+      assert.equal(player.progress.detailed, 466);
+      assert.equal(player.status, 'ready');
+      assert.equal(player.player.detailDone, true);
+      assert.equal((await getScoutingData({ teamId: US })).status, 'ready');
+    }
+    f.sqlite.exec("UPDATE faceit_players SET status='collecting',detail_done=1; UPDATE faceit_matches SET voting_synced_at=null WHERE match_id='m1'");
+    assert.equal((await getScoutingData({ playerId: 'p1' })).status, 'collecting', 'stale ready flags cannot hide missing details');
+    assert.equal((await getScoutingData({ teamId: US })).status, 'collecting');
+    f.sqlite.exec("UPDATE faceit_matches SET voting_synced_at=1; UPDATE faceit_players SET list_done=0 WHERE player_id='p1'");
+    assert.equal((await getScoutingData({ playerId: 'p1' })).status, 'collecting', 'a full counter cannot substitute for exhausting history');
+  } finally { f.sqlite.close(); }
+});

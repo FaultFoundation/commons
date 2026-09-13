@@ -382,11 +382,13 @@ export async function getScoutingData(
     const [teamCount] = query.teamId ? await db.select({ total: sql<number>`count(*)` }).from(faceitScoutTeamMatches).where(eq(faceitScoutTeamMatches.teamId, query.teamId)) : [];
     const expectedTotal = teamCount ? Number(teamCount.total) : totalAll;
     player.matchCount = expectedTotal;
-    const fullyReady = row.listDone && row.detailDone && Number(agg?.completeAll ?? 0) === expectedTotal;
+    // Shared matches may be finished by another scan without updating this
+    // player's cached detailDone/status flags. Read the actual sync markers.
+    const fullyReady = row.listDone && Number(agg?.completeAll ?? 0) === expectedTotal;
     const teamWindow = teamRow ? await db.select({ complete: sql<number>`case when ${faceitMatches.detailSyncedAt} is not null and ${faceitMatches.statsSyncedAt} is not null and ${faceitMatches.roundsSyncedAt} is not null and ${faceitMatches.votingSyncedAt} is not null then 1 else 0 end` })
       .from(faceitScoutTeamMatches).innerJoin(faceitMatches, eq(faceitScoutTeamMatches.matchId, faceitMatches.matchId))
       .where(eq(faceitScoutTeamMatches.teamId, teamRow.teamId)).orderBy(desc(faceitMatches.startedAt)).limit(50) : [];
-    player.detailDone = teamRow ? fullyReady : player.detailDone;
+    player.detailDone = fullyReady;
     const quickReady = teamRow ? row.searchMode === "quick" && teamRow.listPage > 0 && (teamRow.listDone || expectedTotal >= 50)
       && teamWindow.length === Math.min(expectedTotal, 50) && teamWindow.every(m => Number(m.complete) === 1) :
       row.searchMode === "quick" &&
@@ -395,11 +397,13 @@ export async function getScoutingData(
     const status: ScoutStatus =
       row.status === "not_found"
         ? "not_found"
-        : row.status === "error"
-          ? "error"
-          : fullyReady || quickReady
-            ? "ready"
-            : "collecting";
+        : fullyReady
+          ? "ready"
+          : row.status === "error"
+            ? "error"
+            : quickReady
+              ? "ready"
+              : "collecting";
 
     const members = teamRow ? await Promise.all((JSON.parse(teamRow.rosterJson) as { playerId: string; nickname: string }[]).map(async member => {
       const response = await getScoutingData({ playerId: member.playerId }, gameMode, limit);

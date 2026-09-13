@@ -76,7 +76,6 @@ export function ScoutSearchInput({ query, target, disabled, onChange, onPick }: 
         </li>)}
       </ul>
       {!items.length && <p role="status">{!current ? "Finding matches…" : current.message ?? `No saved ${target === "team" ? "teams" : "players"} match. Try a FACEIT ID or link.`}</p>}
-      {!!items.length && <p className="ff-scoutlookup__hint">Select to scout · Scout uses the first match</p>}
     </div>}
   </div>;
 }

@@ -7528,7 +7528,15 @@ button.ff-dash__link:hover {
   justify-content: space-between;
   gap: 4px 12px;
   margin: 0;
-  font-size: var(--ff-dash-text-sm);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--ff-border);
+  font-size: var(--ff-dash-text-lg);
+  font-weight: 700;
+}
+/* The per-group win-rate summary (player chart) stays small and light so the map
+   type name reads as the header. */
+.ff-scoutmap__heading .ff-scoutmap__mode {
+  font-weight: 400;
 }
 .ff-scoutmap__limited {
   margin-top: 16px;
@@ -7637,12 +7645,7 @@ button.ff-dash__link:hover {
   }
 }
 
-/* Search sub-copy + the Quick/Deep depth switch beside the Scout button. */
-.ff-scoutsearch__hint {
-  margin: 8px 0 0;
-  font-size: var(--ff-dash-text-xs);
-  color: var(--ff-text-dim);
-}
+/* The Quick/Deep depth switch beside the Scout button. */
 /* Page-level format filter (1v1 / 5v5 / 6v6) under the search row. It reuses the
    tournament list's head bar and pill group wholesale — same control, same
    affordance — and only adds the leading label and the spacing that puts it

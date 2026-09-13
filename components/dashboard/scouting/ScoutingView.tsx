@@ -131,6 +131,11 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
   const alive = useRef(true);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollsLeft = useRef(0);
+  // A generation token for the in-flight search. Every search bumps it and
+  // captures its own value; Cancel bumps it too. A running loop or poll only
+  // applies while its captured value is still current, so a cancelled search
+  // (or one superseded by a new one) can neither resume nor land a stale result.
+  const runId = useRef(0);
   // The nickname currently on screen (drives Refresh / Deep scan / polling).
   const activeNick = useRef<string | null>(null);
   // The format the response on screen was fetched under. Comparing it to the
@@ -181,12 +186,13 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
   const schedulePoll = useCallback(
     (nickname: string, playerId: string | undefined, mode: ScoutGameMode) => {
       clearPoll();
+      const my = runId.current;
       pollsLeft.current = MAX_POLLS;
       const tick = async () => {
-        if (!alive.current || pollsLeft.current <= 0) return;
+        if (!alive.current || runId.current !== my || pollsLeft.current <= 0) return;
         pollsLeft.current -= 1;
         const data = await runRead(nickname, playerId, mode);
-        if (!alive.current) return;
+        if (!alive.current || runId.current !== my) return;
         if (data && data.status !== "idle") {
           applyResp(nickname, data, mode);
           if (data.status === "collecting" && pollsLeft.current > 0) {
@@ -206,6 +212,8 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
     async (raw: string, gm: ScoutGameMode) => {
       const nickname = target === "team" ? (raw.trim().length <= 256 ? raw.trim() : null) : (parseScoutPlayerQuery(raw) ? raw.trim() : null);
       if (!nickname) return;
+      const myRun = ++runId.current;
+      const isLive = () => alive.current && runId.current === myRun;
       clearPoll();
       setLoading(true);
       if (target === "team") setTeamRunning(true);
@@ -221,10 +229,10 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
               if (next?.team) teamId = next.team.teamId;
               return next;
             },
-            next => { applyResp(nickname, next, gm); setLoading(false); },
-            () => alive.current,
+            next => { if (isLive()) { applyResp(nickname, next, gm); setLoading(false); } },
+            isLive,
           );
-          if (completed && alive.current) applyResp(nickname, completed, gm);
+          if (completed && isLive()) applyResp(nickname, completed, gm);
           return;
         }
         const response = await scoutRequest("/api/scouting/search", {
@@ -233,15 +241,15 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
           body: JSON.stringify({ nickname, mode: "quick", game_mode: gm }),
         });
         const data = response ?? ({ status: "error", player: null, data: null } as ScoutResponse);
-        if (!alive.current) return;
+        if (!isLive()) return;
         applyResp(nickname, data, gm);
         if (data.status === "collecting") {
           schedulePoll(nickname, data.player?.playerId, gm);
         }
       } catch {
-        if (alive.current) setResp({ status: "error", player: null, data: null });
+        if (isLive()) setResp({ status: "error", player: null, data: null });
       } finally {
-        if (alive.current) { setLoading(false); setTeamRunning(false); }
+        if (isLive()) { setLoading(false); setTeamRunning(false); }
       }
     },
     [applyResp, clearPoll, schedulePoll, target],
@@ -253,6 +261,8 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
     async (raw: string, gm: ScoutGameMode) => {
       const nickname = target === "team" ? (raw.trim().length <= 256 ? raw.trim() : null) : (parseScoutPlayerQuery(raw) ? raw.trim() : null);
       if (!nickname) return;
+      const myRun = ++runId.current;
+      const isLive = () => alive.current && runId.current === myRun;
       clearPoll();
       setLoading(false);
       setResp(null);
@@ -265,11 +275,11 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
       });
 
       let playerId: string | undefined;
-      const updateProgress = (response: ScoutResponse) => setDeep({
+      const updateProgress = (response: ScoutResponse) => { if (isLive()) setDeep({
         active: true,
         total: response.progress?.total ?? null,
         detailed: response.progress?.detailed ?? null,
-      });
+      }); };
       const completed = await finishDeepScout(
         { status: "collecting", player: null, data: null },
         async () => {
@@ -280,9 +290,9 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
           return response;
         },
         updateProgress,
-        () => alive.current,
+        isLive,
       );
-      if (!completed || !alive.current) return;
+      if (!completed || !isLive()) return;
       setDeep({ active: false, total: null, detailed: null });
       applyResp(nickname, completed, gm);
     },
@@ -294,6 +304,17 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
       m === "deep" ? runDeep(raw, gm) : runQuick(raw, gm),
     [runDeep, runQuick],
   );
+
+  // Cancel the in-flight search: invalidate its generation token (so a pending
+  // loop or poll can neither resume nor apply) and drop back to the idle search
+  // bar. The controls re-enable the moment `busy` clears.
+  const cancel = useCallback(() => {
+    runId.current += 1;
+    clearPoll();
+    setLoading(false);
+    setTeamRunning(false);
+    setDeep({ active: false, total: null, detailed: null });
+  }, [clearPoll]);
 
   // Refresh: re-read the current player from the cache (picks up background
   // detail the Worker has since filled).
@@ -392,19 +413,20 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
               void runSearch(suggestion.id, mode, gameMode);
             }} />
           <ScoutModeToggle mode={mode} onChange={setMode} disabled={busy} />
-          <button
-            type="submit"
-            className="ff-btn ff-btn--brand"
-            disabled={busy || !(target === "team" ? query.trim() && query.length <= 256 : (parseScoutPlayerQuery(query) ? query.trim() : null))}
-          >
-            {busy ? "Scouting…" : "Scout"}
-          </button>
+          {busy ? (
+            <button type="button" className="ff-btn ff-btn--outline" onClick={cancel}>
+              Cancel
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className="ff-btn ff-btn--brand"
+              disabled={!(target === "team" ? query.trim() && query.length <= 256 : (parseScoutPlayerQuery(query) ? query.trim() : null))}
+            >
+              Scout
+            </button>
+          )}
         </form>
-        <p className="ff-scoutsearch__hint">
-          {mode === "quick"
-            ? "Quick — the recent ~50 games, fast."
-            : "Deep — waits for the full match history, so every stat is exact."}
-        </p>
 
         {/* The page-level format filter, in the tournament list's head-bar
             idiom (a segmented pill group). It shapes every panel below —

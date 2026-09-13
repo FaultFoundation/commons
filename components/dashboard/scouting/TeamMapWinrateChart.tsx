@@ -1,5 +1,5 @@
 "use client";
-import { Fragment, useEffect, useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { teamMapWinrates, formatWinratePct, formatRecord, formatElo, type ScoutTeamMember } from "@/lib/faceit-scouting-shared";
 
@@ -22,28 +22,24 @@ export function TeamMapWinrateChart({ members }: { members: ScoutTeamMember[] })
   };
   const rows = teamMapWinrates(members).sort((a, b) => (order === "mode" ? (a.mapMode ?? "Other").localeCompare(b.mapMode ?? "Other") : order === "played" ? b.total - a.total : (b.winrate ?? -1) - (a.winrate ?? -1)) || a.map.localeCompare(b.map));
   if (!rows.length) return <p className="ff-bubble__note">Collecting the roster’s map histories…</p>;
-  return <div className="ff-scoutmap" role="region" aria-label="Team map profile">
-    <label className="ff-scoutmap__sort" htmlFor={id}>Display <select id={id} value={order} onChange={e => setOrder(e.target.value)}>
-      <option value="mode">Group by type</option><option value="winrate">Win rate</option><option value="played">Most played</option>
-    </select></label>
-    <p className="ff-scoutmap__note">Large dot: roster average · Wicks: lowest–highest player · Small dots: players. Hover or focus a dot for details.</p>
-    {rows.map((row, index) => {
-      const placed: { rate: number; y: number }[] = [];
-      const points = row.players.map(p => {
-        let lane = 0;
-        let y = 0;
-        while ((Math.abs(p.rate - (row.winrate ?? -1)) < .035 && y === 0) || placed.some(q => Math.abs(p.rate - q.rate) < .05 && q.y === y)) {
-          lane++;
-          y = Math.ceil(lane / 2) * 18 * (lane % 2 ? -1 : 1);
-        }
-        placed.push({ rate: p.rate, y });
-        return { ...p, y };
-      });
-      const height = Math.max(62, ...placed.map(p => Math.abs(p.y) * 2 + 28));
-      return <Fragment key={row.map}>
-      {order === "mode" && (index === 0 || rows[index - 1].mapMode !== row.mapMode) && <h4 className="ff-scoutmap__heading">{row.mapMode || "Other"}</h4>}
-      <div className="ff-scoutmap__row">
-      <div className="ff-scoutmap__label"><span className="ff-scoutmap__map">{row.map}</span><span className="ff-scoutmap__mode">{row.mapMode}</span></div>
+
+  // One map row (the dot/wick track). Extracted so grouped and flat layouts share
+  // it, matching the player Map Profile's structure.
+  const renderRow = (row: (typeof rows)[number], grouped = false) => {
+    const placed: { rate: number; y: number }[] = [];
+    const points = row.players.map(p => {
+      let lane = 0;
+      let y = 0;
+      while ((Math.abs(p.rate - (row.winrate ?? -1)) < .035 && y === 0) || placed.some(q => Math.abs(p.rate - q.rate) < .05 && q.y === y)) {
+        lane++;
+        y = Math.ceil(lane / 2) * 18 * (lane % 2 ? -1 : 1);
+      }
+      placed.push({ rate: p.rate, y });
+      return { ...p, y };
+    });
+    const height = Math.max(62, ...placed.map(p => Math.abs(p.y) * 2 + 28));
+    return <div className="ff-scoutmap__row" key={row.map}>
+      <div className="ff-scoutmap__label"><span className="ff-scoutmap__map">{row.map}</span>{!grouped && row.mapMode ? <span className="ff-scoutmap__mode">{row.mapMode}</span> : null}</div>
       <div className="ff-teammap__track" style={{ height }}>
         <span className="ff-teammap__guide" />
         {row.low != null && row.high != null && <span className="ff-teammap__wick" style={{ left: `${row.low * 100}%`, width: `${(row.high - row.low) * 100}%` }} />}
@@ -67,8 +63,28 @@ export function TeamMapWinrateChart({ members }: { members: ScoutTeamMember[] })
         })}
       </div>
       <div className="ff-scoutmap__value"><span className="ff-scoutmap__pct">{formatWinratePct(row.winrate)}</span><span className="ff-scoutmap__record">{row.players.length}/{members.length} players</span></div>
-    </div></Fragment>;
-    })}
-    <p className="ff-scoutmap__note">Average gives each player equal weight. Players without decided maps are excluded. Team records and the Matches tab use the team’s own history.</p>
+    </div>;
+  };
+
+  // Grouped by map type (the same section wrapper the player Map Profile uses, so
+  // the two charts share identical spacing) when sorting by type; otherwise flat.
+  const groups = new Map<string, (typeof rows)[number][]>();
+  for (const row of rows) {
+    const mode = row.mapMode || "Other";
+    groups.set(mode, [...(groups.get(mode) ?? []), row]);
+  }
+
+  return <div className="ff-scoutmap" role="region" aria-label="Team map profile">
+    <label className="ff-scoutmap__sort" htmlFor={id}>Display <select id={id} value={order} onChange={e => setOrder(e.target.value)}>
+      <option value="mode">Group by type</option><option value="winrate">Win rate</option><option value="played">Most played</option>
+    </select></label>
+    {order === "mode"
+      ? [...groups].map(([mode, maps]) => (
+          <section className="ff-scoutmap__group" key={mode} aria-label={mode}>
+            <h4 className="ff-scoutmap__heading"><span>{mode}</span></h4>
+            {maps.map(row => renderRow(row, true))}
+          </section>
+        ))
+      : rows.map(row => renderRow(row))}
   </div>;
 }

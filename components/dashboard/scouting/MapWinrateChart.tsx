@@ -82,7 +82,6 @@ export function MapWinrateChart({ rows }: { rows: MapWinrate[] }) {
         </select>
       </label>
       <MapSection rows={sorted} order={order} />
-      <p className="ff-scoutmap__note">Win rate excludes draws. Group totals cover the maps shown in each group.</p>
     </div>
   );
 }

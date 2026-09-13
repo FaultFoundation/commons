@@ -19,3 +19,11 @@ Quick collects a recent team window and recent player details while showing incr
 3. Smoke-test Quick and Deep with `LGBTQI-AIM(AIM)` and confirm it resolves to `df36dcb1-6397-4f2d-8fca-562bad8f307f`. Verify the team feed works from the deployed Worker before treating live collection as verified.
 
 Local verification: the real team lookup resolved the example and six roster members. FACEIT returned HTTP 403 for direct team-history requests from the development machine; end-to-end collection tests therefore use provider fixtures. Desktop/mobile browser checks use the actual React components with fixture responses. No remote migration or deployment was performed as part of this change.
+
+## Deep-scan completion and diagnostics
+
+Roster collection checks the underlying match sync markers before skipping a player. A cached `detail_done` flag is insufficient: another player's scan can add unfinished shared matches after that flag was written. Deep readiness requires each available member's history list and details to be complete, even when that member is already quick-ready. Temporary provider errors remain retryable and do not count as completed members.
+
+The loading view reports whether it is paging team history or collecting roster histories. Collector failures retain the selected team and surface the failing page/stage while retrying, instead of leaving only the last successful match counter visible. A full counter does not imply the history list has been exhausted.
+
+These fixes require deploying both `ow-data` (the collector) and Commons (readiness and failure display). No new migration is needed. Regression coverage exercises the real collector against SQLite with provider fixtures; the stale-completion case fails against the preceding collector commit. Live verification still requires access to the affected site's authenticated scan and collection state.

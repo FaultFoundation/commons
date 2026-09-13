@@ -8,9 +8,11 @@
 export function ScoutDeepLoading({
   total,
   detailed,
+  message,
 }: {
   total: number | null;
   detailed: number | null;
+  message?: string;
 }) {
   const known = total != null && total > 0;
   const pct = known ? Math.min(99, Math.round(((detailed ?? 0) / total) * 100)) : null;
@@ -30,10 +32,11 @@ export function ScoutDeepLoading({
           style={pct != null ? { width: `${Math.max(4, pct)}%` } : undefined}
         />
       </div>
+      {message && <p className="ff-owload__hint">{message}</p>}
       <p className="ff-owload__hint">
         {known
           ? `Detailed ${detailed ?? 0} of ${total} matches — pulling every map and scoreboard so the stats are exact.`
-          : "Resolving the player and paging their history — this can take a little while for a full career."}
+          : "Resolving the profile and paging match history — this can take a little while for a full career."}
         {" Temporary connection delays are retried automatically — keep this search open."}
       </p>
     </section>

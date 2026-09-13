@@ -413,17 +413,20 @@ export async function getScoutingData(
         matchCount: 0, listDone: false, detailDone: false, searchMode: null,
       } };
     })) : [];
-    // A roster member blocks the team's "ready" only while it is still actively
-    // collecting. A member that is fully collected — OR terminally uncollectable
-    // (a renamed/deleted account, surfaced as not_found/error) — must not wedge
-    // the deep search. We deliberately no longer require the member's searchMode
-    // to equal the team's: the Worker re-tags members lazily, so that equality
-    // used to hold the team at "collecting" forever even once everything was in.
-    const rosterReady = members.every(m => m.status === "ready" || m.status === "not_found" || m.status === "error");
+    // Deep requires full histories even if a member was previously quick-ready.
+    // A transient error is unfinished work, not a completed roster member.
+    const pendingMembers = members.filter(m => m.status !== "not_found" &&
+      !(m.status === "ready" && (row.searchMode !== "deep" || (m.player.listDone && m.player.detailDone))));
+    const rosterReady = pendingMembers.length === 0;
     return {
       target: teamRow ? "team" : "player",
       ...(teamRow ? { team: { teamId: teamRow.teamId, members } } : {}),
       status: teamRow && status === "ready" && !rosterReady ? "collecting" : status,
+      ...(teamRow ? { message: !teamRow.listDone && row.searchMode === "deep"
+        ? `Reading team history (page ${teamRow.listPage + 1}); the match total can still grow.`
+        : status !== "ready" ? "Collecting the team's match details, maps and voting history."
+        : !rosterReady ? `Collecting full player histories: ${pendingMembers.map(m => m.player.nickname).join(", ")}.`
+        : undefined } : {}),
       player,
       data: { summary, mapWinrates, matches, gameMode },
       progress: { total: expectedTotal + members.reduce((n, m) => n + (m.progress?.total ?? m.player.matchCount), 0), detailed: Number(agg?.completeAll ?? 0) + members.reduce((n, m) => n + (m.progress?.detailed ?? 0), 0) },
@@ -813,8 +816,11 @@ export async function requestFaceitTeam(action: "search" | "advance", value: str
   const params = new URLSearchParams({ mode, [action === "search" ? "nickname" : "team_id"]: value });
   try {
     const res = await fetch(`${base}/faceit/team/${action}?${params}`, { method: "POST", headers: { Authorization: `Bearer ${secret}` }, signal: AbortSignal.timeout(35_000) });
-    if (!res.ok) return { status: res.status === 404 ? "not_found" as const : res.status === 503 ? "not_configured" as const : "error" as const };
-    const body = await res.json() as { teamId?: string };
+    const body = await res.json().catch(() => ({})) as { teamId?: string; message?: string };
+    if (!res.ok) return { status: res.status === 404 ? "not_found" as const : res.status === 503 ? "not_configured" as const : "error" as const,
+      teamId: action === "advance" ? value : undefined,
+      message: body.message ?? `The team collector returned HTTP ${res.status}.` };
     return { status: "collecting" as const, teamId: body.teamId };
-  } catch { return { status: "error" as const }; }
+  } catch { return { status: "error" as const, teamId: action === "advance" ? value : undefined,
+    message: "The team collector timed out or could not be reached." }; }
 }

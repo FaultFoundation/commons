@@ -38,6 +38,7 @@ export async function finishDeepScout(
     if (!alive()) return null;
     if (next && ["unauthorized", "not_found", "not_configured"].includes(next.status)) return next;
     if (!next || next.status === "error" || !next.player) {
+      onProgress({ ...current, message: next?.message ?? "The collector could not be reached. Retrying; collected matches are saved." });
       await pause(Math.min(30_000, 2500 * 2 ** Math.min(retries++, 4)));
       continue;
     }

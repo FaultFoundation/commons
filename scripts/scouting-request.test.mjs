@@ -75,7 +75,7 @@ test('cancelling during retry backoff prevents further requests', async () => {
   let mounted = true;
   let calls = 0;
   const result = await load().finishDeepScout(profile(0), async () => { calls++; return null; },
-    () => assert.fail('published a failure'), () => mounted, async () => { mounted = false; });
+    response => { assert.equal(response.progress.detailed, 0); assert.match(response.message, /Retrying/); }, () => mounted, async () => { mounted = false; });
   assert.equal(result, null);
   assert.equal(calls, 1);
 });
@@ -111,4 +111,14 @@ test('real terminal results stop retries even before a player is resolved', asyn
       () => assert.fail('retried a terminal result'));
     assert.equal(result.status, status);
   }
+});
+
+
+test('a team provider failure remains visible while retrying the same saved scan', async () => {
+  const updates=[];
+  const replies=[{status:'error',player:{playerId:'team'},message:'Team history page 24 failed (FACEIT 403).'},profile(466,'ready',466)];
+  const result=await load().finishDeepScout(profile(466,'collecting',466),async()=>replies.shift(),r=>updates.push(r),alive,pause);
+  assert.equal(updates[0].progress.detailed,466);
+  assert.match(updates[0].message,/page 24.*403/);
+  assert.equal(result.status,'ready');
 });

@@ -59,7 +59,7 @@ const PAGE = 20;
 
 type Cached = { query?: string; nickname: string; gameMode: ScoutGameMode; resp: ScoutResponse };
 type Tab = "overview" | "matches";
-type DeepState = { active: boolean; total: number | null; detailed: number | null };
+type DeepState = { active: boolean; total: number | null; detailed: number | null; message?: string };
 
 function readCache(target: ScoutTarget): Cached | null {
   try {
@@ -289,6 +289,7 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
         active: true,
         total: response.progress?.total ?? null,
         detailed: response.progress?.detailed ?? null,
+        message: response.message,
       }); };
       const completed = await finishDeepScout(
         { status: "collecting", player: null, data: null },
@@ -468,7 +469,7 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
       </Bubble>
 
       {deep.active ? (
-        <ScoutDeepLoading total={deep.total} detailed={deep.detailed} />
+        <ScoutDeepLoading total={deep.total} detailed={deep.detailed} message={deep.message} />
       ) : loading ? (
         <StatLoading />
       ) : status === "not_found" || status === "error" || status === "unauthorized" || status === "not_configured" ? (

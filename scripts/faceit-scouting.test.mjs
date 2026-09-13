@@ -458,13 +458,13 @@ test('cached suggestions rank exact names first, disambiguate tags, return avata
   } finally {f.sqlite.close();}
 });
 
-function teamRoute(f, calls) {
+function teamRoute(f, calls, trigger = {}) {
   const exports={};
   const code=ts.transpileModule(readFileSync(resolve(root,'app/api/scouting/team/route.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
   runInNewContext(code,{exports,URL,Response,require:id=>{
     if(id==='@/lib/session') return {getSessionCached:async()=>({user:{id:'signed-in'}})};
     if(id==='@/lib/faceit-scouting') return {
-      requestFaceitTeam:async(action,id,mode)=>{calls.push({action,id,mode});return {teamId:id,status:'collecting'};},
+      requestFaceitTeam:async(action,id,mode)=>{calls.push({action,id,mode});return {teamId:id,status:'collecting',...trigger};},
       getScoutingData:async({teamId})=>({status:'collecting',player:{playerId:teamId},data:null}),
     };
     return f.load(id);
@@ -541,4 +541,37 @@ test('466/466 completed matches finish despite stale collection flags', async ()
     f.sqlite.exec("UPDATE faceit_matches SET voting_synced_at=1; UPDATE faceit_players SET list_done=0 WHERE player_id='p1'");
     assert.equal((await getScoutingData({ playerId: 'p1' })).status, 'collecting', 'a full counter cannot substitute for exhausting history');
   } finally { f.sqlite.close(); }
+});
+
+
+test('deep teams do not accept quick-ready or temporarily failed roster histories', async () => {
+  const f=fixture();
+  try {
+    seedTeam(f);
+    const {getScoutingData}=f.load('@/lib/faceit-scouting');
+    f.sqlite.exec("UPDATE faceit_players SET search_mode='quick',list_done=0,detail_done=0,status='collecting' WHERE player_id='p1'");
+    assert.equal((await getScoutingData({playerId:'p1'})).status,'ready');
+    const team=await getScoutingData({teamId:US});
+    assert.equal(team.status,'collecting');
+    assert.match(team.message,/Scouted/);
+    f.sqlite.exec("UPDATE faceit_players SET status='error' WHERE player_id='p1'");
+    assert.equal((await getScoutingData({teamId:US})).status,'collecting');
+  } finally {f.sqlite.close();}
+});
+
+
+test('team advance errors preserve the identity and expose the failing stage; terminal results stop', async () => {
+  const f=fixture();
+  try {
+    for (const status of ['error','not_found','not_configured']) {
+      const route=teamRoute(f,[],{status,message:'Team history page 24 failed (FACEIT 403).'});
+      const response=await route.POST(new Request('https://commons.test/api/scouting/team',{method:'POST',headers:{origin:'https://commons.test','Content-Type':'application/json'},body:JSON.stringify({team_id:TEAM_A,mode:'deep'})}));
+      const body=await response.json();
+      assert.equal(body.status,status);
+      if(status==='error') {
+        assert.equal(body.player.playerId,TEAM_A);
+        assert.match(body.message,/page 24.*403/);
+      }
+    }
+  } finally {f.sqlite.close();}
 });

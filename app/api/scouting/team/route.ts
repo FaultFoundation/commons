@@ -25,6 +25,7 @@ export async function POST(request: Request) {
   if (!teamId) return Response.json({ status: "not_found", player: null, data: null, target: "team", message: "No saved team matches that name. Scout its FACEIT link or ID once to add it to suggestions." });
   // An initial selection is sent as nickname: ID; team_id remains the advance cursor.
   const trigger = await requestFaceitTeam(body.team_id ? "advance" : "search", teamId, body.mode === "deep" ? "deep" : "quick");
-  if (!trigger.teamId) return Response.json({ status: trigger.status, player: null, data: null, target: "team", message: trigger.status === "not_found" ? "That FACEIT team could not be found. Check its ID or team link." : undefined });
-  return Response.json(await getScoutingData({ teamId: trigger.teamId }, asScoutGameMode(body.game_mode) ?? DEFAULT_GAME_MODE));
+  if (!trigger.teamId || (trigger.status !== "collecting" && trigger.status !== "error")) return Response.json({ status: trigger.status, player: null, data: null, target: "team", message: trigger.status === "not_found" ? "That FACEIT team could not be found. Check its ID or team link." : trigger.message });
+  const read = await getScoutingData({ teamId: trigger.teamId }, asScoutGameMode(body.game_mode) ?? DEFAULT_GAME_MODE);
+  return Response.json(trigger.status === "error" ? { ...read, status: "error", message: trigger.message } : read);
 }

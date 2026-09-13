@@ -65,7 +65,7 @@ export const SCOUT_STATUS_MESSAGES: Record<
   no_matches:
     "No matches in this format for this player. Their history is collected — try another format above.",
   not_found:
-    "No FACEIT Overwatch player found with that name. Check the exact FACEIT nickname (not their BattleTag) and try again.",
+    "No FACEIT Overwatch player found. Try their FACEIT nickname, player ID, or profile link (not their BattleTag).",
   unauthorized:
     "Your sign-in could not be verified. Sign in again to continue scouting; collected matches are saved.",
   error:
@@ -551,4 +551,40 @@ export function teamMapWinrates(members: ScoutTeamMember[]) {
   return [...maps.values()].map(row => ({ ...row, winrate: mean(row.players.map(p => p.rate)),
     low: row.players.length ? Math.min(...row.players.map(p => p.rate)) : null,
     high: row.players.length ? Math.max(...row.players.map(p => p.rate)) : null }));
+}
+
+/** Normalize a FACEIT nickname, UUID, or profile/stats link without fetching the supplied URL. */
+export function parseScoutPlayerQuery(raw: string): { nickname?: string; playerId?: string } | null {
+  let value = raw.trim();
+  if (!value || value.length > 256) return null;
+  if (/^(?:https?:\/\/|(?:www\.)?faceit\.com\/)/i.test(value)) {
+    try {
+      const url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
+      if (!["faceit.com", "www.faceit.com"].includes(url.hostname.toLowerCase()) || url.username || url.password || url.port) return null;
+      const match = url.pathname.match(/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?players\/([^/]+)(?:\/.*)?$/i);
+      if (!match) return null;
+      value = decodeURIComponent(match[1]);
+    } catch { return null; }
+  }
+  if (/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value)) return { playerId: value.toLowerCase() };
+  const nickname = normalizeNickname(value);
+  return nickname && !/[\s/\\?#:]/.test(nickname) ? { nickname } : null;
+}
+
+export type ScoutSuggestion = { id: string; name: string; avatarUrl: string | null; target: ScoutTarget };
+
+export function isScoutDirectQuery(raw: string): boolean {
+  return /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(raw.trim()) || /^(?:https?:\/\/|(?:www\.)?faceit\.com\/)/i.test(raw.trim());
+}
+
+export function parseScoutTeamId(raw: string): string | null {
+  let value = raw.trim();
+  if (/^(?:https?:\/\/|(?:www\.)?faceit\.com\/)/i.test(value)) {
+    try {
+      const url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
+      if (!["faceit.com", "www.faceit.com"].includes(url.hostname.toLowerCase()) || url.username || url.password || url.port) return null;
+      value = url.pathname.match(/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?teams\/([^/]+)(?:\/.*)?$/i)?.[1] ?? "";
+    } catch { return null; }
+  }
+  return /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value) ? value.toLowerCase() : null;
 }

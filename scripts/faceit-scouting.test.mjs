@@ -376,3 +376,121 @@ test('quick team readiness checks the newest window and refreshes page zero on a
     assert.equal((await getScoutingData({teamId:US})).status,'collecting','new search must fetch newest team feed page');
   } finally {f.sqlite.close();}
 });
+
+test('player searches normalize names, UUIDs, and FACEIT profile or stats links', () => {
+  const f = fixture();
+  try {
+    const { parseScoutPlayerQuery: parse } = f.load('@/lib/faceit-scouting-shared');
+    const id = '1b4b3fb6-44f2-4f56-84f6-c54fb4bf615a';
+    assert.equal(parse(' AliveFPS ').nickname, 'AliveFPS');
+    assert.equal(parse(id.toUpperCase()).playerId, id);
+    for (const url of [
+      'https://www.faceit.com/en/players/AliveFPS',
+      'https://www.faceit.com/en/players/AliveFPS/stats/ow?game=ow2#stats',
+      'https://faceit.com/players/AliveFPS/',
+      'www.faceit.com/en/players/AliveFPS/ow',
+      'faceit.com/en/players/%41liveFPS',
+    ]) assert.equal(parse(url)?.nickname, 'AliveFPS', url);
+    assert.equal(parse(`https://www.faceit.com/en/players/${id}`).playerId, id);
+    for (const value of ['', 'Player#1234', 'https://example.com/en/players/AliveFPS',
+      'https://faceit.com.example.com/en/players/AliveFPS', 'https://faceit.com/en/teams/team',
+      'https://faceit.com/en/players/%ZZ', 'https://faceit.com/en/players/a%2Fb',
+      'https://user:secret@faceit.com/en/players/AliveFPS', 'a'.repeat(257)]) {
+      assert.equal(parse(value), null, value);
+    }
+  } finally { f.sqlite.close(); }
+});
+
+const TEAM_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const TEAM_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+function seedDirectory(f) {
+  seedTeam(f);
+  f.sqlite.exec(`CREATE TABLE pd_teams (id TEXT PRIMARY KEY,provider TEXT,external_team_id TEXT,name TEXT,game TEXT,logo_url TEXT);
+    CREATE TABLE pd_team_members (team_id TEXT,player_external_id TEXT,handle TEXT,avatar_url TEXT);
+    INSERT INTO faceit_scout_teams VALUES ('${TEAM_A}','Aim','Alpha','https://images.example/alpha.png','[]','quick',0,0,0);
+    INSERT INTO faceit_scout_teams VALUES ('${TEAM_B}','Aim','Beta','https://images.example/beta.png','[]','quick',0,0,0);
+    INSERT INTO pd_teams VALUES ('faceit:${TEAM_A}','faceit','${TEAM_A}','Aim','ow2','old.png');
+    INSERT INTO pd_teams VALUES ('faceit:other','faceit','cccccccc-cccc-cccc-cccc-cccccccccccc','Aim Academy','ow2','academy.png');
+    INSERT INTO pd_teams VALUES ('faceit:cs','faceit','dddddddd-dddd-dddd-dddd-dddddddddddd','Aim CS','cs2','cs.png');
+    INSERT INTO pd_teams VALUES ('startgg:other','startgg','other','Aim Other','ow2','other.png');
+    INSERT INTO pd_team_members VALUES ('faceit:other','p1','Scouted','cached-avatar.png');
+    INSERT INTO pd_team_members VALUES ('faceit:other','eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee','ScoutedFriend','friend.png');
+    INSERT INTO pd_team_members VALUES ('faceit:cs','ffffffff-ffff-ffff-ffff-ffffffffffff','ScoutedCS','cs.png');`);
+}
+
+test('cached suggestions rank exact names first, disambiguate tags, return avatars and deduplicate IDs', async () => {
+  const f=fixture();
+  try {
+    seedDirectory(f);
+    const {getScoutSuggestions}=f.load('@/lib/scouting-directory');
+    const rows=await getScoutSuggestions('Aim','team');
+    assert.deepEqual(Array.from(rows,r=>r.name),['Aim (Alpha)','Aim (Beta)','Aim Academy']);
+    assert.equal(rows[0].id,TEAM_A);assert.equal(rows[1].id,TEAM_B);
+    assert.equal(rows[0].avatarUrl,'https://images.example/alpha.png');
+    assert.equal((await getScoutSuggestions('Aim(Beta)','team'))[0].id,TEAM_B);
+    assert.equal((await getScoutSuggestions('beta','team'))[0].id,TEAM_B);
+    assert.equal((await getScoutSuggestions('not saved','team')).length,0);
+    assert.equal((await getScoutSuggestions('%','team')).length,0,'SQL wildcards are literal');
+    const players=await getScoutSuggestions('Scouted','player');
+    assert.deepEqual(Array.from(players,r=>r.name),['Scouted','ScoutedFriend']);
+    assert.equal(players[0].avatarUrl,'cached-avatar.png', 'reuse a roster avatar when the primary cache lacks one');
+    assert.equal(players[1].avatarUrl,'friend.png');
+  } finally {f.sqlite.close();}
+});
+
+function teamRoute(f, calls) {
+  const exports={};
+  const code=ts.transpileModule(readFileSync(resolve(root,'app/api/scouting/team/route.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+  runInNewContext(code,{exports,URL,Response,require:id=>{
+    if(id==='@/lib/session') return {getSessionCached:async()=>({user:{id:'signed-in'}})};
+    if(id==='@/lib/faceit-scouting') return {
+      requestFaceitTeam:async(action,id,mode)=>{calls.push({action,id,mode});return {teamId:id,status:'collecting'};},
+      getScoutingData:async({teamId})=>({status:'collecting',player:{playerId:teamId},data:null}),
+    };
+    return f.load(id);
+  }});
+  return exports;
+}
+
+test('plain team names use the first local suggestion; selected IDs start exact searches instead of advances', async () => {
+  const f=fixture();
+  try {
+    seedDirectory(f);
+    const calls=[];
+    const route=teamRoute(f,calls);
+    const post=body=>route.POST(new Request('https://commons.test/api/scouting/team',{method:'POST',headers:{origin:'https://commons.test','Content-Type':'application/json'},body:JSON.stringify(body)}));
+    await post({nickname:'Aim',mode:'quick'});
+    assert.deepEqual(calls.pop(),{action:'search',id:TEAM_A,mode:'quick'});
+    await post({nickname:TEAM_B,mode:'deep'});
+    assert.deepEqual(calls.pop(),{action:'search',id:TEAM_B,mode:'deep'});
+    await post({nickname:`https://www.faceit.com/en/teams/${TEAM_B}/stats`,mode:'deep'});
+    assert.deepEqual(calls.pop(),{action:'search',id:TEAM_B,mode:'deep'});
+    await post({team_id:TEAM_B,mode:'deep'});
+    assert.deepEqual(calls.pop(),{action:'advance',id:TEAM_B,mode:'deep'});
+    const missing=await (await post({nickname:'unknown'})).json();
+    assert.equal(missing.status,'not_found');assert.equal(calls.length,0,'unknown name never falls back to FACEIT search');
+  } finally {f.sqlite.close();}
+});
+
+test('player name submissions use local IDs but explicit profile links preserve their exact identity', async () => {
+  const f=fixture();
+  try {
+    seedDirectory(f);
+    const calls=[];const exports={};
+    const code=ts.transpileModule(readFileSync(resolve(root,'app/api/scouting/search/route.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+    runInNewContext(code,{exports,URL,Response,require:id=>{
+      if(id==='@/lib/session') return {getSessionCached:async()=>({user:{id:'signed-in'}})};
+      if(id==='@/lib/faceit-scouting') return {
+        requestFaceitSearch:async(query)=>{calls.push({...query});return {ok:true,status:'ready'};},
+        getScoutingData:async()=>({status:'ready',player:null,data:null}),
+      };
+      return f.load(id);
+    }});
+    const post=body=>exports.POST(new Request('https://commons.test/api/scouting/search',{method:'POST',headers:{origin:'https://commons.test','Content-Type':'application/json'},body:JSON.stringify(body)}));
+    await post({nickname:'Scouted'});assert.deepEqual(calls.pop(),{playerId:'p1'});
+    await post({nickname:'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'});assert.deepEqual(calls.pop(),{playerId:'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'});
+    await post({nickname:'https://www.faceit.com/en/players/ScoutedFriend'});assert.deepEqual(calls.pop(),{nickname:'ScoutedFriend'});
+    await post({nickname:'NewPlayer'});assert.deepEqual(calls.pop(),{nickname:'NewPlayer'});
+    assert.equal((await post(null)).status,400);
+  } finally {f.sqlite.close();}
+});

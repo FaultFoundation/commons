@@ -2,7 +2,7 @@ import { getScoutingData } from "@/lib/faceit-scouting";
 import {
   DEFAULT_GAME_MODE,
   asScoutGameMode,
-  normalizeNickname,
+  parseScoutPlayerQuery,
 } from "@/lib/faceit-scouting-shared";
 import { getSessionCached } from "@/lib/session";
 
@@ -20,8 +20,8 @@ export async function GET(request: Request) {
   }
   const url = new URL(request.url);
   const playerId = url.searchParams.get("player_id") ?? undefined;
-  const nickname = normalizeNickname(url.searchParams.get("nickname") ?? "") ?? undefined;
-  if (!playerId && !nickname) {
+  const query = parseScoutPlayerQuery(playerId ?? url.searchParams.get("nickname") ?? "");
+  if (!query || (playerId != null && !query.playerId)) {
     return Response.json({ error: "nickname or player_id required" }, { status: 400 });
   }
   // `game_mode` is the team-size filter (1v1/5v5/6v6), not the search depth.
@@ -29,6 +29,6 @@ export async function GET(request: Request) {
   // remembered filter should show the default view, not an error.
   const gameMode =
     asScoutGameMode(url.searchParams.get("game_mode")) ?? DEFAULT_GAME_MODE;
-  const payload = await getScoutingData({ playerId, nickname }, gameMode);
+  const payload = await getScoutingData(query, gameMode);
   return Response.json(payload);
 }

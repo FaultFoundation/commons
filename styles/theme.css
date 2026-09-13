@@ -8855,3 +8855,17 @@ a.ff-sview__crumb:hover {
 .ff-teammap__dot:focus-visible, .ff-teammap__average:focus-visible { outline: 2px solid var(--ff-navy-900); outline-offset: 3px; }
 .ff-teammap__tooltip { position: fixed; z-index: 1000; display: grid; gap: 5px; width: 250px; max-width: calc(100vw - 50px); padding: 13px; border: 1px solid #53606e; border-radius: 10px; background: #182029; color: #f4f7fa; box-shadow: 0 8px 30px #0006; font-size: 12px; line-height: 1.4; pointer-events: none; }
 .ff-teammap__tooltip strong { font-size: 14px; }
+
+/* Cached scouting identities, with stable IDs for similarly named teams. */
+.ff-scoutlookup { position: relative; flex: 1 1 260px; min-width: 0; }
+.ff-scoutlookup > input { width: 100%; box-sizing: border-box; }
+.ff-scoutlookup__dropdown { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 30; border: 1px solid var(--ff-border); border-radius: 12px; background: var(--ff-bg, #003167); box-shadow: 0 10px 30px #0006; color: #fff; overflow: hidden; }
+.ff-scoutlookup__dropdown ul { list-style: none; margin: 0; padding: 4px; max-height: 340px; overflow-y: auto; }
+.ff-scoutlookup__dropdown li { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; cursor: pointer; }
+.ff-scoutlookup__dropdown li[aria-selected="true"] { background: var(--ff-surface-2); outline: 1px solid var(--ff-accent); outline-offset: -1px; }
+.ff-scoutlookup__dropdown img, .ff-scoutlookup__avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex: none; }
+.ff-scoutlookup__avatar { display: grid; place-items: center; background: var(--ff-surface-2); font-size: 13px; font-weight: 700; }
+.ff-scoutlookup__identity { display: grid; min-width: 0; gap: 3px; }
+.ff-scoutlookup__identity strong { font-size: var(--ff-dash-text-sm); overflow-wrap: anywhere; }
+.ff-scoutlookup__identity small { font-size: 11px; color: var(--ff-text-dim); overflow-wrap: anywhere; }
+.ff-scoutlookup__dropdown p { margin: 0; padding: 10px 14px; font-size: var(--ff-dash-text-xs); color: var(--ff-text-dim); }

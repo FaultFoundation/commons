@@ -6,6 +6,7 @@ import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { FaceitMatchList } from "@/components/dashboard/scouting/FaceitMatchList";
 import { ScoutAnalytics } from "@/components/dashboard/scouting/ScoutAnalytics";
 import { ScoutDeepLoading } from "@/components/dashboard/scouting/ScoutDeepLoading";
+import { ScoutSearchInput } from "@/components/dashboard/scouting/ScoutSearchInput";
 import { ScoutModeToggle } from "@/components/dashboard/scouting/ScoutModeToggle";
 import { StatLoading } from "@/components/dashboard/statistics/StatLoading";
 import {
@@ -15,10 +16,11 @@ import {
   asScoutGameMode,
   formatElo,
   formatWinratePct,
-  normalizeNickname,
+  parseScoutPlayerQuery,
   type ScoutGameMode,
   type ScoutMode,
   type ScoutTarget,
+  type ScoutSuggestion,
   type ScoutResponse,
 } from "@/lib/faceit-scouting-shared";
 import { finishDeepScout, scoutRequest } from "@/lib/scouting-request";
@@ -110,6 +112,15 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
     asScoutGameMode,
   );
 
+  const [selected, setSelected] = usePersistentState<Pick<ScoutSuggestion, "id" | "name"> | null>(
+    `scouting:selection:${target}`, null, value => {
+      if (value === null) return null;
+      if (!value || typeof value !== "object") return undefined;
+      const item = value as { id?: unknown; name?: unknown };
+      return typeof item.id === "string" && parseScoutPlayerQuery(item.id)?.playerId && typeof item.name === "string"
+        ? { id: item.id, name: item.name } : undefined;
+    },
+  );
   const [resp, setResp] = useState<ScoutResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [teamRunning, setTeamRunning] = useState(false);
@@ -193,7 +204,7 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
   // A quick search: ask the Worker to collect, then read back + poll a few times.
   const runQuick = useCallback(
     async (raw: string, gm: ScoutGameMode) => {
-      const nickname = target === "team" ? (raw.trim().length <= 256 ? raw.trim() : null) : normalizeNickname(raw);
+      const nickname = target === "team" ? (raw.trim().length <= 256 ? raw.trim() : null) : (parseScoutPlayerQuery(raw) ? raw.trim() : null);
       if (!nickname) return;
       clearPoll();
       setLoading(true);
@@ -240,7 +251,7 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
   // screen until the whole history is collected, or an explicit failure occurs.
   const runDeep = useCallback(
     async (raw: string, gm: ScoutGameMode) => {
-      const nickname = target === "team" ? (raw.trim().length <= 256 ? raw.trim() : null) : normalizeNickname(raw);
+      const nickname = target === "team" ? (raw.trim().length <= 256 ? raw.trim() : null) : (parseScoutPlayerQuery(raw) ? raw.trim() : null);
       if (!nickname) return;
       clearPoll();
       setLoading(false);
@@ -312,7 +323,7 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
   useEffect(() => {
     if (!restored || hydrated.current) return;
     hydrated.current = true;
-    const seed = target === "team" ? query.trim() : normalizeNickname(query);
+    const seed = target === "team" ? query.trim() : (parseScoutPlayerQuery(query) ? query.trim() : null);
     const cached = readCache(target);
     if (cached && seed && (cached.nickname.toLowerCase() === seed.toLowerCase() || cached.query?.toLowerCase() === seed.toLowerCase())) {
       setResp(cached.resp);
@@ -349,7 +360,7 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    void runSearch(query, mode, gameMode);
+    void runSearch(selected?.name === query ? selected.id : query, mode, gameMode);
   }
 
   const player = resp?.player ?? null;
@@ -373,21 +384,18 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
               {option === "player" ? "Player" : "Team"}
             </button>)}
           </div>
-          <input
-            className="ff-auth__input ff-scoutsearch__input"
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={target === "team" ? "FACEIT team name (tag) or URL" : "FACEIT nickname"}
-            aria-label={target === "team" ? "FACEIT team" : "FACEIT nickname"}
-            autoComplete="off"
-            spellCheck={false}
-          />
+          <ScoutSearchInput query={query} target={target} disabled={busy}
+            onChange={value => { setSelected(null); setQuery(value); }}
+            onPick={suggestion => {
+              setSelected({ id: suggestion.id, name: suggestion.name });
+              setQuery(suggestion.name);
+              void runSearch(suggestion.id, mode, gameMode);
+            }} />
           <ScoutModeToggle mode={mode} onChange={setMode} disabled={busy} />
           <button
             type="submit"
             className="ff-btn ff-btn--brand"
-            disabled={busy || !(target === "team" ? query.trim() && query.length <= 256 : normalizeNickname(query))}
+            disabled={busy || !(target === "team" ? query.trim() && query.length <= 256 : (parseScoutPlayerQuery(query) ? query.trim() : null))}
           >
             {busy ? "Scouting…" : "Scout"}
           </button>
@@ -438,7 +446,7 @@ function ScoutingSearch({ initialQuery, target, onTargetChange }: { initialQuery
             resp={resp!}
             refreshing={refreshing}
             onRefresh={onRefresh}
-            onDeep={() => runDeep(activeNick.current ?? query, gameMode)}
+            onDeep={() => runDeep(player.playerId, gameMode)}
           />
 
 

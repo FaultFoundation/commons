@@ -1,6 +1,10 @@
 # Team scouting
 
-The Player / Team switch is independent of Quick / Deep. Team searches accept an exact team name, `name(tag)`, a team UUID, or a FACEIT team URL. The resolver verifies the Overwatch game and rejects ambiguous names instead of choosing an arbitrary fuzzy search result.
+Player searches accept a FACEIT nickname, player UUID, or profile/stats link; links are parsed locally and only the extracted identity is sent to FACEIT.
+
+The Player / Team switch is independent of Quick / Deep. Team searches accept a cached team name, `name(tag)`, a team UUID, or a FACEIT team URL. The dropdown searches local public FACEIT identities from `faceit_scout_teams`, `faceit_players`, and linked Overwatch teams/rosters in `pd_teams` / `pd_team_members`. It does not call FACEIT search. Exact names/tags rank first, followed by prefixes and literal substring matches, with deterministic name/tag/ID ordering. Duplicate cache entries merge by ID.
+
+Clicking a suggestion (or pressing Enter on a keyboard-highlighted option) starts a search with its exact ID. Submitting a plain name uses the first local suggestion in that same order. Player names with no local suggestion can still use FACEIT's direct exact-nickname profile endpoint. Teams absent from the local directory need a link or ID once; the resulting profile becomes available for name lookup. Selected identity and display name persist together so identical names do not silently switch identities on a later visit. The Worker no longer uses FACEIT's fuzzy team search.
 
 Team identity and the current roster come from FACEIT Data API `/teams/{id}`. Match membership comes exclusively from the team Stats page's `/stats/v1/stats/time/teams/{id}/games/ow2` feed. Its per-map entries are deduplicated to match IDs in `faceit_scout_team_matches`. The existing detail collector fills those matches; every roster member also receives their own player-history collection. Team aggregates select one participant per team-feed match, so teammate duplicates do not multiply maps and former-roster matches remain visible.
 

@@ -88,7 +88,7 @@ export function IntegrationCard({
         <p className="ff-integration__warn" role="status">
           We couldn&rsquo;t read this account through {label}&rsquo;s API. Set your
           {" "}
-          {label} profile to public so it can sync with the Commons Project.
+          {label} profile to public so it can sync with the Esports Commons.
         </p>
       ) : null}
 

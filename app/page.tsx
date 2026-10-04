@@ -14,12 +14,12 @@ export const metadata: Metadata = {
   // segment in current Next.
   title: { absolute: "Commons - The Fault Foundation" },
   description:
-    "The Commons Project reads Challonge, FACEIT, start.gg, LeagueOS, and Discord into one feed. Your matches, your record, and your team's schedule live in one place.",
+    "The Esports Commons reads Challonge, FACEIT, start.gg, LeagueOS, and Discord into one feed. Your matches, your record, and your team's schedule live in one place.",
   alternates: { canonical: "/" },
 };
 
 /**
- * The Commons Project landing page — the front door for members. Static by
+ * The Esports Commons landing page — the front door for members. Static by
  * design (no session read, so it stays cacheable and off the Worker CPU
  * budget); the hero swaps signed-in vs signed-out CTAs with the same pre-paint
  * `data-auth` attribute the header uses (.ff-auth-when-in / .ff-auth-when-out),
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
 // Real product screenshots, in place of the hand-drawn feed panel this hero
 // used to render in markup. A mock is cheap to keep in sync but it is also a
 // drawing of the product rather than the product; these are captures of the
-// live Commons Project, so the front door shows what a member actually gets.
+// live Esports Commons, so the front door shows what a member actually gets.
 //
 // Plain <img> is the site convention (next.config.ts turns image optimization
 // off), and every shot is cropped by its frame (.ff-home-shot) rather than
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
 // markup change. Files live in public/screenshots/.
 const SHOT_HERO = {
   src: "/screenshots/tournaments-list.jpg",
-  alt: "The Commons Project tournaments tab: a featured tournament banner above a grid of tournament cards drawn from start.gg and FACEIT, each showing its art, date, entrant count and registration status.",
+  alt: "The Esports Commons tournaments tab: a featured tournament banner above a grid of tournament cards drawn from start.gg and FACEIT, each showing its art, date, entrant count and registration status.",
 };
 
 // Beside "Why we built this", where the argument for the project is made — the
@@ -57,7 +57,7 @@ const SHOT_HERO = {
 // a gallery of its own.
 const SHOT_WHY = {
   src: "/screenshots/tournament-detail.jpg",
-  alt: "A tournament page on the Commons Project showing the advancing teams with their school logos, an About section, and a details panel listing game, dates, entrants, stream and organizer.",
+  alt: "A tournament page on the Esports Commons showing the advancing teams with their school logos, an About section, and a details panel listing game, dates, entrants, stream and organizer.",
 };
 
 // The platforms we read, each with its own brand glyph. Marks are the same
@@ -158,7 +158,7 @@ export default function CommonsPage() {
               <span className="ff-home-accent">every bracket</span>
             </h1>
             <p className="ff-home-hero__lede">
-              The Commons Project reads Challonge, FACEIT, start.gg, LeagueOS, and
+              The Esports Commons reads Challonge, FACEIT, start.gg, LeagueOS, and
               Discord into one feed, so your matches, your record, and your
               team&rsquo;s schedule live together with no tabs, no spreadsheets,
               and no missed check-ins.
@@ -166,7 +166,7 @@ export default function CommonsPage() {
 
             <div className="ff-home-hero__cta ff-auth-when-out">
               <a className="ff-btn ff-btn--accent" href="/login/">
-                Log in to the Commons Project
+                Log in to the Esports Commons
               </a>
               <a className="ff-btn ff-btn--outline" href="/signup/">
                 Create an account
@@ -174,7 +174,7 @@ export default function CommonsPage() {
             </div>
             <div className="ff-home-hero__cta ff-auth-when-in">
               <a className="ff-btn ff-btn--accent" href="/home/">
-                Open the Commons Project
+                Open the Esports Commons
               </a>
             </div>
 
@@ -264,7 +264,7 @@ export default function CommonsPage() {
               between more and more accounts.
             </p>
             <p>
-              We introduced the Commons Project to unify all tournaments into
+              We introduced the Esports Commons to unify all tournaments into
               one view. As we expand, we hope this project will make esports
               more manageable for the largest schools to the newest teams.
             </p>
@@ -282,7 +282,7 @@ export default function CommonsPage() {
           <div>
             <h2 className="ff-home-program__title">Run a program? Talk to us.</h2>
             <p className="ff-home-program__body">
-              We&rsquo;re onboarding school programs onto the Commons Project and
+              We&rsquo;re onboarding school programs onto the Esports Commons and
               shaping the hosting tools around what they actually need.
             </p>
           </div>

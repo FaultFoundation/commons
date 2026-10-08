@@ -6,7 +6,7 @@ import { useEffect, useState, useTransition } from "react";
 import {
   resendParentalConsent,
   submitRegistration,
-} from "@/app/account/setup/actions";
+} from "@/app/(dashboard)/overfault/actions";
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 import { SETUP_DRAFT_KEY } from "@/components/dashboard/setup/draft";
 import { SchoolTypeahead, type SchoolHit } from "@/components/dashboard/SchoolTypeahead";
@@ -199,7 +199,7 @@ export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
         // Don't dead-end here. Let them keep setting up — linking Discord opens
         // a support ticket, and the "under review" status surfaces once they
         // finish or leave setup (team step + account page).
-        router.push("/account/setup/integrations/");
+        router.push("/overfault/integrations/");
         return;
       }
       if (result.outcome === "CONSENT_PENDING") {
@@ -210,10 +210,10 @@ export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
         return;
       }
       if (result.outcome === "VERIFIED") {
-        router.push("/account/setup/integrations/");
+        router.push("/overfault/integrations/");
         return;
       }
-      router.push("/account/setup/code/");
+      router.push("/overfault/code/");
     });
   }
 
@@ -263,7 +263,7 @@ export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
           >
             {pending ? "Sending…" : "Resend link"}
           </button>
-          <a className="ff-btn" href="/account/setup/integrations/">
+          <a className="ff-btn" href="/overfault/integrations/">
             Next
           </a>
         </div>

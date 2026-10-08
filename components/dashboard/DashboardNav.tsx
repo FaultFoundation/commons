@@ -39,6 +39,9 @@ export type NavItem = {
   /** Absent = no page yet (rendered dimmed) unless `children` is set. */
   href?: string;
   children?: NavChild[];
+  /** "brand" outlines the tab in the accent yellow, like the header's Commons
+      pill. An identity mark for one destination, not a state. */
+  tone?: "brand";
 };
 
 /** Points right when collapsed; the CSS rotates it down when expanded. */
@@ -222,7 +225,11 @@ export function DashboardNav({
           return item.href ? (
             <Link
               key={item.key}
-              className="ff-dash__link"
+              className={
+                item.tone === "brand"
+                  ? "ff-dash__link ff-dash__link--brand"
+                  : "ff-dash__link"
+              }
               href={item.href}
               aria-current={item.key === active ? "page" : undefined}
             >

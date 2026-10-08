@@ -14,8 +14,13 @@ export const PATHNAME_HEADER = "x-ff-pathname";
 const LEGACY_PATHS: Record<string, string> = {
   "/dashboard/": "/home/",
   "/dashboard/accounts/": "/account/",
-  "/dashboard/register/": "/account/setup/",
+  "/dashboard/register/": "/overfault/",
 };
+
+/** League registration moved from /account/setup/* to the Overfault tab. Kept
+    as a prefix redirect for bookmarks and any OAuth popup still in flight
+    with the old integrations callbackURL. */
+const LEGACY_SETUP_PREFIX = "/account/setup";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -33,6 +38,17 @@ export function middleware(request: NextRequest) {
   if (moved) {
     const url = new URL(request.url);
     url.pathname = moved;
+    return NextResponse.redirect(url, 308);
+  }
+  if (
+    pathname === LEGACY_SETUP_PREFIX ||
+    pathname.startsWith(`${LEGACY_SETUP_PREFIX}/`)
+  ) {
+    // Query survives (an OAuth `?error=` the bridge needs to show).
+    const url = new URL(request.url);
+    url.pathname = `/overfault/${pathname
+      .slice(LEGACY_SETUP_PREFIX.length)
+      .replace(/^\//, "")}`;
     return NextResponse.redirect(url, 308);
   }
 

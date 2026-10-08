@@ -1,4 +1,3 @@
-import { SetupBanner } from "@/components/dashboard/SetupBanner";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -34,7 +33,6 @@ export default async function SchedulePage() {
 
   return (
     <>
-      <SetupBanner userId={userId} />
       <h1 className="screen-reader-text">Schedule</h1>
       <DashboardDataRefresh schedule />
       <ScheduleView

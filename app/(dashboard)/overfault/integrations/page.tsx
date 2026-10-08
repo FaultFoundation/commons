@@ -57,7 +57,7 @@ export default async function IntegrationsSetupPage() {
               enabled={discordAuthEnabled()}
               note={discordServerNote(discord.inGuild)}
               linkLabel="Link Discord"
-              callbackURL="/account/setup/integrations/"
+              callbackURL="/overfault/integrations/"
             />
             <IntegrationCard
               provider="battlenet"
@@ -68,14 +68,14 @@ export default async function IntegrationsSetupPage() {
               handle={battlenetIdentity?.handle ?? null}
               enabled={battlenetAuthEnabled()}
               linkLabel="Link Blizzard"
-              callbackURL="/account/setup/integrations/"
+              callbackURL="/overfault/integrations/"
             />
           </div>
           <div className="ff-reg__nav">
-            <a className="ff-btn ff-btn--outline" href="/account/setup/academic/">
+            <a className="ff-btn ff-btn--outline" href="/overfault/academic/">
               Back
             </a>
-            <a className="ff-btn" href="/account/setup/team/">
+            <a className="ff-btn" href="/overfault/team/">
               Next
             </a>
           </div>
@@ -93,7 +93,7 @@ export default async function IntegrationsSetupPage() {
                 enabled={c.enabled}
                 reachable={c.reachable}
                 linkLabel={c.linkLabel}
-                callbackURL="/account/setup/integrations/"
+                callbackURL="/overfault/integrations/"
               />
             ))}
             <ComingSoonIntegration

@@ -364,9 +364,10 @@ export type SetupProgress = {
 export const REQUIRED_PROVIDERS = ["discord", "battlenet"] as const;
 
 /**
- * Single source of truth for setup completion: drives both the step rail's
- * checkmarks (SetupShell) and the resume redirect (/account/setup/), so the two
- * can't drift apart and send someone to a step the rail calls finished.
+ * Single source of truth for Overfault registration progress: drives both the
+ * step rail's checkmarks (SetupShell) and the /overfault/ checklist with its
+ * "next step" button, so the two can't drift apart and send someone to a step
+ * the rail calls finished.
  */
 async function readSetupProgress(
   userId: string,

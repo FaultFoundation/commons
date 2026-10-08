@@ -23,13 +23,18 @@ now 308s via `middleware.ts`). `/` stays the public Commons landing page.
 | `/tournaments/discovery/<id>/<tid>/` | —     | One of that series' tournaments, inside the shell |
 | `/join/<token>/`               | —           | Invite landing (join a team) |
 | `/account/`                    | Account     | Profile / integrations       |
-| `/account/setup/`              | —           | Resolver → current step      |
-| `/account/setup/academic/`     | —           | Step 1                       |
-| `/account/setup/code/`         | —           | Code entry (part of step 1)  |
-| `/account/setup/integrations/` | —           | Step 2                       |
-| `/account/setup/team/`         | —           | Step 3                       |
+| `/overfault/`                  | Overfault   | League registration checklist (status + next step) |
+| `/overfault/academic/`         | Overfault   | Step 1                       |
+| `/overfault/code/`             | Overfault   | Code entry (part of step 1)  |
+| `/overfault/integrations/`     | Overfault   | Step 2 (Discord + Blizzard)  |
+| `/overfault/team/`             | Overfault   | Step 3                       |
 
-Sign-up lands on `/account/setup/`; sign-in lands on `/home/`.
+Sign-up and sign-in both land on `/home/`. An account is all the portal needs:
+nothing pushes a new member through verification, account linking or a team.
+Those are **Overfault** (the collegiate league) registration, which a member
+opts into from the Overfault tab. The steps used to be the sign-up flow at
+`/account/setup/*`; middleware 308s those URLs to `/overfault/*` so bookmarks
+and in-flight OAuth popups still land.
 
 Member tabs live under `app/(dashboard)/` (the group does not change URLs).
 Its shared `layout.tsx` owns `DashboardShell`, so the sidebar stays mounted
@@ -39,7 +44,7 @@ across Home, Schedule, Teams, Settings, Experimental, and Admin navigation.
 the client; default Link prefetching can fetch the loading boundary ahead of
 a click. Keep page data and setup prompts below this layout so slow reads
 cannot block the sidebar. Pages retain their own session/capability checks.
-Onboarding and public invite pages keep their standalone shells. Client-side
+Public invite pages keep their standalone shell. Client-side
 requests retain their own loading indicators; tournament details keep their
 more specific skeleton.
 
@@ -457,24 +462,18 @@ hand-written crop math.
 Team logos have no such constraint — `setTeamLogo` owns the object and the row
 together, gated on `editSettings` like every other team setting.
 
-### `SetupBanner` — the amber "action required" bar
+### `SetupShell` — the Overfault step rail
 
-`components/dashboard/SetupBanner.tsx`, rendered by member pages (and the
-tournaments content layout) beneath the shared shell. Its reads stay inside
-the content loading boundary. Exactly one prompt shows, in priority order:
+`components/dashboard/setup/SetupShell.tsx`. Draws the numbered step rail
+above an Overfault step page; the portal shell itself comes from the
+`(dashboard)` layout like every other tab. Takes `step: 1 | 2 | 3`; the
+code-entry page passes `1` because it belongs to step 1. Ticks come from
+`getSetupProgress`, the same read the `/overfault/` checklist uses.
 
-1. academic email not `VERIFIED`, or Discord not linked → finish setup
-2. set up but on no team → create or join a team
-3. on a team but entered in nothing → join a tournament
-
-Renders nothing once all three hold. Omit the banner on pages that *are* a
-setup step — `SetupShell` already does this.
-
-### `SetupShell` — chrome for the setup wizard
-
-`components/dashboard/setup/SetupShell.tsx`. Wraps `DashboardShell` (Account
-tab active, no banner) and draws the numbered step rail. Takes `step: 1 | 2
-| 3`; the code-entry page passes `1` because it belongs to step 1.
+There is no site-wide "action required" banner or auto-opening Getting Started
+popup any more. Both pushed every member toward verification and account
+linking, which is now opt-in league registration. The yellow-outlined
+Overfault tab is the standing pointer instead (see "Rail groups" below).
 
 ## Recipe: add a new tab
 
@@ -484,7 +483,6 @@ tab active, no banner) and draws the numbered step rail. Takes `step: 1 | 2
    import type { Metadata } from "next";
    import { redirect } from "next/navigation";
 
-   import { SetupBanner } from "@/components/dashboard/SetupBanner";
    import { Bubble } from "@/components/dashboard/bubbles/Bubble";
    import { getSessionCached } from "@/lib/session";
 
@@ -499,7 +497,6 @@ tab active, no banner) and draws the numbered step rail. Takes `step: 1 | 2
 
      return (
        <>
-         <SetupBanner userId={session.user.id} />
          <h1 className="screen-reader-text">My Tab</h1>
          <div className="ff-bubble-grid">
            {/* The first bubble always spans the grid. */}
@@ -548,6 +545,20 @@ privileged action; the rail's `adminLocked` flag is UX only.
 The routes are independent of the grouping: moving a page under a group changes
 where the rail offers it and nothing else. `/home/` is still where sign-in
 lands, and every existing link and `callbackURL` keeps working.
+
+### The outlined tab (`tone: "brand"`)
+
+A plain `NAV_ITEMS` link can carry `tone: "brand"`, which renders
+`.ff-dash__link--brand`: accent-yellow text inside a 1.5px accent outline, the
+header's **Commons** pill (`.ff-btn--brand`) carried into the rail. Only
+**Overfault** uses it. Sign-up no longer walks anyone through league
+registration, so the tab has to be findable on its own.
+
+This is the one exception to "yellow is state" in the button standard, and it is
+kept narrow. The outline is an identity mark for one destination. Hover and
+current still use the ordinary rail surfaces, and the text simply stays yellow
+through both. Don't give it to a second tab: two outlined items stop pointing at
+anything.
 
 ## Recipe: add a new bubble to a tab
 
@@ -664,16 +675,30 @@ its body into a panel (if it isn't one), add an entry to `HOME_WIDGETS` with its
 `HomeWidgets.tsx`.** A new surface that isn't reachable from Home is an
 incomplete change.
 
-## Getting Started onboarding
+## Overfault registration
 
-`SetupBanner` (shell-owned) also mounts `GettingStartedDialog` — a large modal
-(the 2FA-style native `<dialog>`, sized up to cover most of the screen) that
-**auto-opens once a session** while any setup step is outstanding, so a fresh
-sign-up lands in a guided checklist rather than a bare dashboard. It runs off the
-**same single D1 read** the amber banner already does (academic verified /
-Discord linked / on a team / entered a tournament), dismissal is a
-`sessionStorage` flag, and the banner remains the persistent nudge afterward.
-It's presentation only — every step's real gate is still server-side.
+Joining Overfault, the collegiate Overwatch league, takes three steps: a
+verified academic email, linked Discord **and** Blizzard accounts
+(`REQUIRED_PROVIDERS`), and a place on a team. None of them is required to use
+the Commons. A fresh account lands on `/home/`, and the steps live under the
+**Overfault** rail tab (`app/(dashboard)/overfault/`).
+
+- **`/overfault/` renders a checklist; it never redirects to the step owed.**
+  The `(dashboard)` loading boundary flushes the shell first, so a `redirect()`
+  there would degrade into a blank-shell client hop on every tab click (the
+  series-profile index follows the same rule). One row per step shows its status.
+  The first step the member can act on gets the one blue button. A step waiting
+  on someone else is skipped for that button so the member can carry on: consent
+  waits on a parent and `MANUAL_REVIEW` on staff.
+- **Links that mean "go verify"** (Settings' Profile row, the Start Team dialog,
+  the invite page, the team step) point at `/overfault/` rather than a step,
+  because only the checklist knows whether that member owes the form or the
+  code. Consent "Resend" links go straight to `/overfault/academic/`, which
+  renders the resend panel for that status.
+- The **server-side gates are unchanged**: creating or joining a team still
+  requires `VERIFIED` (`isVerifiedMember` in the team actions), and tournament
+  entry still checks the roster. Moving the steps out of sign-up changed where
+  members find them, not who may do what.
 
 ## Team roles
 
@@ -873,7 +898,7 @@ portal conventions specific to these surfaces:
 
 - Account mutations (name/email/password/unlink/delete) are Better Auth
   client calls — no custom endpoints. Server actions
-  (`app/account/setup/actions.ts`) exist only for domain logic Better Auth
+  (`app/(dashboard)/overfault/actions.ts`) exist only for domain logic Better Auth
   doesn't own.
 - Verification codes are 6 uppercase alphanumerics. D1 only ever stores
   `sha256(userId:code)` (`lib/registration.ts`), compared in constant time,

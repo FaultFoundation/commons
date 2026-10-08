@@ -216,8 +216,8 @@ export default async function JoinPage({
           </p>
           {details}
           <div className="ff-row__buttons">
-            <a className="ff-btn" href="/account/setup/">
-              Finish Setting Up
+            <a className="ff-btn" href="/overfault/">
+              Verify in Overfault
             </a>
           </div>
         </Bubble>

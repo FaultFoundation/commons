@@ -1,4 +1,3 @@
-import { SetupBanner } from "@/components/dashboard/SetupBanner";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -30,7 +29,6 @@ export default async function ScoutingPage({
 
   return (
     <>
-      <SetupBanner userId={session.user.id} />
       <h1 className="screen-reader-text">Scouting</h1>
       <ScoutingView
         // An explicit ?q= wins; otherwise seed with the member's own FACEIT

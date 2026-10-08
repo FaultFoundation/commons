@@ -2,8 +2,10 @@
 
 The member-facing side of [The Fault Foundation](https://fault.foundation) —
 a centralized place for teams to find tournaments, schedules, and each other.
-Registration, login, and the member dashboard live here; **Overfault** (the
-bracket side) becomes a tab inside it.
+Registration, login, and the member dashboard live here. **Overfault**, the
+collegiate Overwatch league, is a tab inside it. Signing up only needs an
+account; league registration (school verification, Discord + Blizzard, a team)
+is opt-in from that tab.
 
 Ships to `commons.fault.foundation`. The public marketing site is a
 [separate repository](https://fault.foundation) and a separate Worker — see

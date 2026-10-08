@@ -1166,6 +1166,19 @@ button.ff-dash__link:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--ff-accent);
 }
+/* Overfault: the header's Commons pill (.ff-btn--brand) carried into the rail
+   — accent text inside a 1.5px accent outline. Sign-up no longer walks anyone
+   through league registration, so this tab is how it gets found. The outline
+   is identity, not state: hover and current keep the ordinary rail surfaces
+   above (yellow is never a hover colour), and only the text stays yellow.
+   The inset shadow follows border-radius, so it becomes a pill on tablets. */
+.ff-dash__link--brand {
+  color: var(--ff-accent);
+  box-shadow: inset 0 0 0 1.5px var(--ff-accent);
+}
+a.ff-dash__link--brand:hover {
+  color: var(--ff-accent);
+}
 .ff-dash__link--soon {
   color: var(--ff-text-dim);
   opacity: 0.5;
@@ -2179,26 +2192,6 @@ button.ff-dash__link:hover {
   transform: none;
 }
 
-/* "Action required" banner (shell-owned, above every tab's bubbles until
-   setup + team + tournament all hold — then it unmounts) */
-.ff-banner {
-  margin: 0 0 20px;
-  padding: 12px 20px;
-  border-radius: var(--ff-radius-lg);
-  background: #a1701d;
-  color: #fff;
-  font-weight: 600;
-  box-shadow: var(--ff-shadow-card);
-}
-.ff-banner a {
-  color: #fff;
-  font-weight: 800;
-  text-decoration: underline;
-}
-.ff-banner a:hover {
-  color: var(--ff-navy-900);
-}
-
 /* ---------------------------------------------------------------------------
    Teams — role badges, invite links, the score reporter.
    Everything here layers on .ff-row / .ff-bubble; no new type sizes.
@@ -2502,106 +2495,6 @@ button.ff-dash__link:hover {
    bottom margin under the alternates above it. */
 .ff-dialog--unlock .ff-auth__alts {
   margin-bottom: 0;
-}
-
-/* Getting Started onboarding — a big modal (covers most of the screen) that
-   walks a new member through the setup checklist. */
-.ff-dialog--getstarted {
-  width: min(720px, calc(100% - 24px));
-  padding: 28px;
-  max-height: min(88vh, 760px);
-  overflow-y: auto;
-}
-.ff-getstarted__eyebrow {
-  display: inline-block;
-  font-size: var(--ff-dash-text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ff-accent);
-  font-weight: 700;
-}
-.ff-getstarted__title {
-  margin-top: 6px;
-  font-size: var(--ff-dash-text-xl);
-}
-.ff-getstarted__lede {
-  margin-bottom: 14px;
-}
-.ff-getstarted__progress {
-  height: 8px;
-  border-radius: var(--ff-radius-pill);
-  background: rgba(255, 255, 255, 0.1);
-  overflow: hidden;
-}
-.ff-getstarted__progress-bar {
-  display: block;
-  height: 100%;
-  background: var(--ff-ok);
-  transition: width var(--ff-transition);
-}
-.ff-getstarted__count {
-  display: block;
-  margin-top: 6px;
-  font-size: var(--ff-dash-text-xs);
-  color: var(--ff-text-dim);
-}
-.ff-getstarted__steps {
-  list-style: none;
-  margin: 18px 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.ff-getstarted__step {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--ff-border);
-  border-radius: var(--ff-radius-md);
-  background: var(--ff-surface-2);
-}
-.ff-getstarted__step--done {
-  opacity: 0.72;
-}
-.ff-getstarted__check {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  flex: none;
-  border-radius: var(--ff-radius-pill);
-  border: 1px solid var(--ff-border);
-  color: var(--ff-navy-900);
-}
-.ff-getstarted__step--done .ff-getstarted__check {
-  background: var(--ff-ok);
-  border-color: var(--ff-ok);
-}
-.ff-getstarted__step-main {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-.ff-getstarted__step-label {
-  font-weight: 700;
-}
-.ff-getstarted__step-desc {
-  font-size: var(--ff-dash-text-sm);
-  color: var(--ff-text-dim);
-}
-.ff-getstarted__done-tag {
-  flex: none;
-  font-size: var(--ff-dash-text-xs);
-  font-weight: 700;
-  color: var(--ff-ok);
-}
-.ff-getstarted__actions {
-  margin-top: 20px;
 }
 
 /* ===========================================================================

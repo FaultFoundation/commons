@@ -1,4 +1,3 @@
-import { SetupBanner } from "@/components/dashboard/SetupBanner";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -41,7 +40,6 @@ export default async function TeamsPage() {
 
   return (
     <>
-      <SetupBanner userId={session.user.id} />
       <h1 className="screen-reader-text">Teams</h1>
 
       {/* Starting, finding and recruiting are actions, not cards — the tab

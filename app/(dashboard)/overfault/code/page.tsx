@@ -30,7 +30,7 @@ export default async function CodeSetupPage() {
   const reg = await getRegistrationStateCached(session.user.id);
   // Nothing outstanding — the resolver knows where this member belongs.
   if (reg?.status !== "EMAIL_SENT") {
-    redirect("/account/setup/");
+    redirect("/overfault/");
   }
 
   const row = (

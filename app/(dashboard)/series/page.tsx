@@ -1,4 +1,3 @@
-import { SetupBanner } from "@/components/dashboard/SetupBanner";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -43,7 +42,6 @@ export default async function SeriesPage() {
 
   return (
     <>
-      <SetupBanner userId={session.user.id} />
       <h1 className="screen-reader-text">Series</h1>
       <div className="ff-bubble-grid">
         {/* These bubbles pass `titleHidden`: each section renders its own

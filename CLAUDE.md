@@ -23,8 +23,16 @@ cover rather than re-deriving:
 Member routes and their actions live under `app/(dashboard)/`; the route group
 preserves public URLs. Its layout owns the persistent `DashboardShell` and its
 loading boundary replaces only the right-hand content. Keep slow page reads
-and setup prompts below that boundary. Onboarding remains in `app/account/setup/`
-with its standalone shell. See the dashboard guide for navigation conventions.
+below that boundary. See the dashboard guide for navigation conventions.
+
+**Sign-up asks for nothing beyond an account.** A new member lands on `/home/`
+with the whole portal open. School verification, Discord + Blizzard linking and
+a team are **Overfault** (collegiate league) registration. They live under the
+yellow-outlined Overfault rail tab (`app/(dashboard)/overfault/`, formerly the
+`/account/setup/*` sign-up wizard, which middleware still 308s). There is no
+site-wide "action required" banner or Getting Started popup to bring back.
+The server-side verification gates on creating/joining a team are unchanged.
+See "Overfault registration" in the dashboard guide.
 
 ## Keeping the docs current
 
@@ -877,8 +885,8 @@ local dev).
   **School identity is resolved when the scraper WRITES a tournament**, so a
   matching or seed fix reaches existing rows only as each tournament is
   re-scraped or opened (the on-demand `/refresh`) — never retroactively.
-- **The dashboard shell for the whole tab lives in
-  [app/tournaments/layout.tsx](app/tournaments/layout.tsx)**, not the pages, so
+- **The dashboard shell for the whole tab comes from
+  [app/(dashboard)/layout.tsx](app/(dashboard)/layout.tsx)**, not the pages, so
   `loading.tsx` skeletons and `[id]/error.tsx` render inside the content area
   beside the rail (the rail stays mounted across list↔detail and reloads)
   instead of the whole page being replaced by a centered skeleton that then

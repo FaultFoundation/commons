@@ -1,4 +1,3 @@
-import { SetupBanner } from "@/components/dashboard/SetupBanner";
 import { DashboardDataRefresh } from "@/components/dashboard/DashboardDataRefresh";
 import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
@@ -53,7 +52,6 @@ export default async function HomePage() {
 
   return (
     <>
-      <SetupBanner userId={userId} />
       <h1 className="screen-reader-text">Home</h1>
       <DashboardDataRefresh schedule={Boolean(data.schedule)} tournaments={Boolean(data.tournaments)} />
       <HomeBoard

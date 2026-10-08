@@ -102,7 +102,7 @@ export function ProfilePanel({
           value="Awaiting consent"
           note="Waiting for your parent or guardian to confirm by email."
           action={
-            <a className="ff-btn ff-btn--sm" href="/account/setup/">
+            <a className="ff-btn ff-btn--sm" href="/overfault/academic/">
               Resend
             </a>
           }
@@ -119,7 +119,7 @@ export function ProfilePanel({
           value="Not verified"
           note="Verify your academic email to become a member."
           action={
-            <a className="ff-btn ff-btn--sm" href="/account/setup/">
+            <a className="ff-btn ff-btn--sm" href="/overfault/">
               Verify
             </a>
           }

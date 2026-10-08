@@ -1,4 +1,3 @@
-import { SetupBanner } from "@/components/dashboard/SetupBanner";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
@@ -70,7 +69,6 @@ export default async function TeamPage({
     if (!detail) notFound();
     return (
       <>
-      <SetupBanner userId={session.user.id} />
         <h1 className="screen-reader-text">{detail.team.name}</h1>
         <ExternalTeamView detail={detail} />
       </>
@@ -97,7 +95,6 @@ export default async function TeamPage({
 
   return (
     <>
-      <SetupBanner userId={session.user.id} />
       <h1 className="screen-reader-text">{team.name}</h1>
       <div className="ff-bubble-grid ff-bubble-grid--single">
         {/* Identity + stats + quick links, with the game's colour and mark —

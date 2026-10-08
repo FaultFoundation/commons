@@ -239,6 +239,7 @@ export async function submitRegistration(input: SubmitInput): Promise<SubmitResu
     });
     revalidatePath("/home/", "layout");
     revalidatePath("/account/", "layout");
+    revalidatePath("/overfault/", "layout");
   };
 
   // --- Minors (13–17): parental consent, whatever the membership type. The
@@ -557,5 +558,6 @@ export async function verifyCode(input: string): Promise<VerifyResult> {
 
   revalidatePath("/home/", "layout");
   revalidatePath("/account/", "layout");
+  revalidatePath("/overfault/", "layout");
   return { ok: true };
 }

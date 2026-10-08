@@ -10,7 +10,6 @@ import {
 import { DashboardRail } from "@/components/dashboard/DashboardRail";
 import { DashboardFrame } from "@/components/dashboard/DashboardFrame";
 import { DensityCookie } from "@/components/dashboard/accounts/DensityCookie";
-import { SetupBanner } from "@/components/dashboard/SetupBanner";
 import { isAdminUnlocked } from "@/lib/admin-unlock";
 import { DENSITY_COOKIE, asDensity, type Density } from "@/lib/density";
 import { getProfileCached } from "@/lib/registration";
@@ -31,6 +30,7 @@ export type DashboardNavKey =
   | "schedule"
   | "tournaments"
   | "teams"
+  | "overfault"
   | "account"
   | "experimental"
   | "admin";
@@ -44,6 +44,10 @@ const NAV_ITEMS: NavItem[] = [
   { key: "schedule", label: "Schedule", href: "/schedule/" },
   { key: "tournaments", label: "Tournaments", href: "/tournaments/" },
   { key: "teams", label: "Teams", href: "/teams/" },
+  // League registration (school verification, Discord + Blizzard, a team).
+  // Signing up no longer routes anyone through it, so the rail is where it is
+  // found — outlined in the brand yellow like the header's Commons pill.
+  { key: "overfault", label: "Overfault", href: "/overfault/", tone: "brand" },
   // Route stays /account/ (many callbackURLs and OAuth redirects point at it);
   // only the label reads "Settings".
   { key: "account", label: "Settings", href: "/account/" },
@@ -128,7 +132,6 @@ async function resolveDensity(userId: string | null): Promise<Density> {
 export async function DashboardShell({
   active,
   activeChild,
-  setupUserId,
   surface,
   children,
 }: {
@@ -136,9 +139,6 @@ export async function DashboardShell({
   active?: DashboardNavKey;
   /** The sub-tab key within a group (e.g. "tickets" under "admin"). */
   activeChild?: string;
-  /** When set, the "action required" banner renders above the tab's
-      bubbles. Omit on pages that ARE a setup step. */
-  setupUserId?: string;
   /** "technical" tightens radius/shadow/padding for the admin surface. */
   surface?: "technical";
   children: ReactNode;
@@ -177,10 +177,7 @@ export async function DashboardShell({
             <SignOutButton />
           </div>
         </DashboardRail>
-        <div className="ff-dash__content">
-          {setupUserId ? <SetupBanner userId={setupUserId} /> : null}
-          {children}
-        </div>
+        <div className="ff-dash__content">{children}</div>
       </DashboardFrame>
     </main>
   );

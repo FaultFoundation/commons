@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 
-import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import {
   getSetupProgressCached,
   type SetupProgress,
@@ -11,14 +10,14 @@ const STEPS = [
   {
     key: "academic",
     label: "Academic verification",
-    href: "/account/setup/academic/",
+    href: "/overfault/academic/",
   },
   {
     key: "integrations",
     label: "Integrations",
-    href: "/account/setup/integrations/",
+    href: "/overfault/integrations/",
   },
-  { key: "team", label: "Registration", href: "/account/setup/team/" },
+  { key: "team", label: "Registration", href: "/overfault/team/" },
 ] as const satisfies readonly {
   key: keyof SetupProgress;
   label: string;
@@ -26,10 +25,9 @@ const STEPS = [
 }[];
 
 /**
- * Chrome for every /account/setup page: the portal shell (Account tab
- * active) plus the numbered step rail. Deliberately does NOT pass
- * setupUserId — these pages *are* the setup, so the "action required"
- * banner would just point at itself.
+ * The numbered step rail over every Overfault step page. The portal shell
+ * itself comes from app/(dashboard)/layout.tsx, which keeps the sidebar
+ * mounted and marks the Overfault tab current off the pathname.
  *
  * Steps are links, so the rail navigates as well as reports and members
  * aren't confined to Back/Next. A step shows a ✓ only when its requirements
@@ -51,8 +49,8 @@ export async function SetupShell({
     : null;
 
   return (
-    <DashboardShell active="account">
-      <h1 className="screen-reader-text">Account Setup</h1>
+    <>
+      <h1 className="screen-reader-text">Overfault Registration</h1>
       <ol className="ff-reg__steps" aria-label="Setup progress">
         {STEPS.map((entry, i) => {
           const isCurrent = i + 1 === step;
@@ -79,6 +77,6 @@ export async function SetupShell({
         })}
       </ol>
       {children}
-    </DashboardShell>
+    </>
   );
 }

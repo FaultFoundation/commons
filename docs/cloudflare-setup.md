@@ -115,7 +115,7 @@ npx wrangler secret put BATTLENET_CLIENT_SECRET
 
 ### 4. Verification emails (Gmail SMTP) + schools directory
 
-The academic-verification flow (`/account/setup`) needs two one-time steps in
+The academic-verification flow (`/overfault/`) needs two one-time steps in
 production:
 
 1. **Seed the schools directory** (university typeahead data):

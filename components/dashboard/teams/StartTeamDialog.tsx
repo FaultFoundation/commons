@@ -203,7 +203,7 @@ export function StartTeamDialog({
               >
                 Close
               </button>
-              <a className="ff-btn" href="/account/setup/">
+              <a className="ff-btn" href="/overfault/">
                 Verify My Email
               </a>
             </div>

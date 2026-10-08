@@ -95,7 +95,7 @@ export default async function TeamSetupPage() {
               value="Awaiting consent"
               note="Waiting for your parent or guardian to confirm by email. Teams open up once they do."
               action={
-                <a className="ff-btn ff-btn--sm" href="/account/setup/">
+                <a className="ff-btn ff-btn--sm" href="/overfault/academic/">
                   Resend
                 </a>
               }
@@ -106,7 +106,7 @@ export default async function TeamSetupPage() {
               value="Not verified yet"
               note="Finish step 1 and teams open up."
               action={
-                <a className="ff-btn ff-btn--sm" href="/account/setup/">
+                <a className="ff-btn ff-btn--sm" href="/overfault/">
                   Verify
                 </a>
               }
@@ -128,11 +128,11 @@ export default async function TeamSetupPage() {
           <div className="ff-reg__nav">
             <a
               className="ff-btn ff-btn--outline"
-              href="/account/setup/integrations/"
+              href="/overfault/integrations/"
             >
               Back
             </a>
-            <a className="ff-btn" href="/home/">
+            <a className="ff-btn" href="/overfault/">
               Finish
             </a>
           </div>

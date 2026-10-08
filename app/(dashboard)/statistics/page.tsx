@@ -1,4 +1,3 @@
-import { SetupBanner } from "@/components/dashboard/SetupBanner";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -34,7 +33,6 @@ export default async function StatisticsPage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <SetupBanner userId={userId} />
       <h1 className="screen-reader-text">Statistics</h1>
       <StatisticsView
         // Left undefined when the URL asked for nothing, so the view can fall

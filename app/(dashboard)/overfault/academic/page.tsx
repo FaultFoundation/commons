@@ -30,7 +30,7 @@ export default async function AcademicSetupPage() {
   const status = reg?.status ?? null;
 
   // EMAIL_SENT deliberately still renders the form: this is where "Wrong
-  // address? Change email" on the code page lands. /account/setup/ is the
+  // address? Change email" on the code page lands. /overfault/ is the
   // route that sends an outstanding code to the code page.
   if (status === "VERIFIED") {
     return (
@@ -46,7 +46,7 @@ export default async function AcademicSetupPage() {
           </p>
           <div className="ff-reg__nav">
             <span />
-            <a className="ff-btn" href="/account/setup/integrations/">
+            <a className="ff-btn" href="/overfault/integrations/">
               Next
             </a>
           </div>

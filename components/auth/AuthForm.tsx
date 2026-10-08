@@ -45,16 +45,15 @@ export function AuthForm({ mode, discordEnabled, next }: Props) {
 
   /**
    * Full navigation (like the rest of the site's links); the hint makes the
-   * destination paint the avatar immediately. A brand-new account goes straight
-   * into setup; returning members land on the portal home. Either is overridden
-   * by a `next` (an invite link, say), which then explains for itself whatever
-   * is still missing.
+   * destination paint the avatar immediately. New and returning members alike
+   * land on the portal home — an account is all the Commons needs. League
+   * registration (school, Discord + Blizzard, a team) is opt-in from the
+   * Overfault tab. A `next` (an invite link, say) overrides this, and then
+   * explains for itself whatever is still missing.
    */
   function land() {
     setAuthHint(true);
-    window.location.assign(
-      next ?? (mode === "signup" ? "/account/setup/" : "/home/"),
-    );
+    window.location.assign(next ?? "/home/");
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -115,8 +114,7 @@ export function AuthForm({ mode, discordEnabled, next }: Props) {
     setPending(true);
     const result = await authClient.signIn.social({
       provider: "discord",
-      // Can't tell a new Discord user from a returning one here; the
-      // "action required" banner on /home catches anyone still unset-up.
+      // New and returning members land in the same place, as with email.
       callbackURL: next ?? "/home/",
     });
     if (result.error) {

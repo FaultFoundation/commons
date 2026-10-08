@@ -1,4 +1,3 @@
-import { SetupBanner } from "@/components/dashboard/SetupBanner";
 import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -109,7 +108,6 @@ export default async function AccountPage({
 
   return (
     <>
-      <SetupBanner userId={session.user.id} />
       {/* The popup bridge is mounted by IntegrationsPanel below, so it travels
           with the connect cards to every page that hosts them (Home included)
           instead of only existing here. */}

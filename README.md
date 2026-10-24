@@ -35,6 +35,7 @@ Ships to `commons.fault.foundation`. The public marketing site is a
 | `app/{login,signup}/` | Auth pages (honor `?next=` after signing in) |
 | `app/(dashboard)/` | Session-gated member portal tabs with a persistent sidebar and content loading skeletons |
 | `app/(dashboard)/teams/[teamId]/`, `app/join/[token]/` | Team management and the invite landing |
+| `app/(dashboard)/forms/`, `app/f/[id]/` | Sign-up forms: the organizer's builder/responses and the public form link |
 | `app/api/auth/[...all]/` | Better Auth route handler |
 | `components/` | Site chrome (`SiteHeader`/`SiteFooter`/`MainNav`) + `auth/` + `dashboard/` |
 | `lib/auth.ts`, `lib/db.ts` | Per-request Better Auth / Drizzle-D1 instances (bindings only exist on the request context) |
@@ -44,6 +45,7 @@ Ships to `commons.fault.foundation`. The public marketing site is a
 | `lib/ow-stats.ts`, `lib/overfast.ts` | Overwatch player statistics: snapshot writer/reader + the sole OverFast API client |
 | `lib/player-data.ts`, `lib/player-data-sync.ts` | Cross-provider player data: external FACEIT/start.gg teams + match history (sync core mirrored into the `ow-data` Worker) |
 | `lib/lfg-shared.ts` | Shapes for the matchmaking (LFG/LFM) JSON columns |
+| `lib/signup-forms.ts`, `lib/signup-forms-shared.ts` | Sign-up forms: requirement checks, the bucket/question registry, and the export columns behind CSV, PDF and platform lists |
 | `db/schema.ts` | Drizzle schema: Better Auth tables + `profiles` |
 | `drizzle/` | Generated SQL migrations (`npm run db:generate`), applied with `npm run db:migrate:*` |
 | `db/cen-schema.ts`, `drizzle-cen/` | Read-only external-tournament projection + its independent migrations |

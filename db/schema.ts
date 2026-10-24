@@ -1317,3 +1317,139 @@ export const discoveryFollows = sqliteTable("discovery_follows", {
   targetId: text("target_id").notNull(),
   createdAt: integer("created_at").notNull(),
 }, t => [uniqueIndex("discovery_follows_user_target_idx").on(t.userId, t.targetId)]);
+
+// ===========================================================================
+// LAYER 11 — Sign-up forms (organizer-built registration links)
+//
+// The generalization of the Overfault checklist. Any member builds a form by
+// switching on requirement "buckets" (verified account email, academic
+// verification, Discord server membership, a public Overwatch profile, linked
+// FACEIT/start.gg/Challonge accounts, …) and adding their own questions, then
+// shares /f/<id>/. Requirements and questions are both ROWS of
+// signup_form_items keyed by `kind`, so a new bucket is a new kind value in
+// lib/signup-forms-shared.ts, never a schema change (the platform_identities
+// rule applied to forms).
+//
+// The verification itself stays on the PERSON (collegiate_registrations,
+// platform_identities, ow_snapshots), so a member verifies once and every form
+// reuses it. What a form stores is the evidence AS SUBMITTED: each response
+// value is a snapshot of exactly what that item shared (a school name, a
+// BattleTag, a rank), so an organizer's export doesn't drift when a member
+// later changes a handle, and nothing beyond what the form asked for is ever
+// readable by its owner.
+//
+// Entries are per person today. Team entries are deferred to the team revamp;
+// the per-provider handle snapshots are already the shape a team roster export
+// needs (see db/README.md, "Sign-up forms").
+// ===========================================================================
+
+export const signupForms = sqliteTable(
+  "signup_forms",
+  {
+    // Random 10-char base62, and also the public id in /f/<id>/. Unguessable,
+    // so a draft isn't reachable by counting.
+    id: text("id").primaryKey(),
+    // Cascade: an owner deleting their account takes the responses with them,
+    // since nobody else may read them.
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    // Free-text "Hosted by" line. There is no organization model yet.
+    hostName: text("host_name"),
+    // Markdown, rendered by the XSS-safe Markdown component.
+    description: text("description"),
+    // draft | open | closed. Only `open` accepts submissions.
+    status: text("status").notNull().default("draft"),
+    // Optional automatic close; null = open until closed by hand.
+    closesAt: integer("closes_at", { mode: "timestamp_ms" }),
+    // Where the event itself runs. We host no brackets for organizers, so this
+    // is a pointer plus a hint for which platform list the export leads with.
+    eventUrl: text("event_url"),
+    eventPlatform: text("event_platform"), // challonge | startgg | faceit | leagueos | other
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [index("signup_forms_owner_idx").on(t.ownerUserId)],
+);
+
+export const signupFormItems = sqliteTable(
+  "signup_form_items",
+  {
+    id: text("id").primaryKey(),
+    formId: text("form_id")
+      .notNull()
+      .references(() => signupForms.id, { onDelete: "cascade" }),
+    // Requirement kinds (account_email, academic, discord, discord_server,
+    // battlenet, ow_public, ow_rank, faceit, startgg, challonge) appear at most
+    // once per form; question kinds (short_text, long_text, single_choice,
+    // multi_choice, checkbox) repeat. lib/signup-forms-shared.ts is the registry.
+    kind: text("kind").notNull(),
+    // Question order. Requirements render in the registry's fixed order.
+    position: integer("position").notNull().default(0),
+    // Questions only; a requirement's label comes from the registry.
+    label: text("label"),
+    help: text("help"),
+    // An optional requirement is shared when met but never blocks a submit.
+    required: integer("required", { mode: "boolean" }).notNull().default(true),
+    // JSON, per kind: academic {domains}, discord_server {guildId, inviteUrl,
+    // serverName}, choice questions {options}. Normalized on every write.
+    config: text("config"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [index("signup_form_items_form_idx").on(t.formId, t.position)],
+);
+
+export const signupResponses = sqliteTable(
+  "signup_responses",
+  {
+    id: text("id").primaryKey(),
+    formId: text("form_id")
+      .notNull()
+      .references(() => signupForms.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // submitted | withdrawn. Re-submitting updates the same row (one per
+    // member per form) and re-snapshots every value.
+    status: text("status").notNull().default("submitted"),
+    submittedAt: integer("submitted_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [
+    uniqueIndex("signup_responses_form_user_unique").on(t.formId, t.userId),
+    index("signup_responses_user_idx").on(t.userId),
+  ],
+);
+
+export const signupResponseValues = sqliteTable(
+  "signup_response_values",
+  {
+    id: text("id").primaryKey(),
+    responseId: text("response_id")
+      .notNull()
+      .references(() => signupResponses.id, { onDelete: "cascade" }),
+    // Cascade: removing a question from a form removes its answers.
+    itemId: text("item_id")
+      .notNull()
+      .references(() => signupFormItems.id, { onDelete: "cascade" }),
+    // JSON. A question's answer, or a requirement's shared evidence.
+    value: text("value"),
+    // Requirements only: whether it was met at submission. NULL for questions.
+    met: integer("met", { mode: "boolean" }),
+  },
+  (t) => [
+    uniqueIndex("signup_response_values_response_item_unique").on(
+      t.responseId,
+      t.itemId,
+    ),
+  ],
+);

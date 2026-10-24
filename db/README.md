@@ -295,7 +295,7 @@ wrangler d1 execute website-sql --local --command "SELECT name FROM sqlite_maste
 
 # Data model
 
-**Thirty-four relations** across two tiers. **Naming convention:** lean
+**Thirty-eight relations** across two tiers. **Naming convention:** lean
 `snake_case`, and columns are **not** table-prefixed — Better Auth fixes the
 `user` / `session` / `account` / `verification` / `two_factor` shapes, and the
 app's Drizzle models read the domain tables directly. Primary keys are
@@ -364,6 +364,7 @@ site-initiated work out of `bot_outbox`.
 | 8 — tournaments (Challonge-backed) | `tournaments`, `tournament_participants`, `tournament_brackets`, `tournament_list_cache`, `external_matches` |
 | 9 — matchmaking | `lfg_profiles`, `team_listings`, `lfg_connections` |
 | 10 — support tickets | `support_tickets`, `support_ticket_messages`, `support_ticket_notes`, `bot_outbox` |
+| 11 — sign-up forms | `signup_forms`, `signup_form_items`, `signup_responses`, `signup_response_values` |
 | registration support | `schools`, `school_email_verifications`, `parental_consents` |
 
 ## Feature → schema mapping
@@ -767,6 +768,8 @@ User  (Better Auth: + session, account, verification, two_factor)
 ├─ Parental Consent    minors 13-17; pending until a parent confirms       0..1
 ├─ Team Membership     role, position ─→ Team ─→ College                   0..n
 ├─ LFG Profile         one advertisement per program + game                0..n
+├─ Sign-Up Form        built by the member (owner) ─→ Items             0..n
+├─ Sign-Up Response    one per form; snapshot values per item            0..n
 ├─ Support Ticket      opened from Discord or the site                     0..n
 └─ Moderation Action   note / warn / kick / ban                            0..n
 ```
@@ -809,11 +812,58 @@ Support Ticket   number, status, priority, assignee, discord_channel_id
 | Cross-site schedule & calendar | `external_matches`, `tournament_participants` | The connect OAuth (FACEIT / start.gg / Challonge) is live; the lazy sync (`lib/schedule.ts`) pulls each connected member's matches/tournaments into `external_matches` on read, and `/schedule` renders them. Live-verified for Challonge; FACEIT/start.gg adapters are code-complete against documented shapes, pending live tokens |
 | Matchmaking (LFG/LFM) | `lfg_profiles`, `team_listings`, `lfg_connections` | Schema-ready — `team_listings` is written by the team actions; `lfg_profiles` / `lfg_connections` have no code yet and the browse/apply UI is WIP |
 | Support tickets | `support_tickets`, `support_ticket_messages`, `support_ticket_notes`, `bot_outbox` | **Live** — staff queue, two-way Discord mirror, outbox bridge |
+| Sign-up forms | `signup_forms`, `signup_form_items`, `signup_responses`, `signup_response_values` | **Built** — any member builds a form from requirement buckets + questions and shares `/f/<id>/`; per-person entries, CSV/PDF export and per-platform handle lists. Team entries deferred to the team revamp (see "Sign-up forms" below) |
 | Reference data | `games`, `programs` | Seeded via `db/seed/bootstrap.sql`: the program `collegiate-overwatch`, and **five games** — `overwatch`, `valorant`, `cs2`, `league-of-legends`, `rocket-league` — each with `logo_url` pointing at its `public/brand/games/<slug>.svg`. `logo_url` is the brand art for the game mark: a `/public` path (drop the file at `public/brand/games/<slug>.svg`) or absolute URL. The games list is read by `lib/games.ts` (`listGames`) to populate the **team game dropdown** ("what are you competing in", on team creation and settings — `teams.game_id`); the game supplies the card's corner **mark** (`components/brand/GameLogo`), while the card's **colour** is the member-chosen `teams.color` (not game-derived). Tournament creation is still hardcoded to Overwatch (`GAME_OVERWATCH_ID` in `app/admin/tournaments/actions.ts`); add a game by adding a row here plus its SVG. External (cen-sql-scraped) tournaments have no `games` row at all, so `components/brand/GameLogo` also matches their free-text game name against a `KNOWN_GAME_LOGOS` table (normalized, so "CS2" / "Counter-Strike 2" resolve alike) before falling back to a name monogram; `public/brand/games/` has ready-to-use art for `cs2`, `valorant`, `league-of-legends` and `rocket-league` this way even though only Overwatch has a D1 row. Source/platform marks (top-left) are inline in `components/brand/SourceLogo`, sharing real art with `components/brand/ProviderMark` for challonge/faceit/startgg; the Commons mark is real org art at `public/brand/sources/commons.svg` |
 
 Schema source of truth: [`db/schema.ts`](schema.ts). Migrations:
 [`drizzle/`](../drizzle). Full rebuild: [`db/reset/drop-all.sql`](reset/drop-all.sql)
 + [`db/seed/bootstrap.sql`](seed/bootstrap.sql).
+
+## Sign-up forms
+
+Migration `0025_fair_kulan_gath.sql` adds four **website-sql** tables (Layer 11 in
+`db/schema.ts`). The Overfault checklist, generalized: a form is a set of
+requirement buckets plus organizer questions, shared as `/f/<id>/`.
+
+| Feature | Table | Relationship / retained state |
+| --- | --- | --- |
+| The form | `signup_forms` | `id` PK is a random 10-char base62 string and also the public id in `/f/<id>/` (unguessable, so a draft can't be reached by counting). `owner_user_id → user.id` **cascade** (nobody else may read the responses, so they go with the owner). `status` ∈ `draft` \| `open` \| `closed`, optional `closes_at`; `host_name` (free-text "Hosted by" — there is no organization model yet), Markdown `description`, and `event_url` + `event_platform` ∈ `challonge` \| `startgg` \| `faceit` \| `leagueos` \| `other` — a pointer only, since we host no brackets for organizers |
+| Requirements **and** questions | `signup_form_items` | `form_id → signup_forms.id` cascade. `kind` is the registry key in `lib/signup-forms-shared.ts`: requirement kinds (`account_email`, `academic`, `discord`, `discord_server`, `battlenet`, `ow_public`, `ow_rank`, `faceit`, `startgg`, `challonge`) appear at most once per form; question kinds (`short_text`, `long_text`, `single_choice`, `multi_choice`, `checkbox`) repeat and are ordered by `position`. `required` (an optional requirement is shared when met and never blocks). `config` JSON per kind — `academic {domains}`, `discord_server {guildId, inviteUrl, serverName}`, choice questions `{options}` — normalized on every write and every read. **A new bucket is a new `kind` value, never a migration** — the `platform_identities` rule applied to forms |
+| A member's entry | `signup_responses` | `form_id` + `user_id → user.id` (both cascade), `UNIQUE(form_id, user_id)` — re-submitting updates the one row; `status` ∈ `submitted` \| `withdrawn` (withdrawn rows drop out of every export), `submitted_at` (first) + `updated_at` (latest) |
+| What the entry shared | `signup_response_values` | `response_id` + `item_id` (both cascade — removing a question removes its answers), `UNIQUE(response_id, item_id)`. `value` JSON is a question's answer or a requirement's **evidence as submitted**: `{email}`, `{school, memberType, emailDomain}`, `{handle, id}` per linked platform, `{battletag}`, `{public}`, `{season, tank, damage, support, open, capturedAt}` for rank. `met` is set for requirements only (NULL for questions). A submit replaces the whole set in one `db.batch` |
+
+**Verification is per person, evidence is per form.** The checks read the
+member's existing records (`collegiate_registrations` via the collegiate
+membership, `account` + `platform_identities`, the OW registry in
+`ow-player-data`), so a member verifies once and every form — and Overfault —
+reuses it. What a form stores is a *snapshot* of exactly what each item shared at
+submission, so the organizer's export doesn't drift when a handle changes later,
+and nothing the form didn't ask for is ever readable by its owner. The academic
+record still lives under the `collegiate-overwatch` program membership; that is
+where Overfault and `/verify/academic/` both write it.
+
+**Importable to any supported site.** None of start.gg, FACEIT or LeagueOS
+accepts an organizer's roster over an API (start.gg's public mutations cover
+seeding/brackets/reporting only and its Bulk Add tool is singles-only, 50 per
+paste; FACEIT's Data API is read-only and teams join by invite; LeagueOS exposes
+only anonymous public reads). Challonge does (`participants/bulk_add`), but only
+into tournaments the caller can write. So the portable form of a roster is each
+platform's **own handle**, snapshotted per provider in `signup_response_values`
+and laid out by `PLATFORM_LISTS` the way that platform's admin tools take it.
+Team entries are deferred to the team revamp; they will hang off
+`signup_responses` with the same per-provider snapshots, and a per-provider link
+table (entry → provider participant id + reconcile state) is the planned home
+for reading a platform's entrant list back and matching it to our rosters.
+
+```mermaid
+erDiagram
+  user ||--o{ signup_forms : owns
+  signup_forms ||--o{ signup_form_items : asks
+  signup_forms ||--o{ signup_responses : receives
+  user ||--o{ signup_responses : submits
+  signup_responses ||--o{ signup_response_values : shares
+  signup_form_items ||--o{ signup_response_values : answers
+```
 
 ## Tournament discovery overlays
 

@@ -28,6 +28,11 @@ now 308s via `middleware.ts`). `/` stays the public Commons landing page.
 | `/overfault/code/`             | Overfault   | Code entry (part of step 1)  |
 | `/overfault/integrations/`     | Overfault   | Step 2 (Discord + Blizzard)  |
 | `/overfault/team/`             | Overfault   | Step 3                       |
+| `/verify/academic/`, `/verify/code/` | —     | Academic verification outside Overfault; returns to `?next=` (a sign-up form) |
+| `/forms/`                      | Experimental › Sign-Up Forms | Your sign-up forms + New Form |
+| `/forms/<id>/`                 | Experimental › Sign-Up Forms | Builder: status, share link, details, requirement buckets, questions |
+| `/forms/<id>/responses/`       | Experimental › Sign-Up Forms | Who signed up, CSV / PDF export, per-platform lists |
+| `/f/<id>/`                     | —           | The public sign-up form (signed-out-safe, like `/join/`) |
 
 Sign-up and sign-in both land on `/home/`. An account is all the portal needs:
 nothing pushes a new member through verification, account linking or a team.
@@ -526,7 +531,7 @@ around it is. There are two:
 
 | Group          | Sub-tabs                | Why it's a group |
 | -------------- | ----------------------- | ---------------- |
-| `experimental` | Home, Series, Statistics | Surfaces still being shaped, kept out of the finished tabs |
+| `experimental` | Series, Statistics, Scouting, Sign-Up Forms | Surfaces still being shaped, kept out of the finished tabs |
 | `admin`        | Support, Verification, Teams, Tournaments, Staff | Staff-only; the group is absent entirely for a member with no capability |
 
 A page inside a group passes **both** halves of the active state —
@@ -699,6 +704,60 @@ the Commons. A fresh account lands on `/home/`, and the steps live under the
   requires `VERIFIED` (`isVerifiedMember` in the team actions), and tournament
   entry still checks the roster. Moving the steps out of sign-up changed where
   members find them, not who may do what.
+
+## Sign-up forms
+
+The Overfault checklist generalized into **requirement buckets** an organizer
+picks for their own event, plus their own questions, shared as one link
+(`/f/<id>/`). Any signed-in member can build forms — there is deliberately no
+organizer role yet — under Experimental › Sign-Up Forms. Data model and the
+platform-import reasoning: [db/README.md](../db/README.md#sign-up-forms).
+
+- **One registry, three readers.** `lib/signup-forms-shared.ts` holds the
+  buckets (`REQUIREMENTS`), the question kinds, the config normalizers, and
+  `exportColumns` — the single column list behind the Responses table, the CSV
+  and the printable report, so the three can never disagree. Adding a bucket is
+  a `REQUIREMENTS` entry (with its `shares` line — what the member is told the
+  organizer sees), its evidence shape, a `checkRequirements` case in
+  `lib/signup-forms.ts`, and its export columns. No migration.
+- **Verify once, reuse everywhere.** Checks read the member's existing records,
+  never a per-form copy. Academic verification is the same flow as Overfault's:
+  the step bodies are shared server components
+  (`components/dashboard/setup/AcademicVerification.tsx`), mounted by
+  `/overfault/academic/` + `/overfault/code/` with the step rail and by
+  `/verify/academic/` + `/verify/code/` without it, returning to a sanitized
+  `?next=`. `AcademicStep` / `CodeStep` take their destinations as props.
+- **Page renders never wait on OverFast.** The form page runs
+  `checkRequirements({ live: false })` — cached OW visibility and the latest
+  snapshot only. The submit runs `live: true` (fresh D1 reads, OverFast past its
+  caches) and is the real gate; the page's checkmarks are guidance. "Check
+  again" on an Overwatch row is `recheckOverwatch`. Discord server membership
+  is one Discord call either way, with the member's own token
+  (`checkDiscordGuild`), so it works for any server id and needs no bot — but
+  only for Discord links made after `guilds.members.read` shipped; older ones
+  are told to relink.
+- **The member sees exactly what is shared.** The Sign Up bubble lists every
+  `shares` line before the button; the submit snapshots only what each item
+  found. A required requirement that is definitely unmet disables Sign Up; one
+  the page couldn't confirm yet (an unchecked OW profile) stays clickable and
+  the live submit decides. Re-submitting replaces the snapshot; Withdraw drops
+  the member from every export but keeps their answers.
+- **Implied buckets.** `ow_rank` implies `ow_public` and `battlenet`;
+  `discord_server` implies `discord`. Switching one on switches its parents on,
+  and a parent can't be switched off while something needs it.
+- **Exports.** `GET /api/forms/<id>/export?format=csv|print`, owner only (a
+  non-owner gets the same 404 as a missing form). The CSV defuses
+  spreadsheet formulas (`csvCell`) because answers are member input. "PDF" is a
+  standalone print-styled report that opens the browser's print dialog — no PDF
+  library in the Worker bundle, and names in any script render correctly.
+- **Platform lists.** The Responses page turns each linked-platform bucket into
+  a copyable list in the shape that platform's admin tools take — start.gg
+  gamertags in 50-line batches for Bulk Add, FACEIT nicknames for championship
+  invites, Challonge usernames — led by the form's own event platform. This is
+  the import path: none of those platforms accepts an organizer's roster over
+  an API.
+- **Teams are deferred.** Entries are per person today; team entries arrive
+  with the team revamp, on top of the same per-provider snapshots.
 
 ## Team roles
 

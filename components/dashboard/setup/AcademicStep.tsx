@@ -43,7 +43,18 @@ const TYPE_HINTS: Record<string, string> = {
  * alumnus, or 18+ high-schooler gets an emailed code (an alumnus without a
  * school email is parked in staff review).
  */
-export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
+export function AcademicStep({
+  initial,
+  nextHref = "/overfault/integrations/",
+  codeHref = "/overfault/code/",
+}: {
+  initial: AcademicInitialState;
+  /** Where a finished (or staff-reviewed) member goes next: the Overfault
+      integrations step, or back to the sign-up form that sent them. */
+  nextHref?: string;
+  /** The code-entry page that belongs to this flow. */
+  codeHref?: string;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -199,7 +210,7 @@ export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
         // Don't dead-end here. Let them keep setting up — linking Discord opens
         // a support ticket, and the "under review" status surfaces once they
         // finish or leave setup (team step + account page).
-        router.push("/overfault/integrations/");
+        router.push(nextHref);
         return;
       }
       if (result.outcome === "CONSENT_PENDING") {
@@ -210,10 +221,10 @@ export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
         return;
       }
       if (result.outcome === "VERIFIED") {
-        router.push("/overfault/integrations/");
+        router.push(nextHref);
         return;
       }
-      router.push("/overfault/code/");
+      router.push(codeHref);
     });
   }
 
@@ -263,7 +274,7 @@ export function AcademicStep({ initial }: { initial: AcademicInitialState }) {
           >
             {pending ? "Sending…" : "Resend link"}
           </button>
-          <a className="ff-btn" href="/overfault/integrations/">
+          <a className="ff-btn" href={nextHref}>
             Next
           </a>
         </div>

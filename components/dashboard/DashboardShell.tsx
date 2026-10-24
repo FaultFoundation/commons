@@ -70,6 +70,9 @@ const NAV_ITEMS: NavItem[] = [
       // win rate by map (over the `faceit_*` search cache the ow-data Worker
       // fills). See the FACEIT scouting section of CLAUDE.md.
       { key: "scouting", label: "Scouting", href: "/scouting/" },
+      // Organizer-built sign-up links: the Overfault checklist generalized
+      // into requirement buckets anyone can pick for their own event.
+      { key: "forms", label: "Sign-Up Forms", href: "/forms/" },
     ],
   },
 ];

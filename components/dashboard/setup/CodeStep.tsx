@@ -17,10 +17,16 @@ export function CodeStep({
   email,
   attemptsRemaining: initialAttempts,
   cooldownSeconds,
+  nextHref = "/overfault/integrations/",
+  changeEmailHref = "/overfault/academic/",
 }: {
   email: string;
   attemptsRemaining: number;
   cooldownSeconds: number;
+  /** Where a verified member goes: the next Overfault step or a sign-up form. */
+  nextHref?: string;
+  /** The academic form of this same flow ("Wrong address? Change email"). */
+  changeEmailHref?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -42,7 +48,7 @@ export function CodeStep({
       if (result.ok) {
         // Verified — the D1 row is the source of truth from here on.
         clearSetupDraft();
-        router.push("/overfault/integrations/");
+        router.push(nextHref);
         return;
       }
       setError(result.error);
@@ -124,7 +130,7 @@ export function CodeStep({
         </div>
         <p className="ff-auth__meta">
           Wrong address?{" "}
-          <a className="ff-reg__alt ff-reg__alt--inline" href="/overfault/academic/">
+          <a className="ff-reg__alt ff-reg__alt--inline" href={changeEmailHref}>
             Change email
           </a>
         </p>

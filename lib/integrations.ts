@@ -153,6 +153,39 @@ export async function loadDiscordIntegration(
   return { linked: true, handle, inGuild };
 }
 
+export type GuildCheck =
+  | { state: "not_linked" }
+  /** Linked before guilds.members.read shipped, so membership can't be read. */
+  | { state: "no_scope" }
+  /** true in / false out / null unknown (revoked app, outage, timeout). */
+  | { state: "checked"; inGuild: boolean | null };
+
+/**
+ * Whether the member is in ANY server, by id — the sign-up form's
+ * "Discord server member" requirement. Reads the member's own
+ * /users/@me/guilds/{id}/member with their token, so it works for an
+ * organizer's server without our bot being in it.
+ */
+export async function checkDiscordGuild(
+  userId: string,
+  guildId: string,
+  requestHeaders: Headers,
+): Promise<GuildCheck> {
+  const discordAccount = (await getAccountLinksCached(userId)).find(
+    (row) => row.providerId === "discord",
+  );
+  if (!discordAccount) return { state: "not_linked" };
+  if (!hasScope(discordAccount.scope, "guilds.members.read")) {
+    return { state: "no_scope" };
+  }
+  const accessToken = await getDiscordAccessToken(
+    userId,
+    discordAccount.accountId,
+    requestHeaders,
+  );
+  return { state: "checked", inGuild: await fetchIsInGuild(accessToken, guildId) };
+}
+
 /**
  * Push the member's verification state onto their Discord connection (Linked
  * Roles), so the server can gate roles on it. No-op when Discord isn't linked,

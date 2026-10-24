@@ -78,8 +78,10 @@ npm run cf-typegen      # regenerate cloudflare-env.d.ts after editing wrangler.
 **There is no working linter.** Focused regression tests live in `scripts/` and
 run with `node --test scripts/*.test.mjs` (Node 22.13+ for `node:sqlite`); they
 execute the real Drizzle queries against real SQLite with mocked provider I/O —
-`server-efficiency`, `discovery`, `statistics-formats`, `faceit-scouting`, and
-the legacy import's own `migrate-legacy-bot-data`. `npm run lint` runs the
+`server-efficiency`, `discovery`, `statistics-formats`, `faceit-scouting`,
+`signup-forms`, and the legacy import's own `migrate-legacy-bot-data`. The
+`leagueos` "screenshot leagues group…" case already fails on the Oct 7 2026
+`main`; it is not a regression signal for unrelated work. `npm run lint` runs the
 deprecated `next lint`, and ESLint isn't installed — it drops into an
 interactive "configure ESLint?" prompt and fails. Verification is
 `npx tsc --noEmit` + `npm run build`, then exercising the change on :3000 or
@@ -191,11 +193,49 @@ row, not by column. Layer comments in the file mark the tiers.
 ### The `*-shared.ts` convention
 
 `lib/teams-shared.ts`, `staff-shared.ts`, `tickets-shared.ts`,
-`registration-shared.ts`, `lfg-shared.ts`, `integrations-shared.ts` are
+`registration-shared.ts`, `lfg-shared.ts`, `integrations-shared.ts`,
+`signup-forms-shared.ts` are
 importable from **client**
 components: they must stay free of server-only imports (db, cloudflare context).
 Constants, enums, labels, and pure validators live there; the server-only
 counterpart (`teams.ts`, `staff.ts`, `tickets.ts`) does the D1 work.
+
+### Sign-up forms — organizer-built registration links
+
+The Overfault checklist generalized: any signed-in member (no organizer role
+yet, by decision) builds a form at `/forms/` by switching on requirement
+buckets — verified account email, academic verification (optionally limited to
+listed school email domains), Discord account, Discord server membership,
+Blizzard account, public Overwatch profile, Overwatch rank, FACEIT / start.gg /
+Challonge accounts — plus their own questions, and shares `/f/<id>/`. Details:
+[docs/dashboard-guide.md](docs/dashboard-guide.md#sign-up-forms) and the
+"Sign-up forms" section of [db/README.md](db/README.md).
+
+- **Buckets and questions are rows** (`signup_form_items.kind`); the registry is
+  `lib/signup-forms-shared.ts`. A new bucket is a registry entry plus a
+  `checkRequirements` case, never a migration.
+- **Verification belongs to the person; a form stores evidence.** Checks read
+  the existing records (the collegiate registration, `account` +
+  `platform_identities`, the OW registry), so verifying once serves every form
+  and Overfault. A submit snapshots exactly what each item found into
+  `signup_response_values` — the organizer can read nothing the form didn't
+  ask for, and the member is shown that list before submitting.
+- **The submit is the gate, and the only place OverFast is called.** Page
+  renders run `checkRequirements({ live: false })` (cached state); the submit
+  action re-checks everything live. Never move the OverFast read into a render.
+- **Trust boundary.** `/f/<id>/` is public (signed-out-safe, like `/join/`);
+  a draft reads as missing to anyone but its owner. Every owner action and
+  `GET /api/forms/<id>/export` re-reads the form and checks
+  `owner_user_id` — a non-owner gets the same 404 as a missing form. Form ids are
+  random 10-char base62, so drafts can't be enumerated. CSV cells are
+  formula-defused (answers are member input).
+- **Import to tournament platforms is handles, not an API push.** start.gg,
+  FACEIT and LeagueOS accept no organizer roster writes; Challonge does
+  (`participants/bulk_add`) but only into tournaments the caller can write, and
+  our member Challonge OAuth requests read scopes only. So the Responses page
+  emits per-platform handle lists (start.gg Bulk Add in 50s, FACEIT invite
+  nicknames, Challonge usernames). Entries are per person; team entries wait on
+  the team revamp.
 
 ### Remembered view state — `localStorage`, not cookies
 

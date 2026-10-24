@@ -8765,3 +8765,46 @@ a.ff-sview__crumb:hover {
 .ff-scoutlookup__identity strong { font-size: var(--ff-dash-text-sm); overflow-wrap: anywhere; }
 .ff-scoutlookup__identity small { font-size: 11px; color: var(--ff-text-dim); overflow-wrap: anywhere; }
 .ff-scoutlookup__dropdown p { margin: 0; padding: 10px 14px; font-size: var(--ff-dash-text-xs); color: var(--ff-text-dim); }
+
+/* Sign-up forms (/forms/ builder, /f/<id>/ public form). ------------------ */
+/* The answer <form> groups two bubbles for one submit without becoming a grid
+   item itself, so each bubble still sits in the grid like any other. */
+.ff-form-fill { display: contents; }
+/* Signed-out form page: a little wider than an invite card for the description. */
+.ff-join--form { max-width: 760px; }
+.ff-form-editor { display: grid; gap: var(--ff-row-editor-gap); }
+.ff-form-editor .ff-auth__field { margin-block-end: 0; }
+.ff-form-editor__pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ff-row-editor-gap); }
+@media (max-width: 640px) { .ff-form-editor__pair { grid-template-columns: 1fr; } }
+.ff-form-group { display: grid; gap: var(--ff-bubble-body-gap); }
+.ff-form-group + .ff-form-group { margin-top: var(--ff-bubble-head-gap); }
+.ff-form-group__title {
+  margin: 0;
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ff-form-status, .ff-form-action { display: grid; justify-items: end; gap: var(--ff-bubble-body-gap); }
+.ff-form-status .ff-auth__error { margin: 0; }
+.ff-form-met { color: var(--ff-ok); }
+.ff-form-desc { font-size: var(--ff-dash-text-md); overflow-wrap: anywhere; }
+.ff-form-shares__title { margin: 0; font-size: var(--ff-dash-text-sm); font-weight: 700; }
+.ff-form-shares { margin: 0; padding-left: 1.2em; color: var(--ff-text-dim); font-size: var(--ff-dash-text-sm); }
+.ff-form-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ff-row-editor-gap);
+  font-size: var(--ff-dash-text-md);
+  cursor: pointer;
+}
+.ff-form-check input { flex: none; width: 18px; height: 18px; margin-top: 2px; accent-color: var(--ff-blue); }
+.ff-form-choices { display: grid; gap: var(--ff-bubble-body-gap); margin: 0; padding: 0; border: 0; }
+.ff-form-choices legend { padding: 0; }
+.ff-form-add {
+  padding: var(--ff-row-pad-y) var(--ff-row-pad-x);
+  border: 1px dashed var(--ff-border);
+  border-radius: var(--ff-radius-md);
+}
+.ff-form-table td { white-space: nowrap; }

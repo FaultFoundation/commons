@@ -22,12 +22,18 @@ export function LinkProviderButton({
   provider,
   label,
   callbackURL = "/home/",
+  small,
+  primary,
 }: {
   provider: LinkableProvider;
   /** Button text, e.g. "Link Discord" or "Connect". */
   label: string;
   /** Where the provider sends the member back — pass the page the button is on. */
   callbackURL?: string;
+  /** Row-sized (`ff-btn--sm`), for a BubbleRow action slot. */
+  small?: boolean;
+  /** The context's one blue next step (a sign-up form's first unmet link). */
+  primary?: boolean;
 }) {
   const [pending, setPending] = useState(false);
 
@@ -107,7 +113,7 @@ export function LinkProviderButton({
 
   return (
     <button
-      className="ff-btn ff-btn--outline"
+      className={`ff-btn${primary ? "" : " ff-btn--outline"}${small ? " ff-btn--sm" : ""}`}
       type="button"
       onClick={onLink}
       disabled={pending}

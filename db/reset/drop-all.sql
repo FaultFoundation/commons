@@ -14,6 +14,12 @@
 -- db/schema.ts must appear here — a missing one survives the reset and then
 -- collides with the baseline's CREATE TABLE.
 
+-- Layer 11 — sign-up forms (values → responses → items → forms)
+DROP TABLE IF EXISTS signup_response_values;
+DROP TABLE IF EXISTS signup_responses;
+DROP TABLE IF EXISTS signup_form_items;
+DROP TABLE IF EXISTS signup_forms;
+
 -- Tournament discovery overlays (application-owned, not collector projection)
 DROP TABLE IF EXISTS discovery_follows;
 DROP TABLE IF EXISTS discovery_submissions;

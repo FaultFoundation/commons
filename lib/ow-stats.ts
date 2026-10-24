@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 import { owPlayers, owSnapshots } from "@/db/ow-schema";
@@ -435,6 +435,96 @@ export async function loadPlayerStats(
     statsSummary: safeParse<OverfastStatsSummary>(latestRow.statsJson),
     summary: safeParse<OverfastSummary>(latestRow.summaryJson),
   };
+}
+
+/**
+ * What a sign-up form needs to know about a member's Overwatch career. Kept to
+ * the two facts the Commons can vouch for — visibility and competitive rank
+ * (division + tier; Blizzard publishes no SR) — see the accuracy note in
+ * CLAUDE.md.
+ */
+export type OwSignupState = {
+  /** Last definitive answer, or null when never checked. */
+  visibility: OwVisibility | null;
+  latest: {
+    capturedAt: number;
+    season: number | null;
+    tank: RoleRank;
+    damage: RoleRank;
+    support: RoleRank;
+    open: RoleRank;
+  } | null;
+};
+
+/**
+ * Cached-only read for page renders: never calls OverFast (a server render
+ * that waits on OverFast is what froze the Statistics tab). Degrades to
+ * "unknown" when the OW binding is absent.
+ */
+export async function getCachedOwState(userId: string): Promise<OwSignupState> {
+  const db = getOwDb();
+  if (!db) return { visibility: null, latest: null };
+  try {
+    const [player, snap] = await Promise.all([
+      db
+        .select({ visibility: owPlayers.visibility })
+        .from(owPlayers)
+        .where(eq(owPlayers.userId, userId))
+        .limit(1),
+      db
+        .select({
+          capturedAt: owSnapshots.capturedAt,
+          season: owSnapshots.compSeason,
+          tankDivision: owSnapshots.tankDivision,
+          tankTier: owSnapshots.tankTier,
+          damageDivision: owSnapshots.damageDivision,
+          damageTier: owSnapshots.damageTier,
+          supportDivision: owSnapshots.supportDivision,
+          supportTier: owSnapshots.supportTier,
+          openDivision: owSnapshots.openDivision,
+          openTier: owSnapshots.openTier,
+        })
+        .from(owSnapshots)
+        .where(eq(owSnapshots.userId, userId))
+        .orderBy(desc(owSnapshots.capturedAt))
+        .limit(1),
+    ]);
+    const s = snap[0];
+    return {
+      visibility: (player[0]?.visibility as OwVisibility | null) ?? null,
+      latest: s
+        ? {
+            capturedAt: s.capturedAt.getTime(),
+            season: s.season,
+            tank: { division: s.tankDivision, tier: s.tankTier },
+            damage: { division: s.damageDivision, tier: s.damageTier },
+            support: { division: s.supportDivision, tier: s.supportTier },
+            open: { division: s.openDivision, tier: s.openTier },
+          }
+        : null,
+    };
+  } catch (error) {
+    console.error("ow signup state read failed:", error);
+    return { visibility: null, latest: null };
+  }
+}
+
+/**
+ * Live variant for a submit or an explicit "check again": visibility through
+ * its TTL cache (bypassed when `force`), then a snapshot when public and due
+ * (MIN_SNAPSHOT_INTERVAL_MS still applies, so a rank can be up to ~20 h old —
+ * the snapshot time travels with it). Never throws.
+ */
+export async function refreshOwState(
+  userId: string,
+  battletag: string,
+  { force = false }: { force?: boolean } = {},
+): Promise<OwSignupState> {
+  const visibility = await getOwVisibility(userId, battletag, force);
+  if (visibility === "public") await captureSnapshot(userId, battletag);
+  const cached = await getCachedOwState(userId);
+  // An outage isn't cached, so report the live answer rather than a stale one.
+  return { ...cached, visibility: visibility === "unknown" ? cached.visibility : visibility };
 }
 
 /**

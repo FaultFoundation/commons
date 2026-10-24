@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 
 import { setRequirement } from "@/app/(dashboard)/forms/actions";
-import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
+import { InfoTip } from "@/components/dashboard/bubbles/InfoTip";
 import { Switch } from "@/components/dashboard/bubbles/Switch";
 import {
   EVENT_PLATFORMS,
@@ -12,7 +12,6 @@ import {
   academicConfig,
   discordServerConfig,
   requirementDef,
-  requirementSummary,
   type FormItem,
   type RequirementDef,
   type RequirementKind,
@@ -21,10 +20,16 @@ import {
 const GROUPS: RequirementDef["group"][] = ["Identity", "Discord", "Overwatch", "Platforms"];
 
 /**
- * The bucket list: every requirement a form can ask for, each a switch. On
- * rows grow a Required/Optional choice and, for the two that need one, their
- * settings. A requirement another one depends on (Blizzard under Overwatch
- * Rank) is locked on while that one is.
+ * The bucket list, one collapsed section per group. Each requirement is a
+ * single line — its name, an ⓘ with what it asks of players, a Required
+ * check and an on/off switch — so the organizer scans names, not paragraphs.
+ * The two buckets that need settings (school domains, Discord server) grow
+ * them under their line while on. A requirement another one depends on
+ * (Blizzard under Overwatch Rank) is locked on while that one is.
+ *
+ * Sections are native <details> and start closed; their summary lists what's
+ * on, so a closed section still says what it holds. React never sets `open`,
+ * so a section stays open across the router.refresh() each change triggers.
  */
 export function RequirementsEditor({
   formId,
@@ -46,9 +51,15 @@ export function RequirementsEditor({
   const neededBy = (kind: RequirementKind) =>
     REQUIREMENTS.find((d) => byKind.has(d.kind) && d.implies?.includes(kind)) ?? null;
 
-  function apply(kind: RequirementKind, enabled: boolean, required: boolean, config?: Record<string, unknown>) {
+  function apply(
+    kind: RequirementKind,
+    enabled: boolean,
+    required: boolean,
+    config?: Record<string, unknown>,
+  ) {
     setError(null);
     startTransition(async () => {
+      // No config = keep what's stored (setRequirement falls back to it).
       const result = await setRequirement(formId, kind, { enabled, required, config });
       if (!result.ok) {
         setError(result.error);
@@ -76,57 +87,88 @@ export function RequirementsEditor({
           get a list you can paste into {platform?.label}.
         </p>
       ) : null}
-      {GROUPS.map((group) => (
-        <div key={group} className="ff-form-group">
-          <h3 className="ff-form-group__title">{group}</h3>
-          {REQUIREMENTS.filter((d) => d.group === group).map((def) => {
-            const item = byKind.get(def.kind) ?? null;
-            const lockedBy = item ? neededBy(def.kind) : null;
-            const open = Boolean(item) || drafting === def.kind;
-            const summary = item ? requirementSummary(item) : null;
-            const value = !item
-              ? "Off"
-              : `${item.required ? "Required" : "Optional"}${summary ? ` · ${summary}` : ""}`;
-            return (
-              <BubbleRow
-                key={def.kind}
-                label={def.label}
-                value={value}
-                note={lockedBy ? `Needed by ${lockedBy.label}.` : def.organizerNote}
-                action={
-                  <Switch
-                    checked={open}
-                    disabled={pending || Boolean(lockedBy)}
-                    label={def.label}
-                    onChange={(next) => {
-                      if (!next) {
-                        if (item) apply(def.kind, false, true);
-                        else setDrafting(null);
-                        return;
-                      }
-                      if (def.kind === "discord_server") setDrafting(def.kind);
-                      else apply(def.kind, true, true);
-                    }}
-                  />
-                }
-              >
-                {open ? (
-                  <RequirementSettings
-                    def={def}
-                    item={item}
-                    pending={pending}
-                    onSave={(required, config) => apply(def.kind, true, required, config)}
-                  />
-                ) : undefined}
-              </BubbleRow>
-            );
-          })}
-        </div>
-      ))}
+      {GROUPS.map((group) => {
+        const defs = REQUIREMENTS.filter((d) => d.group === group);
+        const on = defs.filter((d) => byKind.has(d.kind)).map((d) => d.label);
+        return (
+          <details key={group} className="ff-row ff-disclosure">
+            <summary className="ff-disclosure__summary">
+              <span className="ff-row__main">
+                <span className="ff-row__value">{group}</span>
+                <span className="ff-row__note">{on.length ? `On: ${on.join(", ")}` : "Nothing on"}</span>
+              </span>
+              <span className="ff-disclosure__chevron" aria-hidden="true">
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" width="12" height="12">
+                  <path d="M1.5 4L6 8L10.5 4" strokeWidth="1.5" />
+                </svg>
+              </span>
+            </summary>
+            <div className="ff-disclosure__body">
+              {defs.map((def) => {
+                const item = byKind.get(def.kind) ?? null;
+                const lockedBy = item ? neededBy(def.kind) : null;
+                const open = Boolean(item) || drafting === def.kind;
+                const configurable = def.kind === "academic" || def.kind === "discord_server";
+                return (
+                  <div key={def.kind} className="ff-row ff-req">
+                    <div className="ff-req__name">
+                      <span className="ff-row__value">{def.label}</span>
+                      <InfoTip
+                        label={def.label}
+                        text={
+                          lockedBy
+                            ? `${def.organizerNote} ${lockedBy.label} needs this, so it stays on while that's on.`
+                            : def.organizerNote
+                        }
+                      />
+                    </div>
+                    <div className="ff-req__controls">
+                      <label className="ff-form-check ff-req__required">
+                        <input
+                          type="checkbox"
+                          checked={item?.required ?? false}
+                          disabled={pending || !item}
+                          onChange={(e) => apply(def.kind, true, e.target.checked)}
+                        />
+                        <span>Required</span>
+                      </label>
+                      <Switch
+                        checked={open}
+                        disabled={pending || Boolean(lockedBy)}
+                        label={def.label}
+                        onChange={(next) => {
+                          if (!next) {
+                            if (item) apply(def.kind, false, true);
+                            else setDrafting(null);
+                            return;
+                          }
+                          if (def.kind === "discord_server") setDrafting(def.kind);
+                          else apply(def.kind, true, true);
+                        }}
+                      />
+                    </div>
+                    {open && configurable ? (
+                      <div className="ff-row__editor">
+                        <RequirementSettings
+                          def={def}
+                          item={item}
+                          pending={pending}
+                          onSave={(config) => apply(def.kind, true, item?.required ?? true, config)}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </details>
+        );
+      })}
     </>
   );
 }
 
+/** The settings of the two buckets that have any: school domains, Discord server. */
 function RequirementSettings({
   def,
   item,
@@ -136,134 +178,118 @@ function RequirementSettings({
   def: RequirementDef;
   item: FormItem | null;
   pending: boolean;
-  onSave: (required: boolean, config?: Record<string, unknown>) => void;
+  onSave: (config: Record<string, unknown>) => void;
 }) {
-  const required = item?.required ?? true;
+  const ids = useId();
   const academic = def.kind === "academic" ? academicConfig(item?.config ?? {}) : null;
   const server = def.kind === "discord_server" ? discordServerConfig(item?.config ?? {}) : null;
+  const savedDomains = academic?.domains.join(", ") ?? "";
 
-  const [domains, setDomains] = useState(academic?.domains.join(", ") ?? "");
+  const [domains, setDomains] = useState(savedDomains);
   const [guildId, setGuildId] = useState(server?.guildId ?? "");
   const [inviteUrl, setInviteUrl] = useState(server?.inviteUrl ?? "");
   const [serverName, setServerName] = useState(server?.serverName ?? "");
 
-  const config =
-    def.kind === "academic"
-      ? { domains }
-      : def.kind === "discord_server"
-        ? { guildId, inviteUrl, serverName }
-        : undefined;
+  if (def.kind === "academic") {
+    return (
+      <form
+        className="ff-form-editor"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSave({ domains });
+        }}
+      >
+        <div className="ff-auth__field">
+          <span className="ff-req__label">
+            <label className="ff-auth__label" htmlFor={`${ids}-domains`}>
+              Only these school email domains (optional)
+            </label>
+            <InfoTip
+              label="school email domains"
+              text="Subdomains count, so cs.uic.edu passes uic.edu. With a list set, players verified through a parent instead of a school email won't pass. Leave it empty to accept any school."
+            />
+          </span>
+          <input
+            id={`${ids}-domains`}
+            className="ff-auth__input"
+            value={domains}
+            placeholder="uic.edu, illinois.edu"
+            onChange={(e) => setDomains(e.target.value)}
+          />
+        </div>
+        <div className="ff-row__buttons">
+          <button
+            className="ff-btn ff-btn--sm"
+            type="submit"
+            disabled={pending || domains.trim() === savedDomains}
+          >
+            Save Domains
+          </button>
+        </div>
+      </form>
+    );
+  }
 
   return (
-    <div className="ff-form-editor">
-      <div className="ff-segment" role="group" aria-label={`${def.label}: required or optional`}>
-        <button
-          type="button"
-          className="ff-segment__btn"
-          aria-pressed={required}
-          disabled={pending || !item}
-          onClick={() => onSave(true, config)}
-        >
-          Required
-        </button>
-        <button
-          type="button"
-          className="ff-segment__btn"
-          aria-pressed={!required}
-          disabled={pending || !item}
-          onClick={() => onSave(false, config)}
-        >
-          Optional
+    <form
+      className="ff-form-editor"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave({ guildId, inviteUrl, serverName });
+      }}
+    >
+      <div className="ff-auth__field">
+        <span className="ff-req__label">
+          <label className="ff-auth__label" htmlFor={`${ids}-guild`}>
+            Server ID
+          </label>
+          <InfoTip
+            label="the server ID"
+            text="In Discord: Server Settings → Widget shows it, or turn on Developer Mode and right-click the server → Copy Server ID."
+          />
+        </span>
+        <input
+          id={`${ids}-guild`}
+          className="ff-auth__input"
+          value={guildId}
+          inputMode="numeric"
+          placeholder="123456789012345678"
+          onChange={(e) => setGuildId(e.target.value)}
+        />
+      </div>
+      <div className="ff-form-editor__pair">
+        <div className="ff-auth__field">
+          <label className="ff-auth__label" htmlFor={`${ids}-name`}>
+            Server name
+          </label>
+          <input
+            id={`${ids}-name`}
+            className="ff-auth__input"
+            value={serverName}
+            maxLength={100}
+            placeholder="Shown to players"
+            onChange={(e) => setServerName(e.target.value)}
+          />
+        </div>
+        <div className="ff-auth__field">
+          <label className="ff-auth__label" htmlFor={`${ids}-invite`}>
+            Invite link
+          </label>
+          <input
+            id={`${ids}-invite`}
+            className="ff-auth__input"
+            type="url"
+            value={inviteUrl}
+            placeholder="https://discord.gg/…"
+            onChange={(e) => setInviteUrl(e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="ff-row__buttons">
+        <button className="ff-btn ff-btn--sm" type="submit" disabled={pending || !guildId.trim()}>
+          {item ? "Save Server" : "Turn On"}
         </button>
       </div>
-      <p className="ff-row__hint">
-        {required
-          ? "Players can't sign up until this is done."
-          : "Shared when players have it; never blocks a sign-up."}
-      </p>
-
-      {def.kind === "academic" ? (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSave(required, config);
-          }}
-        >
-          <label className="ff-auth__field">
-            <span className="ff-auth__label">Only accept these school email domains (optional)</span>
-            <input
-              className="ff-auth__input"
-              value={domains}
-              placeholder="uic.edu, illinois.edu"
-              onChange={(e) => setDomains(e.target.value)}
-            />
-          </label>
-          <p className="ff-row__hint">
-            Subdomains count (cs.uic.edu passes uic.edu). With a list set, players verified
-            through a parent instead of a school email won&rsquo;t pass.
-          </p>
-          <div className="ff-row__buttons">
-            <button
-              className="ff-btn ff-btn--sm"
-              type="submit"
-              disabled={pending || domains.trim() === (academic?.domains.join(", ") ?? "")}
-            >
-              Save Domains
-            </button>
-          </div>
-        </form>
-      ) : null}
-
-      {def.kind === "discord_server" ? (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSave(required, config);
-          }}
-        >
-          <label className="ff-auth__field">
-            <span className="ff-auth__label">Server ID</span>
-            <input
-              className="ff-auth__input"
-              value={guildId}
-              inputMode="numeric"
-              placeholder="123456789012345678"
-              onChange={(e) => setGuildId(e.target.value)}
-            />
-          </label>
-          <p className="ff-row__hint">
-            In Discord: Server Settings → Widget shows it, or turn on Developer Mode and
-            right-click the server → Copy Server ID.
-          </p>
-          <div className="ff-form-editor__pair">
-            <label className="ff-auth__field">
-              <span className="ff-auth__label">Server name</span>
-              <input
-                className="ff-auth__input"
-                value={serverName}
-                maxLength={100}
-                placeholder="Shown to players"
-                onChange={(e) => setServerName(e.target.value)}
-              />
-            </label>
-            <label className="ff-auth__field">
-              <span className="ff-auth__label">Invite link</span>
-              <input
-                className="ff-auth__input"
-                type="url"
-                value={inviteUrl}
-                placeholder="https://discord.gg/…"
-                onChange={(e) => setInviteUrl(e.target.value)}
-              />
-            </label>
-          </div>
-          <div className="ff-row__buttons">
-            <button className="ff-btn ff-btn--sm" type="submit" disabled={pending || !guildId.trim()}>
-              {item ? "Save Server" : "Turn On"}
-            </button>
-          </div>
-        </form>
-      ) : null}
-    </div>
+    </form>
   );
 }

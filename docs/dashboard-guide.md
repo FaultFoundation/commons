@@ -423,6 +423,17 @@ Switch's `label` for the accessible name. Accent when on.
     label="Third-place match" />} />
 ```
 
+### `InfoTip` — the hover/focus ⓘ (client)
+
+`components/dashboard/bubbles/InfoTip.tsx`. For rows that should read as a
+name and a control, with the explanation one hover away instead of a line of
+fine print under every row (the sign-up form builder's requirement rows). The
+trigger is a real button and the tip shows on `:focus-within` as well as hover,
+so keyboard and touch users get it; the tip is the button's
+`aria-describedby`. Don't nest it inside a `<label>` — a button there is a
+second labelable element — so a field heading with a tip uses
+`<label htmlFor>` beside it (see `RequirementSettings`).
+
 ### `useReorderableGrid` + `DragGrip` — draggable tiles
 
 `components/dashboard/bubbles/useReorderableGrid.ts` + `DragGrip.tsx`, plus the
@@ -742,6 +753,13 @@ platform-import reasoning: [db/README.md](../db/README.md#sign-up-forms).
   the page couldn't confirm yet (an unchecked OW profile) stays clickable and
   the live submit decides. Re-submitting replaces the snapshot; Withdraw drops
   the member from every export but keeps their answers.
+- **The builder's layout.** One collapsed `<details>` section per group
+  (Identity / Discord / Overwatch / Platforms) whose summary lists what's on;
+  inside, each requirement is one line — its name, an `InfoTip` with what it
+  asks of players, a Required check and the on/off `Switch`. Only the two
+  buckets with settings (school domains, Discord server) grow an editor under
+  their line while on. React never sets `open`, so a section stays open across
+  the `router.refresh()` each change triggers.
 - **Implied buckets.** `ow_rank` implies `ow_public` and `battlenet`;
   `discord_server` implies `discord`. Switching one on switches its parents on,
   and a parent can't be switched off while something needs it.

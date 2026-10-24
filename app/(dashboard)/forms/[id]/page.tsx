@@ -133,7 +133,7 @@ export default async function FormBuilderPage({
         <Bubble title="Danger Zone" variant="danger" span="full">
           <BubbleRow
             label="Delete form"
-            note="Removes the form, its link and every sign-up."
+            value="Removes the form, its link and every sign-up."
             action={
               <DeleteFormButton formId={form.id} title={form.title} responses={responses} />
             }

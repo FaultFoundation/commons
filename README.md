@@ -100,7 +100,10 @@ correction does not create a parallel user.
 
 ## Deploy (Cloudflare Workers)
 
-`npm run deploy` builds with OpenNext and deploys the `commons` Worker.
+`npm run deploy` builds with OpenNext and deploys the `commons` Worker. The build
+scripts carry `--dangerouslyUseUnsupportedNextVersion` until the Next 16 upgrade,
+because OpenNext refuses Next 15 past its two-year window (see CLAUDE.md,
+"Commands").
 Pushes to `main` auto-deploy once Workers Builds is connected. Full
 account-side setup — D1 database, secrets, custom domain — is in
 [docs/cloudflare-setup.md](docs/cloudflare-setup.md); the Discord and Blizzard

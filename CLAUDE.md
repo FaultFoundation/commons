@@ -75,6 +75,17 @@ npx tsc --noEmit        # the typecheck — run this after any change
 npm run cf-typegen      # regenerate cloudflare-env.d.ts after editing wrangler.jsonc/.dev.vars
 ```
 
+**`build` / `preview` / `deploy` pass `--dangerouslyUseUnsupportedNextVersion`.**
+OpenNext hard-codes each Next major's release date and exits the build once it
+is two years old; Next 15's window closed 2026-10-21, which broke Workers Builds
+at the "Next.js version" line. Next still ships 15.5.x security backports, so
+the mitigation for that flag is to stay on the **latest 15.5 patch** (with the
+`@opennextjs/cloudflare` release whose `next` peer range covers it — currently
+15.5.28 / 1.20.13 / wrangler 4.152). The real fix is the Next 16 upgrade
+(middleware → proxy, Turbopack builds); drop the flag in the same change.
+`allowScripts` in package.json pins the exact esbuild/workerd versions whose
+install scripts may run — bump it with them, or npm 11 skips the native install.
+
 **There is no working linter.** Focused regression tests live in `scripts/` and
 run with `node --test scripts/*.test.mjs` (Node 22.13+ for `node:sqlite`); they
 execute the real Drizzle queries against real SQLite with mocked provider I/O —

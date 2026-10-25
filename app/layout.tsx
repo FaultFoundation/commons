@@ -3,6 +3,7 @@ import Script from "next/script";
 
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { SiteHeaderGate } from "@/components/SiteHeaderGate";
 
 import "@/styles/fonts.css";
 // Brand tokens + element base styles; theme.css aliases its presets.
@@ -62,7 +63,10 @@ export default function RootLayout({
         {/* Floating donation widget, as on the live site */}
         <givebutter-widget id="pEZdY1"></givebutter-widget>
         <div className="wp-site-blocks">
-          <SiteHeader />
+          {/* Standalone pages (a public sign-up form) keep only the footer. */}
+          <SiteHeaderGate>
+            <SiteHeader />
+          </SiteHeaderGate>
           {children}
           <SiteFooter />
         </div>

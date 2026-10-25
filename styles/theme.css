@@ -8772,12 +8772,8 @@ a.ff-sview__crumb:hover {
 .ff-scoutlookup__identity small { font-size: 11px; color: var(--ff-text-dim); overflow-wrap: anywhere; }
 .ff-scoutlookup__dropdown p { margin: 0; padding: 10px 14px; font-size: var(--ff-dash-text-xs); color: var(--ff-text-dim); }
 
-/* Sign-up forms (/forms/ builder, /f/<id>/ public form). ------------------ */
-/* The answer <form> groups two bubbles for one submit without becoming a grid
-   item itself, so each bubble still sits in the grid like any other. */
-.ff-form-fill { display: contents; }
-/* Signed-out form page: a little wider than an invite card for the description. */
-.ff-join--form { max-width: 760px; }
+/* Sign-up forms: the /forms/ builder. (The public /f/<id>/ form is the survey
+   sheet section at the end of this file.) --------------------------------- */
 .ff-form-editor { display: grid; gap: var(--ff-row-editor-gap); }
 .ff-form-editor .ff-auth__field { margin-block-end: 0; }
 .ff-form-editor__pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ff-row-editor-gap); }
@@ -8801,12 +8797,8 @@ a.ff-sview__crumb:hover {
 .ff-req__required:has(input:disabled) { opacity: 0.45; cursor: default; }
 .ff-req__label { display: flex; align-items: center; gap: 6px; margin-block-end: 0.35em; }
 .ff-req__label .ff-auth__label { margin: 0; }
-.ff-form-status, .ff-form-action { display: grid; justify-items: end; gap: var(--ff-bubble-body-gap); }
+.ff-form-status { display: grid; justify-items: end; gap: var(--ff-bubble-body-gap); }
 .ff-form-status .ff-auth__error { margin: 0; }
-.ff-form-met { color: var(--ff-ok); }
-.ff-form-desc { font-size: var(--ff-dash-text-md); overflow-wrap: anywhere; }
-.ff-form-shares__title { margin: 0; font-size: var(--ff-dash-text-sm); font-weight: 700; }
-.ff-form-shares { margin: 0; padding-left: 1.2em; color: var(--ff-text-dim); font-size: var(--ff-dash-text-sm); }
 .ff-form-check {
   display: flex;
   align-items: flex-start;
@@ -8815,8 +8807,6 @@ a.ff-sview__crumb:hover {
   cursor: pointer;
 }
 .ff-form-check input { flex: none; width: 18px; height: 18px; margin-top: 2px; accent-color: var(--ff-blue); }
-.ff-form-choices { display: grid; gap: var(--ff-bubble-body-gap); margin: 0; padding: 0; border: 0; }
-.ff-form-choices legend { padding: 0; }
 .ff-form-add {
   padding: var(--ff-row-pad-y) var(--ff-row-pad-x);
   border: 1px dashed var(--ff-border);
@@ -9194,3 +9184,481 @@ a.ff-sview__crumb:hover {
   cursor: pointer;
 }
 .ff-fbverify__edit:hover { text-decoration: underline; }
+
+/* Public sign-up form (/f/<id>/): a standalone page styled as a survey sheet,
+   the one light surface on the site. It is a link handed to players who may
+   never have opened the portal, so it reads like a survey tool's page
+   (Qualtrics was the model): one white sheet on a pale page, hairline
+   sections, boxed choices, a progress bar and an arrow submit, with only the
+   standard footer below (SiteHeaderGate drops the header). The palette is
+   scoped to .ff-survey; the shared dashboard pieces the sheet hosts (provider
+   link buttons, the withdraw dialog, the OAuth bridge's error) are re-skinned
+   here rather than forked. Blue marks selection on this surface — the
+   portal's yellow state colour has no contrast on white. -------------------- */
+.ff-survey {
+  --ff-sv-page: #f2f5f9;
+  --ff-sv-sheet: #fff;
+  --ff-sv-ink: #0f2138;
+  --ff-sv-ink-2: #3f4f66;
+  --ff-sv-ink-3: #5d6b80;
+  --ff-sv-line: #e3e8ef;
+  --ff-sv-line-strong: #c5cfdb;
+  --ff-sv-control: #8796aa;
+  --ff-sv-hover: #f6f8fb;
+  --ff-sv-chip: #eef1f5;
+  --ff-sv-accent: var(--ff-blue);
+  --ff-sv-accent-hover: #00618b;
+  --ff-sv-accent-soft: #eaf4fa;
+  --ff-sv-ring: rgba(0, 116, 166, 0.22);
+  --ff-sv-ok: #18794e;
+  --ff-sv-ok-soft: #eaf6ef;
+  --ff-sv-ok-line: #bfe3cf;
+  --ff-sv-warn: #9a5b00;
+  --ff-sv-warn-soft: #fff6e3;
+  --ff-sv-danger: #b42318;
+  --ff-sv-danger-soft: #fdf1f0;
+  --ff-sv-danger-line: #f3c9c4;
+  --ff-sv-radius: 14px;
+  --ff-sv-radius-sm: 10px;
+  --ff-sv-pad: clamp(20px, 5vw, 44px);
+  --ff-sv-gap: clamp(22px, 4vw, 32px);
+  --ff-sv-shadow: 0 1px 2px rgba(15, 33, 56, 0.05), 0 12px 32px rgba(15, 33, 56, 0.08);
+  background: var(--ff-sv-page);
+  color: var(--ff-sv-ink);
+}
+/* No rail, so .ff-dash's two-column grid collapses to one column. */
+.ff-survey__page {
+  display: block;
+  max-width: 760px;
+  margin-inline: auto;
+  padding: clamp(24px, 6vw, 64px) var(--ff-gutter) clamp(28px, 5vw, 48px);
+}
+/* The pale page runs straight into the footer, no navy band between. */
+.ff-survey + .ff-footer { margin-top: 0; }
+.ff-survey__sheet :focus-visible,
+.ff-survey__powered :focus-visible { outline-color: var(--ff-sv-accent); }
+
+/* The owner's preview bar: brand navy, outside the sheet, so it can never be
+   mistaken for part of the form players see. */
+.ff-survey__owner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 18px;
+  padding: 10px 10px 10px 18px;
+  border-radius: var(--ff-sv-radius-sm);
+  background: var(--ff-bg);
+  color: #fff;
+  box-shadow: var(--ff-sv-shadow);
+}
+.ff-survey__ownertext { margin: 0; color: rgba(255, 255, 255, 0.85); font-size: var(--ff-dash-text-sm); }
+.ff-survey__ownertext strong { color: #fff; font-weight: 700; }
+.ff-survey__ownerlinks { display: flex; gap: 8px; }
+
+.ff-survey__sheet {
+  border: 1px solid var(--ff-sv-line);
+  border-radius: var(--ff-sv-radius);
+  background: var(--ff-sv-sheet);
+  box-shadow: var(--ff-sv-shadow);
+  color: var(--ff-sv-ink);
+  font-weight: 400;
+}
+.ff-survey__sheet a:not(.ff-btn) {
+  color: var(--ff-sv-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.ff-survey__sheet a:not(.ff-btn):hover { color: var(--ff-sv-accent-hover); }
+
+/* Header: host + state, title, description, event facts, who's signing up. */
+.ff-survey__head { display: grid; gap: 14px; padding: var(--ff-sv-pad) var(--ff-sv-pad) var(--ff-sv-gap); }
+.ff-survey__eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  color: var(--ff-sv-ink-3);
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-survey__eyebrow strong { color: var(--ff-sv-ink-2); font-weight: 700; }
+.ff-survey__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 11px;
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-sv-chip);
+  color: var(--ff-sv-ink-2);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+}
+.ff-survey__state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.ff-survey__state--open { background: var(--ff-sv-ok-soft); color: var(--ff-sv-ok); }
+.ff-survey__state--draft { background: var(--ff-sv-warn-soft); color: var(--ff-sv-warn); }
+.ff-survey__title {
+  margin: 0;
+  color: var(--ff-sv-ink);
+  font-size: calc(var(--ff-dash-text-xl) * 1.3);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 781.98px) { .ff-survey__title { font-size: var(--ff-dash-text-xl); } }
+.ff-survey__desc { color: var(--ff-sv-ink-2); line-height: 1.6; overflow-wrap: anywhere; }
+.ff-survey__desc > :first-child { margin-top: 0; }
+.ff-survey__desc > :last-child { margin-bottom: 0; }
+.ff-survey__desc p, .ff-survey__desc ul, .ff-survey__desc ol, .ff-survey__desc blockquote { margin: 0 0 0.75em; }
+.ff-survey__desc ul, .ff-survey__desc ol { padding-left: 1.3em; }
+.ff-survey__desc h4, .ff-survey__desc h5, .ff-survey__desc h6 {
+  margin: 1.1em 0 0.4em;
+  color: var(--ff-sv-ink);
+  font-size: var(--ff-dash-text-md);
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.ff-survey__desc strong { color: var(--ff-sv-ink); font-weight: 700; }
+.ff-survey__desc blockquote { padding-left: 12px; border-left: 3px solid var(--ff-sv-line); color: var(--ff-sv-ink-3); }
+.ff-survey__desc hr { margin: 1em 0; border: 0; border-top: 1px solid var(--ff-sv-line); }
+.ff-survey__desc .ff-md__code { border-color: var(--ff-sv-line); background: var(--ff-sv-hover); color: var(--ff-sv-ink); }
+.ff-survey__facts { display: flex; flex-wrap: wrap; gap: 10px 36px; margin: 4px 0 0; }
+.ff-survey__fact { display: grid; gap: 2px; min-width: 0; }
+.ff-survey__fact dt {
+  color: var(--ff-sv-ink-3);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ff-survey__fact dd { margin: 0; color: var(--ff-sv-ink); font-weight: 600; }
+.ff-survey__fact a { display: inline-flex; align-items: center; gap: 5px; }
+.ff-survey__ext { width: 13px; height: 13px; }
+.ff-survey__who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ff-sv-line);
+  color: var(--ff-sv-ink-3);
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-survey__who p { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.ff-survey__who strong { color: var(--ff-sv-ink); font-weight: 700; }
+.ff-survey__whomail::before { content: "·"; margin: 0 8px; }
+.ff-survey__linkbtn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ff-sv-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ff-survey__linkbtn:hover:not(:disabled) { color: var(--ff-sv-accent-hover); text-decoration: underline; }
+.ff-survey__linkbtn:disabled { opacity: 0.6; cursor: default; }
+
+/* Progress over the required items. */
+.ff-survey__progress { display: flex; align-items: center; gap: 14px; padding: 0 var(--ff-sv-pad) var(--ff-sv-gap); }
+.ff-survey__progressbar {
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-sv-line);
+}
+.ff-survey__progressfill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ff-sv-accent);
+  transition: width 300ms ease;
+}
+.ff-survey__progresslabel {
+  flex: none;
+  color: var(--ff-sv-ink-3);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* The OAuth bridge renders only a failed connect; collapse while it's empty. */
+.ff-survey__alert { padding: 0 var(--ff-sv-pad) var(--ff-sv-gap); }
+.ff-survey__alert:empty { display: none; }
+
+/* Sections, each under a hairline. */
+.ff-survey__section { padding: var(--ff-sv-gap) var(--ff-sv-pad); border-top: 1px solid var(--ff-sv-line); }
+.ff-survey__sechead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 18px;
+}
+.ff-survey__secmain { display: grid; flex: 1 1 280px; gap: 4px; min-width: 0; }
+.ff-survey__sectitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--ff-sv-ink);
+  font-size: var(--ff-dash-text-lg);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+.ff-survey__step {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--ff-sv-accent-soft);
+  color: var(--ff-sv-accent);
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 800;
+}
+.ff-survey__secintro { margin: 0; color: var(--ff-sv-ink-3); font-size: var(--ff-dash-text-sm); }
+.ff-survey__pill, .ff-survey__tag {
+  flex: none;
+  padding: 3px 11px;
+  border-radius: var(--ff-radius-pill);
+  background: var(--ff-sv-chip);
+  color: var(--ff-sv-ink-2);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+}
+.ff-survey__pill--ok { background: var(--ff-sv-ok-soft); color: var(--ff-sv-ok); }
+.ff-survey__tag { padding: 1px 8px; color: var(--ff-sv-ink-3); font-weight: 600; }
+.ff-survey__key { color: var(--ff-sv-ink-3); font-size: var(--ff-dash-text-xs); }
+.ff-survey__lead { margin: 0; color: var(--ff-sv-ink-2); }
+.ff-survey__empty { display: grid; justify-items: start; gap: 14px; padding: var(--ff-sv-pad); }
+
+/* Requirements: a bordered checklist, one row per bucket. */
+.ff-survey__reqs {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--ff-sv-line);
+  border-radius: var(--ff-sv-radius-sm);
+  list-style: none;
+}
+.ff-survey__req {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 14px;
+  padding: 14px 16px;
+}
+.ff-survey__req + .ff-survey__req { border-top: 1px solid var(--ff-sv-line); }
+.ff-survey__reqbody { display: grid; gap: 2px; min-width: 0; }
+.ff-survey__reqlabel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0;
+  color: var(--ff-sv-ink);
+  font-weight: 700;
+}
+.ff-survey__reqstatus { margin: 0; color: var(--ff-sv-ink-2); font-size: var(--ff-dash-text-sm); overflow-wrap: anywhere; }
+.ff-survey__reqnote { margin: 2px 0 0; color: var(--ff-sv-ink-3); font-size: var(--ff-dash-text-xs); }
+.ff-survey__reqaction { display: grid; align-self: center; justify-items: end; gap: 6px; }
+.ff-survey__actionmsg { color: var(--ff-sv-ink-3); font-size: var(--ff-dash-text-xs); text-align: right; }
+@media (max-width: 560px) {
+  .ff-survey__req { grid-template-columns: auto minmax(0, 1fr); }
+  .ff-survey__reqaction { grid-column: 2; justify-items: start; }
+  .ff-survey__actionmsg { text-align: left; }
+}
+.ff-survey__mark { flex: none; width: 22px; height: 22px; margin-top: 1px; }
+.ff-survey__mark circle { fill: none; stroke: var(--ff-sv-line-strong); stroke-width: 2; }
+.ff-survey__mark--met circle { fill: var(--ff-sv-ok); stroke: var(--ff-sv-ok); }
+.ff-survey__mark--met path { fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.ff-survey__mark--unknown circle { stroke: var(--ff-sv-warn); stroke-dasharray: 3 3; }
+.ff-survey__mark--unknown .ff-survey__markdot { fill: var(--ff-sv-warn); stroke: none; }
+
+/* Questions, separated by hairlines. */
+.ff-survey__questions { display: grid; }
+.ff-survey__q { display: block; min-width: 0; margin: 0; padding: 22px 0; border: 0; border-top: 1px solid var(--ff-sv-line); }
+.ff-survey__q:first-child { padding-top: 4px; border-top: 0; }
+.ff-survey__q:last-child { padding-bottom: 0; }
+/* Floated to full width, a legend lays out like any block, so its margin
+   holds in every engine (a rendered legend otherwise sits in the border). */
+.ff-survey__q > legend { float: left; width: 100%; padding: 0; }
+.ff-survey__q > legend + * { clear: both; }
+.ff-survey__qtext {
+  display: block;
+  margin: 0 0 12px;
+  color: var(--ff-sv-ink);
+  font-size: var(--ff-dash-text-lg);
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.ff-survey__ast { margin-left: 4px; color: var(--ff-sv-danger); font-weight: 700; }
+.ff-survey__help { margin: -6px 0 12px; color: var(--ff-sv-ink-3); font-size: var(--ff-dash-text-sm); }
+.ff-survey__choice + .ff-survey__help { margin: 8px 0 0; }
+.ff-survey__input {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--ff-sv-line-strong);
+  border-radius: var(--ff-sv-radius-sm);
+  background: var(--ff-sv-sheet);
+  color: var(--ff-sv-ink);
+  font: inherit;
+  transition: border-color var(--ff-transition), box-shadow var(--ff-transition);
+}
+.ff-survey__input:hover:not(:disabled) { border-color: var(--ff-sv-control); }
+.ff-survey .ff-survey__input:focus { outline: none; border-color: var(--ff-sv-accent); box-shadow: 0 0 0 3px var(--ff-sv-ring); }
+.ff-survey__input:disabled { background: var(--ff-sv-hover); color: var(--ff-sv-ink-3); cursor: not-allowed; }
+.ff-survey__input--long { min-height: 132px; line-height: 1.5; resize: vertical; }
+.ff-survey__choices { display: grid; gap: 8px; }
+.ff-survey__choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--ff-sv-line-strong);
+  border-radius: var(--ff-sv-radius-sm);
+  background: var(--ff-sv-sheet);
+  color: var(--ff-sv-ink);
+  cursor: pointer;
+  transition: border-color var(--ff-transition), background var(--ff-transition), box-shadow var(--ff-transition);
+}
+.ff-survey__choice:not(:has(:disabled)):hover { border-color: var(--ff-sv-control); background: var(--ff-sv-hover); }
+.ff-survey__choice:has(:checked) {
+  border-color: var(--ff-sv-accent);
+  background: var(--ff-sv-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--ff-sv-accent);
+}
+.ff-survey__choice:has(:focus-visible) { outline: 2px solid var(--ff-sv-accent); outline-offset: 2px; }
+.ff-survey__choice:has(:disabled) { cursor: not-allowed; }
+.ff-survey__choice:has(:disabled):not(:has(:checked)) { background: var(--ff-sv-hover); color: var(--ff-sv-ink-3); }
+.ff-survey__choicetext { min-width: 0; line-height: 1.45; overflow-wrap: anywhere; }
+.ff-survey__control {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+  border: 2px solid var(--ff-sv-control);
+  border-radius: 50%;
+  background: var(--ff-sv-sheet);
+  cursor: inherit;
+  transition: border-color var(--ff-transition), background var(--ff-transition);
+}
+.ff-survey__control[type="checkbox"] { border-radius: 5px; }
+.ff-survey__control:checked { border-color: var(--ff-sv-accent); }
+.ff-survey__control[type="radio"]:checked {
+  background: radial-gradient(circle, var(--ff-sv-accent) 0 4.5px, var(--ff-sv-sheet) 5px);
+}
+.ff-survey__control[type="checkbox"]:checked {
+  background: var(--ff-sv-accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+}
+/* The choice box carries the focus ring. */
+.ff-survey .ff-survey__control:focus-visible { outline: none; }
+@media (forced-colors: active) {
+  .ff-survey__control { appearance: auto; -webkit-appearance: auto; }
+}
+
+/* Review: what's shared, status, the submit. */
+.ff-survey__panel {
+  padding: 16px 18px;
+  border: 1px solid var(--ff-sv-line);
+  border-radius: var(--ff-sv-radius-sm);
+  background: var(--ff-sv-hover);
+}
+.ff-survey__label { margin: 0 0 8px; color: var(--ff-sv-ink); font-size: var(--ff-dash-text-sm); font-weight: 700; }
+.ff-survey__list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ff-survey__list li { position: relative; padding-left: 20px; color: var(--ff-sv-ink-2); font-size: var(--ff-dash-text-sm); }
+.ff-survey__list li::before {
+  content: "";
+  position: absolute;
+  top: 0.55em;
+  left: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ff-sv-control);
+}
+.ff-survey__list .ff-survey__tag { margin-left: 8px; }
+.ff-survey__banner {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--ff-sv-line);
+  border-radius: var(--ff-sv-radius-sm);
+  background: var(--ff-sv-hover);
+  color: var(--ff-sv-ink-2);
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-survey__banner p { margin: 0; }
+.ff-survey__banner--ok { border-color: var(--ff-sv-ok-line); background: var(--ff-sv-ok-soft); color: var(--ff-sv-ok); }
+.ff-survey__panel + .ff-survey__banner { margin: 16px 0 0; }
+.ff-survey__banner--error,
+.ff-survey__sheet .ff-auth__error {
+  border-color: var(--ff-sv-danger-line);
+  border-radius: var(--ff-sv-radius-sm);
+  background: var(--ff-sv-danger-soft);
+  color: var(--ff-sv-danger);
+}
+.ff-survey__sheet .ff-auth__error { margin: 0; }
+.ff-survey__submit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin-top: 24px;
+}
+.ff-survey__submitmain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px 16px;
+  margin-left: auto;
+}
+.ff-survey__hint { color: var(--ff-sv-ink-3); font-size: var(--ff-dash-text-sm); }
+.ff-survey__saved { color: var(--ff-sv-ok); font-size: var(--ff-dash-text-sm); font-weight: 700; }
+.ff-survey__arrow { width: 16px; height: 16px; transition: transform var(--ff-transition); }
+.ff-survey__next:hover:not([disabled]) .ff-survey__arrow { transform: translateX(3px); }
+@media (max-width: 560px) {
+  .ff-survey__submitmain { width: 100%; }
+  .ff-survey__next { flex: 1 1 100%; }
+}
+
+/* Shared dashboard controls, re-skinned for the light sheet. */
+.ff-survey__sheet .ff-btn--outline { color: var(--ff-sv-ink); box-shadow: inset 0 0 0 1.5px var(--ff-sv-line-strong); }
+.ff-survey__sheet .ff-btn--outline:hover:not([disabled]) {
+  background: var(--ff-sv-hover);
+  color: var(--ff-sv-ink);
+  box-shadow: inset 0 0 0 1.5px var(--ff-sv-control);
+}
+.ff-survey__sheet .ff-btn--danger { background: var(--ff-sv-danger); color: #fff; box-shadow: none; }
+.ff-survey__sheet .ff-btn--danger:hover:not([disabled]) { background: #8f1d14; color: #fff; }
+.ff-survey__sheet .ff-dialog {
+  border-color: var(--ff-sv-line);
+  background: var(--ff-sv-sheet);
+  color: var(--ff-sv-ink);
+  box-shadow: 0 24px 60px rgba(15, 33, 56, 0.25);
+}
+.ff-survey__sheet .ff-dialog::backdrop { background: rgba(15, 33, 56, 0.45); }
+.ff-survey__sheet .ff-dialog__title { color: var(--ff-sv-ink); }
+.ff-survey__sheet .ff-dialog__text { color: var(--ff-sv-ink-3); }
+
+/* "Powered by", under the sheet — the survey-tool sign-off. */
+.ff-survey__powered { margin: 20px 0 0; color: var(--ff-sv-ink-3); font-size: var(--ff-dash-text-xs); text-align: center; }
+.ff-survey__powered a { color: var(--ff-sv-ink-2); font-weight: 700; text-decoration: none; }
+.ff-survey__powered a:hover { color: var(--ff-sv-accent); text-decoration: underline; }

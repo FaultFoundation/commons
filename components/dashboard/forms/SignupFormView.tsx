@@ -9,15 +9,19 @@ import {
   withdrawSignup,
 } from "@/app/f/[id]/actions";
 import { LinkProviderButton } from "@/components/dashboard/LinkProviderButton";
-import { Bubble } from "@/components/dashboard/bubbles/Bubble";
-import { BubbleRow } from "@/components/dashboard/bubbles/BubbleRow";
 import { ConfirmDialog } from "@/components/dashboard/bubbles/ConfirmDialog";
+import {
+  ArrowRight,
+  FormSection,
+  RequirementMark,
+} from "@/components/dashboard/forms/FormSheet";
 import { authClient } from "@/lib/auth-client";
 import {
   LONG_ANSWER_MAX,
   SHORT_ANSWER_MAX,
   choiceConfig,
   formPath,
+  normalizeAnswer,
   type Answer,
   type FormItem,
 } from "@/lib/signup-forms-shared";
@@ -35,12 +39,19 @@ function dateLabel(ms: number): string {
   return new Date(ms).toLocaleDateString("en-US", { dateStyle: "medium" });
 }
 
+/** Whether an answer would get past the submit's own validation. */
+function answered(item: FormItem, value: Answer): boolean {
+  const result = normalizeAnswer(item, value);
+  return result.ok && result.value !== null;
+}
+
 /**
- * A member filling in a sign-up form: what the organizer requires (each row
- * saying where they stand and the one click that fixes it), the organizer's
- * questions, and exactly what will be shared before they press Sign Up.
- * Requirement state comes from the server's cached checks; the submit re-checks
- * everything live, so this page's checkmarks are guidance, not the gate.
+ * A member filling in a sign-up form, as the sections of the survey sheet: what
+ * the organizer requires (each row saying where they stand and the one click
+ * that fixes it), the organizer's questions, and exactly what will be shared
+ * before they press Sign Up. Requirement state comes from the server's cached
+ * checks; the submit re-checks everything live, so this page's checkmarks (and
+ * the progress bar built on them) are guidance, not the gate.
  */
 export function SignupFormView({
   formId,
@@ -75,6 +86,20 @@ export function SignupFormView({
   // One blue button per context: the first unmet requirement the member can
   // act on themselves.
   const nextId = checks.find((c) => c.met !== true && c.action)?.itemId ?? null;
+
+  // The progress bar counts what the submit needs: every required requirement
+  // met and every required question answered.
+  const requiredQuestions = questions.filter((q) => q.required);
+  const total = checks.filter((c) => c.required).length + requiredQuestions.length;
+  const done =
+    checks.filter((c) => c.required && c.met === true).length +
+    requiredQuestions.filter((q) => answered(q, answers[q.id] ?? null)).length;
+
+  // Sections are numbered only when there is more than one to work through.
+  const reqStep = checks.length ? 1 : 0;
+  const questionStep = questions.length ? reqStep + 1 : reqStep;
+  const reviewStep = questionStep + 1;
+  const step = (n: number) => (reviewStep > 1 ? n : undefined);
 
   function set(itemId: string, value: Answer) {
     setSaved(false);
@@ -113,65 +138,77 @@ export function SignupFormView({
 
   return (
     <>
+      {accepting && total ? <Progress done={done} total={total} /> : null}
+
       {checks.length ? (
-        <Bubble
-          title="Requirements"
-          span="full"
-          actions={
-            <span className="ff-badge">
+        <FormSection
+          step={step(reqStep)}
+          title="Before You Sign Up"
+          intro="Checked against your Commons account. Each one carries over to any other sign-up that asks for it."
+          aside={
+            <span className={`ff-survey__pill${outstanding.length ? "" : " ff-survey__pill--ok"}`}>
               {outstanding.length ? `${outstanding.length} to go` : "All set"}
             </span>
           }
         >
-          {checks.map((check) => (
-            <BubbleRow
-              key={check.itemId}
-              label={check.required ? check.label : `${check.label} (optional)`}
-              value={
-                <span className={check.met === true ? "ff-form-met" : undefined}>
-                  {check.met === true ? "✓ " : ""}
-                  {check.status}
-                </span>
-              }
-              note={check.note}
-              action={
-                check.met === true || !check.action ? undefined : (
+          <ul className="ff-survey__reqs">
+            {checks.map((check) => (
+              <li key={check.itemId} className="ff-survey__req">
+                <RequirementMark met={check.met} />
+                <div className="ff-survey__reqbody">
+                  <p className="ff-survey__reqlabel">
+                    {check.label}
+                    {check.required ? null : <span className="ff-survey__tag">Optional</span>}
+                  </p>
+                  <p className="ff-survey__reqstatus">{check.status}</p>
+                  {check.note ? <p className="ff-survey__reqnote">{check.note}</p> : null}
+                </div>
+                {check.met === true || !check.action ? null : (
                   <CheckAction
                     formId={formId}
                     action={check.action}
                     primary={check.itemId === nextId}
                   />
-                )
-              }
-            />
-          ))}
-        </Bubble>
+                )}
+              </li>
+            ))}
+          </ul>
+        </FormSection>
       ) : null}
 
-      {/* display: contents — the form groups the two bubbles for submit without
-          becoming a grid item of its own. */}
-      <form className="ff-form-fill" onSubmit={onSubmit}>
+      <form onSubmit={onSubmit}>
         {questions.length ? (
-          <Bubble title="Your Answers" span="full">
-            {questions.map((q) => (
-              <QuestionField
-                key={q.id}
-                item={q}
-                value={answers[q.id] ?? null}
-                disabled={!accepting}
-                onChange={(v) => set(q.id, v)}
-              />
-            ))}
-          </Bubble>
+          <FormSection
+            step={step(questionStep)}
+            title="Questions"
+            aside={
+              requiredQuestions.length ? (
+                <span className="ff-survey__key">
+                  <span className="ff-survey__ast" aria-hidden="true">*</span> Required
+                </span>
+              ) : undefined
+            }
+          >
+            <div className="ff-survey__questions">
+              {questions.map((q) => (
+                <QuestionField
+                  key={q.id}
+                  item={q}
+                  value={answers[q.id] ?? null}
+                  disabled={!accepting}
+                  onChange={(v) => set(q.id, v)}
+                />
+              ))}
+            </div>
+          </FormSection>
         ) : null}
 
-        <Bubble
-          title={signedUp ? "You're Signed Up" : "Sign Up"}
-          span="full"
-          actions={signedUp ? <span className="ff-badge">Submitted</span> : undefined}
+        <FormSection
+          step={step(reviewStep)}
+          title={signedUp ? "You're Signed Up" : "Review and Sign Up"}
         >
           {signedUp && response ? (
-            <p className="ff-auth__hint">
+            <p className="ff-survey__banner ff-survey__banner--ok">
               Submitted {dateLabel(response.submittedAt)}
               {response.updatedAt !== response.submittedAt
                 ? `, last updated ${dateLabel(response.updatedAt)}`
@@ -179,29 +216,28 @@ export function SignupFormView({
               .{accepting ? " You can update your answers until sign-ups close." : ""}
             </p>
           ) : response?.status === "withdrawn" ? (
-            <p className="ff-auth__hint">You withdrew. Sign up again any time while it&rsquo;s open.</p>
+            <p className="ff-survey__banner">
+              You withdrew. Sign up again any time while it&rsquo;s open.
+            </p>
           ) : null}
 
-          <p className="ff-form-shares__title">The organizer will see:</p>
-          <ul className="ff-form-shares">
-            {shares.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
+          <div className="ff-survey__panel">
+            <p className="ff-survey__label">The organizer will see</p>
+            <ul className="ff-survey__list">
+              {shares.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
 
           {error ? (
-            <div className="ff-auth__error" role="alert">
+            <div className="ff-survey__banner ff-survey__banner--error" role="alert">
               <p>{error}</p>
               {blocking.length ? <p>Still needed: {blocking.join(", ")}.</p> : null}
             </div>
           ) : null}
-          {saved ? (
-            <p className="ff-row__saved" role="status">
-              {signedUp ? "Saved." : "You're signed up."}
-            </p>
-          ) : null}
 
-          <div className="ff-row__buttons">
+          <div className="ff-survey__submit">
             {signedUp ? (
               <button
                 className="ff-btn ff-btn--outline"
@@ -212,16 +248,25 @@ export function SignupFormView({
                 Withdraw
               </button>
             ) : null}
-            <button
-              className="ff-btn"
-              type="submit"
-              disabled={pending || !accepting || blocked.length > 0}
-              title={blocked.length ? "Finish the requirements above first" : undefined}
-            >
-              {pending ? "Saving…" : signedUp ? "Update Sign-Up" : "Sign Up"}
-            </button>
+            <div className="ff-survey__submitmain">
+              {saved ? (
+                <span className="ff-survey__saved" role="status">
+                  {signedUp ? "Saved." : "You're signed up."}
+                </span>
+              ) : accepting && blocked.length ? (
+                <span className="ff-survey__hint">Finish the requirements above first.</span>
+              ) : null}
+              <button
+                className="ff-btn ff-survey__next"
+                type="submit"
+                disabled={pending || !accepting || blocked.length > 0}
+              >
+                {pending ? "Saving…" : signedUp ? "Update Sign-Up" : "Sign Up"}
+                {pending ? null : <ArrowRight />}
+              </button>
+            </div>
           </div>
-        </Bubble>
+        </FormSection>
       </form>
 
       <ConfirmDialog
@@ -235,6 +280,31 @@ export function SignupFormView({
         onClose={() => setWithdrawing(false)}
       />
     </>
+  );
+}
+
+/** The survey's progress bar, over the required items: met and answered. */
+function Progress({ done, total }: { done: number; total: number }) {
+  return (
+    <div className="ff-survey__progress">
+      <div
+        className="ff-survey__progressbar"
+        role="progressbar"
+        aria-label="Required items done"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={done}
+        aria-valuetext={`${done} of ${total}`}
+      >
+        <span
+          className="ff-survey__progressfill"
+          style={{ width: `${Math.round((done / total) * 100)}%` }}
+        />
+      </div>
+      <span className="ff-survey__progresslabel">
+        {done >= total ? "All required items done" : `${done} of ${total} required items done`}
+      </span>
+    </div>
   );
 }
 
@@ -253,29 +323,35 @@ function CheckAction({
   const cls = `ff-btn ff-btn--sm${primary ? "" : " ff-btn--outline"}`;
 
   if (action.type === "link") {
-    return action.enabled ? (
-      <LinkProviderButton
-        provider={action.provider}
-        label={action.label}
-        callbackURL={formPath(formId)}
-        small
-        primary={primary}
-      />
-    ) : (
-      <button className="ff-btn ff-btn--outline ff-btn--sm" type="button" disabled>
-        Unavailable
-      </button>
+    return (
+      <div className="ff-survey__reqaction">
+        {action.enabled ? (
+          <LinkProviderButton
+            provider={action.provider}
+            label={action.label}
+            callbackURL={formPath(formId)}
+            small
+            primary={primary}
+          />
+        ) : (
+          <button className="ff-btn ff-btn--outline ff-btn--sm" type="button" disabled>
+            Unavailable
+          </button>
+        )}
+      </div>
     );
   }
   if (action.type === "href") {
     return (
-      <a
-        className={cls}
-        href={action.href}
-        {...(action.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-      >
-        {action.label}
-      </a>
+      <div className="ff-survey__reqaction">
+        <a
+          className={cls}
+          href={action.href}
+          {...(action.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+        >
+          {action.label}
+        </a>
+      </div>
     );
   }
 
@@ -298,7 +374,7 @@ function CheckAction({
     });
 
   return (
-    <div className="ff-form-action">
+    <div className="ff-survey__reqaction">
       <button className={cls} type="button" disabled={pending} onClick={run}>
         {pending
           ? "Checking…"
@@ -307,7 +383,7 @@ function CheckAction({
             : "Check Again"}
       </button>
       {message ? (
-        <span className="ff-row__hint" role="status">
+        <span className="ff-survey__actionmsg" role="status">
           {message}
         </span>
       ) : null}
@@ -327,103 +403,119 @@ function QuestionField({
   onChange: (value: Answer) => void;
 }) {
   const id = `q-${item.id}`;
-  const label = `${item.label ?? "Question"}${item.required ? "" : " (optional)"}`;
-  const help = item.help ? <span className="ff-row__hint">{item.help}</span> : null;
+  const helpId = item.help ? `${id}-help` : undefined;
+  const text = (
+    <>
+      {item.label ?? "Question"}
+      {item.required ? (
+        <span className="ff-survey__ast" aria-hidden="true">
+          *
+        </span>
+      ) : null}
+    </>
+  );
+  const help = item.help ? (
+    <p id={helpId} className="ff-survey__help">
+      {item.help}
+    </p>
+  ) : null;
 
   if (item.kind === "checkbox") {
+    // One box to tick (a rules agreement): the statement is the choice itself.
     return (
-      <div className="ff-auth__field">
-        <label className="ff-form-check">
+      <div className="ff-survey__q">
+        <label className="ff-survey__choice">
           <input
+            className="ff-survey__control"
             type="checkbox"
             checked={value === true}
             disabled={disabled}
             required={item.required}
+            aria-describedby={helpId}
             onChange={(e) => onChange(e.target.checked)}
           />
-          <span>{label}</span>
+          <span className="ff-survey__choicetext">{text}</span>
         </label>
         {help}
       </div>
     );
   }
 
-  if (item.kind === "single_choice") {
-    // Radios, as Google Forms shows "Multiple choice" — every option visible.
-    return (
-      <fieldset className="ff-auth__field ff-form-choices">
-        <legend className="ff-auth__label">{label}</legend>
-        {help}
-        {choiceConfig(item.config).options.map((option) => (
-          <label key={option} className="ff-form-check">
-            <input
-              type="radio"
-              name={id}
-              value={option}
-              checked={value === option}
-              disabled={disabled}
-              required={item.required}
-              onChange={() => onChange(option)}
-            />
-            <span>{option}</span>
-          </label>
-        ))}
-      </fieldset>
-    );
-  }
-
-  if (item.kind === "multi_choice") {
+  if (item.kind === "single_choice" || item.kind === "multi_choice") {
+    // Every option visible as its own box, the way a survey lays out
+    // multiple choice; radios for one answer, checkboxes for several.
+    const multi = item.kind === "multi_choice";
     const picked = Array.isArray(value) ? value : [];
     return (
-      <fieldset className="ff-auth__field ff-form-choices">
-        <legend className="ff-auth__label">{label}</legend>
+      <fieldset className="ff-survey__q" aria-describedby={helpId}>
+        <legend className="ff-survey__qtext">{text}</legend>
         {help}
-        {choiceConfig(item.config).options.map((option) => (
-          <label key={option} className="ff-form-check">
-            <input
-              type="checkbox"
-              checked={picked.includes(option)}
-              disabled={disabled}
-              onChange={(e) =>
-                onChange(
-                  e.target.checked
-                    ? [...picked, option]
-                    : picked.filter((p) => p !== option),
-                )
-              }
-            />
-            <span>{option}</span>
-          </label>
-        ))}
+        <div className="ff-survey__choices">
+          {choiceConfig(item.config).options.map((option) => (
+            <label key={option} className="ff-survey__choice">
+              {multi ? (
+                <input
+                  className="ff-survey__control"
+                  type="checkbox"
+                  checked={picked.includes(option)}
+                  disabled={disabled}
+                  onChange={(e) =>
+                    onChange(
+                      e.target.checked
+                        ? [...picked, option]
+                        : picked.filter((p) => p !== option),
+                    )
+                  }
+                />
+              ) : (
+                <input
+                  className="ff-survey__control"
+                  type="radio"
+                  name={id}
+                  value={option}
+                  checked={value === option}
+                  disabled={disabled}
+                  required={item.required}
+                  onChange={() => onChange(option)}
+                />
+              )}
+              <span className="ff-survey__choicetext">{option}</span>
+            </label>
+          ))}
+        </div>
       </fieldset>
     );
   }
 
   return (
-    <label className="ff-auth__field" htmlFor={id}>
-      <span className="ff-auth__label">{label}</span>
+    <div className="ff-survey__q">
+      <label className="ff-survey__qtext" htmlFor={id}>
+        {text}
+      </label>
+      {help}
       {item.kind === "long_text" ? (
         <textarea
           id={id}
-          className="ff-auth__input ff-reg__textarea"
+          className="ff-survey__input ff-survey__input--long"
           value={typeof value === "string" ? value : ""}
           maxLength={LONG_ANSWER_MAX}
           disabled={disabled}
           required={item.required}
+          aria-describedby={helpId}
           onChange={(e) => onChange(e.target.value)}
         />
       ) : (
         <input
           id={id}
-          className="ff-auth__input"
+          className="ff-survey__input"
           value={typeof value === "string" ? value : ""}
           maxLength={SHORT_ANSWER_MAX}
           disabled={disabled}
           required={item.required}
+          aria-describedby={helpId}
           onChange={(e) => onChange(e.target.value)}
         />
       )}
-      {help}
-    </label>
+    </div>
   );
 }

@@ -62,7 +62,6 @@ export function FormStatusControl({
   formId: string;
   status: FormStatus;
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -79,12 +78,9 @@ export function FormStatusControl({
             onClick={() =>
               startTransition(async () => {
                 setError(null);
+                // Revalidates: the response re-renders the builder.
                 const result = await setFormStatus(formId, s);
-                if (!result.ok) {
-                  setError(result.error);
-                  return;
-                }
-                router.refresh();
+                if (!result.ok) setError(result.error);
               })
             }
           >

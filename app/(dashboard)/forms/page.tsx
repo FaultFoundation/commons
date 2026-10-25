@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Bubble } from "@/components/dashboard/bubbles/Bubble";
@@ -53,12 +54,12 @@ export default async function FormsPage() {
                 note={formPath(form.id)}
                 action={
                   <div className="ff-row__buttons">
-                    <a className="ff-btn ff-btn--outline ff-btn--sm" href={`/forms/${form.id}/?tab=responses`}>
+                    <Link className="ff-btn ff-btn--outline ff-btn--sm" href={`/forms/${form.id}/?tab=responses`}>
                       Responses
-                    </a>
-                    <a className="ff-btn ff-btn--outline ff-btn--sm" href={`/forms/${form.id}/`}>
+                    </Link>
+                    <Link className="ff-btn ff-btn--outline ff-btn--sm" href={`/forms/${form.id}/`}>
                       Edit
-                    </a>
+                    </Link>
                   </div>
                 }
               />

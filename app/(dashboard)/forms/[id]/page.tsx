@@ -55,15 +55,17 @@ export default async function FormBuilderPage({
   const session = await getSessionCached();
   if (!session) redirect("/login/");
   const { id } = await params;
-  // Someone else's form reads as missing, so ids can't be probed.
-  const form = await getOwnedForm(session.user.id, id);
-  if (!form) notFound();
-
-  const [items, rows, importSources] = await Promise.all([
-    listFormItemsCached(form.id),
-    listResponsesForExport(form.id),
-    listImportSources(session.user.id, form.id),
+  // One round trip for everything: the reads don't depend on each other, and
+  // awaiting the form first cost every builder render an extra D1 hop. Nothing
+  // is used until ownership is checked — someone else's form reads as missing,
+  // so ids can't be probed.
+  const [form, items, rows, importSources] = await Promise.all([
+    getOwnedForm(session.user.id, id),
+    listFormItemsCached(id),
+    listResponsesForExport(id),
+    listImportSources(session.user.id, id),
   ]);
+  if (!form) notFound();
   const questions = items.filter((i) => isQuestionKind(i.kind));
   const requirementItems = items.filter((i) => isRequirementKind(i.kind));
   const requirements = REQUIREMENTS.flatMap((def) => {

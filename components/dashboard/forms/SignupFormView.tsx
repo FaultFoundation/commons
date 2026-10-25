@@ -91,11 +91,14 @@ export function SignupFormView({
       if (!result.ok) {
         setError(result.error);
         setBlocking(result.blocking ?? []);
+        // A refused submit doesn't revalidate, but the live re-check it ran
+        // may have changed what the checklist should show.
         router.refresh();
         return;
       }
+      // Saved: the action revalidated this page, so its response carries the
+      // re-render — a router.refresh() here would fetch it a second time.
       setSaved(true);
-      router.refresh();
     });
   }
 
@@ -103,11 +106,8 @@ export function SignupFormView({
     startTransition(async () => {
       const result = await withdrawSignup(formId);
       setWithdrawing(false);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      router.refresh();
+      // Revalidates on success; nothing to refresh on failure.
+      if (!result.ok) setError(result.error);
     });
   }
 

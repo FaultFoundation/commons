@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 
 import {
@@ -93,7 +92,6 @@ export function QuestionsEditor({
   /** The organizer's other forms with questions, for the toolbar's Import. */
   importSources: { id: string; title: string; questions: number }[];
 }) {
-  const router = useRouter();
   const [list, setList] = useState(questions);
   useEffect(() => setList(questions), [questions]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -133,8 +131,9 @@ export function QuestionsEditor({
         setError(result.error);
         return;
       }
+      // The action's response is the re-rendered page (it revalidates), which
+      // re-seeds `list` through the effect above.
       after?.(result.id);
-      router.refresh();
     });
   }
 

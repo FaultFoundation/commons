@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
 import { setRequirement } from "@/app/(dashboard)/forms/actions";
@@ -37,7 +36,6 @@ export function RequirementsEditor({
   items: FormItem[];
   eventPlatform: string | null;
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   // discord_server can't be switched on without a server id, so the switch
@@ -56,14 +54,15 @@ export function RequirementsEditor({
   ) {
     setError(null);
     startTransition(async () => {
-      // No config = keep what's stored (setRequirement falls back to it).
+      // No config = keep what's stored (setRequirement falls back to it). The
+      // action revalidates the builder, so its response already carries the
+      // re-rendered page — no router.refresh() round trip after it.
       const result = await setRequirement(formId, kind, { enabled, required, config });
       if (!result.ok) {
         setError(result.error);
         return;
       }
       setDrafting(null);
-      router.refresh();
     });
   }
 

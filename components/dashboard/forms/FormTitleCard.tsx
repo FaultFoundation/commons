@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { updateEventDetails, updateFormHeader } from "@/app/(dashboard)/forms/actions";
@@ -43,7 +42,6 @@ export function FormTitleCard({
   details: EventDetails;
   responses: number;
 }) {
-  const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -75,8 +73,8 @@ export function FormTitleCard({
     }
     setProblem(null);
     setStatus("saved");
-    // The header card above shows the title too.
-    router.refresh();
+    // The header card above shows the title too; the action revalidates, so
+    // its response re-renders that without a router.refresh().
   }
 
   function edit(patch: Partial<{ title: string; description: string }>) {
@@ -166,7 +164,6 @@ function toLocalInput(ms: number | null): string {
  * so the server never guesses a zone.
  */
 function EventDetailsEditor({ formId, initial }: { formId: string; initial: EventDetails }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -206,7 +203,6 @@ function EventDetailsEditor({ formId, initial }: { formId: string; initial: Even
       }
       setSaved(true);
       setInitialCloses(closesAt);
-      router.refresh();
     });
   }
 

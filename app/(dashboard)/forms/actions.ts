@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { and, eq, max } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { signupFormItems, signupForms } from "@/db/schema";
 import { getAuth } from "@/lib/auth";
@@ -33,6 +33,7 @@ import {
   normalizeDomains,
   normalizeHttpUrl,
   requirementDef,
+  type FormItem,
   type FormStatus,
   type RequirementKind,
 } from "@/lib/signup-forms-shared";
@@ -53,26 +54,54 @@ async function requireUserId(): Promise<string | null> {
   return session?.user.id ?? null;
 }
 
-/** The caller's form, or the error to return. Fresh read, never the cache. */
+/**
+ * The caller's form, or the error to return. Fresh read, never the cache.
+ * The session and the form are read together: each D1 round trip is a network
+ * hop from the Worker, and an action that awaited them one by one made every
+ * toggle visibly slower.
+ */
 async function ownForm(
   formId: string,
 ): Promise<{ error: string } | { form: SignupForm; userId: string }> {
-  const userId = await requireUserId();
+  const [userId, form] = await Promise.all([
+    requireUserId(),
+    getForm(String(formId ?? "")),
+  ]);
   if (!userId) return { error: "You need to be signed in." };
-  const form = await getForm(String(formId ?? ""));
   if (!form || form.ownerUserId !== userId) {
     return { error: "That form doesn't exist or isn't yours." };
   }
   return { form, userId };
 }
 
+/**
+ * ownForm plus the form's items, all in one round trip. The items are read
+ * before ownership is known and simply dropped when the caller isn't the
+ * owner — nothing is returned or written for someone else's form.
+ */
+async function ownFormWithItems(
+  formId: string,
+): Promise<{ error: string } | { form: SignupForm; userId: string; items: FormItem[] }> {
+  const [owned, items] = await Promise.all([
+    ownForm(formId),
+    listFormItems(String(formId ?? "")),
+  ]);
+  return "error" in owned ? owned : { ...owned, items };
+}
+
+/**
+ * Re-renders the builder in the action's own response. The editors rely on
+ * that and do NOT call router.refresh() afterwards — a second refresh doubled
+ * every toggle's round trips.
+ */
 function revalidateForm(formId: string) {
   revalidatePath("/forms/", "layout");
   revalidatePath(formPath(formId));
 }
 
-async function touch(formId: string) {
-  await getDb()
+/** Bumps the form's updatedAt — batch it with the write it records. */
+function touch(formId: string) {
+  return getDb()
     .update(signupForms)
     .set({ updatedAt: new Date() })
     .where(eq(signupForms.id, formId));
@@ -189,14 +218,14 @@ export async function setFormStatus(
   formId: string,
   status: FormStatus,
 ): Promise<FormActionResult> {
-  const owned = await ownForm(formId);
+  const owned = await ownFormWithItems(formId);
   if ("error" in owned) return { ok: false, error: owned.error };
   if (!FORM_STATUSES.includes(status)) return { ok: false, error: "Unknown status." };
 
   if (status === "open") {
     // An unconfigured server check would block every submit, so refuse to open
     // until it's fixed rather than let members find out.
-    const items = await listFormItems(owned.form.id);
+    const { items } = owned;
     const server = items.find((i) => i.kind === "discord_server");
     if (server && !discordServerConfig(server.config)) {
       return { ok: false, error: "Add your Discord server ID before opening the form." };
@@ -284,12 +313,12 @@ export async function setRequirement(
   kind: string,
   input: RequirementInput,
 ): Promise<FormActionResult> {
-  const owned = await ownForm(formId);
+  const owned = await ownFormWithItems(formId);
   if ("error" in owned) return { ok: false, error: owned.error };
   if (!isRequirementKind(kind)) return { ok: false, error: "Unknown requirement." };
 
   const db = getDb();
-  const items = await listFormItems(owned.form.id);
+  const { items } = owned;
   const existing = items.find((i) => i.kind === kind);
 
   if (!input.enabled) {
@@ -300,9 +329,11 @@ export async function setRequirement(
       return { ok: false, error: `${dependent.label} needs this. Turn that off first.` };
     }
     if (existing) {
-      await db.delete(signupFormItems).where(eq(signupFormItems.id, existing.id));
+      await db.batch([
+        db.delete(signupFormItems).where(eq(signupFormItems.id, existing.id)),
+        touch(owned.form.id),
+      ]);
     }
-    await touch(owned.form.id);
     revalidateForm(owned.form.id);
     return { ok: true };
   }
@@ -398,14 +429,12 @@ export async function addQuestion(
   input: QuestionInput,
   afterItemId?: string,
 ): Promise<FormActionResult<{ id: string }>> {
-  const owned = await ownForm(formId);
+  const owned = await ownFormWithItems(formId);
   if ("error" in owned) return { ok: false, error: owned.error };
   const fields = questionFields(input);
   if (!fields.ok) return fields;
 
-  const questions = (await listFormItems(owned.form.id)).filter((i) =>
-    isQuestionKind(i.kind),
-  );
+  const questions = owned.items.filter((i) => isQuestionKind(i.kind));
   if (questions.length >= MAX_QUESTIONS) {
     return { ok: false, error: `A form can hold up to ${MAX_QUESTIONS} questions.` };
   }
@@ -415,17 +444,16 @@ export async function addQuestion(
   const after = afterItemId ? questions.findIndex((q) => q.id === afterItemId) : -1;
 
   if (after < 0) {
-    const top = await db
-      .select({ n: max(signupFormItems.position) })
-      .from(signupFormItems)
-      .where(eq(signupFormItems.formId, owned.form.id));
-    await db.insert(signupFormItems).values({
-      id,
-      formId: owned.form.id,
-      position: (top[0]?.n ?? 0) + 1,
-      createdAt: new Date(),
-      ...values,
-    });
+    await db.batch([
+      db.insert(signupFormItems).values({
+        id,
+        formId: owned.form.id,
+        position: Math.max(0, ...owned.items.map((i) => i.position)) + 1,
+        createdAt: new Date(),
+        ...values,
+      }),
+      touch(owned.form.id),
+    ]);
   } else {
     // Insert below `after` and rewrite every position densely, in one batch.
     const order = [...questions.slice(0, after + 1).map((q) => q.id), id, ...questions.slice(after + 1).map((q) => q.id)];
@@ -445,10 +473,10 @@ export async function addQuestion(
             .set({ position: order.indexOf(qid) + 1 })
             .where(eq(signupFormItems.id, qid)),
         ),
+      touch(owned.form.id),
     ];
     await db.batch(writes as [(typeof writes)[number], ...typeof writes]);
   }
-  await touch(owned.form.id);
   revalidateForm(owned.form.id);
   return { ok: true, id };
 }
@@ -463,13 +491,16 @@ export async function updateQuestion(
   const fields = questionFields(input);
   if (!fields.ok) return fields;
   const { ok: _ok, ...values } = fields;
-  await getDb()
-    .update(signupFormItems)
-    .set(values)
-    .where(
-      and(eq(signupFormItems.id, itemId), eq(signupFormItems.formId, owned.form.id)),
-    );
-  await touch(owned.form.id);
+  const db = getDb();
+  await db.batch([
+    db
+      .update(signupFormItems)
+      .set(values)
+      .where(
+        and(eq(signupFormItems.id, itemId), eq(signupFormItems.formId, owned.form.id)),
+      ),
+    touch(owned.form.id),
+  ]);
   revalidateForm(owned.form.id);
   return { ok: true };
 }
@@ -481,12 +512,15 @@ export async function removeQuestion(
 ): Promise<FormActionResult> {
   const owned = await ownForm(formId);
   if ("error" in owned) return { ok: false, error: owned.error };
-  await getDb()
-    .delete(signupFormItems)
-    .where(
-      and(eq(signupFormItems.id, itemId), eq(signupFormItems.formId, owned.form.id)),
-    );
-  await touch(owned.form.id);
+  const db = getDb();
+  await db.batch([
+    db
+      .delete(signupFormItems)
+      .where(
+        and(eq(signupFormItems.id, itemId), eq(signupFormItems.formId, owned.form.id)),
+      ),
+    touch(owned.form.id),
+  ]);
   revalidateForm(owned.form.id);
   return { ok: true };
 }
@@ -497,11 +531,9 @@ export async function moveQuestion(
   itemId: string,
   direction: "up" | "down",
 ): Promise<FormActionResult> {
-  const owned = await ownForm(formId);
+  const owned = await ownFormWithItems(formId);
   if ("error" in owned) return { ok: false, error: owned.error };
-  const questions = (await listFormItems(owned.form.id)).filter((i) =>
-    isQuestionKind(i.kind),
-  );
+  const questions = owned.items.filter((i) => isQuestionKind(i.kind));
   const from = questions.findIndex((q) => q.id === itemId);
   const to = direction === "up" ? from - 1 : from + 1;
   if (from < 0 || to < 0 || to >= questions.length) return { ok: true };
@@ -514,8 +546,7 @@ export async function moveQuestion(
       .set({ position: index + 1 })
       .where(eq(signupFormItems.id, q.id)),
   );
-  await db.batch(writes as [(typeof writes)[number], ...typeof writes]);
-  await touch(owned.form.id);
+  await db.batch([touch(owned.form.id), ...writes]);
   revalidateForm(owned.form.id);
   return { ok: true };
 }

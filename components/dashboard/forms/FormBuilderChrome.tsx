@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { createContext, useContext, useEffect, type ReactNode } from "react";
 
 import { CopyButton } from "@/components/dashboard/forms/CopyButton";
@@ -72,9 +73,9 @@ export function FormBuilderChrome({
     <FormTabCtx.Provider value={setActive}>
       <section className="ff-card ff-fbhead">
         <div className="ff-fbhead__top">
-          <a className="ff-fbhead__back" href="/forms/">
+          <Link className="ff-fbhead__back" href="/forms/">
             ← All forms
-          </a>
+          </Link>
           <div className="ff-fbhead__titles">
             <h1 className="ff-fbhead__title">{title}</h1>
             <p className="ff-fbhead__note">{STATUS_NOTES[status]}</p>

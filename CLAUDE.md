@@ -170,6 +170,14 @@ Cloudflare bindings (`DB`, `CEN`, `OW`, `AVATARS`) and secrets only exist on the
   still hosts no `scheduled` handler (see below); scheduled work lives in separate
   Workers (`cen-scraper`, `ow-data`).
 - Session-gated pages set `export const dynamic = "force-dynamic"`.
+- **A mutation is one round trip.** A server action that calls
+  `revalidatePath()` returns the re-rendered page in its own response; a client
+  that then calls `router.refresh()` pays a second full render (layout + page,
+  every D1 read again). Keep `router.refresh()` for `authClient` calls and
+  action paths that return without revalidating. Inside an action, start
+  independent reads together (`Promise.all`) and put a bookkeeping write such as
+  an `updatedAt` touch in the same `db.batch` as the write it records — each
+  awaited D1 call is a separate network hop from the Worker.
 - **D1 has no interactive transactions.** Drizzle's `transaction()` emits `BEGIN`,
   which D1 rejects — use `db.batch([...])` for writes that must land together.
 - Wrangler D1 also rejects `CREATE TEMP TABLE` with `SQLITE_AUTH`. One-shot

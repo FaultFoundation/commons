@@ -585,8 +585,15 @@ anything.
 3. Interactive content: add a `"use client"` component under
    `components/dashboard/<tab>/`, build it on `BubbleRow` /
    `FieldRow` / `ConfirmDialog`, call Better Auth via
-   `authClient` (or a server action for domain logic), then
-   `router.refresh()` so the server tree re-renders.
+   `authClient` (or a server action for domain logic), and make sure the
+   server tree re-renders — **once**. A server action that calls
+   `revalidatePath()` already returns the re-rendered page in its own
+   response, so the client must *not* follow it with `router.refresh()`: that
+   renders the whole page a second time and doubles the mutation's round
+   trips (the sign-up form builder's toggles took two full Worker renders each
+   until this was removed). `router.refresh()` is for an `authClient` call, or
+   an action path that returns without revalidating (a refused submit whose
+   live re-check may have changed what the page shows).
 4. Keep the bubble self-contained: it must not care where in the grid it
    lives. That's what lets the Home board mount it (below) — the board hands a
    bubble its span, so a bubble that hardcodes its own placement can't be
@@ -786,7 +793,13 @@ platform-import reasoning: [db/README.md](../db/README.md#sign-up-forms).
   Move / Duplicate / Delete and a Required switch. **An open card saves itself**
   ~0.7 s after typing stops and again when it closes (another card, or any click
   outside the questions and toolbar), so there is no Save button; it patches the
-  local list rather than refreshing, so typing never waits on a render. The
+  local list rather than refreshing, so typing never waits on a render. Every
+  builder mutation is **one round trip**: the owner actions read the session,
+  the form and its items together (`ownFormWithItems`), batch the `updatedAt`
+  touch with the write, and revalidate — and the editors take that action
+  response as the refresh rather than calling `router.refresh()` after it. The
+  list's Edit / Responses and the builder's "← All forms" are `Link`s, so
+  opening a form swaps only the content area. The
   toolbar's Duplicate copies the open card's live draft (published from an
   effect, so a StrictMode remount can't blank it). The player's form renders
   Multiple choice as radios to match.

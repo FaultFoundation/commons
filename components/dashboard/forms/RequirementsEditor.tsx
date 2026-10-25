@@ -20,16 +20,13 @@ import {
 const GROUPS: RequirementDef["group"][] = ["Identity", "Discord", "Overwatch", "Platforms"];
 
 /**
- * The bucket list, one collapsed section per group. Each requirement is a
- * single line — its name, an ⓘ with what it asks of players, a Required
- * check and an on/off switch — so the organizer scans names, not paragraphs.
- * The two buckets that need settings (school domains, Discord server) grow
- * them under their line while on. A requirement another one depends on
- * (Blizzard under Overwatch Rank) is locked on while that one is.
- *
- * Sections are native <details> and start closed; their summary lists what's
- * on, so a closed section still says what it holds. React never sets `open`,
- * so a section stays open across the router.refresh() each change triggers.
+ * The bucket list, grouped under plain headings. Each requirement is a single
+ * line — its name, an ⓘ with what it asks of players, a Required check and an
+ * on/off switch — so the organizer scans names, not paragraphs. The two
+ * buckets that need settings (school domains, Discord server) grow them under
+ * their line while on. A requirement another one depends on (Blizzard under
+ * Overwatch Rank) is locked on while that one is. The folding happens one
+ * level up: the whole Settings bubble is collapsible.
  */
 export function RequirementsEditor({
   formId,
@@ -87,83 +84,67 @@ export function RequirementsEditor({
           get a list you can paste into {platform?.label}.
         </p>
       ) : null}
-      {GROUPS.map((group) => {
-        const defs = REQUIREMENTS.filter((d) => d.group === group);
-        const on = defs.filter((d) => byKind.has(d.kind)).map((d) => d.label);
-        return (
-          <details key={group} className="ff-row ff-disclosure">
-            <summary className="ff-disclosure__summary">
-              <span className="ff-row__main">
-                <span className="ff-row__value">{group}</span>
-                <span className="ff-row__note">{on.length ? `On: ${on.join(", ")}` : "Nothing on"}</span>
-              </span>
-              <span className="ff-disclosure__chevron" aria-hidden="true">
-                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" width="12" height="12">
-                  <path d="M1.5 4L6 8L10.5 4" strokeWidth="1.5" />
-                </svg>
-              </span>
-            </summary>
-            <div className="ff-disclosure__body">
-              {defs.map((def) => {
-                const item = byKind.get(def.kind) ?? null;
-                const lockedBy = item ? neededBy(def.kind) : null;
-                const open = Boolean(item) || drafting === def.kind;
-                const configurable = def.kind === "academic" || def.kind === "discord_server";
-                return (
-                  <div key={def.kind} className="ff-row ff-req">
-                    <div className="ff-req__name">
-                      <span className="ff-row__value">{def.label}</span>
-                      <InfoTip
-                        label={def.label}
-                        text={
-                          lockedBy
-                            ? `${def.organizerNote} ${lockedBy.label} needs this, so it stays on while that's on.`
-                            : def.organizerNote
-                        }
-                      />
-                    </div>
-                    <div className="ff-req__controls">
-                      <label className="ff-form-check ff-req__required">
-                        <input
-                          type="checkbox"
-                          checked={item?.required ?? false}
-                          disabled={pending || !item}
-                          onChange={(e) => apply(def.kind, true, e.target.checked)}
-                        />
-                        <span>Required</span>
-                      </label>
-                      <Switch
-                        checked={open}
-                        disabled={pending || Boolean(lockedBy)}
-                        label={def.label}
-                        onChange={(next) => {
-                          if (!next) {
-                            if (item) apply(def.kind, false, true);
-                            else setDrafting(null);
-                            return;
-                          }
-                          if (def.kind === "discord_server") setDrafting(def.kind);
-                          else apply(def.kind, true, true);
-                        }}
-                      />
-                    </div>
-                    {open && configurable ? (
-                      <div className="ff-row__editor">
-                        <RequirementSettings
-                          def={def}
-                          item={item}
-                          pending={pending}
-                          onSave={(config) => apply(def.kind, true, item?.required ?? true, config)}
-                        />
-                      </div>
-                    ) : null}
+      {GROUPS.map((group) => (
+        <div key={group} className="ff-form-group">
+          <h3 className="ff-form-group__title">{group}</h3>
+          {REQUIREMENTS.filter((d) => d.group === group).map((def) => {
+            const item = byKind.get(def.kind) ?? null;
+            const lockedBy = item ? neededBy(def.kind) : null;
+            const open = Boolean(item) || drafting === def.kind;
+            const configurable = def.kind === "academic" || def.kind === "discord_server";
+            return (
+              <div key={def.kind} className="ff-row ff-req">
+                <div className="ff-req__name">
+                  <span className="ff-row__value">{def.label}</span>
+                  <InfoTip
+                    label={def.label}
+                    text={
+                      lockedBy
+                        ? `${def.organizerNote} ${lockedBy.label} needs this, so it stays on while that's on.`
+                        : def.organizerNote
+                    }
+                  />
+                </div>
+                <div className="ff-req__controls">
+                  <label className="ff-form-check ff-req__required">
+                    <input
+                      type="checkbox"
+                      checked={item?.required ?? false}
+                      disabled={pending || !item}
+                      onChange={(e) => apply(def.kind, true, e.target.checked)}
+                    />
+                    <span>Required</span>
+                  </label>
+                  <Switch
+                    checked={open}
+                    disabled={pending || Boolean(lockedBy)}
+                    label={def.label}
+                    onChange={(next) => {
+                      if (!next) {
+                        if (item) apply(def.kind, false, true);
+                        else setDrafting(null);
+                        return;
+                      }
+                      if (def.kind === "discord_server") setDrafting(def.kind);
+                      else apply(def.kind, true, true);
+                    }}
+                  />
+                </div>
+                {open && configurable ? (
+                  <div className="ff-row__editor">
+                    <RequirementSettings
+                      def={def}
+                      item={item}
+                      pending={pending}
+                      onSave={(config) => apply(def.kind, true, item?.required ?? true, config)}
+                    />
                   </div>
-                );
-              })}
-            </div>
-          </details>
-        );
-      })}
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      ))}
     </>
   );
 }

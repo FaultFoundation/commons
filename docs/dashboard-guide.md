@@ -306,6 +306,11 @@ import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 - `media` — leading visual beside the title, for identity (a team logo). It
   belongs next to the name, not out in `actions` with the badges.
 - `actions` — optional right side of the header (a badge or small button).
+- `collapsible` (+ `defaultOpen`) — the whole card folds to its header row: a
+  native `<details>` whose summary is the title row, closed unless
+  `defaultOpen`. For long editors a page shouldn't open on (the sign-up form
+  builder's Details and Settings). Keep `actions` to badges — the header is the
+  toggle, so a button there would fight it.
 
 ### `BubbleRow` — label / value / action rows
 
@@ -753,13 +758,26 @@ platform-import reasoning: [db/README.md](../db/README.md#sign-up-forms).
   the page couldn't confirm yet (an unchecked OW profile) stays clickable and
   the live submit decides. Re-submitting replaces the snapshot; Withdraw drops
   the member from every export but keeps their answers.
-- **The builder's layout.** One collapsed `<details>` section per group
-  (Identity / Discord / Overwatch / Platforms) whose summary lists what's on;
-  inside, each requirement is one line — its name, an `InfoTip` with what it
-  asks of players, a Required check and the on/off `Switch`. Only the two
-  buckets with settings (school domains, Discord server) grow an editor under
-  their line while on. React never sets `open`, so a section stays open across
-  the `router.refresh()` each change triggers.
+- **The builder's layout.** The status/share card stays open; **Details** and
+  **Settings** (the requirement buckets) are collapsible bubbles that start
+  closed, Settings showing how many requirements are on. Inside Settings the
+  buckets sit under plain group headings (Identity / Discord / Overwatch /
+  Platforms), one line each — its name, an `InfoTip` with what it asks of
+  players, a Required check and the on/off `Switch`. Only the two buckets with
+  settings (school domains, Discord server) grow an editor under their line
+  while on.
+- **Questions are edited like Google Forms** (`QuestionsEditor`). Each question
+  is a card previewing what players see (red * when required, dotted "Short
+  answer text" line, ○ / ☐ options). Clicking one opens it in place — title,
+  answer type ("Multiple choice", "Checkboxes", …, Forms' own names), an
+  optional description, the options inline (Enter adds the next, Backspace on
+  an empty one removes it) — with a footer of Move / Duplicate / Delete and a
+  Required switch. **An open card saves itself** ~0.7 s after typing stops and
+  again when it closes (another card, or any click outside the list), so there
+  is no Save button; it patches the local list rather than refreshing, so
+  typing never waits on a render. Add / Duplicate (inserted directly below) /
+  Move / Delete go to the server and refresh. The player's form renders
+  Multiple choice as radios to match.
 - **Implied buckets.** `ow_rank` implies `ow_public` and `battlenet`;
   `discord_server` implies `discord`. Switching one on switches its parents on,
   and a parent can't be switched off while something needs it.

@@ -369,35 +369,69 @@ function questionFields(input: QuestionInput):
   };
 }
 
+/**
+ * Adds a question at the end, or right after `afterItemId` (Duplicate puts the
+ * copy directly below the original, as Google Forms does). Returns the new id
+ * so the editor can open it straight away.
+ */
 export async function addQuestion(
   formId: string,
   input: QuestionInput,
-): Promise<FormActionResult> {
+  afterItemId?: string,
+): Promise<FormActionResult<{ id: string }>> {
   const owned = await ownForm(formId);
   if ("error" in owned) return { ok: false, error: owned.error };
   const fields = questionFields(input);
   if (!fields.ok) return fields;
 
-  const items = await listFormItems(owned.form.id);
-  if (items.filter((i) => isQuestionKind(i.kind)).length >= MAX_QUESTIONS) {
+  const questions = (await listFormItems(owned.form.id)).filter((i) =>
+    isQuestionKind(i.kind),
+  );
+  if (questions.length >= MAX_QUESTIONS) {
     return { ok: false, error: `A form can hold up to ${MAX_QUESTIONS} questions.` };
   }
   const db = getDb();
-  const top = await db
-    .select({ n: max(signupFormItems.position) })
-    .from(signupFormItems)
-    .where(eq(signupFormItems.formId, owned.form.id));
+  const id = crypto.randomUUID();
   const { ok: _ok, ...values } = fields;
-  await db.insert(signupFormItems).values({
-    id: crypto.randomUUID(),
-    formId: owned.form.id,
-    position: (top[0]?.n ?? 0) + 1,
-    createdAt: new Date(),
-    ...values,
-  });
+  const after = afterItemId ? questions.findIndex((q) => q.id === afterItemId) : -1;
+
+  if (after < 0) {
+    const top = await db
+      .select({ n: max(signupFormItems.position) })
+      .from(signupFormItems)
+      .where(eq(signupFormItems.formId, owned.form.id));
+    await db.insert(signupFormItems).values({
+      id,
+      formId: owned.form.id,
+      position: (top[0]?.n ?? 0) + 1,
+      createdAt: new Date(),
+      ...values,
+    });
+  } else {
+    // Insert below `after` and rewrite every position densely, in one batch.
+    const order = [...questions.slice(0, after + 1).map((q) => q.id), id, ...questions.slice(after + 1).map((q) => q.id)];
+    const writes = [
+      db.insert(signupFormItems).values({
+        id,
+        formId: owned.form.id,
+        position: after + 2,
+        createdAt: new Date(),
+        ...values,
+      }),
+      ...order
+        .filter((qid) => qid !== id)
+        .map((qid) =>
+          db
+            .update(signupFormItems)
+            .set({ position: order.indexOf(qid) + 1 })
+            .where(eq(signupFormItems.id, qid)),
+        ),
+    ];
+    await db.batch(writes as [(typeof writes)[number], ...typeof writes]);
+  }
   await touch(owned.form.id);
   revalidateForm(owned.form.id);
-  return { ok: true };
+  return { ok: true, id };
 }
 
 export async function updateQuestion(

@@ -33,7 +33,8 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-/** The builder: share state first, then the form's header, buckets, questions. */
+/** The builder: share state first, then the folded Details and Settings, then
+    the questions — the part an organizer spends most of their time in. */
 export default async function FormBuilderPage({
   params,
 }: {
@@ -51,6 +52,7 @@ export default async function FormBuilderPage({
     countResponses(form.id),
   ]);
   const status = asFormStatus(form.status);
+  const requirementsOn = items.filter((i) => isRequirementKind(i.kind)).length;
   const path = formPath(form.id);
 
   return (
@@ -96,7 +98,7 @@ export default async function FormBuilderPage({
           />
         </Bubble>
 
-        <Bubble title="Details" span="full">
+        <Bubble title="Details" span="full" collapsible>
           <FormDetailsEditor
             formId={form.id}
             initial={{
@@ -110,11 +112,20 @@ export default async function FormBuilderPage({
           />
         </Bubble>
 
-        <Bubble title="Requirements" span="full">
+        <Bubble
+          title="Settings"
+          span="full"
+          collapsible
+          actions={
+            <span className="ff-badge">
+              {requirementsOn === 1 ? "1 requirement" : `${requirementsOn} requirements`}
+            </span>
+          }
+        >
           <p className="ff-auth__hint">
-            Players verify each of these once on The Esports Commons, and it carries over
-            to every form. They&rsquo;re told exactly what you&rsquo;ll see before they
-            sign up.
+            What players must have to sign up. They verify each once on The Esports
+            Commons and it carries over to every form, and they&rsquo;re told exactly
+            what you&rsquo;ll see before they sign up.
           </p>
           <RequirementsEditor
             formId={form.id}

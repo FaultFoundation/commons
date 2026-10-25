@@ -16,6 +16,8 @@ export function Bubble({
   media,
   actions,
   dragHandle,
+  collapsible,
+  defaultOpen,
   children,
   ...rest
 }: {
@@ -46,6 +48,13 @@ export function Bubble({
       useReorderableGrid() when this bubble is one of a draggable set — the
       standard "drag to move this tile" affordance. Presence alone shows it. */
   dragHandle?: ReactNode;
+  /** The whole card folds to its header row: a native <details> whose summary
+      is the title row, so it toggles without JS. For long editors a page
+      shouldn't open on (the sign-up form builder's Details and Settings).
+      Closed unless `defaultOpen`; React never sets `open` after mount, so a
+      card the member opened stays open across router.refresh(). */
+  collapsible?: boolean;
+  defaultOpen?: boolean;
   children?: ReactNode;
   /** Anything else lands on the <section>: drag handlers, aria-*, data-*. */
 } & Omit<ComponentPropsWithoutRef<"section">, "id" | "title" | "className">) {
@@ -65,6 +74,34 @@ export function Bubble({
       {title}
     </h2>
   );
+
+  if (collapsible) {
+    classes.push("ff-bubble--collapsible");
+    return (
+      <details
+        id={id}
+        className={classes.join(" ")}
+        open={defaultOpen ? true : undefined}
+        {...(rest as ComponentPropsWithoutRef<"details">)}
+      >
+        <summary className="ff-bubble__head">
+          <div className="ff-bubble__heading">
+            {media}
+            {heading}
+          </div>
+          <div className="ff-bubble__actions">
+            {actions}
+            <span className="ff-bubble__chevron" aria-hidden="true">
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" width="12" height="12">
+                <path d="M1.5 4L6 8L10.5 4" strokeWidth="1.5" />
+              </svg>
+            </span>
+          </div>
+        </summary>
+        <div className="ff-bubble__body">{children}</div>
+      </details>
+    );
+  }
 
   return (
     <section id={id} className={classes.join(" ")} {...rest}>

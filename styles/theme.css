@@ -1645,6 +1645,33 @@ a.ff-dash__link--brand:hover {
   align-items: center;
   gap: 8px;
 }
+/* A collapsible bubble (<details>): the header row is the toggle. Block, not
+   flex — a <details> as a flex container is still uneven across engines —
+   and the head's bottom margin only applies while there is a body below it. */
+.ff-bubble--collapsible {
+  display: block;
+}
+.ff-bubble--collapsible > .ff-bubble__head {
+  cursor: pointer;
+  list-style: none;
+}
+.ff-bubble--collapsible > .ff-bubble__head::-webkit-details-marker {
+  display: none;
+}
+.ff-bubble--collapsible:not([open]) > .ff-bubble__head {
+  margin-block-end: 0;
+}
+.ff-bubble__chevron {
+  display: inline-flex;
+  color: var(--ff-text-dim);
+  transition: transform var(--ff-transition);
+}
+.ff-bubble--collapsible[open] > .ff-bubble__head .ff-bubble__chevron {
+  transform: rotate(180deg);
+}
+.ff-bubble--collapsible > .ff-bubble__head:hover .ff-bubble__chevron {
+  color: #fff;
+}
 .ff-bubble__body {
   display: grid;
   /* An explicit min-0 column (not the implicit `auto`) so a wide child — a deep
@@ -8776,6 +8803,16 @@ a.ff-sview__crumb:hover {
 .ff-form-editor .ff-auth__field { margin-block-end: 0; }
 .ff-form-editor__pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ff-row-editor-gap); }
 @media (max-width: 640px) { .ff-form-editor__pair { grid-template-columns: 1fr; } }
+.ff-form-group { display: grid; gap: var(--ff-bubble-body-gap); }
+.ff-form-group + .ff-form-group { margin-top: var(--ff-bubble-head-gap); }
+.ff-form-group__title {
+  margin: 0;
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
 /* Builder requirement rows: the name leads, the Required check and the switch
    sit right, and the description lives behind the name's ⓘ. */
 .ff-req__name { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -8844,3 +8881,121 @@ a.ff-sview__crumb:hover {
   transition: opacity var(--ff-transition), visibility var(--ff-transition);
 }
 .ff-info:hover .ff-info__tip, .ff-info:focus-within .ff-info__tip { opacity: 1; visibility: visible; }
+
+/* Sign-up form questions, edited Google Forms-style (QuestionsEditor). A closed
+   card previews exactly what players see; the open card gets Forms' blue left
+   edge, underlined fields and an icon footer. */
+.ff-gq-list { display: grid; gap: var(--ff-bubble-body-gap); }
+.ff-gq {
+  display: grid;
+  gap: var(--ff-row-editor-gap);
+  padding: calc(var(--ff-row-pad-y) * 1.6) calc(var(--ff-row-pad-x) * 1.4);
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: rgba(255, 255, 255, 0.03);
+}
+.ff-gq[role="button"] { cursor: pointer; }
+.ff-gq[role="button"]:hover { background: rgba(255, 255, 255, 0.06); }
+.ff-gq[role="button"]:focus-visible { outline: 2px solid var(--ff-accent); outline-offset: 2px; }
+.ff-gq--active {
+  border-left: 6px solid var(--ff-blue);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+.ff-gq__title { font-size: var(--ff-dash-text-md); font-weight: 600; overflow-wrap: anywhere; }
+.ff-gq__req { margin-left: 4px; color: var(--ff-danger-text); }
+.ff-gq__help, .ff-gq__dim { color: var(--ff-text-dim); font-size: var(--ff-dash-text-sm); }
+/* "Short answer text" / "Long answer text": Forms' dotted answer line. */
+.ff-gq__line {
+  width: min(50%, 320px);
+  padding-bottom: 6px;
+  border-bottom: 1px dotted rgba(255, 255, 255, 0.35);
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-sm);
+}
+.ff-gq__line--long { width: 100%; }
+.ff-gq__options { display: grid; gap: var(--ff-bubble-body-gap); margin: 0; padding: 0; list-style: none; }
+.ff-gq__option { display: flex; align-items: center; gap: var(--ff-row-editor-gap); min-height: 32px; font-size: var(--ff-dash-text-md); }
+.ff-gq__glyph {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+}
+.ff-gq__glyph--box { border-radius: 3px; }
+.ff-gq__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 220px);
+  gap: var(--ff-row-editor-gap);
+  align-items: start;
+}
+@media (max-width: 640px) { .ff-gq__head { grid-template-columns: minmax(0, 1fr); } }
+/* Forms' filled field: a tinted box with an underline that turns blue on focus. */
+.ff-gq__input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.65em 0.9em;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: var(--ff-radius-md) var(--ff-radius-md) 0 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: inherit;
+}
+.ff-gq__input::placeholder, .ff-gq__optinput::placeholder { color: rgba(255, 255, 255, 0.38); }
+.ff-gq__input:focus, .ff-gq__optinput:focus {
+  outline: none;
+  border-bottom: 2px solid var(--ff-blue);
+}
+.ff-gq__input--title { font-size: var(--ff-dash-text-md); font-weight: 600; }
+.ff-gq__input--help { background: transparent; font-size: var(--ff-dash-text-sm); }
+.ff-gq__optinput {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 0;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: none;
+  color: #fff;
+  font: inherit;
+}
+.ff-gq__optinput:hover { border-bottom-color: rgba(255, 255, 255, 0.35); }
+.ff-gq__add {
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--ff-text-dim);
+  font: inherit;
+  cursor: pointer;
+}
+.ff-gq__add:hover { color: #fff; text-decoration: underline; }
+.ff-gq__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  padding-top: var(--ff-row-editor-gap);
+  border-top: 1px solid var(--ff-border);
+}
+.ff-gq__status { margin-right: auto; color: var(--ff-text-dim); font-size: var(--ff-dash-text-xs); }
+.ff-gq__status--error { color: var(--ff-danger-text); }
+.ff-gq__icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ff-text-dim);
+  cursor: pointer;
+}
+.ff-gq__icon:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.ff-gq__icon:focus-visible { outline: 2px solid var(--ff-accent); outline-offset: 1px; }
+.ff-gq__icon:disabled { opacity: 0.35; cursor: default; }
+.ff-gq__divider { width: 1px; height: 24px; margin: 0 var(--ff-row-editor-gap); background: var(--ff-border); }
+.ff-gq__required { display: inline-flex; align-items: center; gap: var(--ff-row-editor-gap); font-size: var(--ff-dash-text-sm); }

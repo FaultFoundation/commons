@@ -348,6 +348,30 @@ function QuestionField({
     );
   }
 
+  if (item.kind === "single_choice") {
+    // Radios, as Google Forms shows "Multiple choice" — every option visible.
+    return (
+      <fieldset className="ff-auth__field ff-form-choices">
+        <legend className="ff-auth__label">{label}</legend>
+        {help}
+        {choiceConfig(item.config).options.map((option) => (
+          <label key={option} className="ff-form-check">
+            <input
+              type="radio"
+              name={id}
+              value={option}
+              checked={value === option}
+              disabled={disabled}
+              required={item.required}
+              onChange={() => onChange(option)}
+            />
+            <span>{option}</span>
+          </label>
+        ))}
+      </fieldset>
+    );
+  }
+
   if (item.kind === "multi_choice") {
     const picked = Array.isArray(value) ? value : [];
     return (
@@ -378,23 +402,7 @@ function QuestionField({
   return (
     <label className="ff-auth__field" htmlFor={id}>
       <span className="ff-auth__label">{label}</span>
-      {item.kind === "single_choice" ? (
-        <select
-          id={id}
-          className="ff-auth__input"
-          value={typeof value === "string" ? value : ""}
-          disabled={disabled}
-          required={item.required}
-          onChange={(e) => onChange(e.target.value || null)}
-        >
-          <option value="">Choose…</option>
-          {choiceConfig(item.config).options.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      ) : item.kind === "long_text" ? (
+      {item.kind === "long_text" ? (
         <textarea
           id={id}
           className="ff-auth__input ff-reg__textarea"

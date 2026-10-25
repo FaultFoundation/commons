@@ -196,12 +196,14 @@ export const QUESTION_KINDS = [
 ] as const;
 export type QuestionKind = (typeof QUESTION_KINDS)[number];
 
+/** Google Forms' own names, which organizers already know. `checkbox` is ours:
+    a single box to tick, for a rules agreement. */
 export const QUESTION_LABELS: Record<QuestionKind, string> = {
   short_text: "Short answer",
   long_text: "Paragraph",
-  single_choice: "Pick one",
-  multi_choice: "Pick any",
-  checkbox: "Checkbox",
+  single_choice: "Multiple choice",
+  multi_choice: "Checkboxes",
+  checkbox: "Single tick box",
 };
 
 export function isQuestionKind(kind: string): kind is QuestionKind {

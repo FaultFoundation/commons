@@ -119,25 +119,46 @@ export async function createForm(): Promise<FormActionResult<{ id: string }>> {
   return { ok: true, id };
 }
 
-export type FormDetailsInput = {
-  title: string;
+/**
+ * The title card's two fields, autosaved as the organizer types (the Google
+ * Forms header): the title, and the Markdown description players read first.
+ */
+export async function updateFormHeader(
+  formId: string,
+  input: { title: string; description: string },
+): Promise<FormActionResult> {
+  const owned = await ownForm(formId);
+  if ("error" in owned) return { ok: false, error: owned.error };
+  const title = clean(input.title, TITLE_MAX);
+  if (!title) return { ok: false, error: "Give the form a title." };
+  await getDb()
+    .update(signupForms)
+    .set({
+      title,
+      description: clean(input.description, DESCRIPTION_MAX),
+      updatedAt: new Date(),
+    })
+    .where(eq(signupForms.id, owned.form.id));
+  revalidateForm(owned.form.id);
+  return { ok: true };
+}
+
+export type EventDetailsInput = {
   hostName: string;
-  description: string;
   eventUrl: string;
   eventPlatform: string;
   /** ISO string from a datetime-local field, or "" for no automatic close. */
   closesAt: string;
 };
 
-export async function updateFormDetails(
+/** The title card's folded "Event details": who hosts, where it runs, when it closes. */
+export async function updateEventDetails(
   formId: string,
-  input: FormDetailsInput,
+  input: EventDetailsInput,
 ): Promise<FormActionResult> {
   const owned = await ownForm(formId);
   if ("error" in owned) return { ok: false, error: owned.error };
 
-  const title = clean(input.title, TITLE_MAX);
-  if (!title) return { ok: false, error: "Give the form a title." };
   const eventUrlRaw = String(input.eventUrl ?? "").trim();
   const eventUrl = normalizeHttpUrl(eventUrlRaw);
   if (eventUrlRaw && !eventUrl) {
@@ -153,9 +174,7 @@ export async function updateFormDetails(
   await getDb()
     .update(signupForms)
     .set({
-      title,
       hostName: clean(input.hostName, HOST_MAX),
-      description: clean(input.description, DESCRIPTION_MAX),
       eventUrl,
       eventPlatform: asEventPlatform(input.eventPlatform),
       closesAt,
@@ -499,4 +518,58 @@ export async function moveQuestion(
   await touch(owned.form.id);
   revalidateForm(owned.form.id);
   return { ok: true };
+}
+
+/**
+ * Copy another of the caller's forms' questions onto the end of this one — the
+ * toolbar's Import. Requirements aren't copied (they're switches, not content),
+ * and both forms must be the caller's: the source is re-read and owner-checked
+ * like the target.
+ */
+export async function importQuestions(
+  formId: string,
+  sourceFormId: string,
+): Promise<FormActionResult<{ added: number }>> {
+  const owned = await ownForm(formId);
+  if ("error" in owned) return { ok: false, error: owned.error };
+  const source = await ownForm(sourceFormId);
+  if ("error" in source || source.form.id === owned.form.id) {
+    return { ok: false, error: "Pick one of your other forms." };
+  }
+
+  const [mine, theirs] = await Promise.all([
+    listFormItems(owned.form.id),
+    listFormItems(source.form.id),
+  ]);
+  const room = MAX_QUESTIONS - mine.filter((i) => isQuestionKind(i.kind)).length;
+  const copies = theirs.filter((i) => isQuestionKind(i.kind)).slice(0, Math.max(room, 0));
+  if (!copies.length) {
+    return {
+      ok: false,
+      error: room > 0 ? "That form has no questions." : `A form can hold up to ${MAX_QUESTIONS} questions.`,
+    };
+  }
+
+  const db = getDb();
+  const start = Math.max(0, ...mine.map((i) => i.position)) + 1;
+  const now = new Date();
+  const writes = [
+    ...copies.map((q, index) =>
+      db.insert(signupFormItems).values({
+        id: crypto.randomUUID(),
+        formId: owned.form.id,
+        kind: q.kind,
+        position: start + index,
+        label: q.label,
+        help: q.help,
+        required: q.required,
+        config: Object.keys(q.config).length ? JSON.stringify(q.config) : null,
+        createdAt: now,
+      }),
+    ),
+    db.update(signupForms).set({ updatedAt: now }).where(eq(signupForms.id, owned.form.id)),
+  ];
+  await db.batch(writes as [(typeof writes)[number], ...typeof writes]);
+  revalidateForm(owned.form.id);
+  return { ok: true, added: copies.length };
 }

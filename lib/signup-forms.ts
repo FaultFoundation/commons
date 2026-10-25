@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { and, asc, count, desc, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, ne } from "drizzle-orm";
 
 import {
   signupFormItems,
@@ -35,6 +35,7 @@ import {
   getRegistrationStateCached,
 } from "@/lib/registration";
 import {
+  QUESTION_KINDS,
   REQUIREMENTS,
   academicConfig,
   discordServerConfig,
@@ -153,6 +154,31 @@ export async function listMyForms(userId: string): Promise<MyFormRow[]> {
       ),
     )
     .where(eq(signupForms.ownerUserId, userId))
+    .groupBy(signupForms.id)
+    .orderBy(desc(signupForms.createdAt));
+  return rows;
+}
+
+/** The caller's other forms that have questions to import, newest first. */
+export async function listImportSources(
+  userId: string,
+  excludeFormId: string,
+): Promise<{ id: string; title: string; questions: number }[]> {
+  const rows = await getDb()
+    .select({
+      id: signupForms.id,
+      title: signupForms.title,
+      questions: count(signupFormItems.id),
+    })
+    .from(signupForms)
+    .innerJoin(
+      signupFormItems,
+      and(
+        eq(signupFormItems.formId, signupForms.id),
+        inArray(signupFormItems.kind, [...QUESTION_KINDS]),
+      ),
+    )
+    .where(and(eq(signupForms.ownerUserId, userId), ne(signupForms.id, excludeFormId)))
     .groupBy(signupForms.id)
     .orderBy(desc(signupForms.createdAt));
   return rows;

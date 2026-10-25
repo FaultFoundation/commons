@@ -53,7 +53,7 @@ export default async function FormsPage() {
                 note={formPath(form.id)}
                 action={
                   <div className="ff-row__buttons">
-                    <a className="ff-btn ff-btn--outline ff-btn--sm" href={`/forms/${form.id}/responses/`}>
+                    <a className="ff-btn ff-btn--outline ff-btn--sm" href={`/forms/${form.id}/?tab=responses`}>
                       Responses
                     </a>
                     <a className="ff-btn ff-btn--outline ff-btn--sm" href={`/forms/${form.id}/`}>

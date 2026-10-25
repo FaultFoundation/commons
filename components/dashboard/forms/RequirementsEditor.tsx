@@ -25,8 +25,8 @@ const GROUPS: RequirementDef["group"][] = ["Identity", "Discord", "Overwatch", "
  * on/off switch — so the organizer scans names, not paragraphs. The two
  * buckets that need settings (school domains, Discord server) grow them under
  * their line while on. A requirement another one depends on (Blizzard under
- * Overwatch Rank) is locked on while that one is. The folding happens one
- * level up: the whole Settings bubble is collapsible.
+ * Overwatch Rank) is locked on while that one is. This is the builder's
+ * Verification tab; the Questions tab summarizes it as chips.
  */
 export function RequirementsEditor({
   formId,

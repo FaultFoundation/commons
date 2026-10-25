@@ -1645,32 +1645,11 @@ a.ff-dash__link--brand:hover {
   align-items: center;
   gap: 8px;
 }
-/* A collapsible bubble (<details>): the header row is the toggle. Block, not
-   flex — a <details> as a flex container is still uneven across engines —
-   and the head's bottom margin only applies while there is a body below it. */
-.ff-bubble--collapsible {
-  display: block;
-}
-.ff-bubble--collapsible > .ff-bubble__head {
-  cursor: pointer;
-  list-style: none;
-}
-.ff-bubble--collapsible > .ff-bubble__head::-webkit-details-marker {
-  display: none;
-}
-.ff-bubble--collapsible:not([open]) > .ff-bubble__head {
-  margin-block-end: 0;
-}
+/* A disclosure chevron that turns over when its <details> opens. */
 .ff-bubble__chevron {
   display: inline-flex;
   color: var(--ff-text-dim);
   transition: transform var(--ff-transition);
-}
-.ff-bubble--collapsible[open] > .ff-bubble__head .ff-bubble__chevron {
-  transform: rotate(180deg);
-}
-.ff-bubble--collapsible > .ff-bubble__head:hover .ff-bubble__chevron {
-  color: #fff;
 }
 .ff-bubble__body {
   display: grid;
@@ -8889,18 +8868,18 @@ a.ff-sview__crumb:hover {
 .ff-gq {
   display: grid;
   gap: var(--ff-row-editor-gap);
-  padding: calc(var(--ff-row-pad-y) * 1.6) calc(var(--ff-row-pad-x) * 1.4);
+  padding: var(--ff-bubble-pad);
   border: 1px solid var(--ff-border);
   border-radius: var(--ff-radius-md);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--ff-surface-2);
 }
 .ff-gq[role="button"] { cursor: pointer; }
-.ff-gq[role="button"]:hover { background: rgba(255, 255, 255, 0.06); }
+.ff-gq[role="button"]:hover { background: rgba(255, 255, 255, 0.09); }
 .ff-gq[role="button"]:focus-visible { outline: 2px solid var(--ff-accent); outline-offset: 2px; }
+/* The open card is the current one — so it takes the accent (yellow is state). */
 .ff-gq--active {
-  border-left: 6px solid var(--ff-blue);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  border-color: var(--ff-accent);
+  box-shadow: var(--ff-shadow-card);
 }
 .ff-gq__title { font-size: var(--ff-dash-text-md); font-weight: 600; overflow-wrap: anywhere; }
 .ff-gq__req { margin-left: 4px; color: var(--ff-danger-text); }
@@ -8924,6 +8903,21 @@ a.ff-sview__crumb:hover {
   border-radius: 50%;
 }
 .ff-gq__glyph--box { border-radius: 3px; }
+.ff-gq__glyph--add { border-style: dashed; border-color: rgba(255, 255, 255, 0.3); }
+.ff-gq__foot-add { margin-right: var(--ff-row-editor-gap); font-size: var(--ff-dash-text-sm); }
+/* Forms' "+ Add question" at the foot of the column: a dashed, full-width card. */
+.ff-gq-addcard {
+  padding: var(--ff-bubble-pad);
+  border: 1px dashed rgba(255, 255, 255, 0.28);
+  border-radius: var(--ff-radius-md);
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ff-gq-addcard:hover:not(:disabled) { background: var(--ff-surface-2); }
+.ff-gq-addcard:disabled { opacity: 0.45; cursor: default; }
 .ff-gq__head {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(160px, 220px);
@@ -8946,7 +8940,7 @@ a.ff-sview__crumb:hover {
 .ff-gq__input::placeholder, .ff-gq__optinput::placeholder { color: rgba(255, 255, 255, 0.38); }
 .ff-gq__input:focus, .ff-gq__optinput:focus {
   outline: none;
-  border-bottom: 2px solid var(--ff-blue);
+  border-bottom: 2px solid var(--ff-accent);
 }
 .ff-gq__input--title { font-size: var(--ff-dash-text-md); font-weight: 600; }
 .ff-gq__input--help { background: transparent; font-size: var(--ff-dash-text-sm); }
@@ -8999,3 +8993,204 @@ a.ff-sview__crumb:hover {
 .ff-gq__icon:disabled { opacity: 0.35; cursor: default; }
 .ff-gq__divider { width: 1px; height: 24px; margin: 0 var(--ff-row-editor-gap); background: var(--ff-border); }
 .ff-gq__required { display: inline-flex; align-items: center; gap: var(--ff-row-editor-gap); font-size: var(--ff-dash-text-sm); }
+
+/* Sign-up form builder (FormBuilderChrome): the header card with its tabs,
+   then the Questions canvas — a card column beside Forms' floating toolbar. */
+.ff-fbhead {
+  display: grid;
+  /* An explicit shrinkable track: the tab row must not set the card's width. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ff-bubble-head-gap);
+  padding: var(--ff-bubble-pad) var(--ff-bubble-pad) 0;
+  margin-bottom: 20px;
+}
+.ff-fbhead__top { display: flex; align-items: center; gap: var(--ff-row-editor-gap) calc(var(--ff-row-editor-gap) * 2); flex-wrap: wrap; }
+.ff-fbhead__back {
+  padding-right: calc(var(--ff-row-editor-gap) * 2);
+  border-right: 1px solid var(--ff-border);
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-sm);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ff-fbhead__back:hover { color: #fff; }
+.ff-fbhead__titles { display: grid; gap: 2px; flex: 1 1 240px; min-width: 0; }
+.ff-fbhead__title { margin: 0; font-size: var(--ff-dash-text-xl); font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
+.ff-fbhead__note { margin: 0; color: var(--ff-text-dim); font-size: var(--ff-dash-text-xs); }
+.ff-fbhead__share { display: flex; align-items: center; gap: var(--ff-row-editor-gap); flex-wrap: wrap; }
+/* The share link as one pill: the path, then a filled Copy inside it. */
+.ff-fbhead__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ff-row-editor-gap);
+  min-width: 0;
+  padding: 4px 4px 4px 14px;
+  border: 1px solid var(--ff-border);
+  border-radius: 999px;
+}
+.ff-fbhead__path { overflow: hidden; color: var(--ff-text-dim); font-size: var(--ff-dash-text-sm); text-overflow: ellipsis; white-space: nowrap; }
+.ff-fbhead__copy {
+  padding: 4px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ff-navy-900);
+  font: inherit;
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+.ff-fbhead__copy:hover { background: rgba(255, 255, 255, 0.85); }
+.ff-fbtabs {
+  display: flex;
+  /* safe: when the tabs outgrow a phone they scroll from the first one
+     rather than centring off both edges. */
+  justify-content: safe center;
+  overflow-x: auto;
+  gap: calc(var(--ff-row-editor-gap) * 3);
+  margin: 0 calc(var(--ff-bubble-pad) * -1);
+  padding: 0 var(--ff-bubble-pad);
+  border-top: 1px solid var(--ff-border);
+}
+.ff-fbtab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(var(--ff-row-pad-y) + 3px) 4px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+.ff-fbtab:hover { color: var(--ff-accent); }
+.ff-fbtab[aria-selected="true"] { border-bottom-color: var(--ff-accent); color: var(--ff-accent); }
+.ff-fbtab__count {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: var(--ff-dash-text-xs);
+  text-align: center;
+}
+.ff-fbtab[aria-selected="true"] .ff-fbtab__count { background: var(--ff-accent); color: var(--ff-navy-900); }
+
+.ff-fbcanvas { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: start; }
+.ff-fbcanvas__col { display: grid; gap: var(--ff-bubble-body-gap); min-width: 0; }
+.ff-fbtools {
+  position: sticky;
+  top: 96px;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-surface-2);
+}
+@media (max-width: 781.98px) {
+  .ff-fbcanvas { grid-template-columns: minmax(0, 1fr); }
+  .ff-fbtools { position: static; order: -1; display: flex; justify-self: end; }
+  .ff-fbtabs { gap: var(--ff-row-editor-gap); }
+}
+
+/* The Forms title card: an accent band, the title and description in place. */
+.ff-fbtitle {
+  display: grid;
+  gap: var(--ff-row-editor-gap);
+  padding: var(--ff-bubble-pad);
+  border: 1px solid var(--ff-border);
+  border-top: 8px solid var(--ff-accent);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-surface-2);
+}
+.ff-fbtitle__title, .ff-fbtitle__desc {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 4px 0 6px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+  background: none;
+  color: #fff;
+  font: inherit;
+}
+.ff-fbtitle__title { font-size: calc(var(--ff-dash-text-xl) * 1.3); font-weight: 800; letter-spacing: -0.3px; }
+@media (max-width: 781.98px) { .ff-fbtitle__title { font-size: var(--ff-dash-text-xl); } }
+.ff-fbtitle__desc { resize: none; overflow: hidden; color: rgba(255, 255, 255, 0.85); font-size: var(--ff-dash-text-md); }
+.ff-fbtitle__title::placeholder, .ff-fbtitle__desc::placeholder { color: rgba(255, 255, 255, 0.38); }
+.ff-fbtitle__title:focus, .ff-fbtitle__desc:focus { outline: none; border-bottom: 2px solid var(--ff-accent); }
+.ff-fbtitle__more { margin-top: 4px; }
+.ff-fbtitle__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ff-text-dim);
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+.ff-fbtitle__summary::-webkit-details-marker { display: none; }
+.ff-fbtitle__summary:hover { color: #fff; }
+.ff-fbtitle__more[open] .ff-bubble__chevron { transform: rotate(180deg); }
+.ff-fbtitle__more[open] > .ff-form-editor { margin-top: var(--ff-row-editor-gap); }
+.ff-fbtitle__danger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ff-row-editor-gap);
+  margin-top: var(--ff-row-editor-gap);
+  padding-top: var(--ff-row-editor-gap);
+  border-top: 1px dashed var(--ff-border);
+}
+
+/* "Players verify before answering": the Verification tab, summarized. */
+.ff-fbverify {
+  display: flex;
+  align-items: center;
+  gap: var(--ff-row-editor-gap) calc(var(--ff-row-editor-gap) * 1.5);
+  padding: calc(var(--ff-bubble-pad) * 0.8) var(--ff-bubble-pad);
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius-md);
+  background: var(--ff-surface-2);
+}
+.ff-fbverify__mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--ff-border);
+  border-radius: 8px;
+  color: var(--ff-accent);
+  font-weight: 800;
+}
+.ff-fbverify__mark--on { background: rgba(255, 255, 255, 0.12); }
+.ff-fbverify__body { display: grid; gap: 6px; flex: 1; min-width: 0; }
+.ff-fbverify__title { font-size: var(--ff-dash-text-md); font-weight: 700; }
+.ff-fbverify__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ff-fbchip {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: var(--ff-dash-text-xs);
+  font-weight: 600;
+}
+.ff-fbchip--required { background: rgba(255, 238, 88, 0.16); color: var(--ff-accent); }
+.ff-fbverify__edit {
+  flex: none;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--ff-accent);
+  font: inherit;
+  font-size: var(--ff-dash-text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+.ff-fbverify__edit:hover { text-decoration: underline; }

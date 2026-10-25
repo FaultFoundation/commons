@@ -13,11 +13,15 @@ export function CopyButton({
   text,
   label,
   small,
+  className,
 }: {
   path?: string;
   text?: string;
   label: string;
   small?: boolean;
+  /** Replaces the outline-button classes, for a copy control with its own
+      look (the builder header's pill). */
+  className?: string;
 }) {
   const [copied, setCopied] = useState(false);
   const [fallback, setFallback] = useState(false);
@@ -53,7 +57,9 @@ export function CopyButton({
   return (
     <>
       <button
-        className={small ? "ff-btn ff-btn--outline ff-btn--sm" : "ff-btn ff-btn--outline"}
+        className={
+          className ?? (small ? "ff-btn ff-btn--outline ff-btn--sm" : "ff-btn ff-btn--outline")
+        }
         type="button"
         onClick={onCopy}
       >

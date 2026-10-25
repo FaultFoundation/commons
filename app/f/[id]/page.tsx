@@ -118,7 +118,7 @@ async function FormHeader({
               <a className="ff-btn ff-btn--outline ff-btn--sm" href={`/forms/${form.id}/`}>
                 Edit
               </a>
-              <a className="ff-btn ff-btn--outline ff-btn--sm" href={`/forms/${form.id}/responses/`}>
+              <a className="ff-btn ff-btn--outline ff-btn--sm" href={`/forms/${form.id}/?tab=responses`}>
                 Responses
               </a>
             </div>

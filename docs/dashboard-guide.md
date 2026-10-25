@@ -30,8 +30,7 @@ now 308s via `middleware.ts`). `/` stays the public Commons landing page.
 | `/overfault/team/`             | Overfault   | Step 3                       |
 | `/verify/academic/`, `/verify/code/` | —     | Academic verification outside Overfault; returns to `?next=` (a sign-up form) |
 | `/forms/`                      | Experimental › Sign-Up Forms | Your sign-up forms + New Form |
-| `/forms/<id>/`                 | Experimental › Sign-Up Forms | Builder: status, share link, details, requirement buckets, questions |
-| `/forms/<id>/responses/`       | Experimental › Sign-Up Forms | Who signed up, CSV / PDF export, per-platform lists |
+| `/forms/<id>/`                 | Experimental › Sign-Up Forms | Builder: header card + Questions / Verification / Responses tabs (`?tab=` deep-links one) |
 | `/f/<id>/`                     | —           | The public sign-up form (signed-out-safe, like `/join/`) |
 
 Sign-up and sign-in both land on `/home/`. An account is all the portal needs:
@@ -226,6 +225,7 @@ const [tab, setTab] = usePersistentState<TabId>(
 | `series:open` | Whether the Series & Leagues row is expanded (its fold toggle). Only the fold is series-specific; its filters ride `tournaments:list`. |
 | `tournament-tab:series:<profileId>` | The open section (Overview / Bracket / Standings / Rules) inside a series profile — ONE key for the whole series, so moving along its tournament strip keeps the member on the section they were reading. |
 | `tournament-tab:<id>` | Overview / Bracket / Standings / Rules on a tournament. |
+| `form-tab:<formId>` | Questions / Verification / Responses in the sign-up form builder. A `?tab=` link (the list's Responses button, the public form's owner bar) wins and becomes the remembered tab. |
 | `tournament-stage:<id>` | The Bracket tab's stage/pool strip (`StageTabs`). |
 | `bracket-tab:<id>:<stage>` | `ExternalBracket`'s phase/pool sub-bracket tabs. |
 | `statistics:tab` | Player Data / Match Data / Team Data. |
@@ -306,11 +306,6 @@ import { Bubble } from "@/components/dashboard/bubbles/Bubble";
 - `media` — leading visual beside the title, for identity (a team logo). It
   belongs next to the name, not out in `actions` with the badges.
 - `actions` — optional right side of the header (a badge or small button).
-- `collapsible` (+ `defaultOpen`) — the whole card folds to its header row: a
-  native `<details>` whose summary is the title row, closed unless
-  `defaultOpen`. For long editors a page shouldn't open on (the sign-up form
-  builder's Details and Settings). Keep `actions` to badges — the header is the
-  toggle, so a button there would fight it.
 
 ### `BubbleRow` — label / value / action rows
 
@@ -758,25 +753,42 @@ platform-import reasoning: [db/README.md](../db/README.md#sign-up-forms).
   the page couldn't confirm yet (an unchecked OW profile) stays clickable and
   the live submit decides. Re-submitting replaces the snapshot; Withdraw drops
   the member from every export but keeps their answers.
-- **The builder's layout.** The status/share card stays open; **Details** and
-  **Settings** (the requirement buckets) are collapsible bubbles that start
-  closed, Settings showing how many requirements are on. Inside Settings the
-  buckets sit under plain group headings (Identity / Discord / Overwatch /
-  Platforms), one line each — its name, an `InfoTip` with what it asks of
-  players, a Required check and the on/off `Switch`. Only the two buckets with
-  settings (school domains, Discord server) grow an editor under their line
-  while on.
+- **The builder is Google Forms-shaped** (`FormBuilderChrome`, the same shell
+  pattern as `TournamentChrome`). One header card: ← All forms, the title with a
+  one-line state note, the Draft / Open / Closed control, the share link as a pill
+  with Copy, Preview, and three tabs with counts — **Questions**, **Verification**,
+  **Responses**. Only the active panel is mounted; the tab is remembered per form
+  (`form-tab:<id>`) and `?tab=` wins. A small context lets "Edit →" on the
+  Questions tab's verification summary switch to Verification.
+- **Questions tab.** A card column beside Forms' floating, sticky toolbar
+  (add question, duplicate the open card, import another of your forms'
+  questions — requirements aren't copied). The column opens with the **title
+  card** (accent band; the form's title and Markdown description edited in place
+  and autosaved, so the header updates; a folded "Event details" for host, event
+  platform + link, auto-close, and Delete), then **"Players verify before
+  answering"** — one chip per requirement, required ones highlighted — then the
+  question cards and a dashed full-width "+ Add question". Clicking the title
+  card closes an open question, as in Forms.
+- **Verification tab.** The buckets under plain group headings (Identity /
+  Discord / Overwatch / Platforms), one line each — its name, an `InfoTip` with
+  what it asks of players, a Required check and the on/off `Switch`. Only the two
+  buckets with settings (school domains, Discord server) grow an editor under
+  their line while on.
+- **Responses tab.** The export table, Save as PDF / Download CSV, and the
+  platform lists. (It was a separate `/forms/<id>/responses/` page; links now use
+  `?tab=responses`.)
 - **Questions are edited like Google Forms** (`QuestionsEditor`). Each question
   is a card previewing what players see (red * when required, dotted "Short
-  answer text" line, ○ / ☐ options). Clicking one opens it in place — title,
-  answer type ("Multiple choice", "Checkboxes", …, Forms' own names), an
-  optional description, the options inline (Enter adds the next, Backspace on
-  an empty one removes it) — with a footer of Move / Duplicate / Delete and a
-  Required switch. **An open card saves itself** ~0.7 s after typing stops and
-  again when it closes (another card, or any click outside the list), so there
-  is no Save button; it patches the local list rather than refreshing, so
-  typing never waits on a render. Add / Duplicate (inserted directly below) /
-  Move / Delete go to the server and refresh. The player's form renders
+  answer text" line, ○ / ☐ options). Clicking one opens it in place with an
+  accent outline — title, answer type ("Multiple choice", "Checkboxes", …, Forms'
+  own names), the options inline (Enter adds the next, Backspace on an empty one
+  removes it), a "+ Description" that reveals the help line — and a footer of
+  Move / Duplicate / Delete and a Required switch. **An open card saves itself**
+  ~0.7 s after typing stops and again when it closes (another card, or any click
+  outside the questions and toolbar), so there is no Save button; it patches the
+  local list rather than refreshing, so typing never waits on a render. The
+  toolbar's Duplicate copies the open card's live draft (published from an
+  effect, so a StrictMode remount can't blank it). The player's form renders
   Multiple choice as radios to match.
 - **Implied buckets.** `ow_rank` implies `ow_public` and `battlenet`;
   `discord_server` implies `discord`. Switching one on switches its parents on,

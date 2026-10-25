@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 
 import {
   addQuestion,
+  importQuestions,
   moveQuestion,
   removeQuestion,
   updateQuestion,
@@ -73,16 +74,24 @@ function draftProblem(d: Draft): string | null {
  * (clicking another card or anywhere outside the list), so there is no Save
  * button to forget.
  *
- * Structural changes (add, duplicate, move, delete) go to the server and
- * refresh; an autosave patches the local list instead, so typing never waits
- * on a page refresh.
+ * Structural changes (add, duplicate, move, delete, import) go to the server
+ * and refresh; an autosave patches the local list instead, so typing never
+ * waits on a page refresh. Beside the column sits Forms' floating toolbar:
+ * add, duplicate the open card, import another form's questions.
  */
 export function QuestionsEditor({
   formId,
   questions,
+  lead,
+  importSources,
 }: {
   formId: string;
   questions: FormItem[];
+  /** Cards above the questions in the same column — the title card and the
+      verification summary — so the toolbar sits beside the whole form. */
+  lead?: ReactNode;
+  /** The organizer's other forms with questions, for the toolbar's Import. */
+  importSources: { id: string; title: string; questions: number }[];
 }) {
   const router = useRouter();
   const [list, setList] = useState(questions);
@@ -92,15 +101,22 @@ export function QuestionsEditor({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<FormItem | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importFrom, setImportFrom] = useState(importSources[0]?.id ?? "");
   const listRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  // The open card's live draft, so the toolbar's Duplicate copies what's on
+  // screen rather than the last autosave.
+  const activeDraft = useRef<Draft | null>(null);
 
-  // A click outside the list closes the open card; its draft saves on close.
+  // A click outside the questions and the toolbar closes the open card; its
+  // draft saves on close.
   useEffect(() => {
     if (!activeId) return;
     const onDown = (event: MouseEvent) => {
-      if (listRef.current && !listRef.current.contains(event.target as Node)) {
-        setActiveId(null);
-      }
+      const target = event.target as Node;
+      if (listRef.current?.contains(target) || toolbarRef.current?.contains(target)) return;
+      setActiveId(null);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
@@ -133,72 +149,138 @@ export function QuestionsEditor({
     );
   }
 
+  const active = list.find((q) => q.id === activeId) ?? null;
+
   return (
-    <div className="ff-gq-list" ref={listRef}>
-      {error ? (
-        <div className="ff-auth__error" role="alert">
-          <p>{error}</p>
-        </div>
-      ) : null}
-      {!list.length ? (
-        <p className="ff-auth__hint">
-          No questions yet. Ask for anything the settings don&rsquo;t cover: team name,
-          preferred role, availability, a rules agreement.
-        </p>
-      ) : null}
+    <div className="ff-fbcanvas">
+      <div className="ff-fbcanvas__col">
+        {lead}
+        <div className="ff-gq-list" ref={listRef}>
+          {error ? (
+            <div className="ff-auth__error" role="alert">
+              <p>{error}</p>
+            </div>
+          ) : null}
 
-      {list.map((q, index) =>
-        q.id === activeId ? (
-          <ActiveQuestion
-            key={q.id}
-            formId={formId}
-            item={q}
-            first={index === 0}
-            last={index === list.length - 1}
+          {list.map((q, index) =>
+            q.id === activeId ? (
+              <ActiveQuestion
+                key={q.id}
+                formId={formId}
+                item={q}
+                first={index === 0}
+                last={index === list.length - 1}
+                busy={pending}
+                autoFocus={q.id === freshId}
+                draftSink={activeDraft}
+                onSaved={(next) =>
+                  setList((prev) => prev.map((x) => (x.id === next.id ? next : x)))
+                }
+                onMove={(direction) => structural(() => moveQuestion(formId, q.id, direction))}
+                onDuplicate={(draft) => add(toInput(draft), q.id)}
+                onDelete={() => setDeleting(q)}
+              />
+            ) : (
+              <QuestionPreview key={q.id} item={q} onOpen={() => setActiveId(q.id)} />
+            ),
+          )}
+
+          <button
+            type="button"
+            className="ff-gq-addcard"
+            disabled={pending || list.length >= MAX_QUESTIONS}
+            onClick={() => add(NEW_QUESTION, activeId ?? undefined)}
+          >
+            + Add question
+          </button>
+
+          {/* Inside the list, so clicking in the dialog doesn't count as "outside". */}
+          <ConfirmDialog
+            open={deleting !== null}
+            title="Delete This Question?"
+            description="Every answer already given to it is deleted too."
+            confirmLabel="Delete"
+            danger
             busy={pending}
-            autoFocus={q.id === freshId}
-            onSaved={(next) =>
-              setList((prev) => prev.map((x) => (x.id === next.id ? next : x)))
-            }
-            onMove={(direction) => structural(() => moveQuestion(formId, q.id, direction))}
-            onDuplicate={(draft) => add(toInput(draft), q.id)}
-            onDelete={() => setDeleting(q)}
+            onConfirm={() => {
+              const target = deleting;
+              setDeleting(null);
+              if (!target) return;
+              structural(
+                () => removeQuestion(formId, target.id),
+                () => setActiveId(null),
+              );
+            }}
+            onClose={() => setDeleting(null)}
           />
-        ) : (
-          <QuestionPreview key={q.id} item={q} onOpen={() => setActiveId(q.id)} />
-        ),
-      )}
+          <ConfirmDialog
+            open={importing}
+            title="Import Questions"
+            description="Copies every question from one of your other forms onto the end of this one."
+            confirmLabel="Import"
+            busy={pending}
+            onConfirm={() => {
+              if (!importFrom) return;
+              setImporting(false);
+              structural(() => importQuestions(formId, importFrom));
+            }}
+            onClose={() => setImporting(false)}
+          >
+            <label className="ff-auth__field">
+              <span className="ff-auth__label">From</span>
+              <select
+                className="ff-auth__input"
+                value={importFrom}
+                onChange={(e) => setImportFrom(e.target.value)}
+              >
+                {importSources.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.title} ({f.questions === 1 ? "1 question" : `${f.questions} questions`})
+                  </option>
+                ))}
+              </select>
+            </label>
+          </ConfirmDialog>
+        </div>
+      </div>
 
-      <div className="ff-row__buttons">
+      {/* Forms' floating toolbar: add, duplicate the open card, import. Sticky,
+          so it stays beside whatever the organizer is working on. */}
+      <div className="ff-fbtools" ref={toolbarRef} role="toolbar" aria-label="Question tools">
         <button
-          className="ff-btn ff-btn--outline ff-btn--sm"
           type="button"
+          className="ff-gq__icon"
+          aria-label="Add question"
+          title="Add question"
           disabled={pending || list.length >= MAX_QUESTIONS}
           onClick={() => add(NEW_QUESTION, activeId ?? undefined)}
         >
-          + Add Question
+          <PlusIcon />
+        </button>
+        <button
+          type="button"
+          className="ff-gq__icon"
+          aria-label="Duplicate the open question"
+          title={active ? "Duplicate question" : "Open a question to duplicate it"}
+          disabled={pending || !active || list.length >= MAX_QUESTIONS}
+          onClick={() => {
+            const draft = activeDraft.current;
+            if (active && draft && !draftProblem(draft)) add(toInput(draft), active.id);
+          }}
+        >
+          <CopyIcon />
+        </button>
+        <button
+          type="button"
+          className="ff-gq__icon"
+          aria-label="Import questions from another form"
+          title={importSources.length ? "Import questions" : "No other forms with questions"}
+          disabled={pending || !importSources.length}
+          onClick={() => setImporting(true)}
+        >
+          <ImportIcon />
         </button>
       </div>
-
-      {/* Inside the list, so clicking in the dialog doesn't count as "outside". */}
-      <ConfirmDialog
-        open={deleting !== null}
-        title="Delete This Question?"
-        description="Every answer already given to it is deleted too."
-        confirmLabel="Delete"
-        danger
-        busy={pending}
-        onConfirm={() => {
-          const target = deleting;
-          setDeleting(null);
-          if (!target) return;
-          structural(
-            () => removeQuestion(formId, target.id),
-            () => setActiveId(null),
-          );
-        }}
-        onClose={() => setDeleting(null)}
-      />
     </div>
   );
 }
@@ -265,6 +347,7 @@ function ActiveQuestion({
   last,
   busy,
   autoFocus,
+  draftSink,
   onSaved,
   onMove,
   onDuplicate,
@@ -276,6 +359,7 @@ function ActiveQuestion({
   last: boolean;
   busy: boolean;
   autoFocus: boolean;
+  draftSink: { current: Draft | null };
   onSaved: (next: FormItem) => void;
   onMove: (direction: "up" | "down") => void;
   onDuplicate: (draft: Draft) => void;
@@ -299,6 +383,17 @@ function ActiveQuestion({
   // debounce timer and the on-close flush without stale closures.
   const latest = useRef(draft);
   latest.current = draft;
+  // Publish the live draft for the toolbar's Duplicate. In an effect, paired
+  // with its own cleanup, so a dev StrictMode remount (cleanup without a
+  // re-render) can't leave the sink empty.
+  useEffect(() => {
+    draftSink.current = draft;
+    return () => {
+      draftSink.current = null;
+    };
+  });
+  // Forms keeps the description out of the way until it's wanted.
+  const [showHelp, setShowHelp] = useState(Boolean(item.help));
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -417,14 +512,17 @@ function ActiveQuestion({
           ))}
         </select>
       </div>
-      <input
-        className="ff-gq__input ff-gq__input--help"
-        value={draft.help}
-        maxLength={HELP_MAX}
-        placeholder="Description (optional)"
-        aria-label="Description"
-        onChange={(e) => change({ help: e.target.value })}
-      />
+      {showHelp ? (
+        <input
+          className="ff-gq__input ff-gq__input--help"
+          value={draft.help}
+          maxLength={HELP_MAX}
+          placeholder="Description"
+          aria-label="Description"
+          autoFocus={!item.help}
+          onChange={(e) => change({ help: e.target.value })}
+        />
+      ) : null}
 
       {choice ? (
         <ul className="ff-gq__options">
@@ -473,7 +571,10 @@ function ActiveQuestion({
           ))}
           {draft.options.length < MAX_OPTIONS ? (
             <li className="ff-gq__option">
-              <span className={`ff-gq__glyph${box ? " ff-gq__glyph--box" : ""}`} aria-hidden="true" />
+              <span
+                className={`ff-gq__glyph ff-gq__glyph--add${box ? " ff-gq__glyph--box" : ""}`}
+                aria-hidden="true"
+              />
               <button
                 type="button"
                 className="ff-gq__add"
@@ -489,6 +590,11 @@ function ActiveQuestion({
       )}
 
       <div className="ff-gq__foot">
+        {!showHelp ? (
+          <button type="button" className="ff-gq__add ff-gq__foot-add" onClick={() => setShowHelp(true)}>
+            + Description
+          </button>
+        ) : null}
         <span className={`ff-gq__status${problem ? " ff-gq__status--error" : ""}`} role="status">
           {problem ?? (status === "saving" ? "Saving…" : status === "saved" ? "Saved" : "")}
         </span>
@@ -575,6 +681,22 @@ function CloseIcon() {
   return (
     <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
       <path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <path d="M8 3v10M3 8h10" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ImportIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+      <path d="M8 10V2.5M5 5.5l3-3 3 3M2.5 10.5v2a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
